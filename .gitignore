@@ -1,0 +1,61 @@
+# --- General ---
+node_modules/
+dist/
+build/
+.env
+.env.*
+*.log
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vscode/
+.idea/
+coverage/
+tmp/
+temp/
+.cache/
+*.local
+*.pid
+*.seed
+*.tgz
+*.bak
+*.swp
+*.swo
+
+# --- TypeScript ---
+*.tsbuildinfo
+
+# --- Prisma ---
+apps/backend/prisma/migrations/
+!apps/backend/prisma/schema.prisma
+
+# --- Next.js ---
+apps/frontend/.next/
+apps/frontend/out/
+apps/frontend/.vercel/
+
+# --- Turborepo or PNPM Workspaces ---
+turbo/
+.pnpm-store/
+.cache/
+
+# --- Docker ---
+*.env.docker
+docker-compose.override.yml
+**/postgres-data/
+**/redis-data/
+
+# --- OS Files ---
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# --- Logs and Uploads ---
+uploads/
+*.zip
+
+# --- AWS/S3 Credentials ---
+.aws/
+aws-credentials.json
