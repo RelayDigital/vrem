@@ -56,6 +56,6 @@ desktop.ini
 uploads/
 *.zip
 
-# --- AWS/S3 Credentials ---
+# --- AWS/S3 Credentials (if any) ---
 .aws/
 aws-credentials.json
