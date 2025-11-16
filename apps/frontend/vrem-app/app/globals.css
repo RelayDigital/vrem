@@ -1,0 +1,178 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Additional VX Media styles */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.5rem;
+  
+  /* Uber-inspired Color Scheme */
+  /* Main colors - Clean whites and blacks */
+  --background: oklch(0.99 0 0);              /* Off-white background */
+  --foreground: oklch(0.15 0 0);              /* Near-black text */
+  
+  /* Card colors */
+  --card: oklch(1 0 0);                       /* Pure white cards */
+  --card-foreground: oklch(0.15 0 0);         /* Near-black text */
+  
+  /* Popover colors */
+  --popover: oklch(1 0 0);                    /* White popover */
+  --popover-foreground: oklch(0.15 0 0);      /* Black text */
+  
+  /* Primary - Uber Black */
+  --primary: oklch(0.15 0 0);                 /* Uber black */
+  --primary-foreground: oklch(0.99 0 0);      /* White text on black */
+  
+  /* Secondary - Light gray */
+  --secondary: oklch(0.95 0 0);               /* Very light gray */
+  --secondary-foreground: oklch(0.15 0 0);    /* Black text */
+  
+  /* Muted - Subtle gray */
+  --muted: oklch(0.96 0 0);                   /* Muted gray background */
+  --muted-foreground: oklch(0.45 0 0);        /* Medium gray text */
+  
+  /* Accent - Subtle accent */
+  --accent: oklch(0.94 0 0);                  /* Light gray accent */
+  --accent-foreground: oklch(0.15 0 0);       /* Black text */
+  
+  /* Destructive - Red for errors */
+  --destructive: oklch(0.55 0.22 25);         /* Red */
+  
+  /* Borders and inputs */
+  --border: oklch(0.89 0 0);                  /* Light gray border */
+  --input: oklch(0.89 0 0);                   /* Input border */
+  --ring: oklch(0.15 0 0);                    /* Black focus ring */
+  
+  /* Charts - Grayscale with subtle colors */
+  --chart-1: oklch(0.35 0 0);                 /* Dark gray */
+  --chart-2: oklch(0.55 0 0);                 /* Medium gray */
+  --chart-3: oklch(0.75 0 0);                 /* Light gray */
+  --chart-4: oklch(0.50 0.15 142);            /* Subtle green accent */
+  --chart-5: oklch(0.45 0.12 264);            /* Subtle blue accent */
+  
+  /* Sidebar */
+  --sidebar: oklch(1 0 0);                    /* White sidebar */
+  --sidebar-foreground: oklch(0.15 0 0);      /* Black text */
+  --sidebar-primary: oklch(0.15 0 0);         /* Black */
+  --sidebar-primary-foreground: oklch(0.99 0 0); /* White */
+  --sidebar-accent: oklch(0.96 0 0);          /* Light gray accent */
+  --sidebar-accent-foreground: oklch(0.15 0 0); /* Black text */
+  --sidebar-border: oklch(0.92 0 0);          /* Light border */
+  --sidebar-ring: oklch(0.15 0 0);            /* Black ring */
+}
+
+.dark {
+  /* Uber Dark Mode - Deep black with white accents */
+  --background: oklch(0.12 0 0);              /* Deep black background */
+  --foreground: oklch(0.98 0 0);              /* White text */
+  
+  /* Card colors */
+  --card: oklch(0.18 0 0);                    /* Dark gray cards */
+  --card-foreground: oklch(0.98 0 0);         /* White text */
+  
+  /* Popover colors */
+  --popover: oklch(0.18 0 0);                 /* Dark popover */
+  --popover-foreground: oklch(0.98 0 0);      /* White text */
+  
+  /* Primary - White on dark */
+  --primary: oklch(0.98 0 0);                 /* White primary */
+  --primary-foreground: oklch(0.12 0 0);      /* Black text on white */
+  
+  /* Secondary - Darker gray */
+  --secondary: oklch(0.22 0 0);               /* Dark gray */
+  --secondary-foreground: oklch(0.98 0 0);    /* White text */
+  
+  /* Muted - Medium dark gray */
+  --muted: oklch(0.25 0 0);                   /* Muted dark gray */
+  --muted-foreground: oklch(0.65 0 0);        /* Light gray text */
+  
+  /* Accent - Slightly lighter gray */
+  --accent: oklch(0.28 0 0);                  /* Accent gray */
+  --accent-foreground: oklch(0.98 0 0);       /* White text */
+  
+  /* Destructive - Brighter red for dark mode */
+  --destructive: oklch(0.65 0.25 25);         /* Brighter red */
+  
+  /* Borders and inputs */
+  --border: oklch(0.30 0 0);                  /* Dark border */
+  --input: oklch(0.30 0 0);                   /* Dark input border */
+  --ring: oklch(0.98 0 0);                    /* White focus ring */
+  
+  /* Charts - Lighter for dark mode */
+  --chart-1: oklch(0.75 0 0);                 /* Light gray */
+  --chart-2: oklch(0.60 0 0);                 /* Medium gray */
+  --chart-3: oklch(0.45 0 0);                 /* Dark gray */
+  --chart-4: oklch(0.65 0.18 142);            /* Green accent */
+  --chart-5: oklch(0.60 0.15 264);            /* Blue accent */
+  
+  /* Sidebar */
+  --sidebar: oklch(0.15 0 0);                 /* Very dark sidebar */
+  --sidebar-foreground: oklch(0.98 0 0);      /* White text */
+  --sidebar-primary: oklch(0.98 0 0);         /* White */
+  --sidebar-primary-foreground: oklch(0.12 0 0); /* Black */
+  --sidebar-accent: oklch(0.25 0 0);          /* Dark accent */
+  --sidebar-accent-foreground: oklch(0.98 0 0); /* White text */
+  --sidebar-border: oklch(0.28 0 0);          /* Dark border */
+  --sidebar-ring: oklch(0.98 0 0);            /* White ring */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom utility classes */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
