@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectStatus, Role } from '@prisma/client';
+import { CreateProjectDto } from './dto/create-project.dto';
+import { AssignProjectDto } from './dto/assign-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 
 @Injectable()
 export class ProjectsService {
@@ -48,22 +51,29 @@ export class ProjectsService {
   }
 
   // Create project (PM or Agent booking)
-  create(data: any) {
+  async create(dto: CreateProjectDto) {
     return this.prisma.project.create({
-      data,
+      data: {
+        agentId: dto.agentId,
+        address: dto.address,
+        notes: dto.notes,
+        scheduledTime: new Date(dto.scheduledTime),
+      }
     });
   }
 
+
   // Assign Technician + Editor
-  assign(projectId: string, techId?: string, editorId?: string) {
+  async assign(projectId: string, dto: AssignProjectDto) {
     return this.prisma.project.update({
       where: { id: projectId },
       data: {
-        technicianId: techId,
-        editorId: editorId,
-      },
+        technicianId: dto.technicianId,
+        editorId: dto.editorId,
+      }
     });
   }
+
 
   // Update status (pipeline movement)
   updateStatus(projectId: string, status: ProjectStatus) {
@@ -86,4 +96,43 @@ export class ProjectsService {
       },
     });
   }
+
+  async findOneForUser(id: string, userId: string, role: Role) {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      include: {
+        agent: true,
+        technician: true,
+        editor: true,
+        mediaItems: true,
+        messages: true,
+      }
+    });
+
+    if (!project) return null;
+
+    if (role === 'ADMIN' || role === 'PROJECT_MANAGER') return project;
+
+    if (role === 'AGENT' && project.agentId !== userId) return null;
+    if (role === 'TECHNICIAN' && project.technicianId !== userId) return null;
+    if (role === 'EDITOR' && project.editorId !== userId) return null;
+
+    return project;
+  }
+
+  async update(id: string, dto: UpdateProjectDto) {
+  return this.prisma.project.update({
+    where: { id },
+    data: { 
+      ...dto,
+      scheduledTime: dto.scheduledTime ? new Date(dto.scheduledTime) : undefined
+    }
+  });
+}
+
+async remove(id: string) {
+  return this.prisma.project.delete({ where: { id }});
+}
+
+  
 }
