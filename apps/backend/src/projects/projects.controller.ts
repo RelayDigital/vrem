@@ -7,6 +7,7 @@ import { Role, ProjectStatus } from '@prisma/client';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { AssignProjectDto } from './dto/assign-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { CreateMessageDto } from './dto/create-message.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
 
 @Controller('projects')
@@ -30,10 +31,46 @@ export class ProjectsController {
   @Roles(Role.TECHNICIAN, Role.EDITOR, Role.PROJECT_MANAGER, Role.ADMIN)
   updateStatus(
     @Param('id') id: string,
-    @Body('status') status: ProjectStatus
+    @Body('status') status: ProjectStatus,
+    @CurrentUser() user: any
   ) {
-    return this.projectsService.updateStatus(id, status);
+    return this.projectsService.updateStatus(id, status, user);
   }
+
+  // GET messages for a project
+  @Get(':id/messages')
+  @Roles(
+    Role.AGENT,
+    Role.TECHNICIAN,
+    Role.EDITOR,
+    Role.PROJECT_MANAGER,
+    Role.ADMIN
+  )
+  getMessages(
+    @Param('id') id: string,
+    @CurrentUser() user: any
+  ) {
+    return this.projectsService.getMessages(id, user);
+  }
+
+
+  // POST a new message
+  @Post(':id/messages')
+  @Roles(
+    Role.AGENT,
+    Role.TECHNICIAN,
+    Role.EDITOR,
+    Role.PROJECT_MANAGER,
+    Role.ADMIN
+  )
+  addMessage(
+    @Param('id') id: string,
+    @Body() dto: CreateMessageDto,
+    @CurrentUser() user: any
+  ) {
+    return this.projectsService.addMessage(id, dto, user);
+  }
+
 
   @Post()
   @Roles(Role.AGENT, Role.PROJECT_MANAGER)
