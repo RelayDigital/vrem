@@ -9,21 +9,15 @@ A modern, AI-powered photography booking and dispatch platform built with Next.j
 npm install
 ```
 
-### 2. Configure Google Maps API (Required for Address Search)
+### 2. Configure Mapbox (Required for Maps)
 
-The application uses Google Maps for real-time address autocomplete.
+The application uses Mapbox GL JS for map visualization and location services.
 
-1. Get a Google Maps API key from [Google Cloud Console](https://console.cloud.google.com/)
-2. Enable these APIs:
-   - Maps JavaScript API
-   - Places API
-   - Geocoding API
-3. Create a `.env.local` file in the root:
+1. Get a Mapbox access token from [Mapbox Account](https://account.mapbox.com/)
+2. Create a `.env.local` file in the root:
    ```env
-   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_api_key_here
+   NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_access_token
    ```
-
-See [GOOGLE_MAPS_SETUP.md](./GOOGLE_MAPS_SETUP.md) for detailed instructions.
 
 ### 3. Run Development Server
 ```bash
@@ -58,9 +52,12 @@ vrem-app/
 │   │
 │   ├── shared/            # Reusable components
 │   │   ├── jobs/         # Job cards & forms
+│   │   ├── tasks/        # Job task management
 │   │   ├── search/       # Address search & filters
+│   │   ├── map/          # Map visualization
 │   │   ├── metrics/      # Analytics components
-│   │   └── map/          # Map visualization
+│   │   ├── kanban/       # Kanban board
+│   │   └── chat/         # Job chat functionality
 │   │
 │   ├── ui/               # shadcn/ui design system
 │   └── common/           # Common utilities
@@ -79,19 +76,23 @@ vrem-app/
 ### For Agents
 - **Smart Booking Flow**: Multi-step wizard for booking photo shoots
 - **Job Management**: View and track all your bookings
-- **Google Address Search**: Real-time address autocomplete (USA & Canada)
+- **Address Search**: Real-time address autocomplete (USA & Canada)
 - **AI Photographer Matching**: Automatic ranking based on multiple factors
+- **Job Chat**: Communicate with dispatchers and photographers
 
 ### For Dispatchers
 - **Intelligent Dashboard**: Overview of all jobs and metrics
 - **AI-Powered Assignment**: Rank photographers by availability, proximity, skills
-- **Live Map View**: Visualize jobs and photographer locations
+- **Live Map View**: Visualize jobs and photographer locations on interactive maps
 - **Audit Logging**: Complete activity tracking
-- **Team Management**: Manage photographer network
+- **Team Management**: Manage photographer network and preferred vendors
+- **Kanban Board**: Visual job management with drag-and-drop
+- **Metrics Dashboard**: Track KPIs and analytics
 
 ### For Photographers
 - **Job Dashboard**: View upcoming and completed shoots
-- **Profile Management**: Update services and availability
+- **Task Management**: Rich text editor for job notes and communication
+- **Profile Management**: Update services, availability, and portfolio
 - **Company Applications**: Apply to join media companies
 - **Performance Tracking**: See your ratings and reliability scores
 
@@ -122,7 +123,7 @@ See `lib/ranking.ts` for implementation details.
 - **UI Components**: shadcn/ui (Radix UI + Tailwind CSS)
 - **Styling**: Tailwind CSS v4
 - **Animations**: Framer Motion
-- **Maps**: Google Maps JavaScript API
+- **Maps**: Mapbox GL JS
 - **Charts**: Recharts
 - **Notifications**: Sonner
 - **TypeScript**: Full type safety
@@ -145,28 +146,11 @@ Switch between roles using the dropdown in the header.
 
 ## 📚 Documentation
 
-- [Google Maps Setup Guide](./GOOGLE_MAPS_SETUP.md)
 - [Component Structure](./components/README.md)
 
 ## 🔐 Environment Variables
 
 Required environment variables (create `.env.local`):
 ```env
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+NEXT_PUBLIC_MAPBOX_TOKEN=your_mapbox_access_token
 ```
-
-See `ENV_TEMPLATE.txt` for the template.
-
-## 🚢 Deployment
-
-The app can be deployed to any Next.js hosting provider:
-- Vercel (recommended)
-- Netlify
-- AWS Amplify
-- Self-hosted
-
-Make sure to add your environment variables to your hosting platform.
-
-## 📄 License
-
-Copyright © 2025 VX Media Operations
