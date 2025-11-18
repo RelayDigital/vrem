@@ -1,0 +1,622 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useIsMobile } from "../../ui/use-mobile";
+import { JobRequest, Photographer, PhotographerRanking } from "../../../types";
+import { MapView } from "../map";
+import { PhotographerCard } from "../../features/photographer/PhotographerCard";
+import { PhotographerCardMinimal } from "../../features/photographer/PhotographerCardMinimal";
+import { JobCard } from "../jobs/JobCard";
+import { Button } from "../../ui/button";
+import { ScrollArea } from "../../ui/scroll-area";
+import { Badge } from "../../ui/badge";
+import { Spinner } from "../../ui/spinner";
+import { H2, H3, Muted, Small } from "../../ui/typography";
+import {
+  MapPin,
+  ArrowLeft,
+  CheckCircle2,
+  TrendingUp,
+  Plus,
+  X,
+} from "lucide-react";
+import { Input } from "../../ui/input";
+import { Search } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../ui/select";
+import { Card, CardContent, CardHeader } from "../../ui/card";
+
+interface MapWithSidebarProps {
+  jobs: JobRequest[];
+  photographers: Photographer[];
+  selectedJob: JobRequest | null;
+  onSelectJob: (job: JobRequest) => void;
+  onNavigateToJobInProjectManagement?: (job: JobRequest) => void;
+  onJobAssign?: (jobId: string, photographerId: string, score: number) => void;
+  className?: string;
+  fullScreen?: boolean;
+  initialSidebarView?: SidebarView;
+  initialJobForRankings?: JobRequest | null;
+  onGoBack?: () => void;
+}
+
+type SidebarView = "pending" | "rankings";
+type PriorityFactor = "availability" | "distance" | "score";
+
+// Helper function to calculate distance
+function calculateDistanceLocal(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+export function MapWithSidebar({
+  jobs,
+  photographers,
+  selectedJob,
+  onSelectJob,
+  onNavigateToJobInProjectManagement,
+  onJobAssign,
+  className,
+  fullScreen = false,
+  initialSidebarView = "pending",
+  initialJobForRankings = null,
+  onGoBack,
+}: MapWithSidebarProps) {
+  const isMobile = useIsMobile();
+  const [sidebarView, setSidebarView] =
+    useState<SidebarView>(initialSidebarView);
+  const [jobForRankings, setJobForRankings] = useState<JobRequest | null>(
+    initialJobForRankings
+  );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [priorityOrder, setPriorityOrder] = useState<PriorityFactor[]>([
+    "availability",
+    "distance",
+    "score",
+  ]);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [selectedPhotographerId, setSelectedPhotographerId] = useState<
+    string | null
+  >(null);
+
+  const pendingJobs = jobs.filter((j) => j.status === "pending");
+
+  // Filter pending jobs based on search
+  const filteredPendingJobs = pendingJobs.filter((job) => {
+    if (!searchQuery) return true;
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      job.propertyAddress.toLowerCase().includes(searchLower) ||
+      job.clientName.toLowerCase().includes(searchLower) ||
+      job.scheduledDate.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const handleFindPhotographer = (job: JobRequest) => {
+    setSelectedPhotographerId(null); // Clear selected photographer
+    setJobForRankings(job);
+    setSidebarView("rankings");
+  };
+
+  const handleGoBack = () => {
+    if (onGoBack) {
+      onGoBack();
+    } else {
+      setSelectedPhotographerId(null); // Clear selected photographer
+      setSidebarView("pending");
+      setJobForRankings(null);
+    }
+  };
+
+  // Calculate ranked photographers when in rankings view
+  const rankedPhotographers = useMemo(() => {
+    if (!jobForRankings) return [];
+
+    const photographerScores = photographers
+      .filter((p) => p.status === "active")
+      .map((photographer) => {
+        const distanceKm = calculateDistanceLocal(
+          photographer.homeLocation.lat,
+          photographer.homeLocation.lng,
+          jobForRankings.location.lat,
+          jobForRankings.location.lng
+        );
+
+        // Check availability
+        const availability = photographer.availability.find(
+          (a) => a.date === jobForRankings.scheduledDate
+        );
+        const isAvailable = availability?.available || false;
+
+        // Calculate distance score (0-100)
+        let distanceScore = 0;
+        if (distanceKm <= 5) distanceScore = 100;
+        else if (distanceKm <= 15) distanceScore = 75;
+        else if (distanceKm <= 30) distanceScore = 50;
+        else if (distanceKm <= 50) distanceScore = 25;
+
+        // Calculate reliability score
+        const { onTimeRate, noShows, totalJobs } = photographer.reliability;
+        let reliabilityScore = 50;
+        if (totalJobs > 0) {
+          const noShowPenalty = (noShows / totalJobs) * 100;
+          reliabilityScore = Math.max(
+            0,
+            Math.min(100, onTimeRate * 100 - noShowPenalty)
+          );
+        }
+
+        // Calculate skill match score
+        const skillMap: Record<string, keyof Photographer["skills"]> = {
+          photo: "residential",
+          video: "video",
+          aerial: "aerial",
+          twilight: "twilight",
+        };
+        let totalSkillScore = 0;
+        let skillCount = 0;
+        for (const mediaType of jobForRankings.mediaType) {
+          const skillKey = skillMap[mediaType];
+          if (skillKey && photographer.skills[skillKey] !== undefined) {
+            totalSkillScore += photographer.skills[skillKey];
+            skillCount++;
+          }
+        }
+        const skillScore =
+          skillCount > 0 ? (totalSkillScore / skillCount) * 20 : 50;
+
+        // Calculate preferred relationship score
+        let preferredScore = 0;
+        if (
+          photographer.preferredClients.includes(jobForRankings.organizationId)
+        ) {
+          preferredScore = 100;
+        }
+
+        // Composite score
+        const overallScore =
+          (isAvailable ? 100 : 0) * 0.3 +
+          preferredScore * 0.25 +
+          reliabilityScore * 0.2 +
+          distanceScore * 0.15 +
+          skillScore * 0.1;
+
+        return {
+          photographer,
+          isAvailable,
+          distanceKm,
+          distanceScore,
+          reliabilityScore,
+          skillScore,
+          preferredScore,
+          overallScore,
+        };
+      });
+
+    // Sort based on priority order
+    const sorted = [...photographerScores].sort((a, b) => {
+      for (const priority of priorityOrder) {
+        let comparison = 0;
+
+        if (priority === "availability") {
+          comparison = (b.isAvailable ? 1 : 0) - (a.isAvailable ? 1 : 0);
+        } else if (priority === "distance") {
+          // Round to 1 decimal place for comparison
+          const distanceA = Math.round(a.distanceKm * 10) / 10;
+          const distanceB = Math.round(b.distanceKm * 10) / 10;
+          comparison = distanceA - distanceB;
+        } else if (priority === "score") {
+          // Round to whole number for comparison
+          const scoreA = Math.round(a.overallScore);
+          const scoreB = Math.round(b.overallScore);
+          comparison = scoreB - scoreA;
+        }
+
+        if (comparison !== 0) return comparison;
+      }
+      return 0;
+    });
+
+    return sorted.map((item, index) => ({
+      photographer: item.photographer,
+      score: item.overallScore,
+      factors: {
+        availability: item.isAvailable ? 100 : 0,
+        distance: item.distanceScore,
+        distanceKm: item.distanceKm,
+        reliability: item.reliabilityScore,
+        skillMatch: item.skillScore,
+        preferredRelationship: item.preferredScore,
+      },
+      recommended: index === 0 && item.isAvailable && item.overallScore >= 60,
+      rank: index + 1,
+    })) as (PhotographerRanking & { rank: number })[];
+  }, [jobForRankings, photographers, priorityOrder]);
+
+  const handleAssign = async (photographerId: string, score: number) => {
+    setAssigningId(photographerId);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (jobForRankings && onJobAssign) {
+        onJobAssign(jobForRankings.id, photographerId, score);
+        handleGoBack();
+      }
+    } catch (error) {
+      console.error("Failed to assign photographer:", error);
+    } finally {
+      setAssigningId(null);
+    }
+  };
+
+  const handlePriorityChange = (index: number, newPriority: PriorityFactor) => {
+    const newOrder = [...priorityOrder];
+    const currentIndex = newOrder.indexOf(newPriority);
+
+    if (currentIndex !== -1 && currentIndex !== index) {
+      const oldPriority = newOrder[index];
+      newOrder[index] = newPriority;
+      newOrder[currentIndex] = oldPriority;
+    } else {
+      newOrder[index] = newPriority;
+    }
+
+    setPriorityOrder(newOrder);
+  };
+
+  const handleAddPriority = () => {
+    if (priorityOrder.length >= 3) return;
+    const allPriorities: PriorityFactor[] = [
+      "availability",
+      "distance",
+      "score",
+    ];
+    const availablePriority = allPriorities.find(
+      (p) => !priorityOrder.includes(p)
+    );
+    if (availablePriority) {
+      setPriorityOrder([...priorityOrder, availablePriority]);
+    }
+  };
+
+  const handleRemovePriority = (index: number) => {
+    if (priorityOrder.length <= 1) return;
+    const newOrder = [...priorityOrder];
+    newOrder.splice(index, 1);
+    setPriorityOrder(newOrder);
+  };
+
+  // Determine what to show on map based on sidebar view
+  const mapJobs =
+    sidebarView === "rankings" && jobForRankings ? [jobForRankings] : jobs;
+  const mapPhotographers =
+    sidebarView === "rankings" && jobForRankings
+      ? rankedPhotographers.map((r) => r.photographer)
+      : photographers;
+
+  // Create a Map of photographer rankings for MapView
+  const photographerRankingsMap = useMemo(() => {
+    if (sidebarView !== "rankings" || !jobForRankings) return undefined;
+    const map = new Map<
+      string,
+      {
+        ranking: PhotographerRanking["factors"];
+        score: number;
+        recommended: boolean;
+      }
+    >();
+    rankedPhotographers.forEach((r) => {
+      map.set(r.photographer.id, {
+        ranking: r.factors,
+        score: r.score,
+        recommended: r.recommended,
+      });
+    });
+    return map;
+  }, [sidebarView, jobForRankings, rankedPhotographers]);
+
+  const mapContent = (
+    <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 h-full w-full">
+      {/* Map - takes most of the space on desktop, small on mobile */}
+      <div className="flex-1 md:flex-1 relative h-[200px] md:h-full min-h-0">
+        <MapView
+          jobs={mapJobs}
+          photographers={mapPhotographers}
+          selectedJob={
+            sidebarView === "rankings" ? jobForRankings : selectedJob
+          }
+          selectedPhotographer={
+            sidebarView === "rankings" && selectedPhotographerId
+              ? mapPhotographers.find((p) => p.id === selectedPhotographerId) ||
+                null
+              : null
+          }
+          disablePopovers={isMobile}
+        />
+      </div>
+
+      {/* Sidebar - bottom on mobile, right on desktop */}
+      <Card className="relative w-full md:min-w-[400px] md:max-w-[30%] bg-background md:border-l border-t md:border-t-0 border-border flex flex-col shrink-0 rounded-none p-0! border-x-0! border-b-0! gap-0 flex-1 min-h-0 h-full overflow-hidden">
+        {sidebarView === "pending" ? (
+          <>
+            {/* Pending Assignments Header */}
+            <CardHeader className="p-4 border-b border-border space-y-3 gap-0!">
+              <div className="flex items-center justify-between">
+                <div>
+                  <H3 className="text-lg border-0">Pending Assignments</H3>
+                  <Muted className="text-xs">
+                    {pendingJobs.length}{" "}
+                    {pendingJobs.length === 1 ? "job" : "jobs"}
+                  </Muted>
+                </div>
+                <Badge
+                  variant="outline"
+                  className="text-orange-600 border-orange-200"
+                >
+                  {pendingJobs.length}
+                </Badge>
+              </div>
+
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by address, client name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9"
+                />
+              </div>
+            </CardHeader>
+
+             {/* Pending Jobs List - Vertical Scroll */}
+             <CardContent className="relative flex-1 p-0! min-h-0 overflow-hidden flex flex-col w-full min-w-0 max-w-full">
+                 <ScrollArea className="h-full w-full min-w-0 max-w-full overflow-x-hidden">
+                   <div className="p-4 space-y-3 min-w-0 w-full max-w-full box-border">
+                     {filteredPendingJobs.length === 0 ? (
+                       <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                         <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
+                         <H3 className="text-lg mb-2">All caught up!</H3>
+                         <Muted>No pending assignments</Muted>
+                       </div>
+                     ) : (
+                       filteredPendingJobs.map((job) => (
+                         <div key={job.id} className="w-full min-w-0 max-w-full box-border">
+                           <JobCard
+                             job={job}
+                             onViewRankings={() => handleFindPhotographer(job)}
+                             onClick={() => onSelectJob(job)}
+                             onViewInProjectManagement={
+                               onNavigateToJobInProjectManagement
+                                 ? () => onNavigateToJobInProjectManagement(job)
+                                 : undefined
+                             }
+                             selected={selectedJob?.id === job.id}
+                           />
+                         </div>
+                       ))
+                     )}
+                   </div>
+                 </ScrollArea>
+             </CardContent>
+          </>
+        ) : (
+          <>
+            {/* Ranked Photographers Header */}
+            <CardHeader className="p-4! border-b border-border space-y-3 gap-0!">
+              <div className="flex items-center gap-2 mb-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleGoBack}
+                  className="h-8 w-8"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <H3 className="text-lg border-0">Ranked Photographers</H3>
+              </div>
+              {jobForRankings && (
+                <Muted className="text-xs mb-2">
+                  {jobForRankings.propertyAddress}
+                </Muted>
+              )}
+              <div>
+                <Muted className="text-xs">
+                  {rankedPhotographers.length} available
+                </Muted>
+              </div>
+            </CardHeader>
+
+            {/* Ranked Photographers Content */}
+            <CardContent className="relative flex-1 p-0! min-h-0 overflow-hidden flex flex-col">
+              {jobForRankings && (
+                <div className="flex-1 min-h-0">
+                  <ScrollArea
+                    key={`photographer-list-${jobForRankings?.id || "none"}`}
+                    className="h-full"
+                  >
+                    <div className="space-y-0">
+                      {/* Priority Controls */}
+                      <div className="bg-background border-b p-4">
+                        <div className="space-y-3">
+                          {/* Priority Controls */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Small className="text-xs font-semibold text-muted-foreground">
+                                Sort Priority
+                              </Small>
+                              {priorityOrder.length < 3 && (
+                                <button
+                                  onClick={handleAddPriority}
+                                  className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                                  type="button"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Add
+                                </button>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              {priorityOrder.map((priority, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center gap-2"
+                                >
+                                  <div className="flex items-center justify-center rounded bg-muted text-xs font-semibold w-6 h-6">
+                                    {index + 1}
+                                  </div>
+                                  <Select
+                                    value={priority}
+                                    onValueChange={(value) =>
+                                      handlePriorityChange(
+                                        index,
+                                        value as PriorityFactor
+                                      )
+                                    }
+                                  >
+                                    <SelectTrigger className="text-xs flex-1 h-8">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="availability">
+                                        <div className="flex items-center gap-2">
+                                          <CheckCircle2 className="h-3 w-3" />
+                                          Availability
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="distance">
+                                        <div className="flex items-center gap-2">
+                                          <MapPin className="h-3 w-3" />
+                                          Distance
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="score">
+                                        <div className="flex items-center gap-2">
+                                          <TrendingUp className="h-3 w-3" />
+                                          Overall Score
+                                        </div>
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {priorityOrder.length > 1 && (
+                                    <button
+                                      onClick={() =>
+                                        handleRemovePriority(index)
+                                      }
+                                      className="flex items-center justify-center w-6 h-6 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                                      type="button"
+                                      aria-label="Remove priority"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Photographer List */}
+                      <div className="p-4 space-y-3">
+                        {rankedPhotographers.length === 0 ? (
+                          <div className="text-center py-8">
+                            <Muted>No photographers available</Muted>
+                          </div>
+                        ) : (
+                          rankedPhotographers.map((ranking) => {
+                            const isSelected =
+                              selectedPhotographerId ===
+                              ranking.photographer.id;
+                            const isAssigning =
+                              assigningId === ranking.photographer.id;
+
+                            return (
+                              <PhotographerCardMinimal
+                                key={ranking.photographer.id}
+                                photographer={ranking.photographer}
+                                ranking={ranking.factors}
+                                score={ranking.score}
+                                recommended={ranking.recommended}
+                                selected={isSelected}
+                                isAssigning={isAssigning}
+                                onClick={() =>
+                                  setSelectedPhotographerId(
+                                    ranking.photographer.id
+                                  )
+                                }
+                                onAssign={() =>
+                                  handleAssign(
+                                    ranking.photographer.id,
+                                    ranking.score
+                                  )
+                                }
+                              />
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </CardContent>
+          </>
+        )}
+      </Card>
+    </div>
+  );
+
+  if (fullScreen) {
+    return (
+      <div
+        className={`${
+          className || "h-full w-full"
+        } overflow-hidden flex flex-col h-full`}
+      >
+        {mapContent}
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 }}
+      className={className || "md:h-[600px] h-[90vh]"}
+    >
+      <Card className="relative h-full bg-card rounded-2xl border border-border shadow-sm overflow-hidden gap-0 flex flex-col">
+        <CardHeader className="p-4 border-b border-border shrink-0 gap-0">
+          <div className="flex size-full items-center gap-2">
+            <MapPin className="h-5 w-5 text-primary" />
+            <H2 className="text-lg border-0">Live Job Map</H2>
+          </div>
+        </CardHeader>
+
+        <CardContent className="flex-1 flex overflow-hidden p-0!">
+          {mapContent}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
