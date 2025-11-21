@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from '../../ui/table';
+import { ButtonGroup } from '@/components/ui/button-group';
 
 interface FilterOption {
   label: string;
@@ -228,9 +229,10 @@ export function PaginatedJobGrid<T>({
       {/* Search, Filter, and Sort Bar */}
       <div className="flex gap-3">
         <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 " />
           <Input
             type="text"
+            variant="muted"
             placeholder={searchPlaceholder}
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
@@ -239,7 +241,7 @@ export function PaginatedJobGrid<T>({
         </div>
         {filterOptions.length > 0 && (
           <Select value={selectedFilter} onValueChange={handleFilterChange}>
-            <SelectTrigger className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
+            <SelectTrigger variant="muted" className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
               <Filter className="h-4 w-4 md:mr-2" />
               <SelectValue placeholder="All Items" className="hidden md:inline" />
             </SelectTrigger>
@@ -254,9 +256,9 @@ export function PaginatedJobGrid<T>({
           </Select>
         )}
         <Select value={sortBy} onValueChange={handleSortChange}>
-          <SelectTrigger className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
+          <SelectTrigger variant="muted" className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
             <ArrowUpDown className="h-4 w-4 md:mr-2" />
-            <SelectValue placeholder="Sort by" className="hidden md:inline" />
+            <SelectValue placeholder="Sort" className="hidden md:inline" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="date-asc">Date (Earliest)</SelectItem>
@@ -267,9 +269,9 @@ export function PaginatedJobGrid<T>({
           </SelectContent>
         </Select>
         {/* View Toggle */}
-        <div className="flex items-center border rounded-md p-0.5 shrink-0">
+        <ButtonGroup className="flex items-center shrink-0">
           <Button
-            variant={viewMode === 'grid' ? 'default' : 'ghost'}
+            variant={viewMode === 'grid' ? 'default' : 'muted'}
             size="sm"
             onClick={() => setViewMode('grid')}
             className="h-8 w-8 p-0"
@@ -278,7 +280,7 @@ export function PaginatedJobGrid<T>({
             <LayoutGrid className="h-4 w-4" />
           </Button>
           <Button
-            variant={viewMode === 'list' ? 'default' : 'ghost'}
+            variant={viewMode === 'list' ? 'default' : 'muted'}
             size="sm"
             onClick={() => setViewMode('list')}
             className="h-8 w-8 p-0"
@@ -286,7 +288,7 @@ export function PaginatedJobGrid<T>({
           >
             <ListIcon className="h-4 w-4" />
           </Button>
-        </div>
+        </ButtonGroup>
       </div>
 
       {/* Results Count */}

@@ -27,7 +27,7 @@ interface AgentJobsViewProps {
 export function AgentJobsView({ jobs, photographers, organizationId, onNewJobClick }: AgentJobsViewProps) {
   // Filter jobs for this agent's organization
   const myJobs = jobs.filter((job) => job.organizationId === organizationId);
-  
+
   const pendingJobs = myJobs.filter((j) => j.status === 'pending');
   const assignedJobs = myJobs.filter((j) => j.status === 'assigned');
   const inProgressJobs = myJobs.filter((j) => j.status === 'in_progress');
@@ -212,8 +212,8 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
           <TabsContent value="all" className="mt-6">
             <PaginatedJobGrid
               items={myJobs}
-              searchPlaceholder="Search by address, client name..."
-              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate}`}
+              searchPlaceholder="Search by address, client, Order #..."
+              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`}
               filterOptions={[
                 { label: 'Urgent', value: 'urgent' },
                 { label: 'Rush', value: 'rush' },
@@ -242,8 +242,8 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
           <TabsContent value="pending" className="mt-6">
             <PaginatedJobGrid
               items={pendingJobs}
-              searchPlaceholder="Search by address, client name..."
-              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate}`}
+              searchPlaceholder="Search by address, client, Order #..."
+              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`}
               filterOptions={[
                 { label: 'Urgent', value: 'urgent' },
                 { label: 'Rush', value: 'rush' },
@@ -268,8 +268,8 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
           <TabsContent value="assigned" className="mt-6">
             <PaginatedJobGrid
               items={assignedJobs}
-              searchPlaceholder="Search by address, client name..."
-              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate}`}
+              searchPlaceholder="Search by address, client, Order #..."
+              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`}
               filterOptions={[
                 { label: 'Urgent', value: 'urgent' },
                 { label: 'Rush', value: 'rush' },
@@ -294,8 +294,8 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
           <TabsContent value="in_progress" className="mt-6">
             <PaginatedJobGrid
               items={inProgressJobs}
-              searchPlaceholder="Search by address, client name..."
-              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate}`}
+              searchPlaceholder="Search by address, client, Order #..."
+              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`}
               filterOptions={[
                 { label: 'Urgent', value: 'urgent' },
                 { label: 'Rush', value: 'rush' },
@@ -320,8 +320,8 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
           <TabsContent value="completed" className="mt-6">
             <PaginatedJobGrid
               items={completedJobs}
-              searchPlaceholder="Search by address, client name..."
-              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate}`}
+              searchPlaceholder="Search by address, client, Order #..."
+              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`}
               filterOptions={[
                 { label: 'Urgent', value: 'urgent' },
                 { label: 'Rush', value: 'rush' },

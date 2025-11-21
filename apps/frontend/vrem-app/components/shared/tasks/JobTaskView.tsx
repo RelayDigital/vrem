@@ -60,6 +60,12 @@ import {
   Code,
   Quote,
   Link as LinkIcon,
+  Image as ImageIcon,
+  File,
+  Box,
+  Upload,
+  Grid3x3,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ImageWithFallback } from "../../common";
@@ -89,6 +95,19 @@ import { ScrollArea } from "../../ui/scroll-area";
 import { useIsMobile } from "../../ui/use-mobile";
 import { cn } from "../../ui/utils";
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+} from "@dnd-kit/core";
+import { SiGoogledrive, SiDropbox } from "react-icons/si";
+
+import { FileUploaderRegular } from "@uploadcare/react-uploader/next";
+import "@uploadcare/react-uploader/core.css";
+import {
   Item,
   ItemActions,
   ItemContent,
@@ -96,6 +115,17 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "../../ui/accordion";
+import { Input } from "../../ui/input";
+import { ButtonGroup } from "../../ui/button-group";
+import { FaGoogleDrive, FaDropbox } from "react-icons/fa";
+import { DiOnedrive } from "react-icons/di";
 
 interface JobTaskViewProps {
   job: JobRequest | null;
@@ -139,7 +169,7 @@ export function JobTaskView({
   onFullScreen,
 }: JobTaskViewProps) {
   const [activeTab, setActiveTab] = useState<
-    "description" | "discussion" | "attachments"
+    "description" | "discussion" | "attachments" | "media"
   >("discussion");
   const [activeChatTab, setActiveChatTab] = useState<"client" | "team">("team");
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
@@ -147,6 +177,26 @@ export function JobTaskView({
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const [hasEditorContent, setHasEditorContent] = useState(false);
   const [hasEditEditorContent, setHasEditEditorContent] = useState(false);
+  const [uploadedMedia, setUploadedMedia] = useState<Array<{
+    id: string;
+    name: string;
+    type: "image" | "video" | "floor-plan" | "3d-content" | "file";
+    url: string;
+    thumbnail?: string;
+    size: number;
+    uploadedAt: Date;
+  }>>([]);
+  const [draggingCategory, setDraggingCategory] = useState<string | null>(null);
+  const [threeDUrl, setThreeDUrl] = useState<string>("");
+  const [cloudStorageDialog, setCloudStorageDialog] = useState<{
+    open: boolean;
+    service: string;
+  }>({ open: false, service: "" });
+  const [connectingService, setConnectingService] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const floorPlanInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -263,10 +313,10 @@ export function JobTaskView({
 
   const handleSend = useCallback(() => {
     if (!editor || !onSendMessage) return;
-    
+
     const htmlContent = editor.getHTML();
     const textContent = editor.getText().trim();
-    
+
     if (!textContent) return;
 
     onSendMessage(htmlContent, activeChatTab, replyingTo?.id);
@@ -325,10 +375,10 @@ export function JobTaskView({
 
   const handleSaveEdit = useCallback(() => {
     if (!editEditor || !editingMessageId || !onEditMessage) return;
-    
+
     const htmlContent = editEditor.getHTML();
     const textContent = editEditor.getText().trim();
-    
+
     if (!textContent) {
       setEditingMessageId(null);
       return;
@@ -422,44 +472,44 @@ export function JobTaskView({
       case "pending":
         return {
           label: "Pending",
-          bgColor: "bg-orange-100",
-          textColor: "text-orange-600",
-          indicatorColor: "bg-orange-500",
+          bgColor: "bg-status-pending",
+          textColor: "text-status-pending",
+          indicatorColor: "bg-status-pending",
         };
       case "assigned":
         return {
           label: "Assigned",
-          bgColor: "bg-primary/10",
-          textColor: "text-primary",
-          indicatorColor: "bg-primary",
+          bgColor: "bg-status-assigned",
+          textColor: "text-status-assigned",
+          indicatorColor: "bg-status-assigned",
         };
       case "in_progress":
         return {
           label: "In Progress",
-          bgColor: "bg-accent/10",
-          textColor: "text-accent",
-          indicatorColor: "bg-accent",
+          bgColor: "bg-status-in-progress",
+          textColor: "text-status-in-progress",
+          indicatorColor: "bg-status-in-progress",
         };
       case "editing":
         return {
           label: "Editing",
-          bgColor: "bg-orange-100",
-          textColor: "text-orange-600",
-          indicatorColor: "bg-orange-500",
+          bgColor: "bg-status-editing",
+          textColor: "text-status-editing",
+          indicatorColor: "bg-status-editing",
         };
       case "delivered":
         return {
           label: "Delivered",
-          bgColor: "bg-emerald-100",
-          textColor: "text-emerald-600",
-          indicatorColor: "bg-emerald-500",
+          bgColor: "bg-status-delivered",
+          textColor: "text-status-delivered",
+          indicatorColor: "bg-status-delivered",
         };
       case "cancelled":
         return {
           label: "Cancelled",
-          bgColor: "bg-muted",
-          textColor: "text-muted-foreground",
-          indicatorColor: "bg-muted-foreground",
+          bgColor: "bg-status-cancelled",
+          textColor: "text-status-cancelled",
+          indicatorColor: "bg-status-cancelled",
         };
       default:
         return {
@@ -489,6 +539,505 @@ export function JobTaskView({
     if (onStatusChange) {
       onStatusChange("delivered");
     }
+  };
+
+  // Media management functions
+  const getMediaTypeIcon = (type: "image" | "video" | "floor-plan" | "3d-content" | "file") => {
+    switch (type) {
+      case "image":
+        return <ImageIcon className="h-10 w-10 text-muted-foreground" />;
+      case "video":
+        return <Video className="h-10 w-10 text-muted-foreground" />;
+      case "floor-plan":
+        return <FileText className="h-10 w-10 text-muted-foreground" />;
+      case "3d-content":
+        return <Box className="h-10 w-10 text-muted-foreground" />;
+      default:
+        return <File className="h-10 w-10 text-muted-foreground" />;
+    }
+  };
+
+  const handleUploadcareSuccess = (info: any) => {
+    // info.allEntries is an array of OutputFileEntry
+    if (!info || !info.allEntries || info.allEntries.length === 0) return;
+
+    const newMediaItems = info.allEntries.map((entry: any) => ({
+      id: entry.uuid,
+      name: entry.name,
+      type: "image",
+      url: entry.cdnUrl,
+      size: entry.size,
+      uploadedAt: new Date(),
+    }));
+
+    setUploadedMedia((prev: any[]) => [...prev, ...newMediaItems]);
+  };
+
+  const handleFileUpload = (files: File[], category: "image" | "video" | "floor-plan" | "3d-content" | "file") => {
+    files.forEach((file) => {
+      const id = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+      const url = URL.createObjectURL(file);
+
+      const newMedia = {
+        id,
+        name: file.name,
+        type: category,
+        url,
+        size: file.size,
+        uploadedAt: new Date(),
+      };
+
+      setUploadedMedia((prev) => [...prev, newMedia]);
+    });
+  };
+
+  const getMediaByCategory = (category: "image" | "video" | "floor-plan" | "3d-content" | "file") => {
+    return uploadedMedia.filter((item) => item.type === category);
+  };
+
+  const getAcceptTypes = (category: "image" | "video" | "floor-plan" | "3d-content" | "file") => {
+    switch (category) {
+      case "image":
+        return "image/*";
+      case "video":
+        return "video/*";
+      case "floor-plan":
+        return "image/*";
+      case "3d-content":
+        return "";
+      default:
+        return "*";
+    }
+  };
+
+  const handleViewMedia = (item: {
+    id: string;
+    name: string;
+    type: "image" | "video" | "floor-plan" | "3d-content" | "file";
+    url: string;
+  }) => {
+    // Open media in new window or modal
+    window.open(item.url, "_blank");
+  };
+
+  const handleDeleteMedia = (id: string) => {
+    setUploadedMedia((prev) => {
+      const item = prev.find((m) => m.id === id);
+      if (item) {
+        // Only revoke object URLs (blob URLs), not regular URLs
+        if (item.url.startsWith("blob:")) {
+          URL.revokeObjectURL(item.url);
+        }
+      }
+      return prev.filter((m) => m.id !== id);
+    });
+  };
+
+  const handleUrlUpload = (url: string, category: "3d-content") => {
+    if (!url.trim()) return;
+
+    // Validate URL
+    try {
+      new URL(url);
+    } catch {
+      // Invalid URL, could show error message here
+      return;
+    }
+
+    const id = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+    const urlParts = url.split("/");
+    const fileName = urlParts[urlParts.length - 1] || "3D Model";
+
+    const newMedia = {
+      id,
+      name: fileName,
+      type: category,
+      url,
+      size: 0,
+      uploadedAt: new Date(),
+    };
+
+    setUploadedMedia((prev) => [...prev, newMedia]);
+    setThreeDUrl("");
+  };
+
+  const handleCloudStorage = (service: "google-drive" | "dropbox" | "onedrive", category: "image" | "video" | "floor-plan" | "file") => {
+    // This would integrate with the respective cloud storage APIs
+    // For now, we'll show a placeholder implementation
+    console.log(`Opening ${service} file picker for ${category}`);
+
+    // In a real implementation, you would:
+    // 1. Initialize the cloud storage SDK (e.g., Google Drive API, Dropbox API, OneDrive API)
+    // 2. Open a file picker dialog
+    // 3. Handle the selected files
+    // 4. Download/import the files and add them to uploadedMedia
+
+    // Example placeholder:
+    // if (service === "google-drive") {
+    //   // Use Google Drive Picker API
+    //   window.gapi.load('picker', () => {
+    //     const picker = new google.picker.PickerBuilder()
+    //       .setOAuthToken(accessToken)
+    //       .addView(google.picker.ViewId.DOCS)
+    //       .setCallback((data) => {
+    //         if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) {
+    //           // Handle selected files
+    //         }
+    //       })
+    //       .build();
+    //     picker.setVisible(true);
+    //   });
+    // }
+
+    // Show alert dialog instead of browser alert
+    const serviceName = service.replace("-", " ").replace(/\b\w/g, l => l.toUpperCase());
+    setConnectingService(service);
+    // Simulate a delay to show the spinner
+    setTimeout(() => {
+      setCloudStorageDialog({ open: true, service: serviceName });
+    }, 500);
+  };
+
+  const renderMediaCategory = (
+    category: "image" | "video" | "floor-plan" | "3d-content" | "file",
+    inputRef: React.RefObject<HTMLInputElement | null>
+  ) => {
+    const categoryMedia = getMediaByCategory(category);
+    const isDragging = draggingCategory === category;
+    const categoryName = category === "floor-plan" ? "Floor Plans" : category === "3d-content" ? "3D Content" : category.charAt(0).toUpperCase() + category.slice(1) + "s";
+
+    // Special handling for 3D Content (URL input)
+    if (category === "3d-content") {
+      return (
+        <div className="py-4 space-y-4">
+          {categoryMedia.length === 0 ? (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="url"
+                    placeholder="Enter 3D model URL (e.g., https://example.com/model.glb)"
+                    value={threeDUrl}
+                    onChange={(e) => setThreeDUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleUrlUpload(threeDUrl, "3d-content");
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={() => handleUrlUpload(threeDUrl, "3d-content")}
+                    disabled={!threeDUrl.trim()}
+                  >
+                    <Link className="h-4 w-4 mr-2" />
+                    Add URL
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Enter a URL to a 3D model file (GLB, GLTF, OBJ, FBX, etc.)
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-foreground">
+                  {categoryMedia.length} {categoryMedia.length === 1 ? "item" : "items"}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="url"
+                    placeholder="Enter 3D model URL"
+                    value={threeDUrl}
+                    onChange={(e) => setThreeDUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleUrlUpload(threeDUrl, "3d-content");
+                      }
+                    }}
+                    className="w-[300px]"
+                  />
+                  <Button
+                    onClick={() => handleUrlUpload(threeDUrl, "3d-content")}
+                    disabled={!threeDUrl.trim()}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Link className="h-4 w-4 mr-2" />
+                    Add URL
+                  </Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {categoryMedia.map((item) => (
+                  <div
+                    key={item.id}
+                    className="group relative aspect-square rounded-lg border border-border overflow-hidden bg-muted hover:border-primary transition-colors"
+                  >
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-muted p-4">
+                      {getMediaTypeIcon(item.type)}
+                      <p className="text-xs text-muted-foreground mt-2 text-center line-clamp-2">
+                        {item.name}
+                      </p>
+                    </div>
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 bg-background/90 hover:bg-background"
+                          onClick={() => handleViewMedia(item)}
+                        >
+                          <Maximize2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 bg-background/90 hover:bg-background hover:text-destructive"
+                          onClick={() => handleDeleteMedia(item.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                      <p className="text-xs text-white truncate">{item.name}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (categoryMedia.length === 0) {
+      // Show upload area when empty
+      return (
+        <div className="py-4 space-y-4">
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            accept={getAcceptTypes(category)}
+            className="hidden"
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+              handleFileUpload(files, category);
+            }}
+          />
+          <div
+            className={cn(
+              "relative border-2 border-dashed rounded-xl p-12 transition-colors cursor-pointer",
+              isDragging
+                ? "border-primary bg-primary/5"
+                : "border-border bg-muted/30 hover:border-primary/50"
+            )}
+            onClick={() => inputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDraggingCategory(category);
+            }}
+            onDragLeave={() => setDraggingCategory(null)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDraggingCategory(null);
+              const files = Array.from(e.dataTransfer.files);
+              handleFileUpload(files, category);
+            }}
+          >
+            {(category === "image" || category === "video" || category === "floor-plan" || category === "file") && (
+              <div className="flex flex-col items-center gap-2 mt-2">
+                {category === "image" ? (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <FileUploaderRegular
+                      pubkey={process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY || "dbf470d49c954f9f6143"}
+                      classNameUploader="uc-light uc-purple"
+                      sourceList="local, camera, gdrive, facebook"
+                      userAgentIntegration="llm-nextjs"
+                      filesViewMode="grid"
+                      onChange={handleUploadcareSuccess}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col items-center justify-center gap-4 text-center">
+                      <div className="p-4 rounded-full bg-muted">
+                        <div className="flex justify-center mb-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => inputRef.current?.click()}
+                            className="flex items-center"
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload {categoryName}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">or attach from</p>
+                        <ButtonGroup orientation="horizontal">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCloudStorage("google-drive", category);
+                            }}
+                            disabled={connectingService === "google-drive"}
+                            className="flex items-center gap-2"
+                          >
+                            {connectingService === "google-drive" ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <SiGoogledrive className="h-4 w-4" />
+                            )}
+                            <span>Drive</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCloudStorage("dropbox", category);
+                            }}
+                            disabled={connectingService === "dropbox"}
+                            className="flex items-center gap-2"
+                          >
+                            {connectingService === "dropbox" ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <SiDropbox className="h-4 w-4" />
+                            )}
+                            <span>Dropbox</span>
+                          </Button>
+                        </ButtonGroup>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Show gallery when there are items
+    return (
+      <div className="py-4 space-y-4">
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept={getAcceptTypes(category)}
+          className="hidden"
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            handleFileUpload(files, category);
+          }}
+        />
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <p className="text-sm font-medium text-foreground">
+            {categoryMedia.length} {categoryMedia.length === 1 ? "item" : "items"}
+          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => inputRef.current?.click()}
+              className="flex items-center gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Add More
+            </Button>
+            {(category === "image" || category === "video" || category === "floor-plan" || category === "file") && (
+              <ButtonGroup orientation="horizontal">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCloudStorage("google-drive", category)}
+                  className="flex items-center gap-2"
+                >
+                  <FaGoogleDrive className="h-4 w-4" />
+                  Google Drive
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCloudStorage("dropbox", category)}
+                  className="flex items-center gap-2"
+                >
+                  <FaDropbox className="h-4 w-4" />
+                  Dropbox
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCloudStorage("onedrive", category)}
+                  className="flex items-center gap-2"
+                >
+                  <DiOnedrive className="h-4 w-4" />
+                  OneDrive
+                </Button>
+              </ButtonGroup>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {categoryMedia.map((item) => (
+            <div
+              key={item.id}
+              className="group relative aspect-square rounded-lg border border-border overflow-hidden bg-muted hover:border-primary transition-colors"
+            >
+              {(item.type === "image" || item.type === "floor-plan") && (
+                <img
+                  src={item.url}
+                  alt={item.name}
+                  className="w-full h-full object-cover"
+                />
+              )}
+              {item.type === "video" && (
+                <div className="w-full h-full flex items-center justify-center bg-muted">
+                  <Video className="h-12 w-12 text-muted-foreground" />
+                </div>
+              )}
+              {(item.type === "3d-content" || item.type === "file") && (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-muted p-4">
+                  {getMediaTypeIcon(item.type)}
+                  <p className="text-xs text-muted-foreground mt-2 text-center line-clamp-2">
+                    {item.name}
+                  </p>
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 bg-background/90 hover:bg-background"
+                    onClick={() => handleViewMedia(item)}
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 bg-background/90 hover:bg-background hover:text-destructive"
+                    onClick={() => handleDeleteMedia(item.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                <p className="text-xs text-white truncate">{item.name}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   // Filter messages by chat type
@@ -564,7 +1113,7 @@ export function JobTaskView({
                 {format(new Date(message.createdAt), "MMM d, h:mm a")}
               </span>
             </div>
-            
+
             {isEditing ? (
               <div className="mb-1.5">
                 <div className="bg-muted/50 border border-border rounded-2xl overflow-hidden flex flex-col">
@@ -593,12 +1142,12 @@ export function JobTaskView({
                 </div>
               </div>
             ) : (
-              <div 
+              <div
                 className="text-[13px] leading-relaxed text-foreground wrap-break-word mb-1.5 prose prose-sm max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic [&_u]:underline [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:italic [&_a]:text-primary [&_a]:underline"
                 dangerouslySetInnerHTML={{ __html: message.content }}
               />
             )}
-            
+
             {!isEditing && (
               <div className="flex items-center gap-2.5 mt-1.5">
                 <Button
@@ -659,9 +1208,9 @@ export function JobTaskView({
     <div
       className={cn(
         "flex items-center justify-between gap-4",
-         variant === "sheet"
-           ? "sticky top-0 z-50 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60"
-           : "p-4 pb-0"
+        variant === "sheet"
+          ? "sticky top-0 z-50 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60"
+          : "p-4"
       )}
     >
       {/* Content Header */}
@@ -676,7 +1225,7 @@ export function JobTaskView({
           </ItemDescription>
         </ItemContent>
         <ItemActions className="">
-          {variant === "sheet" && (
+          {variant === "sheet" && !isMobile && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -824,7 +1373,7 @@ export function JobTaskView({
               editor={editor}
               className="[&_.ProseMirror]:min-h-[64px] [&_.ProseMirror]:max-h-[200px] [&_.ProseMirror]:overflow-y-auto [&_.ProseMirror]:px-3.5 [&_.ProseMirror]:py-3 [&_.ProseMirror]:text-sm [&_.ProseMirror]:text-foreground [&_.ProseMirror]:focus:outline-none [&_.ProseMirror]:prose [&_.ProseMirror]:prose-sm [&_.ProseMirror]:max-w-none [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none [&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0 [&_.ProseMirror_strong]:font-semibold [&_.ProseMirror_em]:italic [&_.ProseMirror_u]:underline"
             />
-            
+
             {/* Formatting Toolbar and Comment Button inside editor */}
             <div className="flex items-center justify-between px-3.5 py-2 border-t border-border/40">
               {/* Formatting Buttons */}
@@ -1139,293 +1688,393 @@ export function JobTaskView({
           variant === "dialog" ? "max-h-[calc(90vh-200px)]" : ""
         )}
       >
-        <div className="px-8 py-6 space-y-6">
-          {/* Task Fields Grid */}
-          <div className="grid grid-cols-[minmax(0,140px)_1fr] gap-y-3.5">
-            {/* Task Name */}
-            <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-              Task name
-            </div>
-            <div className="text-sm font-medium text-foreground">
-              {job.propertyAddress}
-            </div>
+        <Tabs defaultValue="task" className="gap-0 size-full px-8">
+          <TabsList className="grid w-full grid-cols-2 mt-6">
+            <TabsTrigger value="task" onClick={() => setActiveTab("discussion")} className="flex items-center gap-2 cursor-pointer">
+              Task
+            </TabsTrigger>
+            <TabsTrigger value="media" onClick={() => setActiveTab("media")} className="flex items-center gap-2 cursor-pointer">
+              Media
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="task" className="mt-0">
+            <div className="py-6 space-y-6">
+              {/* Task Fields Grid */}
+              <div className="grid grid-cols-[minmax(0,140px)_1fr] gap-y-3.5">
+                {/* Task Name */}
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                  Task name
+                </div>
+                <div className="text-sm font-medium text-foreground">
+                  {job.propertyAddress}
+                </div>
 
-            {/* People */}
-            <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-              People
-            </div>
-            <div className="flex items-center gap-2">
-              {photographer ? (
-                <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
+                {/* People */}
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                  People
+                </div>
+                <div className="flex items-center gap-2">
+                  {photographer ? (
+                    <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
+                      <Avatar className="h-7 w-7">
+                        <AvatarImage
+                          src={photographer.avatar}
+                          alt={photographer.name}
+                        />
+                        <AvatarFallback className="text-xs bg-muted-foreground/20">
+                          {photographer.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium text-foreground">
+                        {photographer.name}
+                      </span>
+                    </div>
+                  ) : (
+                    onAssignPhotographer && (
+                      <Button
+                        onClick={onAssignPhotographer}
+                        variant="muted"
+                        size="sm"
+                        className="h-7 rounded-full"
+                      >
+                        Assign Photographer
+                      </Button>
+                    )
+                  )}
+                </div>
+
+                {/* Due Date */}
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                  Due date
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {format(new Date(job.scheduledDate), "d MMMM yyyy")}
+                </div>
+
+                {/* Status */}
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                  Status
+                </div>
+                <div>
+                  <Badge variant="flat" className="flex items-center gap-1.5 mb-1 px-0">
+                    <div className={cn(
+                      "size-1.5 rounded-full",
+                      statusConfig.indicatorColor
+                    )} />
+
+                    <span
+                      className={cn(
+                        "text-[13px] font-medium",
+                        statusConfig.textColor
+                      )}
+                    >
+                      {statusConfig.label}
+                    </span>
+                  </Badge>
+                </div>
+
+                {/* Tags (Media Types) */}
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                  Tags
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {job.mediaType.map((type, index) => {
+                    const Icon = getMediaIcon(type);
+
+                    return (
+                      <Badge
+                        key={type}
+                        variant="muted"
+
+                      >
+                        <Icon className="h-3 w-3" />
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </Badge>
+                    );
+                  })}
+                </div>
+
+                {/* Priority */}
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                  Priority
+                </div>
+                <div
+                  className={cn("text-[13px] font-medium", priorityConfig.color)}
+                >
+                  {priorityConfig.label}
+                </div>
+
+                {/* Created By */}
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                  Created by
+                </div>
+                <div className="inline-flex items-center gap-2">
                   <Avatar className="h-7 w-7">
-                    <AvatarImage
-                      src={photographer.avatar}
-                      alt={photographer.name}
-                    />
-                    <AvatarFallback className="text-xs bg-muted-foreground/20">
-                      {photographer.name
+                    <AvatarFallback className="text-xs bg-muted">
+                      {currentUserName
                         .split(" ")
                         .map((n) => n[0])
                         .join("")}
                     </AvatarFallback>
                   </Avatar>
                   <span className="text-sm font-medium text-foreground">
-                    {photographer.name}
+                    {currentUserName}
                   </span>
                 </div>
-              ) : (
-                onAssignPhotographer && (
-                  <Button
-                    onClick={onAssignPhotographer}
-                    variant="outline"
-                    size="sm"
-                    className="h-7 rounded-full"
-                  >
-                    Assign Photographer
-                  </Button>
-                )
-              )}
-            </div>
-
-            {/* Due Date */}
-            <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-              Due date
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {format(new Date(job.scheduledDate), "d MMMM yyyy")}
-            </div>
-
-            {/* Status */}
-            <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-              Status
-            </div>
-            <div>
-              <div
-                className={cn(
-                  "inline-flex items-center gap-2 h-7 px-2.5 rounded-full",
-                  statusConfig.bgColor
-                )}
-              >
-                <div
-                  className={cn(
-                    "h-[18px] w-1.5 rounded-full",
-                    statusConfig.indicatorColor
-                  )}
-                />
-                <span
-                  className={cn(
-                    "text-[13px] font-medium",
-                    statusConfig.textColor
-                  )}
-                >
-                  {statusConfig.label}
-                </span>
               </div>
-            </div>
 
-            {/* Tags (Media Types) */}
-            <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-              Tags
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {job.mediaType.map((type, index) => {
-                const Icon = getMediaIcon(type);
-                const isBlue = index % 2 === 0;
-                return (
-                  <div
-                    key={type}
+              {/* Tab Navigation */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-6 border-b border-border pt-2 pb-1">
+                  <Button
+                    variant="ghost"
+                    size={isMobile ? "icon" : "default"}
+                    onClick={() => setActiveTab("description")}
                     className={cn(
-                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
-                      isBlue
-                        ? "bg-primary/10 text-primary"
-                        : "bg-accent/10 text-accent"
+                      "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
+                      activeTab === "description"
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    <Icon className="h-3 w-3" />
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </div>
-                );
-              })}
-            </div>
+                    <FileText className="h-3.5 w-3.5" />
+                    <span className="hidden md:block">Description</span>
+                    {activeTab === "description" && (
+                      <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size={isMobile ? "icon" : "default"}
+                    onClick={() => setActiveTab("discussion")}
+                    className={cn(
+                      "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
+                      activeTab === "discussion"
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span className="hidden md:block">Discussion</span>
+                    {activeTab === "discussion" && (
+                      <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size={isMobile ? "icon" : "default"}
+                    onClick={() => setActiveTab("attachments")}
+                    className={cn(
+                      "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
+                      activeTab === "attachments"
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                    <span className="hidden md:block">Attachments</span>
+                    {activeTab === "attachments" && (
+                      <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
+                    )}
+                  </Button>
+                </div>
 
-            {/* Priority */}
-            <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-              Priority
-            </div>
-            <div
-              className={cn("text-[13px] font-medium", priorityConfig.color)}
-            >
-              {priorityConfig.label}
-            </div>
+              </div>
 
-            {/* Created By */}
-            <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-              Created by
-            </div>
-            <div className="inline-flex items-center gap-2">
-              <Avatar className="h-7 w-7">
-                <AvatarFallback className="text-xs bg-muted">
-                  {currentUserName
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm font-medium text-foreground">
-                {currentUserName}
-              </span>
-            </div>
-          </div>
-
-          {/* Tab Navigation */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-6 border-b border-border pt-2 pb-1">
-              <Button
-                variant="ghost"
-                onClick={() => setActiveTab("description")}
-                className={cn(
-                  "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
-                  activeTab === "description"
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <FileText className="h-3.5 w-3.5" />
-                Description
+              {/* Tab Content */}
+              <div className="pt-4 space-y-4">
                 {activeTab === "description" && (
-                  <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setActiveTab("discussion")}
-                className={cn(
-                  "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
-                  activeTab === "discussion"
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <MessageSquare className="h-3.5 w-3.5" />
-                Discussion
-                {activeTab === "discussion" && (
-                  <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setActiveTab("attachments")}
-                className={cn(
-                  "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
-                  activeTab === "attachments"
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Paperclip className="h-3.5 w-3.5" />
-                Attachments
-                {activeTab === "attachments" && (
-                  <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
-                )}
-              </Button>
-            </div>
-
-          </div>
-
-          {/* Tab Content */}
-          <div className="pt-4 space-y-4">
-            {activeTab === "description" && (
-              <div className="space-y-4">
-                <div>
-                  <H4 className="text-sm font-semibold text-muted-foreground mb-2">
-                    Location
-                  </H4>
-                  <P className="text-sm">{job.propertyAddress}</P>
-                </div>
-                <Separator />
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <H4 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Date
-                    </H4>
-                    <P className="text-sm">
-                      {format(new Date(job.scheduledDate), "MMM d, yyyy")}
-                    </P>
-                  </div>
-                  <div>
-                    <H4 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Time
-                    </H4>
-                    <P className="text-sm">{job.scheduledTime}</P>
-                  </div>
-                </div>
-                {job.requirements && (
-                  <>
-                    <Separator />
+                  <div className="space-y-4">
                     <div>
                       <H4 className="text-sm font-semibold text-muted-foreground mb-2">
-                        Requirements
+                        Location
                       </H4>
-                      <P className="text-sm whitespace-pre-wrap">
-                        {job.requirements}
-                      </P>
+                      <P className="text-sm">{job.propertyAddress}</P>
                     </div>
-                  </>
+                    <Separator />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <H4 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Date
+                        </H4>
+                        <P className="text-sm">
+                          {format(new Date(job.scheduledDate), "MMM d, yyyy")}
+                        </P>
+                      </div>
+                      <div>
+                        <H4 className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Time
+                        </H4>
+                        <P className="text-sm">{job.scheduledTime}</P>
+                      </div>
+                    </div>
+                    {job.requirements && (
+                      <>
+                        <Separator />
+                        <div>
+                          <H4 className="text-sm font-semibold text-muted-foreground mb-2">
+                            Requirements
+                          </H4>
+                          <P className="text-sm whitespace-pre-wrap">
+                            {job.requirements}
+                          </P>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === "discussion" && (
+                  <div className="flex flex-col gap-4">
+                    {/* Chat Content */}
+                    {activeChatTab === "client" ? (
+                      <ScrollArea className="flex-1 pr-4 min-h-[400px]">
+                        <div className="">
+                          {clientMessages.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground text-sm">
+                              No messages in client chat yet
+                            </div>
+                          ) : (
+                            clientProcessed.sortedRootMessages.map((message) =>
+                              renderMessage(message, false, clientProcessed.threadMap)
+                            )
+                          )}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <ScrollArea className="flex-1 pr-4 min-h-[400px]">
+                        <div className="">
+                          {teamMessages.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground text-sm">
+                              No messages in team chat yet
+                            </div>
+                          ) : (
+                            teamProcessed.sortedRootMessages.map((message) =>
+                              renderMessage(message, false, teamProcessed.threadMap)
+                            )
+                          )}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === "attachments" && (
+                  <div className="text-center py-12 text-muted-foreground text-sm">
+                    No attachments yet
+                  </div>
                 )}
               </div>
-            )}
-
-            {activeTab === "discussion" && (
-              <div className="flex flex-col gap-4">
-                {/* Chat Content */}
-                {activeChatTab === "client" ? (
-                  <ScrollArea className="flex-1 pr-4 min-h-[400px]">
-                    <div className="">
-                      {clientMessages.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
-                          No messages in client chat yet
-                        </div>
-                      ) : (
-                        clientProcessed.sortedRootMessages.map((message) =>
-                          renderMessage(message, false, clientProcessed.threadMap)
-                        )
+            </div>
+          </TabsContent>
+          <TabsContent value="media" className="mt-0">
+            <div className="py-6">
+              <Accordion type="multiple" className="w-full space-y-2">
+                {/* Images Section */}
+                <AccordionItem value="images" className="border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-medium">Images</span>
+                      {getMediaByCategory("image").length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {getMediaByCategory("image").length}
+                        </Badge>
                       )}
                     </div>
-                  </ScrollArea>
-                ) : (
-                  <ScrollArea className="flex-1 pr-4 min-h-[400px]">
-                    <div className="">
-                      {teamMessages.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
-                          No messages in team chat yet
-                        </div>
-                      ) : (
-                        teamProcessed.sortedRootMessages.map((message) =>
-                          renderMessage(message, false, teamProcessed.threadMap)
-                        )
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {renderMediaCategory("image", imageInputRef)}
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Videos Section */}
+                <AccordionItem value="videos" className="border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <Video className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-medium">Videos</span>
+                      {getMediaByCategory("video").length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {getMediaByCategory("video").length}
+                        </Badge>
                       )}
                     </div>
-                  </ScrollArea>
-                )}
-              </div>
-            )}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {renderMediaCategory("video", videoInputRef)}
+                  </AccordionContent>
+                </AccordionItem>
 
-            {activeTab === "attachments" && (
-              <div className="text-center py-12 text-muted-foreground text-sm">
-                No attachments yet
-              </div>
-            )}
-          </div>
-        </div>
+                {/* Floor Plans Section */}
+                <AccordionItem value="floor-plans" className="border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-medium">Floor Plans</span>
+                      {getMediaByCategory("floor-plan").length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {getMediaByCategory("floor-plan").length}
+                        </Badge>
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {renderMediaCategory("floor-plan", floorPlanInputRef)}
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* 3D Content Section */}
+                <AccordionItem value="3d-content" className="border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <Box className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-medium">3D Content</span>
+                      {getMediaByCategory("3d-content").length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {getMediaByCategory("3d-content").length}
+                        </Badge>
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {renderMediaCategory("3d-content", fileInputRef)}
+                  </AccordionContent>
+                </AccordionItem>
+
+                {/* Files Section */}
+                <AccordionItem value="files" className="border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <File className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-medium">Files</span>
+                      {getMediaByCategory("file").length > 0 && (
+                        <Badge variant="secondary" className="ml-2">
+                          {getMediaByCategory("file").length}
+                        </Badge>
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {renderMediaCategory("file", fileInputRef)}
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </>
   );
 
   return (
     <>
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Message Confirmation Dialog */}
       <AlertDialog open={deletingMessageId !== null} onOpenChange={(open) => !open && handleDeleteCancel()}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1449,10 +2098,33 @@ export function JobTaskView({
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Cloud Storage Integration Dialog */}
+      <AlertDialog open={cloudStorageDialog.open} onOpenChange={(open) => setCloudStorageDialog({ open, service: "" })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{cloudStorageDialog.service} Integration</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cloudStorageDialog.service} integration is coming soon! This feature will allow you to directly attach files from your {cloudStorageDialog.service} account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => {
+              setCloudStorageDialog({ open: false, service: "" });
+              setConnectingService(null);
+            }}>
+              Got it
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {variant === "dialog" ? (
         <Dialog open={open} onOpenChange={onOpenChange}>
           <DialogContent className="md:min-w-[90vw] min-w-[calc(100vw-1rem)] md:max-w-[90vw] md:h-[90vh] h-[calc(100vh-1rem)] md:max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col [&>button]:hidden">
-            <DialogHeader>{renderHeader(DialogTitle)}</DialogHeader>
+            <DialogTitle className="sr-only">
+              {job.propertyAddress} - {job.clientName}
+            </DialogTitle>
+            <DialogHeader className="border-b">{renderHeader(DialogTitle)}</DialogHeader>
             {renderContent()}
             {activeTab === "discussion" && renderFooter(DialogFooter)}
           </DialogContent>
@@ -1463,6 +2135,9 @@ export function JobTaskView({
             side="right"
             className="w-full sm:max-w-[640px] flex flex-col p-0 gap-0"
           >
+            <SheetTitle className="sr-only">
+              {job.propertyAddress} - {job.clientName}
+            </SheetTitle>
             <SheetHeader className="border-b">
               {renderHeader(SheetTitle)}
             </SheetHeader>

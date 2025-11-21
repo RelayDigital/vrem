@@ -103,6 +103,7 @@ export interface Photographer {
 
 export interface JobRequest {
   id: string;
+  orderNumber: string;
   organizationId: string;
   clientName: string;
   propertyAddress: string;

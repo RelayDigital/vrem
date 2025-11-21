@@ -70,12 +70,12 @@ export function AuditLog({ entries }: AuditLogProps) {
 
   return (
     <Card>
-      <CardHeader>
+      {/* <CardHeader>
         <CardTitle>System Activity Audit Log</CardTitle>
         <p className="text-sm text-muted-foreground">
           All system actions are timestamped and traceable to a user identity
         </p>
-      </CardHeader>
+      </CardHeader> */}
       <CardContent>
         <ScrollArea className="h-[600px]">
           <Table>

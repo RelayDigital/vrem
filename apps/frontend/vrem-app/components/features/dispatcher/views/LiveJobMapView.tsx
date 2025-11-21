@@ -25,7 +25,7 @@ export function LiveJobMapView({
 }: LiveJobMapViewProps) {
   const [headerHeight, setHeaderHeight] = useState(0);
   const isMobile = useIsMobile();
-  
+
   // Get sidebar state to adjust left offset
   let sidebarState: string | undefined;
   let sidebarOpen: boolean | undefined;
@@ -38,7 +38,7 @@ export function LiveJobMapView({
     sidebarState = 'expanded';
     sidebarOpen = true;
   }
-  
+
   // Calculate left offset based on sidebar state
   // When collapsed to icon: 3rem (48px), when expanded: 16rem (256px)
   // On mobile, no offset (sidebar doesn't affect layout)
@@ -57,11 +57,11 @@ export function LiveJobMapView({
 
     // Measure on resize
     window.addEventListener('resize', measureHeader);
-    
+
     // Also use ResizeObserver for more accurate measurements
     const header = document.querySelector('header');
     let resizeObserver: ResizeObserver | null = null;
-    
+
     if (header) {
       resizeObserver = new ResizeObserver(() => {
         measureHeader();
@@ -96,10 +96,10 @@ export function LiveJobMapView({
   }, [sidebarState]);
 
   return (
-    <div 
+    <div
       className="fixed overflow-hidden transition-[left] duration-200 ease-linear"
-      style={{ 
-        top: `${headerHeight}px`, 
+      style={{
+        top: `${headerHeight}px`,
         left: leftOffset,
         right: 0,
         bottom: 0,

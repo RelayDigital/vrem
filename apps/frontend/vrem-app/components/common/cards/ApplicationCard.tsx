@@ -7,7 +7,7 @@ interface ApplicationCardProps {
 
 export function ApplicationCard({ application }: ApplicationCardProps) {
   return (
-    <div className="p-4 bg-orange-50 border-2 border-orange-200 rounded-xl">
+    <div className="p-4 bg-status-pending/10 border-2 border-status-pending/30 rounded-xl">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-sm font-medium">{application.companyName}</div>
@@ -24,9 +24,9 @@ export function ApplicationCard({ application }: ApplicationCardProps) {
           variant="outline" 
           className={
             application.status === 'pending' 
-              ? 'border-orange-500 text-orange-700'
+              ? 'border-status-pending text-status-pending'
               : application.status === 'approved'
-              ? 'border-emerald-500 text-emerald-700'
+              ? 'border-status-delivered text-status-delivered'
               : 'border-destructive text-destructive'
           }
         >

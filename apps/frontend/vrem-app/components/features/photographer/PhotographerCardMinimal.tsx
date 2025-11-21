@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Photographer, PhotographerRanking } from "../../../types";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
 import { Badge } from "../../ui/badge";
@@ -39,6 +39,7 @@ interface PhotographerCardMinimalProps {
   onAssign?: () => void;
   selected?: boolean;
   isAssigning?: boolean;
+  onCollapse?: () => void;
 }
 
 const scoreChartConfig = {
@@ -56,9 +57,19 @@ export function PhotographerCardMinimal({
   onAssign,
   selected,
   isAssigning = false,
+  onCollapse,
 }: PhotographerCardMinimalProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const prevExpandedRef = useRef(isExpanded);
   const isAvailable = ranking ? ranking.availability === 100 : true;
+
+  // Reset map when dropdown collapses (transitions from expanded to collapsed)
+  useEffect(() => {
+    if (prevExpandedRef.current && !isExpanded && onCollapse) {
+      onCollapse();
+    }
+    prevExpandedRef.current = isExpanded;
+  }, [isExpanded, onCollapse]);
 
   // MapWithSidebar is dispatcher-only, so show full address
   const displayAddress = getLocationDisplay(
@@ -90,9 +101,7 @@ export function PhotographerCardMinimal({
 
   return (
     <div
-      className={`relative rounded-lg border transition-all overflow-hidden w-full ${
-        selected ? "ring-2 ring-primary bg-muted/30" : "border-border"
-      }`}
+      className={`relative rounded-lg border transition-all overflow-hidden w-full`}
     >
       {/* Minimal View - Always Visible */}
       <div
@@ -100,7 +109,7 @@ export function PhotographerCardMinimal({
         onClick={handleClick}
       >
         {/* Avatar */}
-        <div className="relative flex-shrink-0">
+        <div className="relative shrink-0">
           <Avatar className="h-12 w-12 border-2 border-background">
             <AvatarImage src={photographer.avatar} alt={photographer.name} />
             <AvatarFallback className="bg-primary text-primary-foreground text-sm">
@@ -125,7 +134,7 @@ export function PhotographerCardMinimal({
               {photographer.name}
             </span>
             {recommended && (
-              <Award className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" />
+              <Award className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -149,7 +158,7 @@ export function PhotographerCardMinimal({
         </div>
 
         {/* Expand/Collapse Icon */}
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           {isExpanded ? (
             <ChevronUp className="h-4 w-4 text-muted-foreground" />
           ) : (

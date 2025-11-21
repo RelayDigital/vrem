@@ -66,8 +66,8 @@ export function JobsView({ upcomingJobs, totalJobs, rating, onTimeRate }: JobsVi
           title="All Upcoming Shoots"
           items={upcomingJobs}
           itemCount={5}
-          searchPlaceholder="Search by address, client..."
-          searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate}`}
+          searchPlaceholder="Search by address, client, Order #..."
+          searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`}
           filterOptions={[
             { label: 'Urgent', value: 'urgent' },
             { label: 'Rush', value: 'rush' },

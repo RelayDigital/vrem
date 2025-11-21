@@ -349,8 +349,8 @@ export default function VremApp() {
   }, [isAuthenticated, currentUser.role]);
 
   const renderHeader = () => (
-    <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-xl shadow-sm w-full">
-      <div className="w-full max-w-full px-6 py-3 overflow-hidden">
+    <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-xl shadow-sm w-full px-4">
+      <div className="w-full max-w-full py-3 overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
                 <H2 className="p-0 border-0">
@@ -365,18 +365,31 @@ export default function VremApp() {
             {/* Auth Section */}
             {isAuthenticated && (
               <>
+              {/* Dispatcher New Job Button */}
+                {currentUser.role === 'dispatcher' && (
+                  <Button
+                    onClick={() => setShowNewJobForm(true)}
+                    size="sm"
+                    className="gap-2"
+                    variant="muted"
+                  >
+                    <Plus className="h-4 w-4" />
+                    New Job
+                  </Button>
+                )}
+
               {/* Agent View Switcher */}
                 {currentUser.role === 'agent' && (
                 <div className="flex items-center gap-2">
                   <Button
-                    variant={agentView === 'jobs' ? 'default' : 'ghost'}
+                    variant={agentView === 'jobs' ? 'default' : 'muted'}
                     size="sm"
                     onClick={() => setAgentView('jobs')}
                   >
                     My Jobs
                   </Button>
                   <Button
-                    variant={agentView === 'booking' ? 'default' : 'ghost'}
+                    variant={agentView === 'booking' ? 'default' : 'muted'}
                     size="sm"
                     onClick={() => setAgentView('booking')}
                   >
@@ -389,7 +402,7 @@ export default function VremApp() {
                 {currentUser.role === 'photographer' && (
                 <div className="flex items-center gap-2">
                   <Button
-                    variant={photographerView === 'jobs' ? 'default' : 'ghost'}
+                    variant={photographerView === 'jobs' ? 'default' : 'muted'}
                     size="sm"
                     onClick={() => setPhotographerView('jobs')}
                   >
@@ -397,7 +410,7 @@ export default function VremApp() {
                     My Jobs
                   </Button>
                   <Button
-                    variant={photographerView === 'profile' ? 'default' : 'ghost'}
+                    variant={photographerView === 'profile' ? 'default' : 'muted'}
                     size="sm"
                     onClick={() => setPhotographerView('profile')}
                   >
@@ -405,7 +418,7 @@ export default function VremApp() {
                     Profile & Services
                   </Button>
                   <Button
-                    variant={photographerView === 'companies' ? 'default' : 'ghost'}
+                    variant={photographerView === 'companies' ? 'default' : 'muted'}
                     size="sm"
                     onClick={() => setPhotographerView('companies')}
                   >
@@ -514,7 +527,6 @@ export default function VremApp() {
           <DispatcherSidebar
             currentView={dispatcherView}
             onViewChange={setDispatcherView}
-            onNewJobClick={() => setShowNewJobForm(true)}
           />
             <SidebarInset className="min-w-0" style={{ paddingTop: `${headerHeight}px` }}>
             <div className="flex-1 overflow-x-hidden min-w-0">
@@ -527,6 +539,7 @@ export default function VremApp() {
                 onJobAssign={handleJobAssign}
                 activeView={dispatcherView}
                 onNavigateToJobsView={() => setDispatcherView('jobs')}
+                onNavigateToMapView={() => setDispatcherView('map')}
                 onNewJobClick={() => setShowNewJobForm(true)}
               />
             </div>

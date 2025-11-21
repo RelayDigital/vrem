@@ -62,9 +62,9 @@ function calculateDistanceLocal(
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLng / 2) *
+    Math.sin(dLng / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -335,9 +335,12 @@ export function MapWithSidebar({
   }, [sidebarView, jobForRankings, rankedPhotographers]);
 
   const mapContent = (
-    <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 h-full w-full">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 size-full">
       {/* Map - takes most of the space on desktop, small on mobile */}
-      <div className="flex-1 md:flex-1 relative h-[200px] md:h-full min-h-0">
+      <div
+        className={`md:col-span-3 overflow-hidden ${fullScreen ? "" : "rounded-md"
+          }`}
+      >
         <MapView
           jobs={mapJobs}
           photographers={mapPhotographers}
@@ -347,7 +350,7 @@ export function MapWithSidebar({
           selectedPhotographer={
             sidebarView === "rankings" && selectedPhotographerId
               ? mapPhotographers.find((p) => p.id === selectedPhotographerId) ||
-                null
+              null
               : null
           }
           disablePopovers={isMobile}
@@ -355,11 +358,14 @@ export function MapWithSidebar({
       </div>
 
       {/* Sidebar - bottom on mobile, right on desktop */}
-      <Card className="relative w-full md:min-w-[400px] md:max-w-[30%] bg-background md:border-l border-t md:border-t-0 border-border flex flex-col shrink-0 rounded-none p-0! border-x-0! border-b-0! gap-0 flex-1 min-h-0 h-full overflow-hidden">
+      <Card
+        className={`relative col-span-1 bg-background md:border-l border-t md:border-t-0 border-border flex flex-col shrink-0 rounded-none border-x-0! border-b-0! gap-0 flex-1 min-h-0 h-full overflow-hidden ${fullScreen ? "md:p-0! md:pr-4!" : ""
+          }`}
+      >
         {sidebarView === "pending" ? (
           <>
             {/* Pending Assignments Header */}
-            <CardHeader className="p-4 border-b border-border space-y-3 gap-0!">
+            <CardHeader className={`py-4 px-0! space-y-3 gap-0!`}>
               <div className="flex items-center justify-between">
                 <div>
                   <H3 className="text-lg border-0">Pending Assignments</H3>
@@ -388,41 +394,47 @@ export function MapWithSidebar({
               </div>
             </CardHeader>
 
-             {/* Pending Jobs List - Vertical Scroll */}
-             <CardContent className="relative flex-1 p-0! min-h-0 overflow-hidden flex flex-col w-full min-w-0 max-w-full">
-                 <ScrollArea className="h-full w-full min-w-0 max-w-full overflow-x-hidden">
-                   <div className="p-4 space-y-3 min-w-0 w-full max-w-full box-border">
-                     {filteredPendingJobs.length === 0 ? (
-                       <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                         <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
-                         <H3 className="text-lg mb-2">All caught up!</H3>
-                         <Muted>No pending assignments</Muted>
-                       </div>
-                     ) : (
-                       filteredPendingJobs.map((job) => (
-                         <div key={job.id} className="w-full min-w-0 max-w-full box-border">
-                           <JobCard
-                             job={job}
-                             onViewRankings={() => handleFindPhotographer(job)}
-                             onClick={() => onSelectJob(job)}
-                             onViewInProjectManagement={
-                               onNavigateToJobInProjectManagement
-                                 ? () => onNavigateToJobInProjectManagement(job)
-                                 : undefined
-                             }
-                             selected={selectedJob?.id === job.id}
-                           />
-                         </div>
-                       ))
-                     )}
-                   </div>
-                 </ScrollArea>
-             </CardContent>
+            {/* Pending Jobs List - Vertical Scroll */}
+            <CardContent
+              className={`relative flex-1 p-0! min-h-0 overflow-hidden flex flex-col w-full min-w-0 max-w-full ${fullScreen ? "py-4 px-0!" : ""
+                }`}
+            >
+              <ScrollArea className="h-full w-full min-w-0 max-w-full overflow-x-hidden">
+                <div className="py-4 px-0! space-y-3 min-w-0 w-full max-w-full box-border">
+                  {filteredPendingJobs.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                      <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
+                      <H3 className="text-lg mb-2">All caught up!</H3>
+                      <Muted>No pending assignments</Muted>
+                    </div>
+                  ) : (
+                    filteredPendingJobs.map((job) => (
+                      <div
+                        key={job.id}
+                        className="w-full min-w-0 max-w-full box-border"
+                      >
+                        <JobCard
+                          job={job}
+                          onViewRankings={() => handleFindPhotographer(job)}
+                          onClick={() => onSelectJob(job)}
+                          onViewInProjectManagement={
+                            onNavigateToJobInProjectManagement
+                              ? () => onNavigateToJobInProjectManagement(job)
+                              : undefined
+                          }
+                          selected={selectedJob?.id === job.id}
+                        />
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
           </>
         ) : (
           <>
             {/* Ranked Photographers Header */}
-            <CardHeader className="p-4! border-b border-border space-y-3 gap-0!">
+            <CardHeader className={`py-4 px-0! space-y-3 gap-0!`}>
               <div className="flex items-center gap-2 mb-2">
                 <Button
                   variant="ghost"
@@ -447,7 +459,10 @@ export function MapWithSidebar({
             </CardHeader>
 
             {/* Ranked Photographers Content */}
-            <CardContent className="relative flex-1 p-0! min-h-0 overflow-hidden flex flex-col">
+            <CardContent
+              className={`relative flex-1 p-0! min-h-0 overflow-hidden flex flex-col ${fullScreen ? "py-4 px-0!" : ""
+                }`}
+            >
               {jobForRankings && (
                 <div className="flex-1 min-h-0">
                   <ScrollArea
@@ -456,7 +471,7 @@ export function MapWithSidebar({
                   >
                     <div className="space-y-0">
                       {/* Priority Controls */}
-                      <div className="bg-background border-b p-4">
+                      <div className="bg-background py-4 px-0!">
                         <div className="space-y-3">
                           {/* Priority Controls */}
                           <div className="space-y-2">
@@ -537,7 +552,7 @@ export function MapWithSidebar({
                       </div>
 
                       {/* Photographer List */}
-                      <div className="p-4 space-y-3">
+                      <div className="py-4 px-0! space-y-3">
                         {rankedPhotographers.length === 0 ? (
                           <div className="text-center py-8">
                             <Muted>No photographers available</Muted>
@@ -564,6 +579,15 @@ export function MapWithSidebar({
                                     ranking.photographer.id
                                   )
                                 }
+                                onCollapse={() => {
+                                  // Only reset if this photographer was selected
+                                  if (
+                                    selectedPhotographerId ===
+                                    ranking.photographer.id
+                                  ) {
+                                    setSelectedPhotographerId(null);
+                                  }
+                                }}
                                 onAssign={() =>
                                   handleAssign(
                                     ranking.photographer.id,
@@ -589,9 +613,8 @@ export function MapWithSidebar({
   if (fullScreen) {
     return (
       <div
-        className={`${
-          className || "h-full w-full"
-        } overflow-hidden flex flex-col h-full`}
+        className={`${className || "h-full w-full"
+          } overflow-hidden flex flex-col h-full`}
       >
         {mapContent}
       </div>
@@ -605,18 +628,11 @@ export function MapWithSidebar({
       transition={{ delay: 0.4 }}
       className={className || "md:h-[600px] h-[90vh]"}
     >
-      <Card className="relative h-full bg-card rounded-2xl border border-border shadow-sm overflow-hidden gap-0 flex flex-col">
-        <CardHeader className="p-4 border-b border-border shrink-0 gap-0">
-          <div className="flex size-full items-center gap-2">
-            <MapPin className="h-5 w-5 text-primary" />
-            <H2 className="text-lg border-0">Live Job Map</H2>
-          </div>
-        </CardHeader>
-
-        <CardContent className="flex-1 flex overflow-hidden p-0!">
-          {mapContent}
-        </CardContent>
-      </Card>
+      {/* <Card className="relative h-full bg-card rounded-2xl border border-border shadow-sm overflow-hidden gap-0 flex flex-col">
+        <CardContent className="flex-1 flex overflow-hidden p-0!"> */}
+      {mapContent}
+      {/* </CardContent>
+      </Card> */}
     </motion.div>
   );
 }

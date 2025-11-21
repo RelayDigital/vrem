@@ -137,7 +137,8 @@ export function AddressSearch({ onAddressSelect }: AddressSearchProps) {
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setIsFocused(true)}
             placeholder="Enter property address..."
-            className="h-16 pl-16 pr-6 text-lg rounded-2xl border-2 border-border shadow-lg focus:border-black focus:ring-4 focus:ring-slate-100 transition-all"
+            className="h-16 pl-16 pr-6 text-lg rounded-2xl transition-all md:rounded-3xl"
+            variant="muted"
             disabled={!!error}
           />
           {isLoading ? (
