@@ -854,7 +854,7 @@ export function JobTaskView({
                   <div onClick={(e) => e.stopPropagation()}>
                     <FileUploaderRegular
                       pubkey={process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY || "dbf470d49c954f9f6143"}
-                      classNameUploader="uc-light uc-purple"
+                      classNameUploader="uc-light uc-custom"
                       sourceList="local, camera, gdrive, facebook"
                       userAgentIntegration="llm-nextjs"
                       filesViewMode="grid"
