@@ -30,14 +30,19 @@ model User {
   messages       Message[]
 }
 
-model MediaItem {
-  id        String   @id @default(uuid())
-  projectId String
-  project   Project  @relation(fields: [projectId], references: [id])
-  fileUrl   String
-  fileType  String // e.g. "image", "video", "zip"
-  createdAt DateTime @default(now())
+model Media {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+
+  key         String   // storage key (Supabase)
+  cdnUrl      String?  // Uploadcare CDN
+  filename    String
+  size        Int
+  type        MediaType
+  createdAt   DateTime @default(now())
 }
+
 
 model Message {
   id        String   @id @default(uuid())
@@ -64,8 +69,15 @@ model Project {
   editor        User?         @relation("EditorProjects", fields: [editorId], references: [id])
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  mediaItems    MediaItem[]
+  media         Media[]
   messages      Message[]
+}
+
+enum MediaType {
+  PHOTO
+  VIDEO
+  FLOORPLAN
+  DOCUMENT
 }
 
 enum ProjectStatus {
