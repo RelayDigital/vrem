@@ -1,0 +1,14 @@
+1. Sorting / reordering photos
+(e.g., property listing cover photo)
+
+2. Marking items as "RAW", "Edited", "Delivery"
+(very useful for editors)
+
+3. Add bulk delete endpoint
+4. Generate delivery ZIPs
+(agents download everything as one folder)
+
+5. Add authorization rules
+(e.g., only the project editor can delete)
+
+Test Proxy URL
