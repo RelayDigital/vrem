@@ -5,10 +5,11 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ProjectsModule } from './projects/projects.module';
 import { MediaModule } from './media/media.module';
+import { MessagesModule } from './messages/messages.module';
 
 
 @Module({
-  imports: [UsersModule, AuthModule, ProjectsModule, MediaModule],
+  imports: [UsersModule, AuthModule, ProjectsModule, MediaModule, MessagesModule],
   controllers: [AppController],
   providers: [AppService],
 })

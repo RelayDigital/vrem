@@ -1,0 +1,5 @@
+tighten WebSocket auth so userId comes from a JWT, not the payload
+wire deleteMessage to broadcast messageDeleted over WS
+add pagination for older messages per project.
+
+do jwt websocketauth
