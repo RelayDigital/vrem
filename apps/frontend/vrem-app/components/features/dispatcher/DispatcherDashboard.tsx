@@ -11,6 +11,7 @@ import {
 import { ChatMessage } from "../../../types/chat";
 import { JobTaskView } from "../../shared/tasks/JobTaskView";
 import { DashboardView, JobsView, LiveJobMapView, TeamView, AuditView } from "./views";
+import { CalendarView } from "../calendar";
 
 interface DispatcherDashboardProps {
   jobs: JobRequest[];
@@ -20,9 +21,10 @@ interface DispatcherDashboardProps {
   onJobCreate: (job: Partial<JobRequest>) => void;
   onJobAssign: (jobId: string, photographerId: string, score: number) => void;
   onJobStatusChange?: (jobId: string, newStatus: JobRequest["status"]) => void;
-  activeView?: "dashboard" | "jobs" | "team" | "audit" | "map";
+  activeView?: "dashboard" | "jobs" | "team" | "audit" | "map" | "calendar";
   onNavigateToJobsView?: () => void;
   onNavigateToMapView?: () => void;
+  onNavigateToCalendarView?: () => void;
   onNewJobClick?: () => void;
 }
 
@@ -37,6 +39,7 @@ export function DispatcherDashboard({
   activeView = "dashboard",
   onNavigateToJobsView,
   onNavigateToMapView,
+  onNavigateToCalendarView,
   onNewJobClick,
 }: DispatcherDashboardProps) {
   const [selectedJob, setSelectedJob] = useState<JobRequest | null>(null);
@@ -159,6 +162,7 @@ export function DispatcherDashboard({
           onSelectJob={handleJobSelect}
           onNavigateToJobsView={onNavigateToJobsView}
           onNavigateToMapView={onNavigateToMapView}
+          onNavigateToCalendarView={onNavigateToCalendarView}
           onNavigateToJobInProjectManagement={(job) => {
             setSelectedJob(job);
             if (onNavigateToJobsView) {
@@ -170,6 +174,7 @@ export function DispatcherDashboard({
             }, 100);
           }}
           onJobAssign={handleJobAssign}
+          onJobClick={handleJobClick}
         />
       )}
 
@@ -177,7 +182,9 @@ export function DispatcherDashboard({
         <JobsView
           jobs={jobs}
           photographers={photographers}
+          messages={chatMessages}
           onViewRankings={handleViewRankings}
+          onChangePhotographer={handleViewRankings} // Reuse the same handler - it opens rankings dialog
           onJobStatusChange={onJobStatusChange}
           onJobClick={handleJobClick}
         />
@@ -208,6 +215,15 @@ export function DispatcherDashboard({
             }, 100);
           }}
           onJobAssign={handleJobAssign}
+        />
+      )}
+
+      {activeView === "calendar" && (
+        <CalendarView
+          jobs={jobs}
+          photographers={photographers}
+          onJobClick={handleJobClick}
+          onCreateJob={handleNewJobClick}
         />
       )}
 
@@ -257,6 +273,12 @@ export function DispatcherDashboard({
             setShowTaskView(false);
           }
         }}
+        onChangePhotographer={() => {
+          if (selectedJob) {
+            handleViewRankings(selectedJob);
+            setShowTaskView(false);
+          }
+        }}
         variant="sheet"
         onFullScreen={handleFullScreen}
       />
@@ -286,6 +308,12 @@ export function DispatcherDashboard({
           }
         }}
         onAssignPhotographer={() => {
+          if (selectedJob) {
+            handleViewRankings(selectedJob);
+            setShowTaskDialog(false);
+          }
+        }}
+        onChangePhotographer={() => {
           if (selectedJob) {
             handleViewRankings(selectedJob);
             setShowTaskDialog(false);

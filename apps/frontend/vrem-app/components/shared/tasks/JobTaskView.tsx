@@ -67,9 +67,9 @@ import {
   Grid3x3,
   Loader2,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { ImageWithFallback } from "../../common";
-import { H3, H4, P, Small, Muted } from "../../ui/typography";
+import { H3, H4, P, Small, Muted } from "@/components/ui/typography";
 import {
   Tooltip,
   TooltipContent,
@@ -146,6 +146,7 @@ interface JobTaskViewProps {
   onDeleteMessage?: (messageId: string) => void;
   onStatusChange?: (status: JobRequest["status"]) => void;
   onAssignPhotographer?: () => void;
+  onChangePhotographer?: () => void; // For reassigning photographer
   variant?: "sheet" | "dialog";
   onFullScreen?: () => void;
 }
@@ -165,6 +166,7 @@ export function JobTaskView({
   onDeleteMessage,
   onStatusChange,
   onAssignPhotographer,
+  onChangePhotographer,
   variant = "sheet",
   onFullScreen,
 }: JobTaskViewProps) {
@@ -734,17 +736,17 @@ export function JobTaskView({
                     Add URL
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <P className="text-xs text-muted-foreground">
                   Enter a URL to a 3D model file (GLB, GLTF, OBJ, FBX, etc.)
-                </p>
+                </P>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-foreground">
+                <P className="text-sm font-medium text-foreground">
                   {categoryMedia.length} {categoryMedia.length === 1 ? "item" : "items"}
-                </p>
+                </P>
                 <div className="flex items-center gap-2">
                   <Input
                     type="url"
@@ -777,9 +779,9 @@ export function JobTaskView({
                   >
                     <div className="w-full h-full flex flex-col items-center justify-center bg-muted p-4">
                       {getMediaTypeIcon(item.type)}
-                      <p className="text-xs text-muted-foreground mt-2 text-center line-clamp-2">
+                      <P className="text-xs text-muted-foreground mt-2 text-center line-clamp-2">
                         {item.name}
-                      </p>
+                      </P>
                     </div>
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                       <div className="flex items-center gap-2">
@@ -802,7 +804,7 @@ export function JobTaskView({
                       </div>
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                      <p className="text-xs text-white truncate">{item.name}</p>
+                      <P className="text-xs text-white truncate">{item.name}</P>
                     </div>
                   </div>
                 ))}
@@ -875,7 +877,7 @@ export function JobTaskView({
                             Upload {categoryName}
                           </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-2">or attach from</p>
+                        <P className="text-xs text-muted-foreground mt-2">or attach from</P>
                         <ButtonGroup orientation="horizontal">
                           <Button
                             variant="outline"
@@ -938,9 +940,9 @@ export function JobTaskView({
           }}
         />
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <p className="text-sm font-medium text-foreground">
+          <P className="text-sm font-medium text-foreground">
             {categoryMedia.length} {categoryMedia.length === 1 ? "item" : "items"}
-          </p>
+          </P>
           <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant="outline"
@@ -1005,9 +1007,9 @@ export function JobTaskView({
               {(item.type === "3d-content" || item.type === "file") && (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-muted p-4">
                   {getMediaTypeIcon(item.type)}
-                  <p className="text-xs text-muted-foreground mt-2 text-center line-clamp-2">
+                  <P className="text-xs text-muted-foreground mt-2 text-center line-clamp-2">
                     {item.name}
-                  </p>
+                  </P>
                 </div>
               )}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -1031,7 +1033,7 @@ export function JobTaskView({
                 </div>
               </div>
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                <p className="text-xs text-white truncate">{item.name}</p>
+                <P className="text-xs text-white truncate">{item.name}</P>
               </div>
             </div>
           ))}
@@ -1715,22 +1717,36 @@ export function JobTaskView({
                 </div>
                 <div className="flex items-center gap-2">
                   {photographer ? (
-                    <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
-                      <Avatar className="h-7 w-7">
-                        <AvatarImage
-                          src={photographer.avatar}
-                          alt={photographer.name}
-                        />
-                        <AvatarFallback className="text-xs bg-muted-foreground/20">
-                          {photographer.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm font-medium text-foreground">
-                        {photographer.name}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
+                        <Avatar className="h-7 w-7">
+                          <AvatarImage
+                            src={photographer.avatar}
+                            alt={photographer.name}
+                          />
+                          <AvatarFallback className="text-xs bg-muted-foreground/20">
+                            {photographer.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium text-foreground">
+                          {photographer.name}
+                        </span>
+                      </div>
+                      {onChangePhotographer &&
+                        (job?.status === "assigned" || job?.status === "in_progress") && (
+                          <Button
+                            onClick={onChangePhotographer}
+                            variant="muted"
+                            size="sm"
+                            className="h-7 rounded-full"
+                          >
+                            <Edit className="h-3.5 w-3.5 mr-1.5" />
+                            Change
+                          </Button>
+                        )}
                     </div>
                   ) : (
                     onAssignPhotographer && (
@@ -1902,7 +1918,12 @@ export function JobTaskView({
                           Date
                         </H4>
                         <P className="text-sm">
-                          {format(new Date(job.scheduledDate), "MMM d, yyyy")}
+                          {(() => {
+                            // Parse date string as local date to avoid timezone shifts
+                            const [year, month, day] = job.scheduledDate.split('-').map(Number);
+                            const date = new Date(year, month - 1, day);
+                            return format(date, "MMM d, yyyy");
+                          })()}
                         </P>
                       </div>
                       <div>
@@ -1910,7 +1931,24 @@ export function JobTaskView({
                           <Clock className="h-4 w-4" />
                           Time
                         </H4>
-                        <P className="text-sm">{job.scheduledTime}</P>
+                        <P className="text-sm">
+                          {job.scheduledTime && job.estimatedDuration
+                            ? (() => {
+                                const duration = job.estimatedDuration || 60;
+                                // Parse scheduled date and time in local timezone
+                                const [year, month, day] = job.scheduledDate.split('-').map(Number);
+                                const [hours, minutes] = job.scheduledTime.split(':').map(Number);
+                                const scheduledDateTime = new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0);
+                                const endDateTime = new Date(scheduledDateTime.getTime() + duration * 60 * 1000);
+                                
+                                // Get timezone abbreviation
+                                const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                                const timeZoneName = new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop() || '';
+                                
+                                return `${format(scheduledDateTime, 'h:mm a')} - ${format(endDateTime, 'h:mm a')} ${timeZoneName}`;
+                              })()
+                            : job.scheduledTime || 'Not scheduled'}
+                        </P>
                       </div>
                     </div>
                     {job.requirements && (

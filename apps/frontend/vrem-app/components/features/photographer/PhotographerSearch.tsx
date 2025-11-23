@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
 import { Photographer, Organization } from '../../../types';
 import { Search, Star, Building2, User as UserIcon, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
-
+import { P } from '@/components/ui/typography';
 interface PhotographerSearchProps {
   photographers: Photographer[];
   companies: Organization[];
@@ -135,9 +135,9 @@ export function PhotographerSearch({
                       )}
                     </div>
                     {photographer.bio && (
-                      <p className="text-xs text-muted-foreground/80 line-clamp-2">
+                      <P className="text-xs text-muted-foreground/80 line-clamp-2">
                         {photographer.bio}
-                      </p>
+                      </P>
                     )}
                   </div>
                 </div>
@@ -188,7 +188,7 @@ export function PhotographerSearch({
                       )}
                       <span>{company.photographerCount} photographers</span>
                     </div>
-                    <p className="text-xs text-muted-foreground/80">{company.description}</p>
+                    <P className="text-xs text-muted-foreground/80">{company.description}</P>
                   </div>
                 </div>
 
@@ -233,18 +233,18 @@ export function PhotographerSearch({
             (searchType === 'company' && filteredCompanies.length === 0)) && (
             <div className="text-center py-8 text-muted-foreground/80">
               <Search className="h-12 w-12 mx-auto mb-2 text-muted-foreground/40" />
-              <p className="text-sm">No results found</p>
+              <P className="text-sm">No results found</P>
             </div>
           )}
 
         {!query && (
           <div className="text-center py-8 text-muted-foreground/80">
             <Search className="h-12 w-12 mx-auto mb-2 text-muted-foreground/40" />
-            <p className="text-sm">
+            <P className="text-sm">
               {searchType === 'photographer'
                 ? 'Search for a specific photographer'
                 : 'Search for a media company'}
-            </p>
+            </P>
           </div>
         )}
       </div>

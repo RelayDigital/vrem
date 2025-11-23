@@ -140,7 +140,13 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
           setError(null);
           // Resize map after initial load to ensure it fills container
           setTimeout(() => {
-            map.resize();
+            if (mapRef.current && mapRef.current === map) {
+              try {
+                map.resize();
+              } catch (err) {
+                console.warn('Error resizing map:', err);
+              }
+            }
           }, 100);
         });
 
@@ -163,7 +169,13 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
           setError(null);
           // Resize map after style loads to ensure it fills container
           setTimeout(() => {
-            map.resize();
+            if (mapRef.current && mapRef.current === map) {
+              try {
+                map.resize();
+              } catch (err) {
+                console.warn('Error resizing map:', err);
+              }
+            }
           }, 100);
         });
 

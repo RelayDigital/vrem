@@ -81,7 +81,7 @@ export default function VremApp() {
   );
   const [agentView, setAgentView] = useState<'booking' | 'jobs'>('jobs');
   const [photographerView, setPhotographerView] = useState<'jobs' | 'profile' | 'companies'>('jobs');
-  const [dispatcherView, setDispatcherView] = useState<'dashboard' | 'jobs' | 'team' | 'audit' | 'map'>('dashboard');
+  const [dispatcherView, setDispatcherView] = useState<'dashboard' | 'jobs' | 'team' | 'audit' | 'map' | 'calendar'>('dashboard');
   const [showNewJobForm, setShowNewJobForm] = useState(false);
 
   const handleJobCreate = (jobData: Partial<JobRequest>) => {
@@ -92,6 +92,7 @@ export default function VremApp() {
 
     const newJob: JobRequest = {
       id: `job-${Date.now().toString().slice(-3)}`,
+      orderNumber: `JOB-${Date.now().toString().slice(-3)}`,
       organizationId: jobData.organizationId || currentUser.organizationId,
       clientName: jobData.clientName!,
       propertyAddress: jobData.propertyAddress!,
@@ -137,11 +138,11 @@ export default function VremApp() {
       jobs.map((job) =>
         job.id === jobId
           ? {
-              ...job,
-              status: 'assigned' as const,
-              assignedPhotographerId: photographerId,
-              assignedAt: new Date(),
-            }
+            ...job,
+            status: 'assigned' as const,
+            assignedPhotographerId: photographerId,
+            assignedAt: new Date(),
+          }
           : job
       )
     );
@@ -263,7 +264,7 @@ export default function VremApp() {
       const matchingPhotographer = photographers.find(
         (p) => p.email === currentUser.email
       ) || photographers[0];
-      
+
       if (matchingPhotographer) {
         updatedUser = {
           ...updatedUser,
@@ -327,11 +328,11 @@ export default function VremApp() {
 
       // Measure on resize
       window.addEventListener('resize', measureHeader);
-      
+
       // Also use ResizeObserver for more accurate measurements
       const header = document.querySelector('header');
       let resizeObserver: ResizeObserver | null = null;
-      
+
       if (header) {
         resizeObserver = new ResizeObserver(() => {
           measureHeader();
@@ -351,21 +352,21 @@ export default function VremApp() {
   const renderHeader = () => (
     <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-xl shadow-sm w-full px-4">
       <div className="w-full max-w-full py-3 overflow-hidden">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <H2 className="p-0 border-0">
-                  VX Media
-                </H2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <H2 className="p-0 border-0">
+              VX Media
+            </H2>
             {isAuthenticated && currentUser.role === 'dispatcher' && (
               <SidebarTrigger />
-                )}
-            </div>
+            )}
+          </div>
 
-            <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4">
             {/* Auth Section */}
             {isAuthenticated && (
               <>
-              {/* Dispatcher New Job Button */}
+                {/* Dispatcher New Job Button */}
                 {currentUser.role === 'dispatcher' && (
                   <Button
                     onClick={() => setShowNewJobForm(true)}
@@ -378,55 +379,55 @@ export default function VremApp() {
                   </Button>
                 )}
 
-              {/* Agent View Switcher */}
+                {/* Agent View Switcher */}
                 {currentUser.role === 'agent' && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={agentView === 'jobs' ? 'default' : 'muted'}
-                    size="sm"
-                    onClick={() => setAgentView('jobs')}
-                  >
-                    My Jobs
-                  </Button>
-                  <Button
-                    variant={agentView === 'booking' ? 'default' : 'muted'}
-                    size="sm"
-                    onClick={() => setAgentView('booking')}
-                  >
-                    New Booking
-                  </Button>
-                </div>
-              )}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={agentView === 'jobs' ? 'default' : 'muted'}
+                      size="sm"
+                      onClick={() => setAgentView('jobs')}
+                    >
+                      My Jobs
+                    </Button>
+                    <Button
+                      variant={agentView === 'booking' ? 'default' : 'muted'}
+                      size="sm"
+                      onClick={() => setAgentView('booking')}
+                    >
+                      New Booking
+                    </Button>
+                  </div>
+                )}
 
-              {/* Photographer View Switcher */}
+                {/* Photographer View Switcher */}
                 {currentUser.role === 'photographer' && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={photographerView === 'jobs' ? 'default' : 'muted'}
-                    size="sm"
-                    onClick={() => setPhotographerView('jobs')}
-                  >
-                    <Briefcase className="h-4 w-4 mr-2" />
-                    My Jobs
-                  </Button>
-                  <Button
-                    variant={photographerView === 'profile' ? 'default' : 'muted'}
-                    size="sm"
-                    onClick={() => setPhotographerView('profile')}
-                  >
-                    <UserIcon2 className="h-4 w-4 mr-2" />
-                    Profile & Services
-                  </Button>
-                  <Button
-                    variant={photographerView === 'companies' ? 'default' : 'muted'}
-                    size="sm"
-                    onClick={() => setPhotographerView('companies')}
-                  >
-                    <Building2 className="h-4 w-4 mr-2" />
-                    Companies
-                  </Button>
-                </div>
-              )}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={photographerView === 'jobs' ? 'default' : 'muted'}
+                      size="sm"
+                      onClick={() => setPhotographerView('jobs')}
+                    >
+                      <Briefcase className="h-4 w-4 mr-2" />
+                      My Jobs
+                    </Button>
+                    <Button
+                      variant={photographerView === 'profile' ? 'default' : 'muted'}
+                      size="sm"
+                      onClick={() => setPhotographerView('profile')}
+                    >
+                      <UserIcon2 className="h-4 w-4 mr-2" />
+                      Profile & Services
+                    </Button>
+                    <Button
+                      variant={photographerView === 'companies' ? 'default' : 'muted'}
+                      size="sm"
+                      onClick={() => setPhotographerView('companies')}
+                    >
+                      <Building2 className="h-4 w-4 mr-2" />
+                      Companies
+                    </Button>
+                  </div>
+                )}
 
                 {/* Profile Dropdown */}
                 <DropdownMenu>
@@ -503,18 +504,18 @@ export default function VremApp() {
             )}
 
             {!isAuthenticated && (
-                <Button
-                  onClick={handleLogin}
-                  variant="default"
-                >
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Log In
-                </Button>
-              )}
-            </div>
+              <Button
+                onClick={handleLogin}
+                variant="default"
+              >
+                <LogIn className="h-4 w-4 mr-2" />
+                Log In
+              </Button>
+            )}
           </div>
         </div>
-      </header>
+      </div>
+    </header>
   );
 
   return (
@@ -528,7 +529,7 @@ export default function VremApp() {
             currentView={dispatcherView}
             onViewChange={setDispatcherView}
           />
-            <SidebarInset className="min-w-0" style={{ paddingTop: `${headerHeight}px` }}>
+          <SidebarInset className="min-w-0" style={{ paddingTop: `${headerHeight}px` }}>
             <div className="flex-1 overflow-x-hidden min-w-0">
               <DispatcherDashboard
                 jobs={jobs}
@@ -540,6 +541,7 @@ export default function VremApp() {
                 activeView={dispatcherView}
                 onNavigateToJobsView={() => setDispatcherView('jobs')}
                 onNavigateToMapView={() => setDispatcherView('map')}
+                onNavigateToCalendarView={() => setDispatcherView('calendar')}
                 onNewJobClick={() => setShowNewJobForm(true)}
               />
             </div>
@@ -562,47 +564,47 @@ export default function VremApp() {
       ) : (
         <>
           {renderHeader()}
-      {!isAuthenticated ? (
-        <LandingPage
-          photographers={photographers}
-          companies={organizations}
-          preferredVendors={preferredVendors.map((v) => v.vendorId)}
-          onJobCreate={handleJobCreate}
-          onGetStarted={handleGetStarted}
-          isAuthenticated={isAuthenticated}
-          onLoginRequired={handleLogin}
-        />
-      ) : currentUser.role === 'agent' ? (
-        agentView === 'jobs' ? (
-          <AgentJobsView
-            jobs={jobs}
-            photographers={photographers}
-            organizationId={currentUser.organizationId}
-            onNewJobClick={() => setAgentView('booking')}
-          />
-        ) : (
-          <AgentBookingFlow
-            photographers={photographers}
-            companies={organizations}
-            preferredVendors={preferredVendors.map((v) => v.vendorId)}
-            onJobCreate={(job) => {
-              handleJobCreate(job);
-              setAgentView('jobs');
-            }}
-            isAuthenticated={isAuthenticated}
-            onLoginRequired={handleLogin}
-          />
-        )
-      ) : currentUser.role === 'photographer' && currentPhotographer ? (
-        <PhotographerDashboard
-          photographer={currentPhotographer}
-          jobs={jobs}
-          companies={organizations}
-          applications={applications}
-          onUpdateProfile={handleUpdatePhotographerProfile}
-          onApplyToCompany={handleApplyToCompany}
-          activeView={photographerView}
-        />
+          {!isAuthenticated ? (
+            <LandingPage
+              photographers={photographers}
+              companies={organizations}
+              preferredVendors={preferredVendors.map((v) => v.vendorId)}
+              onJobCreate={handleJobCreate}
+              onGetStarted={handleGetStarted}
+              isAuthenticated={isAuthenticated}
+              onLoginRequired={handleLogin}
+            />
+          ) : currentUser.role === 'agent' ? (
+            agentView === 'jobs' ? (
+              <AgentJobsView
+                jobs={jobs}
+                photographers={photographers}
+                organizationId={currentUser.organizationId}
+                onNewJobClick={() => setAgentView('booking')}
+              />
+            ) : (
+              <AgentBookingFlow
+                photographers={photographers}
+                companies={organizations}
+                preferredVendors={preferredVendors.map((v) => v.vendorId)}
+                onJobCreate={(job) => {
+                  handleJobCreate(job);
+                  setAgentView('jobs');
+                }}
+                isAuthenticated={isAuthenticated}
+                onLoginRequired={handleLogin}
+              />
+            )
+          ) : currentUser.role === 'photographer' && currentPhotographer ? (
+            <PhotographerDashboard
+              photographer={currentPhotographer}
+              jobs={jobs}
+              companies={organizations}
+              applications={applications}
+              onUpdateProfile={handleUpdatePhotographerProfile}
+              onApplyToCompany={handleApplyToCompany}
+              activeView={photographerView}
+            />
           ) : null}
         </>
       )}

@@ -4,6 +4,7 @@ import { JobRequest, Photographer, Metrics } from "../../../../types";
 import { MetricsDashboard } from "../../../shared/metrics";
 import { JobCard } from "../../../shared/jobs";
 import { MapWithSidebar } from "../../../shared/dashboard/MapWithSidebar";
+import { MiniCalendarView } from "../../../shared/dashboard/MiniCalendarView";
 import { Button } from "../../../ui/button";
 import { motion } from "framer-motion";
 import { Briefcase } from "lucide-react";
@@ -19,8 +20,10 @@ interface DashboardViewProps {
   onSelectJob: (job: JobRequest) => void;
   onNavigateToJobsView?: () => void;
   onNavigateToMapView?: () => void;
+  onNavigateToCalendarView?: () => void;
   onNavigateToJobInProjectManagement?: (job: JobRequest) => void;
   onJobAssign?: (jobId: string, photographerId: string, score: number) => void;
+  onJobClick?: (job: JobRequest) => void;
 }
 
 export function DashboardView({
@@ -32,8 +35,10 @@ export function DashboardView({
   onSelectJob,
   onNavigateToJobsView,
   onNavigateToMapView,
+  onNavigateToCalendarView,
   onNavigateToJobInProjectManagement,
   onJobAssign,
+  onJobClick,
 }: DashboardViewProps) {
   const assignedJobs = jobs.filter((j) => j.status === "assigned");
 
@@ -70,6 +75,21 @@ export function DashboardView({
             onJobAssign={onJobAssign}
           />
         </div>
+        {/* Calendar */}
+        <div className="@container w-full mt-md">
+          <div className="mb-md flex items-baseline justify-between">
+            <H2 className="text-lg border-0">Schedule</H2>
+            <Button variant="flat" onClick={onNavigateToCalendarView}>
+              View calendar
+            </Button>
+          </div>
+          <MiniCalendarView
+            jobs={jobs}
+            photographers={photographers}
+            onJobClick={onJobClick}
+            onViewFullCalendar={onNavigateToCalendarView}
+          />
+        </div>
         {/* Active Jobs */}
         <div className="@container w-full mb-md">
           <div className="mb-md flex items-baseline justify-between">
@@ -96,11 +116,12 @@ export function DashboardView({
                       key={job.id}
                       job={job}
                       photographer={photographer}
-                      onViewInProjectManagement={
-                        onNavigateToJobInProjectManagement
-                          ? () => onNavigateToJobInProjectManagement(job)
+                      onViewRankings={
+                        job.status === "pending"
+                          ? () => onViewRankings(job)
                           : undefined
                       }
+                      onClick={onJobClick ? () => onJobClick(job) : undefined}
                     />
                   );
                 })}

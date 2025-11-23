@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { JobRequest, Photographer } from '../../../types';
+import { ChatMessage } from '../../../types/chat';
 import { JobCardKanban } from '../jobs/JobCardKanban';
 import { Badge } from '../../ui/badge';
 import { Calendar, Camera, Scissors, CheckCircle2 } from 'lucide-react';
@@ -16,9 +17,12 @@ import {
 interface JobKanbanBoardProps {
     jobs: JobRequest[];
     photographers: Photographer[];
+    messages?: ChatMessage[];
     onViewRankings?: (job: JobRequest) => void;
+    onChangePhotographer?: (job: JobRequest) => void; // For reassigning photographer
     onJobStatusChange?: (jobId: string, newStatus: JobRequest['status']) => void;
     onJobClick?: (job: JobRequest) => void;
+    disableContextMenu?: boolean; // Disable context menu when sheet is open
 }
 
 type PipelineStage = 'booked' | 'shooting' | 'editing' | 'delivered';
@@ -77,9 +81,12 @@ interface JobKanbanItem extends Record<string, unknown> {
 export function JobKanbanBoard({
     jobs,
     photographers,
+    messages = [],
     onViewRankings,
+    onChangePhotographer,
     onJobStatusChange,
     onJobClick,
+    disableContextMenu = false,
 }: JobKanbanBoardProps) {
     // Transform jobs into kanban items
     const kanbanData = useMemo<JobKanbanItem[]>(() => {
@@ -124,7 +131,7 @@ export function JobKanbanBoard({
 
     return (
         <div className="relative h-[calc(100vh-165px)] w-full overflow-x-auto">
-            <div style={{ display: 'flex', height: '100%', gap: '16px', width: 'max-content' }}>
+            <div style={{ display: 'flex', height: '100%', gap: '16px' }}>
                 <KanbanProvider
                     columns={columns}
                     data={kanbanData}
@@ -136,7 +143,7 @@ export function JobKanbanBoard({
                         const columnJobs = kanbanData.filter((item) => item.column === column.id);
 
                         return (
-                            <KanbanBoard key={column.id} id={column.id} className="h-full min-w-[340px] w-[340px] shrink-0">
+                            <KanbanBoard key={column.id} id={column.id} className="relative h-full shrink-0">
                                 <KanbanHeader className="flex items-center justify-between p-4 border-b">
                                     <div className="flex items-center gap-2">
                                         <Icon className={`h-4 w-4 ${column.color}`} />
@@ -153,7 +160,7 @@ export function JobKanbanBoard({
                                         </div>
                                     </div>
                                 ) : (
-                                    <KanbanCards id={column.id} className="h-full w-full">
+                                    <KanbanCards id={column.id} className="size-full">
                                         {(item) => {
                                             const jobItem = item as JobKanbanItem;
                                             const photographer = jobItem.job.assignedPhotographerId
@@ -161,23 +168,30 @@ export function JobKanbanBoard({
                                                 : undefined;
 
                                             return (
-                                                <div key={jobItem.id} className="w-full min-w-0 max-w-full">
+                                                <div key={jobItem.id} className="size-full">
                                                     <KanbanCard
                                                         id={jobItem.id}
                                                         name={jobItem.name}
                                                         column={jobItem.column}
-                                                        className="p-0 w-full max-w-full"
+                                                        className="p-0 w-full"
                                                     >
                                                         <JobCardKanban
                                                             job={jobItem.job}
                                                             photographer={photographer}
+                                                            messages={messages}
                                                             onViewRankings={
                                                                 (jobItem.job.status === 'pending' || jobItem.job.status === 'assigned') &&
                                                                     onViewRankings
                                                                     ? () => onViewRankings(jobItem.job)
                                                                     : undefined
                                                             }
+                                                            onChangePhotographer={
+                                                                onChangePhotographer
+                                                                    ? () => onChangePhotographer(jobItem.job)
+                                                                    : undefined
+                                                            }
                                                             onJobClick={onJobClick ? () => onJobClick(jobItem.job) : undefined}
+                                                            disableContextMenu={disableContextMenu}
                                                         />
                                                     </KanbanCard>
                                                 </div>

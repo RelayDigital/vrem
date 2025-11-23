@@ -113,7 +113,7 @@ export function LiveJobMapView({
         onSelectJob={onSelectJob}
         onNavigateToJobInProjectManagement={onNavigateToJobInProjectManagement}
         onJobAssign={onJobAssign}
-        className="h-full w-full"
+        className="size-full"
         fullScreen={true}
       />
     </div>

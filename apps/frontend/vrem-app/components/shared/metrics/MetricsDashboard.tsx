@@ -9,6 +9,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { Progress } from "../../ui/progress";
+import { P } from "@/components/ui/typography";
 
 interface MetricsDashboardProps {
   metrics: Metrics;
@@ -45,10 +46,10 @@ export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
         <CardContent>
           <div className="text-2xl">{utilizationPercent}%</div>
           <Progress value={utilizationPercent} className="mt-2" />
-          <p className="text-xs text-muted-foreground mt-2">
+          <P className="text-xs text-muted-foreground mt-2">
             {metrics.photographers.available}/{metrics.photographers.active}{" "}
             available
-          </p>
+          </P>
         </CardContent>
       </Card>
 
@@ -61,9 +62,9 @@ export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
           <div className="text-2xl">
             {metrics.performance.averageDeliveryTime}h
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
+          <P className="text-xs text-muted-foreground mt-2">
             Assignment: {metrics.performance.averageAssignmentTime}m
-          </p>
+          </P>
         </CardContent>
       </Card>
 
@@ -76,9 +77,9 @@ export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
           <div className="text-2xl">
             ${(metrics.revenue.total / 1000).toFixed(1)}k
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
+          <P className="text-xs text-muted-foreground mt-2">
             ${metrics.revenue.perJob}/job avg
-          </p>
+          </P>
         </CardContent>
       </Card>
 
@@ -94,12 +95,12 @@ export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
             </div>
             <CheckCircle2 className="h-8 w-8 text-emerald-600" />
           </div>
-          <p className="text-xs text-muted-foreground mt-3">
+          <P className="text-xs text-muted-foreground mt-3">
             {Math.round(
               metrics.jobs.completed * metrics.performance.onTimeRate
             )}{" "}
             of {metrics.jobs.completed} jobs delivered on time
-          </p>
+          </P>
         </CardContent>
       </Card>
 
@@ -120,9 +121,9 @@ export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
             </div>
             <TrendingUp className="h-8 w-8 text-blue-600" />
           </div>
-          <p className="text-xs text-muted-foreground mt-3">
+          <P className="text-xs text-muted-foreground mt-3">
             Based on {metrics.jobs.completed} completed jobs
-          </p>
+          </P>
         </CardContent>
       </Card>
     </div>

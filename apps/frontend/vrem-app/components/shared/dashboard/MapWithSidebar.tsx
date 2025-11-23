@@ -399,7 +399,7 @@ export function MapWithSidebar({
               className={`relative flex-1 p-0! min-h-0 overflow-hidden flex flex-col w-full min-w-0 max-w-full ${fullScreen ? "py-4 px-0!" : ""
                 }`}
             >
-              <ScrollArea className="h-full w-full min-w-0 max-w-full overflow-x-hidden">
+              <ScrollArea className="size-full min-w-0 max-w-full overflow-x-hidden">
                 <div className="py-4 px-0! space-y-3 min-w-0 w-full max-w-full box-border">
                   {filteredPendingJobs.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center py-12">
@@ -415,8 +415,9 @@ export function MapWithSidebar({
                       >
                         <JobCard
                           job={job}
-                          onViewRankings={() => handleFindPhotographer(job)}
-                          onClick={() => onSelectJob(job)}
+                          horizontal={true}
+                          hideRequirements={true}
+                          onClick={() => handleFindPhotographer(job)}
                           onViewInProjectManagement={
                             onNavigateToJobInProjectManagement
                               ? () => onNavigateToJobInProjectManagement(job)
@@ -613,7 +614,7 @@ export function MapWithSidebar({
   if (fullScreen) {
     return (
       <div
-        className={`${className || "h-full w-full"
+        className={`${className || "size-full"
           } overflow-hidden flex flex-col h-full`}
       >
         {mapContent}

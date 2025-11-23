@@ -16,6 +16,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '../../ui/tooltip';
+import { P } from '@/components/ui/typography';
 
 interface AgentJobsViewProps {
   jobs: JobRequest[];
@@ -108,7 +109,7 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
                 <span className="truncate max-w-[180px]">{job.propertyAddress}</span>
               </TooltipTrigger>
               <TooltipContent>
-                <p className="max-w-xs">{job.propertyAddress}</p>
+                <P className="max-w-xs">{job.propertyAddress}</P>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -139,7 +140,7 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="capitalize">{type}</p>
+                    <P className="capitalize">{type}</P>
                   </TooltipContent>
                 </Tooltip>
               );

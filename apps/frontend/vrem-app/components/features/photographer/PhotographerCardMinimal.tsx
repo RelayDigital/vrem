@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { P } from "@/components/ui/typography";
 
 interface PhotographerCardMinimalProps {
   photographer: Photographer;
@@ -245,12 +246,12 @@ export function PhotographerCardMinimal({
                             <Info className="h-3 w-3 text-muted-foreground/60 hover:text-muted-foreground cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
-                            <p className="text-xs">
+                            <P className="text-xs">
                               Calculated by averaging the photographer's skill
                               ratings (1-5 scale) for each media type required
                               by the job. The average is converted to a
                               percentage (multiplied by 20).
-                            </p>
+                            </P>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -334,11 +335,11 @@ export function PhotographerCardMinimal({
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="max-w-xs">
+                            <P className="max-w-xs">
                               Overall match score calculated from availability,
                               distance, skill match, and reliability. Higher
                               scores indicate better fit for the job.
-                            </p>
+                            </P>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -400,7 +401,7 @@ export function PhotographerCardMinimal({
                   </TooltipTrigger>
                   {!isAvailable && (
                     <TooltipContent>
-                      <p>This photographer is not available for assignment</p>
+                      <P>This photographer is not available for assignment</P>
                     </TooltipContent>
                   )}
                 </Tooltip>

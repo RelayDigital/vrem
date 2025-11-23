@@ -16,11 +16,14 @@ import {
   Users,
   FileText,
   MapPin,
+  Calendar,
 } from "lucide-react";
 
 interface DispatcherSidebarProps {
-  currentView: "dashboard" | "jobs" | "team" | "audit" | "map";
-  onViewChange: (view: "dashboard" | "jobs" | "team" | "audit" | "map") => void;
+  currentView: "dashboard" | "jobs" | "team" | "audit" | "map" | "calendar";
+  onViewChange: (
+    view: "dashboard" | "jobs" | "team" | "audit" | "map" | "calendar"
+  ) => void;
 }
 
 export function DispatcherSidebar({
@@ -125,6 +128,16 @@ export function DispatcherSidebar({
                 >
                   <MapPin />
                   <span>Map</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={currentView === "calendar"}
+                  onClick={() => onViewChange("calendar")}
+                  tooltip="Calendar"
+                >
+                  <Calendar />
+                  <span>Calendar</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

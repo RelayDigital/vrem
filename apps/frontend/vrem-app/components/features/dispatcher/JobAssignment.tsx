@@ -11,6 +11,7 @@ import {
   Clock,
   Camera,
 } from 'lucide-react';
+import { P } from '@/components/ui/typography';
 
 interface JobAssignmentProps {
   job: JobRequest;
@@ -67,9 +68,9 @@ export function JobAssignment({ job, rankings, onAssign }: JobAssignmentProps) {
       <Card>
         <CardHeader>
           <CardTitle>AI-Ranked Photographers</CardTitle>
-          <p className="text-sm text-muted-foreground">
+          <P className="text-sm text-muted-foreground">
             Photographers ranked by availability, distance, reliability, and skill match
-          </p>
+          </P>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">

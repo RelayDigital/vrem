@@ -1,6 +1,8 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { JobRequest, Photographer } from "../../../../types";
+import { ChatMessage } from "../../../../types/chat";
 import { JobCard, PaginatedJobGrid } from "../../../shared/jobs";
 import { JobKanbanBoard } from "../../../shared/kanban";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../ui/tabs";
@@ -16,30 +18,129 @@ import {
   Clock,
   Zap,
   AlertCircle,
+  Search,
+  Filter,
+  ArrowUpDown,
 } from "lucide-react";
 import { TableCell } from "../../../ui/table";
 import { Badge } from "../../../ui/badge";
 import { Button } from "../../../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../../../ui/avatar";
+import { Input } from "../../../ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../ui/select";
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../../ui/tooltip";
-import { H2 } from "@/components/ui/typography";
+import { H2, P } from "@/components/ui/typography";
 
 interface JobsViewProps {
   jobs: JobRequest[];
   photographers: Photographer[];
+  messages?: ChatMessage[];
   onViewRankings: (job: JobRequest) => void;
+  onChangePhotographer?: (job: JobRequest) => void; // For reassigning photographer
   onJobStatusChange?: (jobId: string, newStatus: JobRequest["status"]) => void;
   onJobClick?: (job: JobRequest) => void;
+  disableContextMenu?: boolean;
 }
 
 export function JobsView({
   jobs,
   photographers,
+  messages = [],
   onViewRankings,
+  onChangePhotographer,
   onJobStatusChange,
   onJobClick,
+  disableContextMenu = false,
 }: JobsViewProps) {
+  // Kanban view search, filter, and sort state
+  const [kanbanSearchQuery, setKanbanSearchQuery] = useState("");
+  const [kanbanSelectedFilter, setKanbanSelectedFilter] = useState<string>("all");
+  const [kanbanSortBy, setKanbanSortBy] = useState<string>("date-desc");
+
+  // Filter and sort jobs for kanban view
+  const filteredAndSortedJobs = useMemo(() => {
+    let result = [...jobs];
+
+    // Apply search filter
+    if (kanbanSearchQuery) {
+      const query = kanbanSearchQuery.toLowerCase();
+      result = result.filter((job) => {
+        const searchableText = `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`.toLowerCase();
+        return searchableText.includes(query);
+      });
+    }
+
+    // Apply custom filter
+    if (kanbanSelectedFilter !== "all") {
+      // Check if it's a priority filter
+      if (["urgent", "rush", "standard"].includes(kanbanSelectedFilter)) {
+        result = result.filter((j) => j.priority === kanbanSelectedFilter);
+      } else {
+        // Otherwise it's a status filter
+        result = result.filter((j) => j.status === kanbanSelectedFilter);
+      }
+      // Re-apply search after custom filter
+      if (kanbanSearchQuery) {
+        const query = kanbanSearchQuery.toLowerCase();
+        result = result.filter((job) => {
+          const searchableText = `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`.toLowerCase();
+          return searchableText.includes(query);
+        });
+      }
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      switch (kanbanSortBy) {
+        case "date-asc":
+          // Sort by scheduledDate ascending (earliest first)
+          if (a.scheduledDate && b.scheduledDate) {
+            return new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime();
+          }
+          if (a.scheduledDate) return -1;
+          if (b.scheduledDate) return 1;
+          return 0;
+        case "date-desc":
+          // Sort by scheduledDate descending (latest first)
+          if (a.scheduledDate && b.scheduledDate) {
+            return new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime();
+          }
+          if (a.scheduledDate) return -1;
+          if (b.scheduledDate) return 1;
+          return 0;
+        case "client-asc":
+          // Sort by clientName A-Z
+          if (a.clientName && b.clientName) {
+            return a.clientName.localeCompare(b.clientName);
+          }
+          return 0;
+        case "client-desc":
+          // Sort by clientName Z-A
+          if (a.clientName && b.clientName) {
+            return b.clientName.localeCompare(a.clientName);
+          }
+          return 0;
+        case "priority":
+          // Sort by priority: urgent > rush > standard
+          const priorityOrder: Record<string, number> = { urgent: 3, rush: 2, standard: 1 };
+          const priorityA = priorityOrder[a.priority] || 0;
+          const priorityB = priorityOrder[b.priority] || 0;
+          return priorityB - priorityA;
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [jobs, kanbanSearchQuery, kanbanSelectedFilter, kanbanSortBy]);
+
   const getMediaIcon = (type: string) => {
     switch (type) {
       case "photo":
@@ -181,7 +282,7 @@ export function JobsView({
                               </span>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p className="max-w-xs">{job.propertyAddress}</p>
+                              <P className="max-w-xs">{job.propertyAddress}</P>
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -219,7 +320,7 @@ export function JobsView({
                                   </div>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <p className="capitalize">{type}</p>
+                                  <P className="capitalize">{type}</P>
                                 </TooltipContent>
                               </Tooltip>
                             );
@@ -297,13 +398,63 @@ export function JobsView({
             </TabsContent>
 
             <TabsContent value="kanban" className="mt-0">
-              <JobKanbanBoard
-                jobs={jobs}
-                photographers={photographers}
-                onViewRankings={onViewRankings}
-                onJobStatusChange={onJobStatusChange}
-                onJobClick={onJobClick}
-              />
+              <div className="flex flex-col space-y-4">
+                {/* Search, Filter, and Sort Bar */}
+                <div className="flex gap-3">
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
+                    <Input
+                      type="text"
+                      variant="muted"
+                      placeholder="Search by address, client, Order #..."
+                      value={kanbanSearchQuery}
+                      onChange={(e) => setKanbanSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Select value={kanbanSelectedFilter} onValueChange={setKanbanSelectedFilter}>
+                    <SelectTrigger variant="muted" className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
+                      <Filter className="h-4 w-4 md:mr-2" />
+                      <SelectValue placeholder="All Items" className="hidden md:inline" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Items</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                      <SelectItem value="rush">Rush</SelectItem>
+                      <SelectItem value="standard">Standard</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="assigned">Assigned</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="delivered">Delivered</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={kanbanSortBy} onValueChange={setKanbanSortBy}>
+                    <SelectTrigger variant="muted" className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
+                      <ArrowUpDown className="h-4 w-4 md:mr-2" />
+                      <SelectValue placeholder="Sort by" className="hidden md:inline" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="date-desc">Date (Newest First)</SelectItem>
+                      <SelectItem value="date-asc">Date (Oldest First)</SelectItem>
+                      <SelectItem value="client-asc">Client (A-Z)</SelectItem>
+                      <SelectItem value="client-desc">Client (Z-A)</SelectItem>
+                      <SelectItem value="priority">Priority</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Kanban Board */}
+                <JobKanbanBoard
+                  jobs={filteredAndSortedJobs}
+                  photographers={photographers}
+                  messages={messages}
+                  onViewRankings={onViewRankings}
+                  onChangePhotographer={onChangePhotographer}
+                  onJobStatusChange={onJobStatusChange}
+                  onJobClick={onJobClick}
+                  disableContextMenu={disableContextMenu}
+                />
+              </div>
             </TabsContent>
           </Tabs>
         </div>

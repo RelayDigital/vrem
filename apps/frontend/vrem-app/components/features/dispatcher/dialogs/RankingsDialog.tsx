@@ -39,7 +39,7 @@ export function RankingsDialog({
               selectedJob={selectedJob}
               onSelectJob={() => {}}
               onJobAssign={onJobAssign}
-              className="h-full w-full"
+              className="size-full"
               fullScreen={true}
               initialSidebarView="rankings"
               initialJobForRankings={selectedJob}

@@ -20,6 +20,7 @@ import {
   Edit,
   Clock,
 } from 'lucide-react';
+import { P } from '@/components/ui/typography';
 
 interface AuditLogProps {
   entries: AuditLogEntry[];
@@ -72,9 +73,9 @@ export function AuditLog({ entries }: AuditLogProps) {
     <Card>
       {/* <CardHeader>
         <CardTitle>System Activity Audit Log</CardTitle>
-        <p className="text-sm text-muted-foreground">
+        <P className="text-sm text-muted-foreground">
           All system actions are timestamped and traceable to a user identity
-        </p>
+        </P>
       </CardHeader> */}
       <CardContent>
         <ScrollArea className="h-[600px]">
