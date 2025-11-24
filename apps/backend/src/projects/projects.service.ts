@@ -5,9 +5,13 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { AssignProjectDto } from './dto/assign-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { CronofyService } from '../cronofy/cronofy.service';
 @Injectable()
 export class ProjectsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cronofy: CronofyService
+  ) {}
 
   // Get all projects (PM + Admin)
   findAll() {
@@ -83,12 +87,21 @@ export class ProjectsService {
 }
 
 async assignTechnician(projectId: string, technicianId: string) {
-  await this.ensureUserExists(technicianId);
-  return this.prisma.project.update({
+  const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+  const technician = await this.prisma.user.findUnique({ where: { id: technicianId }});
+
+  const updated = await this.prisma.project.update({
     where: { id: projectId },
     data: { technicianId },
   });
+
+  if (project!.scheduledTime) {
+    await this.cronofy.createEvent(updated, technician);
+  }
+
+  return updated;
 }
+
 
 async assignEditor(projectId: string, editorId: string) {
   await this.ensureUserExists(editorId);
@@ -99,11 +112,22 @@ async assignEditor(projectId: string, editorId: string) {
 }
 
 async scheduleProject(projectId: string, scheduled: Date) {
-  return this.prisma.project.update({
+  const project = await this.prisma.project.update({
     where: { id: projectId },
     data: { scheduledTime: scheduled },
   });
+
+  const event = await this.prisma.calendarEvent.findUnique({
+    where: { projectId },
+  });
+
+  if (event) {
+    await this.cronofy.updateEvent(project, event);
+  }
+
+  return project;
 }
+
 
 private async ensureUserExists(id: string) {
   const user = await this.prisma.user.findUnique({ where: { id } });

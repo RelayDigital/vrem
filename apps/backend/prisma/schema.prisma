@@ -71,6 +71,7 @@ model Project {
   updatedAt     DateTime      @updatedAt
   media         Media[]
   messages      Message[]
+  calendarEvent CalendarEvent?
 }
 
 enum MediaType {
@@ -104,5 +105,15 @@ enum InquiryStatus {
   APPROVED
   REJECTED
   CONVERTED_TO_PROJECT
+}
+
+model CalendarEvent {
+  id              String   @id @default(uuid())
+  projectId       String   @unique
+  cronofyEventId  String
+  calendarId      String
+  createdAt       DateTime @default(now())
+
+  project         Project  @relation(fields: [projectId], references: [id])
 }
 

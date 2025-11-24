@@ -1,0 +1,19 @@
+A) Technician Availability (Cronofy /availability)
+
+Required for the booking calendar.
+
+B) Cronofy Webhooks
+
+(e.g., external calendar changes → update project)
+
+C) Stripe → Booking → Cronofy flow
+
+(payment success triggers project + Cronofy event)
+
+D) Linking technician calendar IDs
+
+(so each technician has a Cronofy calendar)
+
+E) Cronofy Slot Picker embedding strategy
+
+(frontend detail, but backend has to supply data)
