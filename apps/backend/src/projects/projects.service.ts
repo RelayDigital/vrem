@@ -95,9 +95,10 @@ async assignTechnician(projectId: string, technicianId: string) {
     data: { technicianId },
   });
 
-  if (project!.scheduledTime) {
+  if (project!.scheduledTime && process.env.CRONOFY_ACCESS_TOKEN) {
     await this.cronofy.createEvent(updated, technician);
   }
+
 
   return updated;
 }
@@ -121,9 +122,10 @@ async scheduleProject(projectId: string, scheduled: Date) {
     where: { projectId },
   });
 
-  if (event) {
+  if (event && process.env.CRONOFY_ACCESS_TOKEN) {
     await this.cronofy.updateEvent(project, event);
   }
+
 
   return project;
 }
@@ -138,71 +140,59 @@ private async ensureUserExists(id: string) {
 
   
   // Update status (pipeline movement with role rules)
-async updateStatus(projectId: string, newStatus: ProjectStatus, user: { id: string; role: Role }) {
+async updateStatus(
+  projectId: string,
+  newStatus: ProjectStatus,
+  user: { id: string; role: Role }
+) {
   const project = await this.prisma.project.findUnique({
-    where: { id: projectId },
+    where: { id: projectId }
   });
 
   if (!project) {
-    throw new NotFoundException('Project not found');
+    throw new NotFoundException("Project not found");
   }
 
-  const currentStatus = project.status;
+  const current = project.status;
 
-  // Admin & PM can set any status
-  if (user.role === 'ADMIN' || user.role === 'PROJECT_MANAGER') {
-    return this.prisma.project.update({
-      where: { id: projectId },
-      data: { status: newStatus },
-    });
+  // Admin & PM can always override
+  if (user.role === Role.ADMIN || user.role === Role.PROJECT_MANAGER) {
+    return this.setProjectStatus(projectId, newStatus);
   }
 
   // Technician rules
-  if (user.role === 'TECHNICIAN') {
-    if (project.technicianId !== user.id) {
-      throw new ForbiddenException('You are not assigned to this project as technician');
+  if (user.role === Role.TECHNICIAN) {
+    if (current === ProjectStatus.BOOKED && newStatus === ProjectStatus.SHOOTING) {
+      return this.setProjectStatus(projectId, newStatus);
     }
 
-    const allowed =
-      (currentStatus === ProjectStatus.BOOKED && newStatus === ProjectStatus.SHOOTING) ||
-      (currentStatus === ProjectStatus.SHOOTING && newStatus === ProjectStatus.EDITING);
-
-    if (!allowed) {
-      throw new ForbiddenException(
-        `Technician cannot move project from ${currentStatus} to ${newStatus}`,
-      );
+    if (current === ProjectStatus.SHOOTING && newStatus === ProjectStatus.EDITING) {
+      return this.setProjectStatus(projectId, newStatus);
     }
 
-    return this.prisma.project.update({
-      where: { id: projectId },
-      data: { status: newStatus },
-    });
+    throw new ForbiddenException("Technician cannot perform this transition");
   }
 
   // Editor rules
-  if (user.role === 'EDITOR') {
-    if (project.editorId !== user.id) {
-      throw new ForbiddenException('You are not assigned to this project as editor');
+  if (user.role === Role.EDITOR) {
+    if (current === ProjectStatus.EDITING && newStatus === ProjectStatus.DELIVERED) {
+      return this.setProjectStatus(projectId, newStatus);
     }
 
-    const allowed =
-      currentStatus === ProjectStatus.EDITING && newStatus === ProjectStatus.DELIVERED;
-
-    if (!allowed) {
-      throw new ForbiddenException(
-        `Editor cannot move project from ${currentStatus} to ${newStatus}`,
-      );
-    }
-
-    return this.prisma.project.update({
-      where: { id: projectId },
-      data: { status: newStatus },
-    });
+    throw new ForbiddenException("Editor cannot perform this transition");
   }
 
-  // Fallback: other roles should be blocked by @Roles decorator already
-  throw new ForbiddenException('You are not allowed to update project status');
+  // Agents cannot edit status
+  throw new ForbiddenException("You do not have permission to update project status");
 }
+
+private async setProjectStatus(projectId: string, status: ProjectStatus) {
+  return this.prisma.project.update({
+    where: { id: projectId },
+    data: { status }
+  });
+}
+
 
 
   // Get one project

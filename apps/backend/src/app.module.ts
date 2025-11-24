@@ -6,10 +6,11 @@ import { AuthModule } from './auth/auth.module';
 import { ProjectsModule } from './projects/projects.module';
 import { MediaModule } from './media/media.module';
 import { MessagesModule } from './messages/messages.module';
+import { InquiriesModule } from './inquiries/inquires.module';
 
 
 @Module({
-  imports: [UsersModule, AuthModule, ProjectsModule, MediaModule, MessagesModule],
+  imports: [UsersModule, AuthModule, ProjectsModule, MediaModule, MessagesModule, InquiriesModule],
   controllers: [AppController],
   providers: [AppService],
 })

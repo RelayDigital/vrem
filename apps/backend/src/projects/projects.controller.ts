@@ -9,6 +9,7 @@ import { AssignProjectDto } from './dto/assign-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { UpdateProjectStatusDto } from './dto/update-project-status.dto';
 
 @Controller('projects')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -25,16 +26,6 @@ export class ProjectsController {
   findMine(@Req() req) {
     const user = req.user;
     return this.projectsService.findForUser(user.id, user.role);
-  }
-
-  @Patch(':id/status')
-  @Roles(Role.TECHNICIAN, Role.EDITOR, Role.PROJECT_MANAGER, Role.ADMIN)
-  updateStatus(
-    @Param('id') id: string,
-    @Body('status') status: ProjectStatus,
-    @CurrentUser() user: any
-  ) {
-    return this.projectsService.updateStatus(id, status, user);
   }
 
   // GET messages for a project
@@ -156,6 +147,16 @@ export class ProjectsController {
     @Body('scheduledTime') scheduledTime: string,
   ) {
     return this.projectsService.scheduleProject(id, new Date(scheduledTime));
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/status')
+  updateStatus(
+    @Param('id') id: string,
+    @CurrentUser() user,
+    @Body() dto: UpdateProjectStatusDto
+  ) {
+    return this.projectsService.updateStatus(id, dto.status, user);
   }
 
 
