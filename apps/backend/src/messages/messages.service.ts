@@ -7,6 +7,31 @@ import { Role } from '@prisma/client';
 export class MessagesService {
   constructor(private prisma: PrismaService) {}
 
+  async userHasAccessToProject(userId: string, role: Role, projectId: string) {
+  // PMs and Admins get full access
+  if (role === Role.ADMIN || role === Role.PROJECT_MANAGER) {
+    return true;
+  }
+
+  const project = await this.prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      agentId: true,
+      technicianId: true,
+      editorId: true,
+    },
+  });
+
+  if (!project) return false;
+
+  return (
+    project.agentId === userId ||
+    project.technicianId === userId ||
+    project.editorId === userId
+  );
+}
+
+
   async sendMessage(userId: string, dto: SendMessageDto) {
     // Ensure project exists (optional but nice)
     const project = await this.prisma.project.findUnique({
@@ -49,25 +74,26 @@ export class MessagesService {
     return message;
   }
 
-  async deleteMessage(messageId: string, currentUser: { id: string; role: Role }) {
-    const message = await this.prisma.message.findUnique({
-      where: { id: messageId },
-    });
+  // maybe don't need it yet if at all
+  // async deleteMessage(messageId: string, currentUser: { id: string; role: Role }) {
+  //   const message = await this.prisma.message.findUnique({
+  //     where: { id: messageId },
+  //   });
 
-    if (!message) throw new NotFoundException('Message not found');
+  //   if (!message) throw new NotFoundException('Message not found');
 
-    const isOwner = message.userId === currentUser.id;
-    const canModerate =
-      currentUser.role === Role.ADMIN || currentUser.role === Role.PROJECT_MANAGER;
+  //   const isOwner = message.userId === currentUser.id;
+  //   const canModerate =
+  //     currentUser.role === Role.ADMIN || currentUser.role === Role.PROJECT_MANAGER;
 
-    if (!isOwner && !canModerate) {
-      throw new ForbiddenException('You are not allowed to delete this message');
-    }
+  //   if (!isOwner && !canModerate) {
+  //     throw new ForbiddenException('You are not allowed to delete this message');
+  //   }
 
-    await this.prisma.message.delete({
-      where: { id: messageId },
-    });
+  //   await this.prisma.message.delete({
+  //     where: { id: messageId },
+  //   });
 
-    return { success: true };
-  }
+  //   return { success: true };
+  // }
 }

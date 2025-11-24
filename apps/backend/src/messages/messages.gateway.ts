@@ -53,10 +53,24 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() data: { projectId: string },
     @ConnectedSocket() client: Socket,
   ) {
+    const user = client.data.user;
+
+    const allowed = await this.messagesService.userHasAccessToProject(
+      user.id,
+      user.role,
+      data.projectId,
+    );
+
+    if (!allowed) {
+      return { error: 'Access denied' };
+    }
+
     const room = `project:${data.projectId}`;
     await client.join(room);
+
     return { joined: room };
   }
+
 
   @SubscribeMessage('sendMessage')
   async handleSendMessage(
@@ -64,6 +78,16 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: Socket,
   ) {
     const user = client.data.user;
+
+    const allowed = await this.messagesService.userHasAccessToProject(
+      user.id,
+      user.role,
+      data.projectId,
+    );
+
+    if (!allowed) {
+      return { error: 'Access denied' };
+    }
 
     const message = await this.messagesService.sendMessage(user.id, {
       projectId: data.projectId,
@@ -75,4 +99,6 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     return message;
   }
+
+
 }
