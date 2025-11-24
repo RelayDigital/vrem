@@ -1,6 +1,6 @@
-import { AuditLogEntry } from '../../../types';
-import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
-import { Badge } from '../../ui/badge';
+import { AuditLogEntry } from "../../../types";
+import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
+import { Badge } from "../../ui/badge";
 import {
   Table,
   TableBody,
@@ -8,8 +8,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../../ui/table';
-import { ScrollArea } from '../../ui/scroll-area';
+} from "../../ui/table";
+import { ScrollArea } from "../../ui/scroll-area";
 import {
   FileText,
   UserPlus,
@@ -19,8 +19,8 @@ import {
   AlertCircle,
   Edit,
   Clock,
-} from 'lucide-react';
-import { P } from '@/components/ui/typography';
+} from "lucide-react";
+import { H2, P } from "@/components/ui/typography";
 
 interface AuditLogProps {
   entries: AuditLogEntry[];
@@ -28,21 +28,21 @@ interface AuditLogProps {
 
 export function AuditLog({ entries }: AuditLogProps) {
   const getActionIcon = (action: string) => {
-    if (action.includes('created')) return FileText;
-    if (action.includes('assigned')) return UserCheck;
-    if (action.includes('delivered')) return CheckCircle2;
-    if (action.includes('cancelled')) return XCircle;
-    if (action.includes('updated')) return Edit;
+    if (action.includes("created")) return FileText;
+    if (action.includes("assigned")) return UserCheck;
+    if (action.includes("delivered")) return CheckCircle2;
+    if (action.includes("cancelled")) return XCircle;
+    if (action.includes("updated")) return Edit;
     return AlertCircle;
   };
 
   const getActionColor = (action: string) => {
-    if (action.includes('created')) return 'text-primary';
-    if (action.includes('assigned')) return 'text-purple-600';
-    if (action.includes('delivered')) return 'text-emerald-600';
-    if (action.includes('cancelled')) return 'text-destructive';
-    if (action.includes('updated')) return 'text-yellow-600';
-    return 'text-gray-600';
+    if (action.includes("created")) return "text-primary";
+    if (action.includes("assigned")) return "text-purple-600";
+    if (action.includes("delivered")) return "text-emerald-600";
+    if (action.includes("cancelled")) return "text-destructive";
+    if (action.includes("updated")) return "text-yellow-600";
+    return "text-gray-600";
   };
 
   const formatTimestamp = (date: Date) => {
@@ -52,16 +52,16 @@ export function AuditLog({ entries }: AuditLogProps) {
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
 
-    if (minutes < 1) return 'Just now';
+    if (minutes < 1) return "Just now";
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     if (days < 7) return `${days}d ago`;
 
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -70,14 +70,14 @@ export function AuditLog({ entries }: AuditLogProps) {
   );
 
   return (
-    <Card>
-      {/* <CardHeader>
-        <CardTitle>System Activity Audit Log</CardTitle>
+    <div className="@container md:col-span-3 mt-md">
+      <div className="mb-md flex items-baseline justify-between">
+        <H2 className="text-lg border-0">System Activity Audit Log</H2>
         <P className="text-sm text-muted-foreground">
           All system actions are timestamped and traceable to a user identity
         </P>
-      </CardHeader> */}
-      <CardContent>
+      </div>
+      <div className="">
         <ScrollArea className="h-[600px]">
           <Table>
             <TableHeader>
@@ -102,13 +102,13 @@ export function AuditLog({ entries }: AuditLogProps) {
                         <span>{formatTimestamp(entry.timestamp)}</span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        {entry.timestamp.toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
+                        {entry.timestamp.toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
                         })}
                       </div>
                     </TableCell>
@@ -136,9 +136,11 @@ export function AuditLog({ entries }: AuditLogProps) {
                       <div className="space-y-1 max-w-[300px]">
                         {Object.entries(entry.details).map(([key, value]) => (
                           <div key={key} className="text-xs">
-                            <span className="text-muted-foreground">{key}:</span>{' '}
+                            <span className="text-muted-foreground">
+                              {key}:
+                            </span>{" "}
                             <span>
-                              {typeof value === 'object'
+                              {typeof value === "object"
                                 ? JSON.stringify(value)
                                 : String(value)}
                             </span>
@@ -152,7 +154,7 @@ export function AuditLog({ entries }: AuditLogProps) {
             </TableBody>
           </Table>
         </ScrollArea>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

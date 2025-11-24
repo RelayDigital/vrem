@@ -12,7 +12,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/components/ui/utils";
 import { Wifi, WifiOff } from "lucide-react";
-import { eventsOverlap } from "@/lib/calendar-utils";
+import { eventsOverlap, calculateEventLayout } from "@/lib/calendar-utils";
+
+import { useState, useRef } from "react";
 
 interface DayViewProps {
   currentDate: Date;
@@ -21,6 +23,11 @@ interface DayViewProps {
   technicianColors: TechnicianColor[];
   onEventClick: (event: CalendarEvent) => void;
   onEventDrag?: (eventId: string, newDate: Date, newTime?: string) => void;
+  onCreateJob?: (initialValues?: {
+    scheduledDate?: string;
+    scheduledTime?: string;
+    estimatedDuration?: number;
+  }) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0:00 to 23:00 (24 hours)
@@ -32,7 +39,71 @@ export function DayView({
   technicianColors,
   onEventClick,
   onEventDrag,
+  onCreateJob,
 }: DayViewProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<number | null>(null); // Minutes from midnight
+  const [dragEnd, setDragEnd] = useState<number | null>(null); // Minutes from midnight
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!onCreateJob || !containerRef.current) return;
+
+    // Prevent dragging if clicking on an event (event click handler will take precedence)
+    if ((e.target as HTMLElement).closest('[data-event-card]')) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const y = e.clientY - rect.top + containerRef.current.scrollTop;
+    const minutes = Math.floor(y / 1.6); // 1.6px per minute
+
+    // Snap to nearest 15 minutes
+    const snappedMinutes = Math.round(minutes / 15) * 15;
+
+    setIsDragging(true);
+    setDragStart(snappedMinutes);
+    setDragEnd(snappedMinutes + 30); // Default 30 min duration initially
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || dragStart === null || !containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const y = e.clientY - rect.top + containerRef.current.scrollTop;
+    const minutes = Math.floor(y / 1.6);
+
+    // Snap to nearest 15 minutes
+    const snappedMinutes = Math.round(minutes / 15) * 15;
+
+    // Ensure end is after start
+    if (snappedMinutes > dragStart) {
+      setDragEnd(snappedMinutes);
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (!isDragging || dragStart === null || dragEnd === null) return;
+
+    setIsDragging(false);
+
+    if (onCreateJob) {
+      const hours = Math.floor(dragStart / 60);
+      const minutes = dragStart % 60;
+      const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      const duration = dragEnd - dragStart;
+
+      // Only create if duration is at least 15 minutes
+      if (duration >= 15) {
+        onCreateJob({
+          scheduledDate: format(currentDate, 'yyyy-MM-dd'),
+          scheduledTime: timeString,
+          estimatedDuration: duration,
+        });
+      }
+    }
+
+    setDragStart(null);
+    setDragEnd(null);
+  };
   const dayEvents = useMemo(
     () => getEventsForDay(events, currentDate),
     [events, currentDate]
@@ -66,75 +137,10 @@ export function DayView({
     return dayEvents.filter((e) => e.technicianId === technicianId);
   };
 
-  // Calculate grid row position and span for an event
-  const getEventGridPosition = (event: CalendarEvent) => {
-    const start = parseISO(event.start);
-    const end = parseISO(event.end);
-    const dayStart = new Date(currentDate);
-    dayStart.setHours(0, 0, 0, 0);
-
-    // Calculate minutes from midnight (start of day)
-    const startMinutes = start.getHours() * 60 + start.getMinutes();
-    const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
-
-    // Total timeline spans 24 hours = 1440 minutes
-    // Each hour is 96px, so we have 24 * 96 = 2304px total
-    // Convert to grid rows: each row represents 1 minute
-    const totalMinutes = 24 * 60; // 1440 minutes
-    const startRow =
-      Math.floor((startMinutes / totalMinutes) * (HOURS.length * 96)) + 1; // +1 because grid rows start at 1
-    const rowSpan = Math.max(
-      Math.ceil((durationMinutes / totalMinutes) * (HOURS.length * 96)),
-      1
-    );
-
-    return {
-      gridRowStart: startRow,
-      gridRowEnd: startRow + rowSpan,
-    };
-  };
-
-  // Calculate col-span and col-start for an event based on overlapping events
-  // Returns the technician's column index and the event's position within that column
-  const getEventColumnPosition = (
-    event: CalendarEvent,
-    technicianId: string
-  ) => {
-    const technicianIndex = activeTechnicians.findIndex(
-      (t) => t.id === technicianId
-    );
-    const technicianEvents = getEventsForTechnician(technicianId);
-
-    // Find all events that overlap with this one
-    const overlappingEvents = technicianEvents.filter((e) =>
-      eventsOverlap(e, event)
-    );
-
-    // Sort overlapping events by start time (chronological order)
-    const sortedOverlapping = [...overlappingEvents].sort(
-      (a, b) => parseISO(a.start).getTime() - parseISO(b.start).getTime()
-    );
-
-    // Find the index of the current event in the sorted overlapping events
-    const overlapIndex = sortedOverlapping.findIndex((e) => e.id === event.id);
-
-    // Calculate column span and start within the technician's column
-    // If no overlap (1 event), span full column (col-span = 1, which is the full technician column)
-    // If overlap, each event gets equal share
-    const numOverlapping = sortedOverlapping.length;
-    const colSpan = numOverlapping === 1 ? 1 : 1 / numOverlapping; // Fraction of the technician's column
-    const colStart = technicianIndex + 1 + overlapIndex * colSpan; // Start at technician's column + offset
-
-    return {
-      gridColumnStart: colStart,
-      gridColumnEnd: colStart + colSpan,
-    };
-  };
-
   return (
-    <div className="grid grid-cols-5 h-full">
+    <div className="grid grid-cols-1 md:grid-cols-5 h-full">
       {/* Technician Labels */}
-      <div className="col-span-1 border-r bg-muted shrink-0 h-full">
+      <div className="col-span-1 border-r bg-muted shrink-0 h-full hidden md:block">
         <div className="h-12 border-b flex items-center px-4 font-semibold text-sm">
           Technician
         </div>
@@ -206,13 +212,19 @@ export function DayView({
           </div>
 
           {/* Timeline Grid Area */}
-          <div className="flex-1 relative">
+          <div
+            className="flex-1 relative select-none"
+            ref={containerRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
             <div
               className="absolute inset-0"
               style={{
                 display: "grid",
-                gridTemplateColumns: `repeat(${activeTechnicians.length}, 1fr)`,
-                gridTemplateRows: `repeat(${HOURS.length * 96}, 1px)`,
+                gridTemplateColumns: "1fr",
                 height: `${HOURS.length * 96}px`,
               }}
             >
@@ -220,134 +232,100 @@ export function DayView({
               {HOURS.map((hour) => (
                 <div
                   key={hour}
-                  className="col-span-full border-b border-muted"
+                  className="col-span-full border-b border-muted absolute w-full"
                   style={{
-                    gridRowStart: hour * 96 + 1,
-                    gridRowEnd: hour * 96 + 1,
+                    top: `${hour * 96}px`,
                   }}
                 />
               ))}
 
-              {/* Technician Columns with nested grids for overlapping events */}
-              {activeTechnicians.map((technician, technicianIndex) => {
-                const technicianEvents = getEventsForTechnician(technician.id);
-                const maxOverlapping = Math.max(
-                  1,
-                  ...technicianEvents.map((event) => {
-                    const overlapping = technicianEvents.filter((e) =>
-                      eventsOverlap(e, event)
-                    );
-                    return overlapping.length;
-                  })
-                );
+              {/* Unified Timeline Area */}
+              <div className="relative w-full h-full">
+                {(() => {
+                  const layoutMap = calculateEventLayout(dayEvents);
 
-                return (
+                  return dayEvents.map((event) => {
+                    const layout = layoutMap.get(event.id);
+                    if (!layout) return null;
+
+                    const start = parseISO(event.start);
+                    const end = parseISO(event.end);
+
+                    // Calculate top position (minutes from midnight)
+                    const startMinutes = start.getHours() * 60 + start.getMinutes();
+                    const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
+
+                    // 96px per hour = 1.6px per minute
+                    const top = startMinutes * 1.6;
+                    const height = Math.max(durationMinutes * 1.6, 24); // Minimum height
+
+                    const technicianObj = getTechnician(event.technicianId);
+                    const technicianColor = getTechnicianColor(event.technicianId);
+
+                    return (
+                      <div
+                        key={event.id}
+                        className="absolute px-1 py-1"
+                        data-event-card
+                        style={{
+                          top: `${top}px`,
+                          height: `${height}px`,
+                          left: `${layout.left}%`,
+                          width: `${layout.width}%`,
+                          zIndex: 20,
+                        }}
+                      >
+                        {event.type === "External" ||
+                          event.type === "Unscheduled" ? (
+                          <CalendarEventPopover
+                            event={event}
+                            technician={technicianObj}
+                            technicianColor={technicianColor}
+                            onOpenJob={() => event.jobId && onEventClick(event)}
+                            onAssignTechnician={() =>
+                              event.jobId && onEventClick(event)
+                            }
+                          >
+                            <div className="h-full">
+                              <CalendarEventCard
+                                event={event}
+                                technician={technicianObj}
+                                technicianColor={technicianColor}
+                                onClick={() => onEventClick(event)}
+                                className="text-xs h-full"
+                              />
+                            </div>
+                          </CalendarEventPopover>
+                        ) : (
+                          <CalendarEventCard
+                            event={event}
+                            technician={technicianObj}
+                            technicianColor={technicianColor}
+                            onClick={() => onEventClick(event)}
+                            className="text-xs h-full"
+                          />
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+
+                {/* Drag Selection Ghost */}
+                {isDragging && dragStart !== null && dragEnd !== null && (
                   <div
-                    key={technician.id}
-                    className="relative"
+                    className="absolute left-0 right-0 bg-primary/20 border-2 border-primary rounded z-50 pointer-events-none"
                     style={{
-                      gridColumnStart: technicianIndex + 1,
-                      gridColumnEnd: technicianIndex + 2,
-                      gridRowStart: 1,
-                      gridRowEnd: HOURS.length * 96 + 1,
-                      display: "grid",
-                      gridTemplateColumns: `repeat(${maxOverlapping}, 1fr)`,
-                      gridTemplateRows: `repeat(${HOURS.length * 96}, 1px)`,
+                      top: `${dragStart * 1.6}px`,
+                      height: `${(dragEnd - dragStart) * 1.6}px`,
                     }}
                   >
-                    {technicianEvents.map((event) => {
-                      const gridPosition = getEventGridPosition(event);
-
-                      // Find all events that overlap with this one
-                      const overlappingEvents = technicianEvents.filter((e) =>
-                        eventsOverlap(e, event)
-                      );
-
-                      // Sort overlapping events by start time (chronological order)
-                      const sortedOverlapping = [...overlappingEvents].sort(
-                        (a, b) =>
-                          parseISO(a.start).getTime() -
-                          parseISO(b.start).getTime()
-                      );
-
-                      // Find the index of the current event in the sorted overlapping events
-                      const overlapIndex = sortedOverlapping.findIndex(
-                        (e) => e.id === event.id
-                      );
-
-                      // Calculate column span and start within the technician's nested grid
-                      const numOverlapping = sortedOverlapping.length;
-
-                      // If no overlap (only this event), span full nested grid and start at column 1
-                      // If overlap, each event gets equal share and later events are staggered
-                      let colSpan: number;
-                      let colStart: number;
-
-                      if (numOverlapping === 1) {
-                        // No overlap - span full width, start at column 1
-                        colSpan = maxOverlapping;
-                        colStart = 1;
-                      } else {
-                        // Overlap - share columns equally, stagger based on chronological order
-                        colSpan = Math.floor(maxOverlapping / numOverlapping);
-                        colStart = overlapIndex * colSpan + 1;
-                      }
-
-                      const technicianObj = getTechnician(event.technicianId);
-                      const technicianColor = getTechnicianColor(
-                        event.technicianId
-                      );
-
-                      return (
-                        <div
-                          key={event.id}
-                          className="relative"
-                          style={{
-                            gridRowStart: gridPosition.gridRowStart,
-                            gridRowEnd: gridPosition.gridRowEnd,
-                            gridColumnStart: colStart,
-                            gridColumnEnd: colStart + colSpan,
-                            zIndex: event.hasConflict ? 30 : 20,
-                          }}
-                        >
-                          {event.type === "External" ||
-                          event.type === "Unscheduled" ? (
-                            <CalendarEventPopover
-                              event={event}
-                              technician={technicianObj}
-                              technicianColor={technicianColor}
-                              onOpenJob={() =>
-                                event.jobId && onEventClick(event)
-                              }
-                              onAssignTechnician={() =>
-                                event.jobId && onEventClick(event)
-                              }
-                            >
-                              <div className="h-full">
-                                <CalendarEventCard
-                                  event={event}
-                                  technician={technicianObj}
-                                  technicianColor={technicianColor}
-                                  onClick={() => onEventClick(event)}
-                                  className="text-xs h-full"
-                                />
-                              </div>
-                            </CalendarEventPopover>
-                          ) : (
-                            <CalendarEventCard
-                              event={event}
-                              technician={technicianObj}
-                              technicianColor={technicianColor}
-                              onClick={() => onEventClick(event)}
-                              className="text-xs h-full"
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
+                    <div className="text-xs font-medium text-primary p-1">
+                      {Math.floor(dragStart / 60)}:{String(dragStart % 60).padStart(2, '0')} - {Math.floor(dragEnd / 60)}:{String(dragEnd % 60).padStart(2, '0')}
+                      <span className="ml-1">({dragEnd - dragStart} min)</span>
+                    </div>
                   </div>
-                );
-              })}
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -23,6 +23,7 @@ import { Photographer } from "@/types";
 import { format, startOfDay, isSameDay } from "date-fns";
 import { cn } from "@/components/ui/utils";
 import { getWeekRange, getMonthRange } from "@/lib/calendar-utils";
+import { H3 } from "@/components/ui/typography";
 
 interface CalendarRightSidebarProps {
   currentDate: Date;
@@ -129,10 +130,10 @@ export function CalendarRightSidebar({
   };
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 size-full">
       {/* Mini Month Calendar */}
       <div>
-        <h3 className="text-sm font-semibold mb-3">Mini Calendar</h3>
+        <H3 className="mb-3 hidden md:block">Mini Calendar</H3>
         {dateRange ? (
           <Calendar
             mode="range"

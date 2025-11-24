@@ -96,7 +96,7 @@ export function LiveJobMapView({
   }, [sidebarState]);
 
   return (
-    <div
+    <main
       className="fixed overflow-hidden transition-[left] duration-200 ease-linear"
       style={{
         top: `${headerHeight}px`,
@@ -116,7 +116,7 @@ export function LiveJobMapView({
         className="size-full"
         fullScreen={true}
       />
-    </div>
+    </main>
   );
 }
 

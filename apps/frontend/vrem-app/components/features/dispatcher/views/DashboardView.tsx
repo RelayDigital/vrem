@@ -1,15 +1,18 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { JobRequest, Photographer, Metrics } from "../../../../types";
 import { MetricsDashboard } from "../../../shared/metrics";
 import { JobCard } from "../../../shared/jobs";
 import { MapWithSidebar } from "../../../shared/dashboard/MapWithSidebar";
-import { MiniCalendarView } from "../../../shared/dashboard/MiniCalendarView";
+import { MonthView } from "../../../features/calendar/MonthView";
 import { Button } from "../../../ui/button";
 import { motion } from "framer-motion";
 import { Briefcase } from "lucide-react";
 import { H2 } from "@/components/ui/typography";
 import { EmptyState } from "../../../common";
+import { jobToCalendarEvent } from "../../../../lib/calendar-utils";
+import { CalendarEvent, generateTechnicianColors } from "../../../../types/calendar";
 
 interface DashboardViewProps {
   jobs: JobRequest[];
@@ -41,11 +44,40 @@ export function DashboardView({
   onJobClick,
 }: DashboardViewProps) {
   const assignedJobs = jobs.filter((j) => j.status === "assigned");
+  const [currentDate] = useState(new Date());
 
   // Show only enough jobs to fill one grid row
   // lg: 4 columns, md: 2 columns, sm: 1 column
   const maxJobsToShow = 4;
   const jobsToDisplay = assignedJobs.slice(0, maxJobsToShow);
+
+  // Convert jobs to calendar events
+  const calendarEvents = useMemo(() => {
+    return jobs.map((job) => jobToCalendarEvent(job));
+  }, [jobs]);
+
+  // Generate technician colors
+  const technicianColors = useMemo(
+    () => generateTechnicianColors(photographers),
+    [photographers]
+  );
+
+  // Handle event click
+  const handleEventClick = (event: CalendarEvent) => {
+    if (event.jobId && onJobClick) {
+      const job = jobs.find((j) => j.id === event.jobId);
+      if (job) {
+        onJobClick(job);
+      }
+    }
+  };
+
+  // Handle day click - navigate to calendar view
+  const handleDayClick = (date: Date) => {
+    if (onNavigateToCalendarView) {
+      onNavigateToCalendarView();
+    }
+  };
 
   return (
     <main className="container relative mx-auto">
@@ -53,6 +85,26 @@ export function DashboardView({
         {/* Metrics */}
         <div className="@container w-full mt-md">
           <MetricsDashboard metrics={metrics} />
+        </div>
+        {/* Calendar */}
+        <div className="@container w-full">
+          <div className="mb-md flex items-baseline justify-between">
+            <H2 className="text-lg border-0">Schedule</H2>
+            <Button variant="flat" onClick={onNavigateToCalendarView}>
+              View calendar
+            </Button>
+          </div>
+          <div className="border rounded-lg overflow-hidden">
+            <MonthView
+              currentDate={currentDate}
+              events={calendarEvents}
+              technicians={photographers}
+              technicianColors={technicianColors}
+              onEventClick={handleEventClick}
+              onDayClick={handleDayClick}
+              compact={true}
+            />
+          </div>
         </div>
         {/* Merged Map and Pending Assignments */}
         <div className="@container w-full">
@@ -73,21 +125,6 @@ export function DashboardView({
               onNavigateToJobInProjectManagement
             }
             onJobAssign={onJobAssign}
-          />
-        </div>
-        {/* Calendar */}
-        <div className="@container w-full mt-md">
-          <div className="mb-md flex items-baseline justify-between">
-            <H2 className="text-lg border-0">Schedule</H2>
-            <Button variant="flat" onClick={onNavigateToCalendarView}>
-              View calendar
-            </Button>
-          </div>
-          <MiniCalendarView
-            jobs={jobs}
-            photographers={photographers}
-            onJobClick={onJobClick}
-            onViewFullCalendar={onNavigateToCalendarView}
           />
         </div>
         {/* Active Jobs */}

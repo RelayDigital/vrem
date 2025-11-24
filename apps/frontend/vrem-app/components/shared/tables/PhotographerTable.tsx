@@ -10,7 +10,7 @@ import {
 } from '../../ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
 import { Badge } from '../../ui/badge';
-import { Star, MapPin, Briefcase, Search, ArrowUpDown, Filter } from 'lucide-react';
+import { Star, MapPin, Briefcase, Search, ArrowUpDown, Filter, Settings2 } from 'lucide-react';
 import { getLocationDisplay } from '../../../lib/utils';
 import { Input } from '../../ui/input';
 import {
@@ -100,6 +100,7 @@ export function PhotographerTable({ photographers, onRowClick }: PhotographerTab
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
           <Input
             type="text"
+            variant="muted"
             placeholder="Search by name, email, or location..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -107,7 +108,7 @@ export function PhotographerTable({ photographers, onRowClick }: PhotographerTab
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-10 md:w-[140px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
+          <SelectTrigger variant="muted" className="w-10 md:w-[140px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
             <Filter className="h-4 w-4 md:mr-2" />
             <SelectValue placeholder="Status" className="hidden md:inline" />
           </SelectTrigger>
@@ -118,8 +119,8 @@ export function PhotographerTable({ photographers, onRowClick }: PhotographerTab
           </SelectContent>
         </Select>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-10 md:w-[140px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
-            <Filter className="h-4 w-4 md:mr-2" />
+          <SelectTrigger variant="muted" className="w-10 md:w-[140px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
+            <Settings2 className="h-4 w-4 md:mr-2" />
             <SelectValue placeholder="Type" className="hidden md:inline" />
           </SelectTrigger>
           <SelectContent>
@@ -129,7 +130,7 @@ export function PhotographerTable({ photographers, onRowClick }: PhotographerTab
           </SelectContent>
         </Select>
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
+          <SelectTrigger variant="muted" className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
             <ArrowUpDown className="h-4 w-4 md:mr-2" />
             <SelectValue placeholder="Sort by" className="hidden md:inline" />
           </SelectTrigger>

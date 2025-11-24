@@ -170,3 +170,93 @@ export function eventsOverlap(event1: CalendarEvent, event2: CalendarEvent): boo
   return start1 < end2 && start2 < end1;
 }
 
+
+export interface EventLayout {
+  left: number; // Percentage 0-100
+  width: number; // Percentage 0-100
+}
+
+/**
+ * Calculate layout for events to handle overlaps
+ * Returns a map of event ID to layout properties (left, width)
+ */
+export function calculateEventLayout(events: CalendarEvent[]): Map<string, EventLayout> {
+  const layoutMap = new Map<string, EventLayout>();
+  
+  // 1. Sort events by start time, then by duration (longer first)
+  const sortedEvents = [...events].sort((a, b) => {
+    const startDiff = parseISO(a.start).getTime() - parseISO(b.start).getTime();
+    if (startDiff !== 0) return startDiff;
+    return parseISO(b.end).getTime() - parseISO(a.end).getTime();
+  });
+
+  // 2. Group events into connected clusters
+  const clusters: CalendarEvent[][] = [];
+  let currentCluster: CalendarEvent[] = [];
+  let clusterEnd = 0;
+
+  sortedEvents.forEach((event) => {
+    const start = parseISO(event.start).getTime();
+    const end = parseISO(event.end).getTime();
+
+    if (currentCluster.length === 0) {
+      currentCluster.push(event);
+      clusterEnd = end;
+    } else {
+      if (start < clusterEnd) {
+        // Overlaps with current cluster
+        currentCluster.push(event);
+        clusterEnd = Math.max(clusterEnd, end);
+      } else {
+        // New cluster
+        clusters.push(currentCluster);
+        currentCluster = [event];
+        clusterEnd = end;
+      }
+    }
+  });
+  if (currentCluster.length > 0) {
+    clusters.push(currentCluster);
+  }
+
+  // 3. Process each cluster
+  clusters.forEach((cluster) => {
+    // Simple column packing algorithm
+    const columns: CalendarEvent[][] = [];
+    
+    cluster.forEach((event) => {
+      let placed = false;
+      for (let i = 0; i < columns.length; i++) {
+        const column = columns[i];
+        const lastEventInColumn = column[column.length - 1];
+        // Check if this event can fit in this column (starts after the last one ends)
+        if (parseISO(event.start).getTime() >= parseISO(lastEventInColumn.end).getTime()) {
+          column.push(event);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        columns.push([event]);
+      }
+    });
+
+    // Calculate width and position
+    const numColumns = columns.length;
+    const width = 100 / numColumns;
+
+    columns.forEach((column, colIndex) => {
+      column.forEach((event) => {
+        // Basic layout: equal width columns
+        // TODO: Expand width if there's empty space to the right?
+        // For now, simple equal columns is a huge improvement over the previous logic
+        layoutMap.set(event.id, {
+          left: colIndex * width,
+          width: width,
+        });
+      });
+    });
+  });
+
+  return layoutMap;
+}

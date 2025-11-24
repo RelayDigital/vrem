@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
 import { PhotographerTable } from "../../shared/tables";
 import { Users, Star, TrendingUp } from "lucide-react";
 import { StatsCard } from "../../shared/dashboard";
+import { H2 } from "@/components/ui/typography";
 
 interface PhotographerManagementProps {
   photographers: Photographer[];
@@ -48,14 +49,14 @@ export function PhotographerManagement({
       />
 
       {/* Table */}
-      <Card className="col-span-3">
-        <CardHeader className="pb-6 gap-0">
-          <CardTitle>Team Members</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="@container md:col-span-3 mt-md">
+        <div className="mb-md flex items-baseline justify-between">
+          <H2 className="text-lg border-0">Team Members</H2>
+        </div>
+        <div className="">
           <PhotographerTable photographers={photographers} />
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

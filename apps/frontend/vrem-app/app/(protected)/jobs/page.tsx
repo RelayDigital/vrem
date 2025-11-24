@@ -1,7 +1,8 @@
 'use client';
 
-import { JobsViewContainer } from '@/components/features/jobs/JobsViewContainer';
+import { AgentJobsView } from '@/components/features/agent/AgentJobsView';
 import { useRequireRole } from '@/hooks/useRequireRole';
+import { jobRequests, photographers } from '@/lib/mock-data';
 
 export default function JobsPage() {
     const { user, isLoading } = useRequireRole(['ADMIN', 'PROJECT_MANAGER', 'TECHNICIAN', 'EDITOR', 'AGENT']);
@@ -14,5 +15,5 @@ export default function JobsPage() {
         return null;
     }
 
-    return <JobsViewContainer user={user} />;
+    return <AgentJobsView jobs={jobRequests} photographers={photographers} organizationId={user.organizationId} onNewJobClick={() => { }} />;
 }

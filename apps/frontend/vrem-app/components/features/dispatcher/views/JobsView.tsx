@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { JobRequest, Photographer } from "../../../../types";
 import { ChatMessage } from "../../../../types/chat";
 import { JobCard, PaginatedJobGrid } from "../../../shared/jobs";
@@ -61,8 +61,10 @@ export function JobsView({
 }: JobsViewProps) {
   // Kanban view search, filter, and sort state
   const [kanbanSearchQuery, setKanbanSearchQuery] = useState("");
-  const [kanbanSelectedFilter, setKanbanSelectedFilter] = useState<string>("all");
+  const [kanbanSelectedFilter, setKanbanSelectedFilter] =
+    useState<string>("all");
   const [kanbanSortBy, setKanbanSortBy] = useState<string>("date-desc");
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   // Filter and sort jobs for kanban view
   const filteredAndSortedJobs = useMemo(() => {
@@ -72,7 +74,8 @@ export function JobsView({
     if (kanbanSearchQuery) {
       const query = kanbanSearchQuery.toLowerCase();
       result = result.filter((job) => {
-        const searchableText = `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`.toLowerCase();
+        const searchableText =
+          `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`.toLowerCase();
         return searchableText.includes(query);
       });
     }
@@ -90,7 +93,8 @@ export function JobsView({
       if (kanbanSearchQuery) {
         const query = kanbanSearchQuery.toLowerCase();
         result = result.filter((job) => {
-          const searchableText = `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`.toLowerCase();
+          const searchableText =
+            `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`.toLowerCase();
           return searchableText.includes(query);
         });
       }
@@ -102,7 +106,10 @@ export function JobsView({
         case "date-asc":
           // Sort by scheduledDate ascending (earliest first)
           if (a.scheduledDate && b.scheduledDate) {
-            return new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime();
+            return (
+              new Date(a.scheduledDate).getTime() -
+              new Date(b.scheduledDate).getTime()
+            );
           }
           if (a.scheduledDate) return -1;
           if (b.scheduledDate) return 1;
@@ -110,7 +117,10 @@ export function JobsView({
         case "date-desc":
           // Sort by scheduledDate descending (latest first)
           if (a.scheduledDate && b.scheduledDate) {
-            return new Date(b.scheduledDate).getTime() - new Date(a.scheduledDate).getTime();
+            return (
+              new Date(b.scheduledDate).getTime() -
+              new Date(a.scheduledDate).getTime()
+            );
           }
           if (a.scheduledDate) return -1;
           if (b.scheduledDate) return 1;
@@ -129,7 +139,11 @@ export function JobsView({
           return 0;
         case "priority":
           // Sort by priority: urgent > rush > standard
-          const priorityOrder: Record<string, number> = { urgent: 3, rush: 2, standard: 1 };
+          const priorityOrder: Record<string, number> = {
+            urgent: 3,
+            rush: 2,
+            standard: 1,
+          };
           const priorityA = priorityOrder[a.priority] || 0;
           const priorityB = priorityOrder[b.priority] || 0;
           return priorityB - priorityA;
@@ -198,18 +212,64 @@ export function JobsView({
     }
   };
 
+  // useEffect(() => {
+  //   const measureHeader = () => {
+  //     const header = document.querySelector("header");
+  //     if (header) {
+  //       setHeaderHeight(header.offsetHeight);
+  //     }
+  //   };
+
+  //   // Measure on mount
+  //   measureHeader();
+
+  //   // Measure on resize
+  //   window.addEventListener("resize", measureHeader);
+
+  //   // Also use ResizeObserver for more accurate measurements
+  //   const header = document.querySelector("header");
+  //   let resizeObserver: ResizeObserver | null = null;
+
+  //   if (header) {
+  //     resizeObserver = new ResizeObserver(() => {
+  //       measureHeader();
+  //     });
+  //     resizeObserver.observe(header);
+  //   }
+
+  //   // Prevent body scrolling when map view is active
+  //   document.body.style.overflow = "hidden";
+  //   document.documentElement.style.overflow = "hidden";
+
+  //   return () => {
+  //     window.removeEventListener("resize", measureHeader);
+  //     if (resizeObserver) {
+  //       resizeObserver.disconnect();
+  //     }
+  //     // Restore scrolling when component unmounts
+  //     document.body.style.overflow = "";
+  //     document.documentElement.style.overflow = "";
+  //   };
+  // }, []);
+
   return (
     <main className="container relative mx-auto">
       <article className="flex flex-col gap-2xl md:gap-3xl px-md">
-        <div className="@container w-full mt-md">
+        <div className="@container w-full mt-md mb-md">
           <H2 className="text-4xl mb-xs">Jobs</H2>
           <Tabs defaultValue="all" className="gap-0 size-full">
             <TabsList className="grid w-full grid-cols-2 max-w-md mb-6">
-              <TabsTrigger value="all" className="flex items-center gap-2 cursor-pointer">
+              <TabsTrigger
+                value="all"
+                className="flex items-center gap-2 cursor-pointer"
+              >
                 <Briefcase className="h-4 w-4" />
                 All Jobs
               </TabsTrigger>
-              <TabsTrigger value="kanban" className="flex items-center gap-2 cursor-pointer">
+              <TabsTrigger
+                value="kanban"
+                className="flex items-center gap-2 cursor-pointer"
+              >
                 <Kanban className="h-4 w-4" />
                 Project Management
               </TabsTrigger>
@@ -243,8 +303,8 @@ export function JobsView({
                 renderItem={(job, index, viewMode) => {
                   const photographer = job.assignedPhotographerId
                     ? photographers.find(
-                      (p) => p.id === job.assignedPhotographerId
-                    )
+                        (p) => p.id === job.assignedPhotographerId
+                      )
                     : undefined;
                   return (
                     <JobCard
@@ -263,8 +323,8 @@ export function JobsView({
                 renderTableRow={(job) => {
                   const photographer = job.assignedPhotographerId
                     ? photographers.find(
-                      (p) => p.id === job.assignedPhotographerId
-                    )
+                        (p) => p.id === job.assignedPhotographerId
+                      )
                     : undefined;
                   const priorityConfig = getPriorityConfig(job.priority);
                   const statusConfig = getStatusConfig(job.status);
@@ -397,7 +457,10 @@ export function JobsView({
               />
             </TabsContent>
 
-            <TabsContent value="kanban" className="mt-0">
+            <TabsContent
+              value="kanban"
+              className="mt-0"
+            >
               <div className="flex flex-col space-y-4">
                 {/* Search, Filter, and Sort Bar */}
                 <div className="flex gap-3">
@@ -412,10 +475,19 @@ export function JobsView({
                       className="pl-10"
                     />
                   </div>
-                  <Select value={kanbanSelectedFilter} onValueChange={setKanbanSelectedFilter}>
-                    <SelectTrigger variant="muted" className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
+                  <Select
+                    value={kanbanSelectedFilter}
+                    onValueChange={setKanbanSelectedFilter}
+                  >
+                    <SelectTrigger
+                      variant="muted"
+                      className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block"
+                    >
                       <Filter className="h-4 w-4 md:mr-2" />
-                      <SelectValue placeholder="All Items" className="hidden md:inline" />
+                      <SelectValue
+                        placeholder="All Items"
+                        className="hidden md:inline"
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Items</SelectItem>
@@ -429,13 +501,23 @@ export function JobsView({
                     </SelectContent>
                   </Select>
                   <Select value={kanbanSortBy} onValueChange={setKanbanSortBy}>
-                    <SelectTrigger variant="muted" className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
+                    <SelectTrigger
+                      variant="muted"
+                      className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block"
+                    >
                       <ArrowUpDown className="h-4 w-4 md:mr-2" />
-                      <SelectValue placeholder="Sort by" className="hidden md:inline" />
+                      <SelectValue
+                        placeholder="Sort by"
+                        className="hidden md:inline"
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="date-desc">Date (Newest First)</SelectItem>
-                      <SelectItem value="date-asc">Date (Oldest First)</SelectItem>
+                      <SelectItem value="date-desc">
+                        Date (Newest First)
+                      </SelectItem>
+                      <SelectItem value="date-asc">
+                        Date (Oldest First)
+                      </SelectItem>
                       <SelectItem value="client-asc">Client (A-Z)</SelectItem>
                       <SelectItem value="client-desc">Client (Z-A)</SelectItem>
                       <SelectItem value="priority">Priority</SelectItem>

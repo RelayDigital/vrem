@@ -127,9 +127,9 @@ export function ListView({
                             event.hasConflict && "border-red-500 border-dashed"
                           )}
                         >
-                          <div className="flex items-start justify-between gap-4">
+                          <div className="flex flex-col md:flex-row items-start justify-between gap-4">
                             <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-start md:items-center gap-2">
                                 <h4 className="font-semibold">{event.title}</h4>
                                 {technicianColor && (
                                   <div

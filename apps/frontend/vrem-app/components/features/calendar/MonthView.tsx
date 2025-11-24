@@ -27,6 +27,7 @@ interface MonthViewProps {
   technicianColors: TechnicianColor[];
   onEventClick: (event: CalendarEvent) => void;
   onDayClick: (date: Date) => void;
+  compact?: boolean;
 }
 
 const MAX_VISIBLE_EVENTS = 3;
@@ -38,6 +39,7 @@ export function MonthView({
   technicianColors,
   onEventClick,
   onDayClick,
+  compact = false,
 }: MonthViewProps) {
   const monthStart = useMemo(() => startOfMonth(currentDate), [currentDate]);
   const monthEnd = useMemo(() => endOfMonth(currentDate), [currentDate]);
@@ -78,13 +80,16 @@ export function MonthView({
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden">
+    <div className={cn("flex-1 flex flex-col", compact ? "h-auto" : "h-full overflow-hidden")}>
       {/* Week Day Headers */}
-      <div className="grid grid-cols-7 border-b bg-muted/30">
+      <div className={cn("grid grid-cols-7 border-b bg-muted/30", compact && "text-xs")}>
         {weekDays.map((day) => (
           <div
             key={day}
-            className="p-2 text-center text-sm font-semibold border-r last:border-r-0"
+            className={cn(
+              "text-center font-semibold border-r last:border-r-0",
+              compact ? "p-1 text-xs" : "p-2 text-sm"
+            )}
           >
             {day}
           </div>
@@ -92,7 +97,7 @@ export function MonthView({
       </div>
 
       {/* Calendar Grid */}
-      <div className="flex-1 grid grid-cols-7 auto-rows-fr">
+      <div className={cn("grid grid-cols-7", compact ? "" : "flex-1 auto-rows-fr")}>
         {calendarDays.map((day, index) => {
           const dayEvents = getEventsForDaySorted(day);
           const visibleEvents = dayEvents.slice(0, MAX_VISIBLE_EVENTS);
@@ -105,17 +110,19 @@ export function MonthView({
             <div
               key={index}
               className={cn(
-                "border-b p-2 min-h-[120px] flex flex-col",
+                "border-b flex flex-col",
                 !isLastDayOfWeek && "border-r",
                 !isCurrentMonth && "bg-muted/20",
-                isToday && "bg-primary/10 ring-2 ring-primary ring-inset"
+                isToday && "bg-primary/10 ring-2 ring-primary ring-inset",
+                compact ? "p-1 min-h-[60px]" : "p-2 min-h-[120px]"
               )}
             >
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "h-6 w-6 p-0 font-semibold mb-1 self-start",
+                  "p-0 font-semibold mb-1 self-start",
+                  compact ? "h-5 w-5 text-xs" : "h-6 w-6",
                   isToday && "bg-primary text-primary-foreground"
                 )}
                 onClick={() => onDayClick(day)}
@@ -123,7 +130,7 @@ export function MonthView({
                 {format(day, "d")}
               </Button>
 
-              <div className="flex-1 space-y-1 overflow-hidden">
+              <div className={cn("flex-1 space-y-0.5 overflow-hidden", compact && "space-y-0")}>
                 {visibleEvents.map((event) => {
                   const technician = getTechnician(event.technicianId);
                   const technicianColor = getTechnicianColor(
@@ -150,6 +157,7 @@ export function MonthView({
                             event={event}
                             technicianColor={technicianColor}
                             onClick={() => onEventClick(event)}
+                            className={compact ? "text-[10px] px-1 py-0.5" : undefined}
                           />
                         </div>
                       </CalendarEventPopover>
@@ -162,6 +170,7 @@ export function MonthView({
                       event={event}
                       technicianColor={technicianColor}
                       onClick={() => onEventClick(event)}
+                      className={compact ? "text-[10px] px-1 py-0.5" : undefined}
                     />
                   );
                 })}
@@ -170,7 +179,10 @@ export function MonthView({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 text-xs text-muted-foreground hover:text-foreground"
+                    className={cn(
+                      "text-muted-foreground hover:text-foreground",
+                      compact ? "h-4 text-[10px]" : "h-6 text-xs"
+                    )}
                     onClick={() => onDayClick(day)}
                   >
                     +{remainingCount} more

@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useTheme } from 'next-themes';
-import { Toaster } from './ui/sonner';
-import { Button } from './ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Badge } from './ui/badge';
-import { H1, H2 } from './ui/typography';
+import { useState, useEffect, useCallback } from "react";
+import { useTheme } from "next-themes";
+import { Toaster } from "./ui/sonner";
+import { Button } from "./ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Badge } from "./ui/badge";
+import { H1, H2 } from "./ui/typography";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,31 +16,30 @@ import {
   DropdownMenuTrigger,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-} from './ui/dropdown-menu';
+} from "./ui/dropdown-menu";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from './ui/select';
-import { LandingPage } from './features/landing';
-import { AgentBookingFlow, AgentJobsView } from './features/agent';
-import { DispatcherDashboard } from './features/dispatcher';
-import { DispatcherSidebar } from './features/dispatcher/DispatcherSidebar';
-import { PhotographerDashboard } from './features/photographer';
+} from "./ui/select";
+import { LandingPage } from "./features/landing";
+import { AgentBookingFlow, AgentJobsView } from "./features/agent";
+import { DispatcherDashboard } from "./features/dispatcher";
+import { DispatcherSidebar } from "./features/dispatcher/DispatcherSidebar";
+import { PhotographerDashboard } from "./features/photographer";
+import { SettingsView } from "./shared/settings";
 import {
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-} from './ui/sidebar';
-import { JobRequestForm } from './shared/jobs';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog';
+  agentSettingsConfig,
+  photographerSettingsConfig,
+} from "./shared/settings/settings-config";
+import { agentSettingsComponents } from "./features/agent/settings";
+import { photographerSettingsComponents } from "./features/photographer/settings";
+import type { SettingsSubView } from "./shared/settings";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "./ui/sidebar";
+import { JobRequestForm } from "./shared/jobs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import {
   organizations as initialOrganizations,
   currentUser as initialUser,
@@ -50,19 +49,37 @@ import {
   metrics,
   preferredVendors as initialPreferredVendors,
   companyApplications as initialApplications,
-} from '../lib/mock-data';
+} from "../lib/mock-data";
 import {
   JobRequest,
+  JobDetails,
   AuditLogEntry,
   User,
   Photographer,
   Organization,
   PreferredVendor,
   CompanyApplication,
-} from '../types';
-import { toast } from 'sonner';
-import { LogIn, User as UserIcon, Settings, LogOut, Briefcase, User as UserIcon2, Building2, LayoutDashboard, Users, FileText, Plus, Moon, Sun, Monitor, MapPin, Camera } from 'lucide-react';
-import { ContextSwitcher, type ContextOption } from './shared/ContextSwitcher';
+} from "../types";
+import { toast } from "sonner";
+import {
+  LogIn,
+  User as UserIcon,
+  Settings,
+  LogOut,
+  Briefcase,
+  User as UserIcon2,
+  Building2,
+  LayoutDashboard,
+  Users,
+  FileText,
+  Plus,
+  Moon,
+  Sun,
+  Monitor,
+  MapPin,
+  Camera,
+} from "lucide-react";
+import { ContextSwitcher, type ContextOption } from "./shared/ContextSwitcher";
 
 export default function VremApp() {
   const { theme, setTheme } = useTheme();
@@ -71,18 +88,45 @@ export default function VremApp() {
   const [currentUser, setCurrentUser] = useState<User>(initialUser);
   const [jobs, setJobs] = useState<JobRequest[]>(initialJobRequests);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>(initialAuditLog);
-  const [photographers, setPhotographers] = useState<Photographer[]>(initialPhotographers);
-  const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations);
+  const [photographers, setPhotographers] =
+    useState<Photographer[]>(initialPhotographers);
+  const [organizations, setOrganizations] =
+    useState<Organization[]>(initialOrganizations);
   const [preferredVendors, setPreferredVendors] = useState<PreferredVendor[]>(
     initialPreferredVendors
   );
-  const [applications, setApplications] = useState<CompanyApplication[]>(
-    initialApplications
-  );
-  const [agentView, setAgentView] = useState<'booking' | 'jobs'>('jobs');
-  const [photographerView, setPhotographerView] = useState<'jobs' | 'profile' | 'companies'>('jobs');
-  const [dispatcherView, setDispatcherView] = useState<'dashboard' | 'jobs' | 'team' | 'audit' | 'map' | 'calendar'>('dashboard');
+  const [applications, setApplications] =
+    useState<CompanyApplication[]>(initialApplications);
+  const [agentView, setAgentView] = useState<"booking" | "jobs" | "settings">("jobs");
+  const [photographerView, setPhotographerView] = useState<
+    "jobs" | "profile" | "companies" | "settings"
+  >("jobs");
+  const [dispatcherView, setDispatcherView] = useState<
+    "dashboard" | "jobs" | "team" | "audit" | "map" | "calendar" | "settings"
+  >("dashboard");
   const [showNewJobForm, setShowNewJobForm] = useState(false);
+  const [newJobInitialValues, setNewJobInitialValues] = useState<{
+    scheduledDate?: string;
+    scheduledTime?: string;
+    estimatedDuration?: number;
+  }>();
+  const [agentSettingsSubView, setAgentSettingsSubView] =
+    useState<SettingsSubView>(null);
+  const [photographerSettingsSubView, setPhotographerSettingsSubView] =
+    useState<SettingsSubView>(null);
+
+  // Reset settings sub-views when navigating away from settings
+  useEffect(() => {
+    if (agentView !== "settings") {
+      setAgentSettingsSubView(null);
+    }
+  }, [agentView]);
+
+  useEffect(() => {
+    if (photographerView !== "settings") {
+      setPhotographerSettingsSubView(null);
+    }
+  }, [photographerView]);
 
   const handleJobCreate = (jobData: Partial<JobRequest>) => {
     const mockLocation = jobData.location || {
@@ -90,9 +134,17 @@ export default function VremApp() {
       lng: -118.35 + Math.random() * 0.3,
     };
 
+    // Generate orderNumber in format "XXXX" (4-digit number with leading zeros)
+    // Find the highest existing orderNumber and increment it
+    const maxOrderNumber = jobs.reduce((max, job) => {
+      const orderNum = parseInt(job.orderNumber, 10);
+      return isNaN(orderNum) ? max : Math.max(max, orderNum);
+    }, 0);
+    const nextOrderNumber = (maxOrderNumber + 1).toString().padStart(4, '0');
+
     const newJob: JobRequest = {
       id: `job-${Date.now().toString().slice(-3)}`,
-      orderNumber: `JOB-${Date.now().toString().slice(-3)}`,
+      orderNumber: nextOrderNumber,
       organizationId: jobData.organizationId || currentUser.organizationId,
       clientName: jobData.clientName!,
       propertyAddress: jobData.propertyAddress!,
@@ -101,13 +153,14 @@ export default function VremApp() {
       scheduledTime: jobData.scheduledTime!,
       mediaType: jobData.mediaType!,
       priority: jobData.priority!,
-      status: 'pending',
+      status: "pending",
       estimatedDuration: jobData.estimatedDuration!,
-      requirements: jobData.requirements || '',
+      requirements: jobData.requirements || "",
       createdBy: currentUser.id,
       createdAt: new Date(),
       propertyImage:
-        jobData.propertyImage || 'https://images.unsplash.com/photo-1706808849780-7a04fbac83ef?w=800',
+        jobData.propertyImage ||
+        "https://images.unsplash.com/photo-1706808849780-7a04fbac83ef?w=800",
     };
 
     setJobs([newJob, ...jobs]);
@@ -118,8 +171,8 @@ export default function VremApp() {
       userId: currentUser.id,
       userName: currentUser.name,
       organizationId: currentUser.organizationId,
-      action: 'job.created',
-      resourceType: 'job',
+      action: "job.created",
+      resourceType: "job",
       resourceId: newJob.id,
       details: {
         clientName: newJob.clientName,
@@ -130,19 +183,23 @@ export default function VremApp() {
     };
 
     setAuditLog([auditEntry, ...auditLog]);
-    toast.success('Job request created successfully');
+    toast.success("Job request created successfully");
   };
 
-  const handleJobAssign = (jobId: string, photographerId: string, score: number) => {
+  const handleJobAssign = (
+    jobId: string,
+    photographerId: string,
+    score: number
+  ) => {
     setJobs(
       jobs.map((job) =>
         job.id === jobId
           ? {
-            ...job,
-            status: 'assigned' as const,
-            assignedPhotographerId: photographerId,
-            assignedAt: new Date(),
-          }
+              ...job,
+              status: "assigned" as const,
+              assignedPhotographerId: photographerId,
+              assignedAt: new Date(),
+            }
           : job
       )
     );
@@ -156,8 +213,8 @@ export default function VremApp() {
       userId: currentUser.id,
       userName: currentUser.name,
       organizationId: currentUser.organizationId,
-      action: 'job.assigned',
-      resourceType: 'job',
+      action: "job.assigned",
+      resourceType: "job",
       resourceId: jobId,
       details: {
         photographerId,
@@ -168,7 +225,7 @@ export default function VremApp() {
     };
 
     setAuditLog([auditEntry, ...auditLog]);
-    toast.success('Photographer assigned successfully');
+    toast.success("Photographer assigned successfully");
   };
 
   const handleUpdatePhotographerProfile = (updates: Partial<Photographer>) => {
@@ -177,7 +234,7 @@ export default function VremApp() {
         p.id === currentUser.id ? { ...p, ...updates } : p
       )
     );
-    toast.success('Profile updated successfully');
+    toast.success("Profile updated successfully");
   };
 
   const handleApplyToCompany = (companyId: string, message: string) => {
@@ -192,7 +249,7 @@ export default function VremApp() {
       photographerName: photographer.name,
       companyId: company.id,
       companyName: company.name,
-      status: 'pending',
+      status: "pending",
       message,
       appliedAt: new Date(),
     };
@@ -204,21 +261,21 @@ export default function VremApp() {
   // Available roles for context switching
   const availableRoles: ContextOption[] = [
     {
-      value: 'agent',
-      label: 'Agent',
-      description: 'Real estate agent view',
+      value: "agent",
+      label: "Agent",
+      description: "Real estate agent view",
       icon: Briefcase,
     },
     {
-      value: 'dispatcher',
-      label: 'Dispatcher',
-      description: 'Media company dispatcher view',
+      value: "dispatcher",
+      label: "Dispatcher",
+      description: "Media company dispatcher view",
       icon: LayoutDashboard,
     },
     {
-      value: 'photographer',
-      label: 'Photographer',
-      description: 'Photographer view',
+      value: "photographer",
+      label: "Photographer",
+      description: "Photographer view",
       icon: Camera,
     },
   ];
@@ -226,28 +283,28 @@ export default function VremApp() {
   // Mock users for role switching (keeping for backward compatibility, but we'll use same user)
   const mockUsers: User[] = [
     {
-      id: 'user-agent',
-      name: 'Emily Rodriguez',
-      email: 'emily@luxuryrealty.com',
-      role: 'agent',
-      organizationId: 'org-client-001',
-      organizationType: 'agent',
+      id: "user-agent",
+      name: "Emily Rodriguez",
+      email: "emily@luxuryrealty.com",
+      role: "agent",
+      organizationId: "org-client-001",
+      organizationType: "agent",
     },
     {
-      id: 'user-dispatcher',
-      name: 'Sarah Chen',
-      email: 'sarah@vxmedia.com',
-      role: 'dispatcher',
-      organizationId: 'org-vx-001',
-      organizationType: 'media_company',
+      id: "user-dispatcher",
+      name: "Sarah Chen",
+      email: "sarah@vxmedia.com",
+      role: "dispatcher",
+      organizationId: "org-vx-001",
+      organizationType: "media_company",
     },
     {
-      id: 'photo-001',
-      name: 'Marcus Rodriguez',
-      email: 'marcus@vxmedia.com',
-      role: 'photographer',
-      organizationId: 'org-vx-001',
-      organizationType: 'media_company',
+      id: "photo-001",
+      name: "Marcus Rodriguez",
+      email: "marcus@vxmedia.com",
+      role: "photographer",
+      organizationId: "org-vx-001",
+      organizationType: "media_company",
     },
   ];
 
@@ -256,14 +313,14 @@ export default function VremApp() {
     // If switching to photographer, find a matching photographer by email or use first photographer
     let updatedUser: User = {
       ...currentUser,
-      role: role as 'agent' | 'dispatcher' | 'photographer',
+      role: role as "agent" | "dispatcher" | "photographer",
     };
 
-    if (role === 'photographer') {
+    if (role === "photographer") {
       // Find photographer by email or use the first one
-      const matchingPhotographer = photographers.find(
-        (p) => p.email === currentUser.email
-      ) || photographers[0];
+      const matchingPhotographer =
+        photographers.find((p) => p.email === currentUser.email) ||
+        photographers[0];
 
       if (matchingPhotographer) {
         updatedUser = {
@@ -272,21 +329,21 @@ export default function VremApp() {
           organizationId: matchingPhotographer.organizationId,
         };
       }
-    } else if (role === 'dispatcher') {
+    } else if (role === "dispatcher") {
       // Reset to original user ID for dispatcher
       updatedUser = {
         ...updatedUser,
         id: initialUser.id,
         organizationId: initialUser.organizationId,
       };
-    } else if (role === 'agent') {
+    } else if (role === "agent") {
       // Use agent organization
-      const agentOrg = organizations.find((o) => o.type === 'real_estate_team');
+      const agentOrg = organizations.find((o) => o.type === "real_estate_team");
       if (agentOrg) {
         updatedUser = {
           ...updatedUser,
           organizationId: agentOrg.id,
-          organizationType: 'agent',
+          organizationType: "agent",
         };
       }
     }
@@ -299,25 +356,27 @@ export default function VremApp() {
     // Simulate login - use the same user with dispatcher role as default
     setIsAuthenticated(true);
     setCurrentUser(initialUser);
-    toast.success('Logged in successfully');
+    toast.success("Logged in successfully");
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    toast.success('Logged out successfully');
+    toast.success("Logged out successfully");
   };
 
   const handleGetStarted = () => {
     handleLogin();
   };
 
-  const currentPhotographer = photographers.find((p) => p.id === currentUser.id);
+  const currentPhotographer = photographers.find(
+    (p) => p.id === currentUser.id
+  );
 
   // Measure header height for sidebar positioning
   useEffect(() => {
-    if (isAuthenticated && currentUser.role === 'dispatcher') {
+    if (isAuthenticated && currentUser.role === "dispatcher") {
       const measureHeader = () => {
-        const header = document.querySelector('header');
+        const header = document.querySelector("header");
         if (header) {
           setHeaderHeight(header.offsetHeight);
         }
@@ -327,10 +386,10 @@ export default function VremApp() {
       measureHeader();
 
       // Measure on resize
-      window.addEventListener('resize', measureHeader);
+      window.addEventListener("resize", measureHeader);
 
       // Also use ResizeObserver for more accurate measurements
-      const header = document.querySelector('header');
+      const header = document.querySelector("header");
       let resizeObserver: ResizeObserver | null = null;
 
       if (header) {
@@ -341,7 +400,7 @@ export default function VremApp() {
       }
 
       return () => {
-        window.removeEventListener('resize', measureHeader);
+        window.removeEventListener("resize", measureHeader);
         if (resizeObserver) {
           resizeObserver.disconnect();
         }
@@ -354,10 +413,8 @@ export default function VremApp() {
       <div className="w-full max-w-full py-3 overflow-hidden">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <H2 className="p-0 border-0">
-              VX Media
-            </H2>
-            {isAuthenticated && currentUser.role === 'dispatcher' && (
+            <H2 className="p-0 border-0">VX Media</H2>
+            {isAuthenticated && currentUser.role === "dispatcher" && (
               <SidebarTrigger />
             )}
           </div>
@@ -367,7 +424,7 @@ export default function VremApp() {
             {isAuthenticated && (
               <>
                 {/* Dispatcher New Job Button */}
-                {currentUser.role === 'dispatcher' && (
+                {currentUser.role === "dispatcher" && (
                   <Button
                     onClick={() => setShowNewJobForm(true)}
                     size="sm"
@@ -380,19 +437,19 @@ export default function VremApp() {
                 )}
 
                 {/* Agent View Switcher */}
-                {currentUser.role === 'agent' && (
+                {currentUser.role === "agent" && (
                   <div className="flex items-center gap-2">
                     <Button
-                      variant={agentView === 'jobs' ? 'default' : 'muted'}
+                      variant={agentView === "jobs" ? "default" : "muted"}
                       size="sm"
-                      onClick={() => setAgentView('jobs')}
+                      onClick={() => setAgentView("jobs")}
                     >
                       My Jobs
                     </Button>
                     <Button
-                      variant={agentView === 'booking' ? 'default' : 'muted'}
+                      variant={agentView === "booking" ? "default" : "muted"}
                       size="sm"
-                      onClick={() => setAgentView('booking')}
+                      onClick={() => setAgentView("booking")}
                     >
                       New Booking
                     </Button>
@@ -400,28 +457,34 @@ export default function VremApp() {
                 )}
 
                 {/* Photographer View Switcher */}
-                {currentUser.role === 'photographer' && (
+                {currentUser.role === "photographer" && (
                   <div className="flex items-center gap-2">
                     <Button
-                      variant={photographerView === 'jobs' ? 'default' : 'muted'}
+                      variant={
+                        photographerView === "jobs" ? "default" : "muted"
+                      }
                       size="sm"
-                      onClick={() => setPhotographerView('jobs')}
+                      onClick={() => setPhotographerView("jobs")}
                     >
                       <Briefcase className="h-4 w-4 mr-2" />
                       My Jobs
                     </Button>
                     <Button
-                      variant={photographerView === 'profile' ? 'default' : 'muted'}
+                      variant={
+                        photographerView === "profile" ? "default" : "muted"
+                      }
                       size="sm"
-                      onClick={() => setPhotographerView('profile')}
+                      onClick={() => setPhotographerView("profile")}
                     >
                       <UserIcon2 className="h-4 w-4 mr-2" />
                       Profile & Services
                     </Button>
                     <Button
-                      variant={photographerView === 'companies' ? 'default' : 'muted'}
+                      variant={
+                        photographerView === "companies" ? "default" : "muted"
+                      }
                       size="sm"
-                      onClick={() => setPhotographerView('companies')}
+                      onClick={() => setPhotographerView("companies")}
                     >
                       <Building2 className="h-4 w-4 mr-2" />
                       Companies
@@ -432,19 +495,22 @@ export default function VremApp() {
                 {/* Profile Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="flex items-center gap-3 h-auto p-0">
+                    <Button
+                      variant="ghost"
+                      className="flex items-center gap-3 h-auto p-0"
+                    >
                       <Avatar className="h-9 w-9 border-2 border-border shadow-sm">
                         <AvatarImage
                           src={
                             currentPhotographer?.avatar ||
-                            'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200'
+                            "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200"
                           }
                         />
                         <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                           {currentUser.name
-                            .split(' ')
+                            .split(" ")
                             .map((n) => n[0])
-                            .join('')}
+                            .join("")}
                         </AvatarFallback>
                       </Avatar>
                     </Button>
@@ -463,13 +529,26 @@ export default function VremApp() {
                       <UserIcon className="h-4 w-4 mr-2" />
                       Profile
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (currentUser.role === "dispatcher") {
+                          setDispatcherView("settings");
+                        } else if (currentUser.role === "agent") {
+                          setAgentView("settings");
+                        } else if (currentUser.role === "photographer") {
+                          setPhotographerView("settings");
+                        }
+                      }}
+                    >
                       <Settings className="h-4 w-4 mr-2" />
                       Settings
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuLabel>Theme</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+                    <DropdownMenuRadioGroup
+                      value={theme}
+                      onValueChange={setTheme}
+                    >
                       <DropdownMenuRadioItem value="light">
                         <Sun className="h-4 w-4 mr-2" />
                         Light
@@ -504,10 +583,7 @@ export default function VremApp() {
             )}
 
             {!isAuthenticated && (
-              <Button
-                onClick={handleLogin}
-                variant="default"
-              >
+              <Button onClick={handleLogin} variant="default">
                 <LogIn className="h-4 w-4 mr-2" />
                 Log In
               </Button>
@@ -520,16 +596,25 @@ export default function VremApp() {
 
   return (
     <div className="min-h-screen bg-background">
-      {isAuthenticated && currentUser.role === 'dispatcher' ? (
+      {isAuthenticated && currentUser.role === "dispatcher" ? (
         <SidebarProvider>
+          {/* Header */}
           <div className="fixed top-0 left-0 right-0 z-50">
             {renderHeader()}
           </div>
+
+          {/* Sidebar */}
           <DispatcherSidebar
             currentView={dispatcherView}
             onViewChange={setDispatcherView}
           />
-          <SidebarInset className="min-w-0" style={{ paddingTop: `${headerHeight}px` }}>
+          
+          {/* Main Content */}
+          <SidebarInset
+            className="min-w-0"
+            style={{ paddingTop: `${headerHeight}px` }}
+          >
+            {/* Dispatcher Dashboard */}
             <div className="flex-1 overflow-x-hidden min-w-0">
               <DispatcherDashboard
                 jobs={jobs}
@@ -539,19 +624,24 @@ export default function VremApp() {
                 onJobCreate={handleJobCreate}
                 onJobAssign={handleJobAssign}
                 activeView={dispatcherView}
-                onNavigateToJobsView={() => setDispatcherView('jobs')}
-                onNavigateToMapView={() => setDispatcherView('map')}
-                onNavigateToCalendarView={() => setDispatcherView('calendar')}
-                onNewJobClick={() => setShowNewJobForm(true)}
+                onNavigateToJobsView={() => setDispatcherView("jobs")}
+                onNavigateToMapView={() => setDispatcherView("map")}
+                onNavigateToCalendarView={() => setDispatcherView("calendar")}
+                onNewJobClick={(initialValues) => {
+                  setNewJobInitialValues(initialValues);
+                  setShowNewJobForm(true);
+                }}
               />
             </div>
-            {/* New Job Form Dialog */}
+
+            {/* New Job Form Dialog - only visible when creating a new job */}
             <Dialog open={showNewJobForm} onOpenChange={setShowNewJobForm}>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Create New Job Request</DialogTitle>
                 </DialogHeader>
                 <JobRequestForm
+                  initialValues={newJobInitialValues}
                   onSubmit={(job) => {
                     handleJobCreate(job);
                     setShowNewJobForm(false);
@@ -574,13 +664,21 @@ export default function VremApp() {
               isAuthenticated={isAuthenticated}
               onLoginRequired={handleLogin}
             />
-          ) : currentUser.role === 'agent' ? (
-            agentView === 'jobs' ? (
+          ) : currentUser.role === "agent" ? (
+            agentView === "settings" ? (
+              <SettingsView
+                subView={agentSettingsSubView}
+                onNavigate={(subView) => setAgentSettingsSubView(subView)}
+                config={agentSettingsConfig}
+                accountType="agent"
+                componentRegistry={agentSettingsComponents}
+              />
+            ) : agentView === "jobs" ? (
               <AgentJobsView
                 jobs={jobs}
                 photographers={photographers}
                 organizationId={currentUser.organizationId}
-                onNewJobClick={() => setAgentView('booking')}
+                onNewJobClick={() => setAgentView("booking")}
               />
             ) : (
               <AgentBookingFlow
@@ -589,22 +687,34 @@ export default function VremApp() {
                 preferredVendors={preferredVendors.map((v) => v.vendorId)}
                 onJobCreate={(job) => {
                   handleJobCreate(job);
-                  setAgentView('jobs');
+                  setAgentView("jobs");
                 }}
                 isAuthenticated={isAuthenticated}
                 onLoginRequired={handleLogin}
               />
             )
-          ) : currentUser.role === 'photographer' && currentPhotographer ? (
-            <PhotographerDashboard
-              photographer={currentPhotographer}
-              jobs={jobs}
-              companies={organizations}
-              applications={applications}
-              onUpdateProfile={handleUpdatePhotographerProfile}
-              onApplyToCompany={handleApplyToCompany}
-              activeView={photographerView}
-            />
+          ) : currentUser.role === "photographer" && currentPhotographer ? (
+            photographerView === "settings" ? (
+              <SettingsView
+                subView={photographerSettingsSubView}
+                onNavigate={(subView) =>
+                  setPhotographerSettingsSubView(subView)
+                }
+                config={photographerSettingsConfig}
+                accountType="photographer"
+                componentRegistry={photographerSettingsComponents}
+              />
+            ) : (
+              <PhotographerDashboard
+                photographer={currentPhotographer}
+                jobs={jobs}
+                companies={organizations}
+                applications={applications}
+                onUpdateProfile={handleUpdatePhotographerProfile}
+                onApplyToCompany={handleApplyToCompany}
+                activeView={photographerView}
+              />
+            )
           ) : null}
         </>
       )}
@@ -613,4 +723,3 @@ export default function VremApp() {
     </div>
   );
 }
-

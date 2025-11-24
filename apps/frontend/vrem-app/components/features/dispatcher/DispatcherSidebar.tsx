@@ -20,9 +20,9 @@ import {
 } from "lucide-react";
 
 interface DispatcherSidebarProps {
-  currentView: "dashboard" | "jobs" | "team" | "audit" | "map" | "calendar";
+  currentView: "dashboard" | "jobs" | "team" | "audit" | "map" | "calendar" | "settings";
   onViewChange: (
-    view: "dashboard" | "jobs" | "team" | "audit" | "map" | "calendar"
+    view: "dashboard" | "jobs" | "team" | "audit" | "map" | "calendar" | "settings"
   ) => void;
 }
 

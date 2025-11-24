@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { RankingsDialog, NewJobDialog } from "./dialogs";
+import { useState, useEffect } from "react";
+import { RankingsDialog } from "./dialogs";
 import {
   JobRequest,
   Photographer,
@@ -12,6 +12,10 @@ import { ChatMessage } from "../../../types/chat";
 import { JobTaskView } from "../../shared/tasks/JobTaskView";
 import { DashboardView, JobsView, LiveJobMapView, TeamView, AuditView } from "./views";
 import { CalendarView } from "../calendar";
+import { SettingsView } from "../../shared/settings";
+import { dispatcherSettingsConfig } from "../../shared/settings/settings-config";
+import { dispatcherSettingsComponents } from "./settings";
+import type { SettingsSubView } from "../../shared/settings";
 
 interface DispatcherDashboardProps {
   jobs: JobRequest[];
@@ -21,11 +25,15 @@ interface DispatcherDashboardProps {
   onJobCreate: (job: Partial<JobRequest>) => void;
   onJobAssign: (jobId: string, photographerId: string, score: number) => void;
   onJobStatusChange?: (jobId: string, newStatus: JobRequest["status"]) => void;
-  activeView?: "dashboard" | "jobs" | "team" | "audit" | "map" | "calendar";
+  activeView?: "dashboard" | "jobs" | "team" | "audit" | "map" | "calendar" | "settings";
   onNavigateToJobsView?: () => void;
   onNavigateToMapView?: () => void;
   onNavigateToCalendarView?: () => void;
-  onNewJobClick?: () => void;
+  onNewJobClick?: (initialValues?: {
+    scheduledDate?: string;
+    scheduledTime?: string;
+    estimatedDuration?: number;
+  }) => void;
 }
 
 export function DispatcherDashboard({
@@ -48,12 +56,30 @@ export function DispatcherDashboard({
   const [showTaskView, setShowTaskView] = useState(false);
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [newJobInitialValues, setNewJobInitialValues] = useState<{
+    scheduledDate?: string;
+    scheduledTime?: string;
+    estimatedDuration?: number;
+  }>();
+  const [settingsSubView, setSettingsSubView] = useState<SettingsSubView>(null);
+
+  // Reset settings sub-view when navigating away from settings
+  useEffect(() => {
+    if (activeView !== "settings") {
+      setSettingsSubView(null);
+    }
+  }, [activeView]);
 
   // If onNewJobClick is provided, use it; otherwise use local state
-  const handleNewJobClick = () => {
+  const handleNewJobClick = (initialValues?: {
+    scheduledDate?: string;
+    scheduledTime?: string;
+    estimatedDuration?: number;
+  }) => {
     if (onNewJobClick) {
-      onNewJobClick();
+      onNewJobClick(initialValues);
     } else {
+      setNewJobInitialValues(initialValues);
       setShowNewJobForm(true);
     }
   };
@@ -227,6 +253,16 @@ export function DispatcherDashboard({
         />
       )}
 
+      {activeView === "settings" && (
+        <SettingsView
+          subView={settingsSubView}
+          onNavigate={(subView) => setSettingsSubView(subView)}
+          config={dispatcherSettingsConfig}
+          accountType="dispatcher"
+          componentRegistry={dispatcherSettingsComponents}
+        />
+      )}
+
       {/* Rankings Dialog */}
       <RankingsDialog
         open={showRankings}
@@ -234,13 +270,6 @@ export function DispatcherDashboard({
         selectedJob={selectedJob}
         photographers={photographers}
         onJobAssign={handleJobAssign}
-      />
-
-      {/* New Job Form Dialog */}
-      <NewJobDialog
-        open={showNewJobForm}
-        onOpenChange={setShowNewJobForm}
-        onJobCreate={onJobCreate}
       />
 
       {/* Job Task View - Sheet (Dashboard) */}

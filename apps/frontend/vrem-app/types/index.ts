@@ -126,6 +126,16 @@ export interface JobRequest {
   propertyImage?: string;
 }
 
+export interface JobDetails {
+  clientName: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  mediaTypes: string[];
+  priority: 'standard' | 'rush' | 'urgent';
+  estimatedDuration: number;
+  requirements: string;
+}
+
 export interface PhotographerRanking {
   photographer: Photographer;
   score: number;

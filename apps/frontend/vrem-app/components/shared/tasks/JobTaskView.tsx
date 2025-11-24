@@ -1300,7 +1300,7 @@ export function JobTaskView({
   const renderFooter = (
     FooterComponent: typeof SheetFooter | typeof DialogFooter
   ) => (
-    <FooterComponent className="flex flex-col! border-t p-6 pt-0 gap-0">
+    <FooterComponent className="flex flex-col! border-t p-4 md:p-6 pt-0 gap-0">
       {/* Chat Type Tabs - Only show when Discussion tab is active */}
       {activeTab === "discussion" && (
         <div className="flex items-center gap-6 pt-2 mb-4">
@@ -1690,7 +1690,7 @@ export function JobTaskView({
           variant === "dialog" ? "max-h-[calc(90vh-200px)]" : ""
         )}
       >
-        <Tabs defaultValue="task" className="gap-0 size-full px-8">
+        <Tabs defaultValue="task" className="gap-0 size-full px-4 md:px-8">
           <TabsList className="grid w-full grid-cols-2 mt-6">
             <TabsTrigger value="task" onClick={() => setActiveTab("discussion")} className="flex items-center gap-2 cursor-pointer">
               Task
@@ -2171,7 +2171,7 @@ export function JobTaskView({
         <Sheet open={open} onOpenChange={onOpenChange}>
           <SheetContent
             side="right"
-            className="w-full sm:max-w-[640px] flex flex-col p-0 gap-0"
+            className="w-full sm:max-w-[40vw] flex flex-col p-0 gap-0"
           >
             <SheetTitle className="sr-only">
               {job.propertyAddress} - {job.clientName}

@@ -27,7 +27,13 @@ import {
 } from "date-fns";
 import { getWeekRange } from "@/lib/calendar-utils";
 import { useIsMobile } from "@/components/ui/use-mobile";
-import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Filter } from "lucide-react";
 
@@ -35,7 +41,11 @@ interface CalendarViewProps {
   jobs?: JobRequest[];
   photographers?: Photographer[];
   onJobClick?: (job: JobRequest) => void;
-  onCreateJob?: () => void;
+  onCreateJob?: (initialValues?: {
+    scheduledDate?: string;
+    scheduledTime?: string;
+    estimatedDuration?: number;
+  }) => void;
 }
 
 export function CalendarView({
@@ -227,7 +237,7 @@ export function CalendarView({
 
     switch (view) {
       case "day":
-        return <DayView {...commonProps} />;
+        return <DayView {...commonProps} onCreateJob={onCreateJob} />;
       case "week":
         return <WeekView {...commonProps} />;
       case "month":
@@ -271,28 +281,27 @@ export function CalendarView({
         onCreateJob={onCreateJob}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-6 overflow-hidden relative h-full">
+      <div className="grid grid-cols-1 lg:grid-cols-8 overflow-hidden relative h-full">
         {/* Main Calendar Area */}
-        <div className="lg:col-span-5 overflow-auto">{renderView()}</div>
+        <div className="col-span-1 md:col-span-7 overflow-auto">{renderView()}</div>
 
         {/* Right Sidebar */}
         {isMobile ? (
-          <Drawer
-            open={sidebarOpen}
-            onOpenChange={setSidebarOpen}
-            direction="right"
-          >
+          <Drawer open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <DrawerTrigger asChild>
               <Button
-                variant="outline"
-                size="sm"
-                className="fixed bottom-4 right-4 z-50 rounded-full w-12 h-12 p-0"
+                variant="default"
+                size="icon"
+                className="fixed bottom-2 right-2 z-50 rounded-full size-12 p-0"
               >
-                <Filter className="h-4 w-4" />
+                <Filter className="size-5" />
               </Button>
             </DrawerTrigger>
-            <DrawerContent className="w-[85vw] max-w-sm">
-              {sidebarContent}
+            <DrawerContent>
+              <DrawerHeader>
+                <DrawerTitle>Filters</DrawerTitle>
+              </DrawerHeader>
+              <div className="overflow-y-scroll size-full">{sidebarContent}</div>
             </DrawerContent>
           </Drawer>
         ) : (
