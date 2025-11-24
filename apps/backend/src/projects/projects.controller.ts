@@ -118,4 +118,45 @@ export class ProjectsController {
     return this.projectsService.remove(id);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Patch(':id/assign-agent')
+  assignAgent(
+    @Param('id') id: string,
+    @Body('agentId') agentId: string,
+  ) {
+    return this.projectsService.assignAgent(id, agentId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Patch(':id/assign-technician')
+  assignTechnician(
+    @Param('id') id: string,
+    @Body('technicianId') technicianId: string,
+  ) {
+    return this.projectsService.assignTechnician(id, technicianId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Patch(':id/assign-editor')
+  assignEditor(
+    @Param('id') id: string,
+    @Body('editorId') editorId: string,
+  ) {
+    return this.projectsService.assignEditor(id, editorId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Patch(':id/schedule')
+  scheduleProject(
+    @Param('id') id: string,
+    @Body('scheduledTime') scheduledTime: string,
+  ) {
+    return this.projectsService.scheduleProject(id, new Date(scheduledTime));
+  }
+
+
 }

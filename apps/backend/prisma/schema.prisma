@@ -86,3 +86,23 @@ enum ProjectStatus {
   EDITING
   DELIVERED
 }
+
+model Inquiry {
+  id        String         @id @default(uuid())
+  name      String
+  email     String
+  phone     String?
+  address   String?
+  message   String?
+  status    InquiryStatus  @default(PENDING)
+  createdAt DateTime       @default(now())
+}
+
+enum InquiryStatus {
+  PENDING
+  REVIEWED
+  APPROVED
+  REJECTED
+  CONVERTED_TO_PROJECT
+}
+

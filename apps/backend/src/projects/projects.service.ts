@@ -16,7 +16,7 @@ export class ProjectsService {
         agent: true,
         technician: true,
         editor: true,
-        mediaItems: true,
+        media: true,
         messages: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -28,21 +28,21 @@ export class ProjectsService {
     if (role === 'AGENT') {
       return this.prisma.project.findMany({
         where: { agentId: userId },
-        include: { mediaItems: true, messages: true },
+        include: { media: true, messages: true },
       });
     }
 
     if (role === 'TECHNICIAN') {
       return this.prisma.project.findMany({
         where: { technicianId: userId },
-        include: { mediaItems: true, messages: true },
+        include: { media: true, messages: true },
       });
     }
 
     if (role === 'EDITOR') {
       return this.prisma.project.findMany({
         where: { editorId: userId },
-        include: { mediaItems: true, messages: true },
+        include: { media: true, messages: true },
       });
     }
 
@@ -73,6 +73,43 @@ export class ProjectsService {
       }
     });
   }
+
+  async assignAgent(projectId: string, agentId: string) {
+  await this.ensureUserExists(agentId);
+  return this.prisma.project.update({
+    where: { id: projectId },
+    data: { agentId },
+  });
+}
+
+async assignTechnician(projectId: string, technicianId: string) {
+  await this.ensureUserExists(technicianId);
+  return this.prisma.project.update({
+    where: { id: projectId },
+    data: { technicianId },
+  });
+}
+
+async assignEditor(projectId: string, editorId: string) {
+  await this.ensureUserExists(editorId);
+  return this.prisma.project.update({
+    where: { id: projectId },
+    data: { editorId },
+  });
+}
+
+async scheduleProject(projectId: string, scheduled: Date) {
+  return this.prisma.project.update({
+    where: { id: projectId },
+    data: { scheduledTime: scheduled },
+  });
+}
+
+private async ensureUserExists(id: string) {
+  const user = await this.prisma.user.findUnique({ where: { id } });
+  if (!user) throw new NotFoundException('User not found');
+}
+
 
 
   
@@ -152,7 +189,7 @@ async updateStatus(projectId: string, newStatus: ProjectStatus, user: { id: stri
         agent: true,
         technician: true,
         editor: true,
-        mediaItems: true,
+        media: true,
         messages: true,
       },
     });
@@ -165,7 +202,7 @@ async updateStatus(projectId: string, newStatus: ProjectStatus, user: { id: stri
         agent: true,
         technician: true,
         editor: true,
-        mediaItems: true,
+        media: true,
         messages: true,
       }
     });
