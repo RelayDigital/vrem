@@ -90,11 +90,11 @@ export function DashboardView({
         <div className="@container w-full">
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-lg border-0">Schedule</H2>
-            <Button variant="flat" onClick={onNavigateToCalendarView}>
+            <Button variant="flat" className="px-0" onClick={onNavigateToCalendarView}>
               View calendar
             </Button>
           </div>
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border rounded-md overflow-hidden">
             <MonthView
               currentDate={currentDate}
               events={calendarEvents}
@@ -111,7 +111,7 @@ export function DashboardView({
           <div className="mb-md flex items-baseline justify-between">
             {/* <MapPin className="h-5 w-5 text-primary" /> */}
             <H2 className="text-lg border-0">Live Job Map</H2>
-            <Button variant="flat" onClick={onNavigateToMapView}>
+            <Button variant="flat" className="px-0" onClick={onNavigateToMapView}>
               View map
             </Button>
           </div>
@@ -132,7 +132,7 @@ export function DashboardView({
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-lg">Active Jobs</H2>
             {assignedJobs.length > 0 && onNavigateToJobsView && (
-              <Button variant="flat" onClick={onNavigateToJobsView}>
+              <Button variant="flat" className="px-0" onClick={onNavigateToJobsView}>
                 View all
               </Button>
             )}

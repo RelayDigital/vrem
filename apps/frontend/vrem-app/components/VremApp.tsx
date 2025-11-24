@@ -81,11 +81,42 @@ import {
 } from "lucide-react";
 import { ContextSwitcher, type ContextOption } from "./shared/ContextSwitcher";
 
-export default function VremApp() {
+interface VremAppProps {
+  initialAccountType?: "agent" | "dispatcher" | "photographer";
+}
+
+export default function VremApp(props: VremAppProps = {}) {
+  const { initialAccountType = "dispatcher" } = props;
   const { theme, setTheme } = useTheme();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(true); // Start authenticated when coming from login
   const [headerHeight, setHeaderHeight] = useState(73); // Default fallback
-  const [currentUser, setCurrentUser] = useState<User>(initialUser);
+  
+  // Initialize user based on account type
+  const getInitialUser = (): User => {
+    if (initialAccountType === "agent") {
+      return {
+        id: "user-agent",
+        name: "Emily Rodriguez",
+        email: "emily@luxuryrealty.com",
+        role: "agent",
+        organizationId: "org-client-001",
+        organizationType: "agent",
+      };
+    } else if (initialAccountType === "photographer") {
+      return {
+        id: "photo-001",
+        name: "Marcus Rodriguez",
+        email: "marcus@vxmedia.com",
+        role: "photographer",
+        organizationId: "org-vx-001",
+        organizationType: "media_company",
+      };
+    } else {
+      return initialUser; // dispatcher
+    }
+  };
+  
+  const [currentUser, setCurrentUser] = useState<User>(getInitialUser());
   const [jobs, setJobs] = useState<JobRequest[]>(initialJobRequests);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>(initialAuditLog);
   const [photographers, setPhotographers] =
@@ -355,13 +386,16 @@ export default function VremApp() {
   const handleLogin = () => {
     // Simulate login - use the same user with dispatcher role as default
     setIsAuthenticated(true);
-    setCurrentUser(initialUser);
+    setCurrentUser(getInitialUser());
     toast.success("Logged in successfully");
   };
 
   const handleLogout = () => {
-    setIsAuthenticated(false);
-    toast.success("Logged out successfully");
+    // Clear localStorage and redirect to login immediately
+    // Don't update state to avoid flashing the landing page
+    localStorage.removeItem("accountType");
+    // Use replace to avoid adding to history and prevent flash
+    window.location.replace("/");
   };
 
   const handleGetStarted = () => {

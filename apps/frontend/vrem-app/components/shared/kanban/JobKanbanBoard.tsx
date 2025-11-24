@@ -134,94 +134,92 @@ export function JobKanbanBoard({
 
   return (
     <div className="relative w-full overflow-x-auto">
-      <div className="flex gap-16" style={{ maxHeight: 'calc(100vh - 400px)', minHeight: '600px' }}>
-        <KanbanProvider
-          columns={columns}
-          data={kanbanData}
-          onDataChange={handleDataChange}
-          className="h-full"
-        >
-          {(column: KanbanColumn) => {
-            const Icon = column.icon as React.ComponentType<{
-              className?: string;
-            }>;
-            const columnJobs = kanbanData.filter(
-              (item) => item.column === column.id
-            );
+      <KanbanProvider
+        columns={columns}
+        data={kanbanData}
+        onDataChange={handleDataChange}
+        className="h-full"
+      >
+        {(column: KanbanColumn) => {
+          const Icon = column.icon as React.ComponentType<{
+            className?: string;
+          }>;
+          const columnJobs = kanbanData.filter(
+            (item) => item.column === column.id
+          );
 
-            return (
-              <KanbanBoard
-                key={column.id}
-                id={column.id}
-                className="relative h-[calc(100vh-400px)]! min-h-[600px] shrink-0 w-[350px]"
-              >
-                <KanbanHeader className="flex items-center justify-between p-4 border-b shrink-0">
-                  <div className="flex items-center gap-2">
-                    <Icon className={`h-4 w-4 ${column.color}`} />
-                    <span className="text-sm font-semibold">{column.name}</span>
+          return (
+            <KanbanBoard
+              key={column.id}
+              id={column.id}
+              className="relative h-[calc(70vh)]! min-h-[600px] shrink-0 w-[350px]"
+            >
+              <KanbanHeader className="flex items-center justify-between p-4 border-b shrink-0">
+                <div className="flex items-center gap-2">
+                  <Icon className={`h-4 w-4 ${column.color}`} />
+                  <span className="text-sm font-semibold">{column.name}</span>
+                </div>
+                <Badge variant="secondary" className="text-xs">
+                  {columnJobs.length}
+                </Badge>
+              </KanbanHeader>
+              {columnJobs.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center overflow-hidden">
+                  <div className="text-center py-8 text-muted-foreground text-sm px-4">
+                    No jobs in this column
                   </div>
-                  <Badge variant="secondary" className="text-xs">
-                    {columnJobs.length}
-                  </Badge>
-                </KanbanHeader>
-                {columnJobs.length === 0 ? (
-                  <div className="flex-1 flex items-center justify-center overflow-hidden">
-                    <div className="text-center py-8 text-muted-foreground text-sm px-4">
-                      No jobs in this column
-                    </div>
-                  </div>
-                ) : (
-                  <KanbanCards id={column.id} className="flex-1 min-h-0">
-                    {(item) => {
-                      const jobItem = item as JobKanbanItem;
-                      const photographer = jobItem.job.assignedPhotographerId
-                        ? photographers.find(
-                            (p) => p.id === jobItem.job.assignedPhotographerId
-                          )
-                        : undefined;
+                </div>
+              ) : (
+                <KanbanCards id={column.id} className="flex-1 min-h-0">
+                  {(item) => {
+                    const jobItem = item as JobKanbanItem;
+                    const photographer = jobItem.job.assignedPhotographerId
+                      ? photographers.find(
+                          (p) => p.id === jobItem.job.assignedPhotographerId
+                        )
+                      : undefined;
 
-                      return (
-                        <div key={jobItem.id} className="w-full">
-                          <KanbanCard
-                            id={jobItem.id}
-                            name={jobItem.name}
-                            column={jobItem.column}
-                            className="p-0 w-full"
-                          >
-                            <JobCardKanban
-                              job={jobItem.job}
-                              photographer={photographer}
-                              messages={messages}
-                              onViewRankings={
-                                (jobItem.job.status === "pending" ||
-                                  jobItem.job.status === "assigned") &&
-                                onViewRankings
-                                  ? () => onViewRankings(jobItem.job)
-                                  : undefined
-                              }
-                              onChangePhotographer={
-                                onChangePhotographer
-                                  ? () => onChangePhotographer(jobItem.job)
-                                  : undefined
-                              }
-                              onJobClick={
-                                onJobClick
-                                  ? () => onJobClick(jobItem.job)
-                                  : undefined
-                              }
-                              disableContextMenu={disableContextMenu}
-                            />
-                          </KanbanCard>
-                        </div>
-                      );
-                    }}
-                  </KanbanCards>
-                )}
-              </KanbanBoard>
-            );
-          }}
-        </KanbanProvider>
-      </div>
+                    return (
+                      <div key={jobItem.id} className="w-full">
+                        <KanbanCard
+                          id={jobItem.id}
+                          name={jobItem.name}
+                          column={jobItem.column}
+                          className="p-0 w-full"
+                        >
+                          <JobCardKanban
+                            job={jobItem.job}
+                            photographer={photographer}
+                            messages={messages}
+                            onViewRankings={
+                              (jobItem.job.status === "pending" ||
+                                jobItem.job.status === "assigned") &&
+                              onViewRankings
+                                ? () => onViewRankings(jobItem.job)
+                                : undefined
+                            }
+                            onChangePhotographer={
+                              onChangePhotographer
+                                ? () => onChangePhotographer(jobItem.job)
+                                : undefined
+                            }
+                            onJobClick={
+                              onJobClick
+                                ? () => onJobClick(jobItem.job)
+                                : undefined
+                            }
+                            disableContextMenu={disableContextMenu}
+                          />
+                        </KanbanCard>
+                      </div>
+                    );
+                  }}
+                </KanbanCards>
+              )}
+            </KanbanBoard>
+          );
+        }}
+      </KanbanProvider>
     </div>
   );
 }

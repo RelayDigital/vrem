@@ -559,14 +559,14 @@ export function JobTaskView({
     }
   };
 
-  const handleUploadcareSuccess = (info: any) => {
+  const handleUploadcareSuccess = (info: any, category: "image" | "video" | "floor-plan" | "file") => {
     // info.allEntries is an array of OutputFileEntry
     if (!info || !info.allEntries || info.allEntries.length === 0) return;
 
     const newMediaItems = info.allEntries.map((entry: any) => ({
       id: entry.uuid,
       name: entry.name,
-      type: "image",
+      type: category,
       url: entry.cdnUrl,
       size: entry.size,
       uploadedAt: new Date(),
@@ -575,29 +575,12 @@ export function JobTaskView({
     setUploadedMedia((prev: any[]) => [...prev, ...newMediaItems]);
   };
 
-  const handleFileUpload = (files: File[], category: "image" | "video" | "floor-plan" | "3d-content" | "file") => {
-    files.forEach((file) => {
-      const id = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-      const url = URL.createObjectURL(file);
-
-      const newMedia = {
-        id,
-        name: file.name,
-        type: category,
-        url,
-        size: file.size,
-        uploadedAt: new Date(),
-      };
-
-      setUploadedMedia((prev) => [...prev, newMedia]);
-    });
-  };
 
   const getMediaByCategory = (category: "image" | "video" | "floor-plan" | "3d-content" | "file") => {
     return uploadedMedia.filter((item) => item.type === category);
   };
 
-  const getAcceptTypes = (category: "image" | "video" | "floor-plan" | "3d-content" | "file") => {
+  const getUploadcareAcceptTypes = (category: "image" | "video" | "floor-plan" | "file") => {
     switch (category) {
       case "image":
         return "image/*";
@@ -605,8 +588,8 @@ export function JobTaskView({
         return "video/*";
       case "floor-plan":
         return "image/*";
-      case "3d-content":
-        return "";
+      case "file":
+        return "*";
       default:
         return "*";
     }
@@ -819,108 +802,21 @@ export function JobTaskView({
       // Show upload area when empty
       return (
         <div className="py-4 space-y-4">
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            accept={getAcceptTypes(category)}
-            className="hidden"
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              handleFileUpload(files, category);
-            }}
-          />
-          <div
-            className={cn(
-              "relative border-2 border-dashed rounded-xl p-12 transition-colors cursor-pointer",
-              isDragging
-                ? "border-primary bg-primary/5"
-                : "border-border bg-muted/30 hover:border-primary/50"
-            )}
-            onClick={() => inputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDraggingCategory(category);
-            }}
-            onDragLeave={() => setDraggingCategory(null)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDraggingCategory(null);
-              const files = Array.from(e.dataTransfer.files);
-              handleFileUpload(files, category);
-            }}
-          >
-            {(category === "image" || category === "video" || category === "floor-plan" || category === "file") && (
-              <div className="flex flex-col items-center gap-2 mt-2">
-                {category === "image" ? (
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <FileUploaderRegular
-                      pubkey={process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY || "dbf470d49c954f9f6143"}
-                      classNameUploader="uc-light uc-custom"
-                      sourceList="local, camera, gdrive, facebook"
-                      userAgentIntegration="llm-nextjs"
-                      filesViewMode="grid"
-                      onChange={handleUploadcareSuccess}
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex flex-col items-center justify-center gap-4 text-center">
-                      <div className="p-4 rounded-full bg-muted">
-                        <div className="flex justify-center mb-4">
-                          <Button
-                            variant="outline"
-                            onClick={() => inputRef.current?.click()}
-                            className="flex items-center"
-                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            Upload {categoryName}
-                          </Button>
-                        </div>
-                        <P className="text-xs text-muted-foreground mt-2">or attach from</P>
-                        <ButtonGroup orientation="horizontal">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCloudStorage("google-drive", category);
-                            }}
-                            disabled={connectingService === "google-drive"}
-                            className="flex items-center gap-2"
-                          >
-                            {connectingService === "google-drive" ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <SiGoogledrive className="h-4 w-4" />
-                            )}
-                            <span>Drive</span>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCloudStorage("dropbox", category);
-                            }}
-                            disabled={connectingService === "dropbox"}
-                            className="flex items-center gap-2"
-                          >
-                            {connectingService === "dropbox" ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <SiDropbox className="h-4 w-4" />
-                            )}
-                            <span>Dropbox</span>
-                          </Button>
-                        </ButtonGroup>
-                      </div>
-                    </div>
-                  </>
-                )}
+          {(category === "image" || category === "video" || category === "floor-plan" || category === "file") && (
+            <div className="flex flex-col items-center gap-2">
+              <div onClick={(e) => e.stopPropagation()}>
+                <FileUploaderRegular
+                  pubkey={process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY || "dbf470d49c954f9f6143"}
+                  classNameUploader="uc-light uc-custom"
+                  sourceList="local, camera, gdrive, facebook"
+                  userAgentIntegration="llm-nextjs"
+                  filesViewMode="grid"
+                  accept={getUploadcareAcceptTypes(category)}
+                  onChange={(info) => handleUploadcareSuccess(info, category)}
+                />
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -928,31 +824,24 @@ export function JobTaskView({
     // Show gallery when there are items
     return (
       <div className="py-4 space-y-4">
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept={getAcceptTypes(category)}
-          className="hidden"
-          onChange={(e) => {
-            const files = Array.from(e.target.files || []);
-            handleFileUpload(files, category);
-          }}
-        />
         <div className="flex items-center justify-between flex-wrap gap-3">
           <P className="text-sm font-medium text-foreground">
             {categoryMedia.length} {categoryMedia.length === 1 ? "item" : "items"}
           </P>
           <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => inputRef.current?.click()}
-              className="flex items-center gap-2"
-            >
-              <Upload className="h-4 w-4" />
-              Add More
-            </Button>
+            {(category === "image" || category === "video" || category === "floor-plan" || category === "file") && (
+              <div onClick={(e) => e.stopPropagation()}>
+                <FileUploaderRegular
+                  pubkey={process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY || "dbf470d49c954f9f6143"}
+                  classNameUploader="uc-light uc-custom"
+                  sourceList="local, camera, gdrive, facebook"
+                  userAgentIntegration="llm-nextjs"
+                  filesViewMode="grid"
+                  accept={getUploadcareAcceptTypes(category)}
+                  onChange={(info) => handleUploadcareSuccess(info, category)}
+                />
+              </div>
+            )}
             {(category === "image" || category === "video" || category === "floor-plan" || category === "file") && (
               <ButtonGroup orientation="horizontal">
                 <Button
