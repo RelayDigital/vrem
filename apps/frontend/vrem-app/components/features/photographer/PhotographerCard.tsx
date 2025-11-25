@@ -26,6 +26,7 @@ import { motion } from "framer-motion";
 import { RadialBarChart, RadialBar, PolarGrid, PolarRadiusAxis, Label } from "recharts";
 import { Separator } from "@/components/ui/separator";
 import { getLocationDisplay } from "../../../lib/utils";
+import { P } from '../../ui/typography';
 
 interface PhotographerCardProps {
   photographer: Photographer;
@@ -156,7 +157,7 @@ export function PhotographerCard({
                           </span>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-xs">
-                          <p className="wrap-break-word">{getLocationDisplay(photographer.homeLocation.address, true)}</p>
+                          <P className="wrap-break-word">{getLocationDisplay(photographer.homeLocation.address, true)}</P>
                         </TooltipContent>
                       </Tooltip>
                     ) : (
@@ -225,10 +226,10 @@ export function PhotographerCard({
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p className="max-w-xs">
+                        <P className="max-w-xs">
                           Overall match score calculated from availability, distance, skill match, and reliability. 
                           Higher scores indicate better fit for the job.
-                        </p>
+                        </P>
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -267,10 +268,10 @@ export function PhotographerCard({
                         <Info className="h-3 w-3 text-muted-foreground/60 hover:text-muted-foreground cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
-                        <p className="text-xs">
+                        <P className="text-xs">
                           Calculated by averaging the photographer's skill ratings (1-5 scale) for each media type required by the job. 
                           The average is converted to a percentage (multiplied by 20).
-                        </p>
+                        </P>
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -346,7 +347,7 @@ export function PhotographerCard({
               </TooltipTrigger>
               {!isAvailable && (
                 <TooltipContent>
-                  <p>This photographer is not available for assignment</p>
+                  <P>This photographer is not available for assignment</P>
                 </TooltipContent>
               )}
             </Tooltip>

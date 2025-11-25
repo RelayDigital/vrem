@@ -26,6 +26,25 @@ const getMediaIcon = (type: string) => {
   }
 };
 
+const getStatusGradient = (status: string) => {
+  switch (status) {
+    case "pending":
+      return "bg-gradient-to-br from-status-pending/20 via-status-pending/15 to-status-pending/10";
+    case "assigned":
+      return "bg-gradient-to-br from-status-assigned/20 via-status-assigned/15 to-status-assigned/10";
+    case "in_progress":
+      return "bg-gradient-to-br from-status-in-progress/20 via-status-in-progress/15 to-status-in-progress/10";
+    case "editing":
+      return "bg-gradient-to-br from-status-editing/20 via-status-editing/15 to-status-editing/10";
+    case "delivered":
+      return "bg-gradient-to-br from-status-delivered/20 via-status-delivered/15 to-status-delivered/10";
+    case "cancelled":
+      return "bg-gradient-to-br from-status-cancelled/20 via-status-cancelled/15 to-status-cancelled/10";
+    default:
+      return "bg-gradient-to-br from-status-cancelled/20 via-status-cancelled/15 to-status-cancelled/10";
+  }
+};
+
 export function JobDetailCard({ job, onClick }: JobDetailCardProps) {
   return (
     <div
@@ -33,15 +52,17 @@ export function JobDetailCard({ job, onClick }: JobDetailCardProps) {
       onClick={onClick}
     >
       <div className="flex gap-4">
-        {job.propertyImage && (
           <div className="w-32 h-32 rounded-lg overflow-hidden flex-shrink-0">
+          {job.propertyImage && job.status === "delivered" ? (
             <ImageWithFallback
               src={job.propertyImage}
               alt={job.propertyAddress}
               className="w-full h-full object-cover"
             />
+          ) : (
+            <div className={getStatusGradient(job.status) + " w-full h-full"} />
+          )}
           </div>
-        )}
         <div className="flex-1 space-y-2">
           <div className="flex items-start justify-between">
             <div>

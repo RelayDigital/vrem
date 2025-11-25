@@ -39,10 +39,87 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-input-background: var(--input-background);
+  --color-status-pending: var(--status-pending);
+  --color-status-pending-foreground: var(--status-pending-foreground);
+  --color-status-assigned: var(--status-assigned);
+  --color-status-assigned-foreground: var(--status-assigned-foreground);
+  --color-status-in-progress: var(--status-in-progress);
+  --color-status-in-progress-foreground: var(--status-in-progress-foreground);
+  --color-status-editing: var(--status-editing);
+  --color-status-editing-foreground: var(--status-editing-foreground);
+  --color-status-delivered: var(--status-delivered);
+  --color-status-delivered-foreground: var(--status-delivered-foreground);
+  --color-status-cancelled: var(--status-cancelled);
+  --color-status-cancelled-foreground: var(--status-cancelled-foreground);
+  --color-priority-urgent: var(--priority-urgent);
+  --color-priority-urgent-foreground: var(--priority-urgent-foreground);
+  --color-priority-rush: var(--priority-rush);
+  --color-priority-rush-foreground: var(--priority-rush-foreground);
+  --color-priority-standard: var(--priority-standard);
+  --color-priority-standard-foreground: var(--priority-standard-foreground);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  
+  /* Custom spacing values - Only applies to spacing utilities (padding, margin, gap, space) */
+  /* These do NOT affect width, height, or other size utilities */
+  --padding-5xs: 0.25rem;
+  --padding-4xs: 0.5rem;
+  --padding-3xs: 0.75rem;
+  --padding-2xs: 1rem;
+  --padding-xs: 1.25rem;
+  --padding-sm: 1.5rem;
+  --padding-md: 2rem;
+  --padding-lg: 3rem;
+  --padding-xl: 4rem;
+  --padding-2xl: 5rem;
+  --padding-3xl: 7.5rem;
+  --padding-4xl: 10rem;
+  --padding-5xl: 12.5rem;
+  
+  --margin-5xs: 0.25rem;
+  --margin-4xs: 0.5rem;
+  --margin-3xs: 0.75rem;
+  --margin-2xs: 1rem;
+  --margin-xs: 1.25rem;
+  --margin-sm: 1.5rem;
+  --margin-md: 2rem;
+  --margin-lg: 3rem;
+  --margin-xl: 4rem;
+  --margin-2xl: 5rem;
+  --margin-3xl: 7.5rem;
+  --margin-4xl: 10rem;
+  --margin-5xl: 12.5rem;
+  
+  --gap-5xs: 0.25rem;
+  --gap-4xs: 0.5rem;
+  --gap-3xs: 0.75rem;
+  --gap-2xs: 1rem;
+  --gap-xs: 1.25rem;
+  --gap-sm: 1.5rem;
+  --gap-md: 2rem;
+  --gap-lg: 3rem;
+  --gap-xl: 4rem;
+  --gap-2xl: 5rem;
+  --gap-3xl: 7.5rem;
+  --gap-4xl: 10rem;
+  --gap-5xl: 12.5rem;
+  
+  --space-5xs: 0.25rem;
+  --space-4xs: 0.5rem;
+  --space-3xs: 0.75rem;
+  --space-2xs: 1rem;
+  --space-xs: 1.25rem;
+  --space-sm: 1.5rem;
+  --space-md: 2rem;
+  --space-lg: 3rem;
+  --space-xl: 4rem;
+  --space-2xl: 5rem;
+  --space-3xl: 7.5rem;
+  --space-4xl: 10rem;
+  --space-5xl: 12.5rem;
 }
 
 :root {
@@ -83,7 +160,30 @@
   /* Borders and inputs */
   --border: oklch(0.89 0 0);                  /* Light gray border */
   --input: oklch(0.89 0 0);                   /* Input border */
+  --input-background: oklch(1 0 0);           /* White input background */
   --ring: oklch(0.15 0 0);                    /* Black focus ring */
+  
+  /* Status colors - All distinct colors (not grayscale) */
+  --status-pending: oklch(0.65 0.15 60);      /* Orange for pending */
+  --status-pending-foreground: oklch(0.15 0 0); /* Black text */
+  --status-assigned: oklch(0.55 0.15 250);    /* Blue for assigned */
+  --status-assigned-foreground: oklch(0.99 0 0); /* White text */
+  --status-in-progress: oklch(0.60 0.15 280); /* Purple for in progress */
+  --status-in-progress-foreground: oklch(0.99 0 0); /* White text */
+  --status-editing: oklch(0.65 0.15 60);      /* Orange for editing */
+  --status-editing-foreground: oklch(0.15 0 0); /* Black text */
+  --status-delivered: oklch(0.60 0.15 142);    /* Emerald green for delivered */
+  --status-delivered-foreground: oklch(0.15 0 0); /* Black text */
+  --status-cancelled: oklch(0.50 0.12 20);     /* Muted red for cancelled */
+  --status-cancelled-foreground: oklch(0.99 0 0); /* White text */
+  
+  /* Priority colors */
+  --priority-urgent: oklch(0.55 0.22 25);     /* Red for urgent */
+  --priority-urgent-foreground: oklch(0.99 0 0); /* White text */
+  --priority-rush: oklch(0.65 0.15 60);        /* Orange for rush */
+  --priority-rush-foreground: oklch(0.15 0 0); /* Black text */
+  --priority-standard: oklch(0.15 0 0);        /* Primary black */
+  --priority-standard-foreground: oklch(0.99 0 0); /* White text */
   
   /* Charts - Grayscale with subtle colors */
   --chart-1: oklch(0.35 0 0);                 /* Dark gray */
@@ -138,7 +238,30 @@
   /* Borders and inputs */
   --border: oklch(0.30 0 0);                  /* Dark border */
   --input: oklch(0.30 0 0);                   /* Dark input border */
+  --input-background: oklch(0.18 0 0);        /* Dark input background */
   --ring: oklch(0.98 0 0);                    /* White focus ring */
+  
+  /* Status colors - All distinct colors (not grayscale) */
+  --status-pending: oklch(0.70 0.15 60);      /* Lighter orange for dark mode */
+  --status-pending-foreground: oklch(0.98 0 0); /* White text */
+  --status-assigned: oklch(0.65 0.15 250);    /* Lighter blue for dark mode */
+  --status-assigned-foreground: oklch(0.98 0 0); /* White text */
+  --status-in-progress: oklch(0.70 0.15 280);  /* Lighter purple for dark mode */
+  --status-in-progress-foreground: oklch(0.98 0 0); /* White text */
+  --status-editing: oklch(0.70 0.15 60);       /* Lighter orange for dark mode */
+  --status-editing-foreground: oklch(0.98 0 0); /* White text */
+  --status-delivered: oklch(0.65 0.18 142);    /* Lighter emerald for dark mode */
+  --status-delivered-foreground: oklch(0.98 0 0); /* White text */
+  --status-cancelled: oklch(0.60 0.12 20);     /* Lighter muted red for dark mode */
+  --status-cancelled-foreground: oklch(0.98 0 0); /* White text */
+  
+  /* Priority colors */
+  --priority-urgent: oklch(0.65 0.25 25);     /* Brighter red for dark mode */
+  --priority-urgent-foreground: oklch(0.98 0 0); /* White text */
+  --priority-rush: oklch(0.70 0.15 60);        /* Lighter orange for dark mode */
+  --priority-rush-foreground: oklch(0.98 0 0); /* White text */
+  --priority-standard: oklch(0.98 0 0);       /* White primary */
+  --priority-standard-foreground: oklch(0.12 0 0); /* Black text */
   
   /* Charts - Lighter for dark mode */
   --chart-1: oklch(0.75 0 0);                 /* Light gray */
@@ -175,4 +298,19 @@
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Chrome, Safari and Opera */
+}
+
+/* Uploadcare Custom Theme */
+.uc-custom {
+  --uc-primary: var(--primary);
+  --uc-primary-foreground: var(--primary-foreground);
+}
+
+.uc-custom .uc-btn-primary {
+  background-color: var(--uc-primary);
+  color: var(--uc-primary-foreground);
+}
+
+.uc-custom .uc-btn-primary:hover {
+  opacity: 0.9;
 }

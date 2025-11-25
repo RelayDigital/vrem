@@ -24,6 +24,7 @@ import {
   TooltipTrigger,
 } from '../../ui/tooltip';
 import { Maximize2, Search, Filter, X, ExternalLink, XIcon, ArrowUpDown, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
+import { P } from '@/components/ui/typography';
 
 interface FilterOption {
   label: string;
@@ -312,7 +313,7 @@ export function ExpandableListModal<T>({
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent side="top">
-                      <p>Go to Jobs</p>
+                      <P>Go to Jobs</P>
                     </TooltipContent>
                   </Tooltip>
                 )}

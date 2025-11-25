@@ -1,3 +1,4 @@
+import { H1, P } from '@/components/ui/typography';
 import { AddressSearch } from '../../../shared/search';
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
@@ -26,12 +27,12 @@ export function AddressStep({ onAddressSelect }: AddressStepProps) {
             <Sparkles className="h-4 w-4" />
             <span>AI-Powered Photographer Matching</span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-foreground">
+          <H1 className="text-4xl md:text-5xl font-bold text-foreground">
             Where's the property?
-          </h1>
-          <p className="text-lg text-muted-foreground">
+          </H1>
+          <P className="text-lg text-muted-foreground">
             Enter the address to get started with your photo shoot booking
-          </p>
+          </P>
         </motion.div>
 
         <motion.div

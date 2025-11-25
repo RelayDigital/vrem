@@ -103,6 +103,7 @@ export interface Photographer {
 
 export interface JobRequest {
   id: string;
+  orderNumber: string;
   organizationId: string;
   clientName: string;
   propertyAddress: string;
@@ -123,6 +124,16 @@ export interface JobRequest {
   assignedAt?: Date;
   completedAt?: Date;
   propertyImage?: string;
+}
+
+export interface JobDetails {
+  clientName: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  mediaTypes: string[];
+  priority: 'standard' | 'rush' | 'urgent';
+  estimatedDuration: number;
+  requirements: string;
 }
 
 export interface PhotographerRanking {

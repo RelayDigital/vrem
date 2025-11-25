@@ -401,6 +401,7 @@ export const photographers: Photographer[] = [
 export const jobRequests: JobRequest[] = [
   {
     id: 'job-001',
+    orderNumber: '0001',
     organizationId: 'org-client-001',
     clientName: 'Luxury Realty Group',
     propertyAddress: '1234 17th Avenue SW, Calgary, AB T2T 0C1',
@@ -421,6 +422,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-002',
+    orderNumber: '0002',
     organizationId: 'org-client-002',
     clientName: 'Metro Properties',
     propertyAddress: '5678 4th Street SW, Calgary, AB T2P 1V1',
@@ -441,6 +443,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-003',
+    orderNumber: '0003',
     organizationId: 'org-client-001',
     clientName: 'Luxury Realty Group',
     propertyAddress: '9012 Elbow Park Drive SW, Calgary, AB T2V 1M2',
@@ -463,6 +466,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-004',
+    orderNumber: '0004',
     organizationId: 'org-client-002',
     clientName: 'Metro Properties',
     propertyAddress: '3456 Kensington Road NW, Calgary, AB T2N 3P7',
@@ -485,6 +489,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-005',
+    orderNumber: '0005',
     organizationId: 'org-client-001',
     clientName: 'Luxury Realty Group',
     propertyAddress: '7890 Mount Royal Drive SW, Calgary, AB T2T 0H5',
@@ -508,6 +513,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-006',
+    orderNumber: '0006',
     organizationId: 'org-client-001',
     clientName: 'Luxury Realty Group',
     propertyAddress: '2345 Altadore Drive SW, Calgary, AB T2V 1M2',
@@ -528,6 +534,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-007',
+    orderNumber: '0007',
     organizationId: 'org-client-002',
     clientName: 'Metro Properties',
     propertyAddress: '4567 Parkdale Boulevard NW, Calgary, AB T2N 1V8',
@@ -548,6 +555,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-008',
+    orderNumber: '0008',
     organizationId: 'org-client-001',
     clientName: 'Luxury Realty Group',
     propertyAddress: '8901 Mission Road SW, Calgary, AB T2T 0C1',
@@ -568,6 +576,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-009',
+    orderNumber: '0009',
     organizationId: 'org-client-002',
     clientName: 'Metro Properties',
     propertyAddress: '1234 Bridgeland Boulevard NE, Calgary, AB T2G 2G8',
@@ -590,6 +599,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-010',
+    orderNumber: '0010',
     organizationId: 'org-client-001',
     clientName: 'Luxury Realty Group',
     propertyAddress: '5678 8th Avenue SW, Calgary, AB T2P 1H4',
@@ -612,6 +622,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-011',
+    orderNumber: '0011',
     organizationId: 'org-client-002',
     clientName: 'Metro Properties',
     propertyAddress: '9012 4th Street SW, Calgary, AB T2P 1V1',
@@ -632,6 +643,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-012',
+    orderNumber: '0012',
     organizationId: 'org-client-001',
     clientName: 'Luxury Realty Group',
     propertyAddress: '3456 Marda Loop Boulevard SW, Calgary, AB T2V 1M2',
@@ -654,6 +666,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-013',
+    orderNumber: '0013',
     organizationId: 'org-client-002',
     clientName: 'Metro Properties',
     propertyAddress: '7890 West Hillhurst Avenue NW, Calgary, AB T3C 2E7',
@@ -674,6 +687,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-014',
+    orderNumber: '0014',
     organizationId: 'org-client-001',
     clientName: 'Luxury Realty Group',
     propertyAddress: '2345 Britannia Drive SW, Calgary, AB T2V 1M2',
@@ -696,6 +710,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-015',
+    orderNumber: '0015',
     organizationId: 'org-client-002',
     clientName: 'Metro Properties',
     propertyAddress: '4567 Sunnyside Boulevard NW, Calgary, AB T2T 0C1',
@@ -716,6 +731,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-016',
+    orderNumber: '0016',
     organizationId: 'org-client-001',
     clientName: 'Luxury Realty Group',
     propertyAddress: '8901 Scarboro Avenue SW, Calgary, AB T2V 1M2',
@@ -738,6 +754,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-017',
+    orderNumber: '0017',
     organizationId: 'org-client-002',
     clientName: 'Metro Properties',
     propertyAddress: '1234 Inglewood Road SE, Calgary, AB T2G 1K1',
@@ -758,6 +775,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-018',
+    orderNumber: '0018',
     organizationId: 'org-client-001',
     clientName: 'Luxury Realty Group',
     propertyAddress: '5678 Bankview Crescent SW, Calgary, AB T2V 1M2',
@@ -781,6 +799,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-019',
+    orderNumber: '0019',
     organizationId: 'org-client-002',
     clientName: 'Metro Properties',
     propertyAddress: '9012 Rosedale Drive NW, Calgary, AB T2T 0C1',
@@ -804,6 +823,7 @@ export const jobRequests: JobRequest[] = [
   },
   {
     id: 'job-020',
+    orderNumber: '0020',
     organizationId: 'org-client-001',
     clientName: 'Luxury Realty Group',
     propertyAddress: '3456 Crescent Heights Boulevard NW, Calgary, AB T2T 0H5',

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Photographer, PhotographerRanking } from "../../../types";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
 import { Badge } from "../../ui/badge";
@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { P } from "@/components/ui/typography";
 
 interface PhotographerCardMinimalProps {
   photographer: Photographer;
@@ -39,6 +40,7 @@ interface PhotographerCardMinimalProps {
   onAssign?: () => void;
   selected?: boolean;
   isAssigning?: boolean;
+  onCollapse?: () => void;
 }
 
 const scoreChartConfig = {
@@ -56,9 +58,19 @@ export function PhotographerCardMinimal({
   onAssign,
   selected,
   isAssigning = false,
+  onCollapse,
 }: PhotographerCardMinimalProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const prevExpandedRef = useRef(isExpanded);
   const isAvailable = ranking ? ranking.availability === 100 : true;
+
+  // Reset map when dropdown collapses (transitions from expanded to collapsed)
+  useEffect(() => {
+    if (prevExpandedRef.current && !isExpanded && onCollapse) {
+      onCollapse();
+    }
+    prevExpandedRef.current = isExpanded;
+  }, [isExpanded, onCollapse]);
 
   // MapWithSidebar is dispatcher-only, so show full address
   const displayAddress = getLocationDisplay(
@@ -90,9 +102,7 @@ export function PhotographerCardMinimal({
 
   return (
     <div
-      className={`relative rounded-lg border transition-all overflow-hidden w-full ${
-        selected ? "ring-2 ring-primary bg-muted/30" : "border-border"
-      }`}
+      className={`relative rounded-lg border transition-all overflow-hidden w-full`}
     >
       {/* Minimal View - Always Visible */}
       <div
@@ -100,7 +110,7 @@ export function PhotographerCardMinimal({
         onClick={handleClick}
       >
         {/* Avatar */}
-        <div className="relative flex-shrink-0">
+        <div className="relative shrink-0">
           <Avatar className="h-12 w-12 border-2 border-background">
             <AvatarImage src={photographer.avatar} alt={photographer.name} />
             <AvatarFallback className="bg-primary text-primary-foreground text-sm">
@@ -125,7 +135,7 @@ export function PhotographerCardMinimal({
               {photographer.name}
             </span>
             {recommended && (
-              <Award className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" />
+              <Award className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -149,7 +159,7 @@ export function PhotographerCardMinimal({
         </div>
 
         {/* Expand/Collapse Icon */}
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           {isExpanded ? (
             <ChevronUp className="h-4 w-4 text-muted-foreground" />
           ) : (
@@ -236,12 +246,12 @@ export function PhotographerCardMinimal({
                             <Info className="h-3 w-3 text-muted-foreground/60 hover:text-muted-foreground cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
-                            <p className="text-xs">
+                            <P className="text-xs">
                               Calculated by averaging the photographer's skill
                               ratings (1-5 scale) for each media type required
                               by the job. The average is converted to a
                               percentage (multiplied by 20).
-                            </p>
+                            </P>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -325,11 +335,11 @@ export function PhotographerCardMinimal({
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="max-w-xs">
+                            <P className="max-w-xs">
                               Overall match score calculated from availability,
                               distance, skill match, and reliability. Higher
                               scores indicate better fit for the job.
-                            </p>
+                            </P>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -391,7 +401,7 @@ export function PhotographerCardMinimal({
                   </TooltipTrigger>
                   {!isAvailable && (
                     <TooltipContent>
-                      <p>This photographer is not available for assignment</p>
+                      <P>This photographer is not available for assignment</P>
                     </TooltipContent>
                   )}
                 </Tooltip>

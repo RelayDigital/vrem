@@ -96,7 +96,7 @@ export function AgentBookingFlow({
     };
 
     onJobCreate(job);
-    
+
     // Reset flow
     setStep('address');
     setSelectedAddress('');
@@ -124,6 +124,7 @@ export function AgentBookingFlow({
 
   const mockJob: JobRequest = {
     id: 'temp',
+    orderNumber: 'TEMP',
     organizationId: '',
     clientName: jobDetails.clientName || 'Agent Booking',
     propertyAddress: selectedAddress,

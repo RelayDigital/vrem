@@ -165,7 +165,7 @@ export const KanbanCards = <T extends KanbanItemProps = KanbanItemProps>({
     <ScrollArea className="overflow-hidden">
       <SortableContext items={items}>
         <div
-          className={cn('flex flex-grow flex-col gap-2 p-2', className)}
+          className={cn('flex size-full flex-col space-y-2 p-2', className)}
           {...props}
         >
           {filteredData.map(children)}
@@ -317,13 +317,37 @@ export const KanbanProvider = <
         sensors={sensors}
         {...props}
       >
-        <div
-          className={cn(
-            'grid size-full auto-cols-fr grid-flow-col gap-4',
-            className
-          )}
-        >
-          {columns.map((column) => children(column))}
+        {/* Responsive horizontal scroll: different column counts per breakpoint */}
+        <div className="size-full overflow-x-auto scroll-smooth">
+          <div
+            className={cn(
+              // Always use flex with horizontal scroll and gap
+              'flex h-full flex-row gap-2',
+              // Large screens: switch to grid with all columns visible
+              '2xl:grid 2xl:size-full 2xl:auto-cols-fr 2xl:grid-flow-col 2xl:gap-4 2xl:overflow-x-visible',
+              className
+            )}
+          >
+            {columns.map((column) => (
+              <div
+                key={column.id}
+                className={cn(
+                  // Mobile & Small (< 768px): 1 column visible, full width
+                  'flex-[0_0_100%]',
+                  // Medium (md, 768px+): 2 columns visible
+                  'md:flex-[0_0_calc(50%-0.25rem)]',
+                  // Large (lg, 1024px+): 3 columns visible
+                  'lg:flex-[0_0_calc(33.333%-0.333rem)]',
+                  // Extra Large (xl, 1280px+): 4 columns visible
+                  'xl:flex-[0_0_calc(25%-0.375rem)]',
+                  // 2XL (1536px+): Grid takes over, auto-sized columns
+                  '2xl:flex-none 2xl:min-w-0'
+                )}
+              >
+                {children(column)}
+              </div>
+            ))}
+          </div>
         </div>
         {typeof window !== 'undefined' &&
           createPortal(

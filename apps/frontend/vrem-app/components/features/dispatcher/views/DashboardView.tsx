@@ -1,14 +1,18 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { JobRequest, Photographer, Metrics } from '../../../../types';
-import { MetricsDashboard } from '../../../shared/metrics';
-import { JobListSection, JobCard } from '../../../shared/jobs';
-import { MapWithSidebar } from '../../../shared/dashboard/MapWithSidebar';
-import { Button } from '../../../ui/button';
-import { Card, CardHeader, CardTitle, CardContent, CardAction } from '../../../ui/card';
-import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useMemo, useState } from "react";
+import { JobRequest, Photographer, Metrics } from "../../../../types";
+import { MetricsDashboard } from "../../../shared/metrics";
+import { JobCard } from "../../../shared/jobs";
+import { MapWithSidebar } from "../../../shared/dashboard/MapWithSidebar";
+import { MonthView } from "../../../features/calendar/MonthView";
+import { Button } from "../../../ui/button";
+import { motion } from "framer-motion";
+import { Briefcase } from "lucide-react";
+import { H2 } from "@/components/ui/typography";
+import { EmptyState } from "../../../common";
+import { jobToCalendarEvent } from "../../../../lib/calendar-utils";
+import { CalendarEvent, generateTechnicianColors } from "../../../../types/calendar";
 
 interface DashboardViewProps {
   jobs: JobRequest[];
@@ -18,8 +22,11 @@ interface DashboardViewProps {
   onViewRankings: (job: JobRequest) => void;
   onSelectJob: (job: JobRequest) => void;
   onNavigateToJobsView?: () => void;
+  onNavigateToMapView?: () => void;
+  onNavigateToCalendarView?: () => void;
   onNavigateToJobInProjectManagement?: (job: JobRequest) => void;
   onJobAssign?: (jobId: string, photographerId: string, score: number) => void;
+  onJobClick?: (job: JobRequest) => void;
 }
 
 export function DashboardView({
@@ -30,74 +37,114 @@ export function DashboardView({
   onViewRankings,
   onSelectJob,
   onNavigateToJobsView,
+  onNavigateToMapView,
+  onNavigateToCalendarView,
   onNavigateToJobInProjectManagement,
   onJobAssign,
+  onJobClick,
 }: DashboardViewProps) {
-  const assignedJobs = jobs.filter((j) => j.status === 'assigned');
-  const [activeJobsScrollLeft, setActiveJobsScrollLeft] = useState<(() => void) | null>(null);
-  const [activeJobsScrollRight, setActiveJobsScrollRight] = useState<(() => void) | null>(null);
+  const assignedJobs = jobs.filter((j) => j.status === "assigned");
+  const [currentDate] = useState(new Date());
+
+  // Show only enough jobs to fill one grid row
+  // lg: 4 columns, md: 2 columns, sm: 1 column
+  const maxJobsToShow = 4;
+  const jobsToDisplay = assignedJobs.slice(0, maxJobsToShow);
+
+  // Convert jobs to calendar events
+  const calendarEvents = useMemo(() => {
+    return jobs.map((job) => jobToCalendarEvent(job));
+  }, [jobs]);
+
+  // Generate technician colors
+  const technicianColors = useMemo(
+    () => generateTechnicianColors(photographers),
+    [photographers]
+  );
+
+  // Handle event click
+  const handleEventClick = (event: CalendarEvent) => {
+    if (event.jobId && onJobClick) {
+      const job = jobs.find((j) => j.id === event.jobId);
+      if (job) {
+        onJobClick(job);
+      }
+    }
+  };
+
+  // Handle day click - navigate to calendar view
+  const handleDayClick = (date: Date) => {
+    if (onNavigateToCalendarView) {
+      onNavigateToCalendarView();
+    }
+  };
 
   return (
-    <main className="w-full px-6 py-6 space-y-6 overflow-x-hidden">
-      <MetricsDashboard metrics={metrics} />
+    <main className="container relative mx-auto">
+      <article className="flex flex-col gap-2xl md:gap-3xl px-md">
+        {/* Metrics */}
+        <div className="@container w-full mt-md">
+          <MetricsDashboard metrics={metrics} />
+        </div>
+        {/* Calendar */}
+        <div className="@container w-full">
+          <div className="mb-md flex items-baseline justify-between">
+            <H2 className="text-lg border-0">Schedule</H2>
+            <Button variant="flat" className="px-0" onClick={onNavigateToCalendarView}>
+              View calendar
+            </Button>
+          </div>
+          <div className="border rounded-md overflow-hidden">
+            <MonthView
+              currentDate={currentDate}
+              events={calendarEvents}
+              technicians={photographers}
+              technicianColors={technicianColors}
+              onEventClick={handleEventClick}
+              onDayClick={handleDayClick}
+              compact={true}
+            />
+          </div>
+        </div>
+        {/* Merged Map and Pending Assignments */}
+        <div className="@container w-full">
+          <div className="mb-md flex items-baseline justify-between">
+            {/* <MapPin className="h-5 w-5 text-primary" /> */}
+            <H2 className="text-lg border-0">Live Job Map</H2>
+            <Button variant="flat" className="px-0" onClick={onNavigateToMapView}>
+              View map
+            </Button>
+          </div>
 
-      {/* Merged Map and Pending Assignments */}
-      <MapWithSidebar
-        jobs={jobs}
-        photographers={photographers}
-        selectedJob={selectedJob}
-        onSelectJob={onSelectJob}
-        onNavigateToJobInProjectManagement={onNavigateToJobInProjectManagement}
-        onJobAssign={onJobAssign}
-      />
-
-      {assignedJobs.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <Card>
-            <CardHeader className="border-b">
-              <CardTitle className="text-lg">Active Jobs</CardTitle>
-              {activeJobsScrollLeft && activeJobsScrollRight && (
-                <CardAction>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={activeJobsScrollLeft}
-                      className="h-8 w-8"
-                      aria-label="Scroll left"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={activeJobsScrollRight}
-                      className="h-8 w-8"
-                      aria-label="Scroll right"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardAction>
-              )}
-            </CardHeader>
-            <CardContent className="p-4 pb-4!">
-              <JobListSection
-                title="Active Jobs"
-                items={assignedJobs}
-                itemCount={10}
-                searchPlaceholder="Search active jobs..."
-                searchFields={(job) => `${job.propertyAddress} ${job.clientName}`}
-                filterOptions={[
-                  { label: 'Assigned', value: 'assigned' },
-                  { label: 'In Progress', value: 'in_progress' },
-                ]}
-                onFilterChange={(value) => assignedJobs.filter((j) => value === 'all' || j.status === value)}
-                renderItem={(job) => {
+          <MapWithSidebar
+            jobs={jobs}
+            photographers={photographers}
+            selectedJob={selectedJob}
+            onSelectJob={onSelectJob}
+            onNavigateToJobInProjectManagement={
+              onNavigateToJobInProjectManagement
+            }
+            onJobAssign={onJobAssign}
+          />
+        </div>
+        {/* Active Jobs */}
+        <div className="@container w-full mb-md">
+          <div className="mb-md flex items-baseline justify-between">
+            <H2 className="text-lg">Active Jobs</H2>
+            {assignedJobs.length > 0 && onNavigateToJobsView && (
+              <Button variant="flat" className="px-0" onClick={onNavigateToJobsView}>
+                View all
+              </Button>
+            )}
+          </div>
+          {assignedJobs.length > 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {jobsToDisplay.map((job) => {
                   const photographer = photographers.find(
                     (p) => p.id === job.assignedPhotographerId
                   );
@@ -106,28 +153,34 @@ export function DashboardView({
                       key={job.id}
                       job={job}
                       photographer={photographer}
-                      onViewInProjectManagement={
-                        onNavigateToJobInProjectManagement
-                          ? () => onNavigateToJobInProjectManagement(job)
+                      onViewRankings={
+                        job.status === "pending"
+                          ? () => onViewRankings(job)
                           : undefined
                       }
+                      onClick={onJobClick ? () => onJobClick(job) : undefined}
                     />
                   );
-                }}
-                emptyMessage="No active jobs"
-                horizontalLayout={true}
-                onNavigateToFullView={onNavigateToJobsView}
-                useGridLayout={true}
-                onScrollControlsReady={(scrollLeft, scrollRight) => {
-                  setActiveJobsScrollLeft(() => scrollLeft);
-                  setActiveJobsScrollRight(() => scrollRight);
-                }}
-              />
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+                })}
+              </div>
+            </motion.div>
+          ) : (
+            <EmptyState
+              icon={Briefcase}
+              title="No Active Jobs"
+              description="There are currently no active jobs assigned to photographers."
+              action={
+                onNavigateToJobsView
+                  ? {
+                      label: "View All Jobs",
+                      onClick: onNavigateToJobsView,
+                    }
+                  : undefined
+              }
+            />
+          )}
+        </div>
+      </article>
     </main>
   );
 }
-

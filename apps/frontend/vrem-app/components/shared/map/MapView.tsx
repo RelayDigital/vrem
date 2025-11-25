@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { JobRequest, Photographer } from '../../../types';
-import { AlertCircle, User, Building2 } from 'lucide-react';
+import { AlertCircle, User, Home } from 'lucide-react';
 import { Small, Muted } from '../../ui/typography';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '../../ui/spinner';
 import { getLocationDisplay } from '../../../lib/utils';
 import { useSidebar } from '../../ui/sidebar';
+import { useTheme } from 'next-themes';
 
 interface MapViewProps {
   jobs: JobRequest[];
@@ -28,10 +29,12 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
   const jobMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const jobPopupsRef = useRef<Map<string, mapboxgl.Popup>>(new Map());
   const animationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const currentlyOpenPopupRef = useRef<mapboxgl.Popup | null>(null);
-  
+  const { resolvedTheme } = useTheme();
+
   // Get sidebar state to trigger map resize when sidebar toggles
   let sidebarState: string | undefined;
   try {
@@ -50,6 +53,39 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
       }
       .mapboxgl-ctrl-attrib {
         display: none !important;
+      }
+      
+      /* Override Mapbox popup styles for theme support */
+      .mapboxgl-popup-content {
+        background-color: var(--popover) !important;
+        color: var(--popover-foreground) !important;
+        border: 1px solid var(--border);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        padding: 0 !important; /* Remove default padding to let our content control it */
+        max-width: none !important; /* Allow our custom width */
+      }
+      
+      .mapboxgl-popup {
+        max-width: none !important; /* Allow wider popups */
+      }
+      
+      .mapboxgl-popup-tip {
+        border-top-color: var(--border) !important;
+        border-bottom-color: var(--border) !important;
+      }
+      
+      /* Adjust tip color based on position (Mapbox adds classes like mapboxgl-popup-anchor-bottom) */
+      .mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip {
+        border-top-color: var(--popover) !important;
+      }
+      .mapboxgl-popup-anchor-top .mapboxgl-popup-tip {
+        border-bottom-color: var(--popover) !important;
+      }
+      .mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+        border-right-color: var(--popover) !important;
+      }
+      .mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+        border-left-color: var(--popover) !important;
       }
     `;
     document.head.appendChild(style);
@@ -70,11 +106,11 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
     }
 
     const container = mapContainerRef.current;
-    
+
     // Wait for container to have dimensions before initializing
     let retryCount = 0;
     const maxRetries = 50; // ~5 seconds max wait time
-    
+
     const checkDimensions = () => {
       if (container.offsetWidth === 0 || container.offsetHeight === 0) {
         retryCount++;
@@ -104,7 +140,13 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
           setError(null);
           // Resize map after initial load to ensure it fills container
           setTimeout(() => {
-            map.resize();
+            if (mapRef.current && mapRef.current === map) {
+              try {
+                map.resize();
+              } catch (err) {
+                console.warn('Error resizing map:', err);
+              }
+            }
           }, 100);
         });
 
@@ -127,7 +169,13 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
           setError(null);
           // Resize map after style loads to ensure it fills container
           setTimeout(() => {
-            map.resize();
+            if (mapRef.current && mapRef.current === map) {
+              try {
+                map.resize();
+              } catch (err) {
+                console.warn('Error resizing map:', err);
+              }
+            }
           }, 100);
         });
 
@@ -148,6 +196,27 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
       }
     };
   }, []);
+
+  // Update map style when theme changes
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const targetStyle = resolvedTheme === 'dark'
+      ? 'mapbox://styles/mapbox/dark-v11'
+      : 'mapbox://styles/mapbox/streets-v12';
+
+    // Set isLoaded to false to prevent other effects from trying to add layers to a loading style
+    // The 'style.load' event listener will set it back to true when the new style is ready
+    setIsLoaded(false);
+
+    try {
+      mapRef.current.setStyle(targetStyle);
+    } catch (err) {
+      console.error('Error setting map style:', err);
+      // If error, ensure we set isLoaded back to true so app doesn't hang
+      setIsLoaded(true);
+    }
+  }, [resolvedTheme]);
 
   // Resize map when sidebar state changes or container dimensions change
   useEffect(() => {
@@ -180,8 +249,110 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
     };
   }, [sidebarState, isLoaded]);
 
+  // Helper to get CSS variable value
+  const getCSSVar = (varName: string): string => {
+    if (typeof window === 'undefined') return '';
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  };
+
+  // Helper to get status color
+  const getStatusColor = (status: string): string => {
+    // Convert underscore to hyphen for CSS variable names
+    const statusVarName = status.replace('_', '-');
+    const statusMap: Record<string, string> = {
+      pending: getCSSVar('--status-pending') || '#ef4444',
+      assigned: getCSSVar('--status-assigned') || '#3b82f6',
+      'in-progress': getCSSVar('--status-in-progress') || '#3b82f6',
+      'in_progress': getCSSVar('--status-in-progress') || '#3b82f6',
+      editing: getCSSVar('--status-editing') || '#f59e0b',
+      delivered: getCSSVar('--status-delivered') || '#22c55e',
+      cancelled: getCSSVar('--status-cancelled') || '#9ca3af',
+    };
+    return statusMap[status] || getCSSVar(`--status-${statusVarName}`) || getCSSVar('--status-cancelled') || '#9ca3af';
+  };
+
+  // Helper to get priority color
+  const getPriorityColor = (priority: string): string => {
+    const priorityMap: Record<string, string> = {
+      urgent: getCSSVar('--priority-urgent') || '#ef4444',
+      rush: getCSSVar('--priority-rush') || '#f59e0b',
+      standard: getCSSVar('--priority-standard') || '#6b7280',
+    };
+    return priorityMap[priority] || getCSSVar('--priority-standard') || '#6b7280';
+  };
+
+  // Helper to get text color (foreground)
+  const getTextColor = (): string => {
+    return getCSSVar('--foreground') || '#1f2937';
+  };
+
+  // Helper to get muted text color
+  const getMutedTextColor = (): string => {
+    return getCSSVar('--muted-foreground') || '#6b7280';
+  };
+
+  // Helper to get background color
+  const getBackgroundColor = (): string => {
+    return getCSSVar('--background') || '#ffffff';
+  };
+
+  // Helper to get muted background color
+  const getMutedBackgroundColor = (): string => {
+    return getCSSVar('--muted') || '#f3f4f6';
+  };
+
+  // Helper to convert CSS color (OKLCH, hex, etc.) to hex for Mapbox compatibility
+  const colorToHex = (color: string): string => {
+    if (!color) return '#000000';
+    // If already hex, return as is
+    if (color.startsWith('#')) {
+      return color.length === 7 ? color : '#000000';
+    }
+    // Use browser to convert any CSS color to RGB, then to hex
+    if (typeof window !== 'undefined') {
+      const tempEl = document.createElement('div');
+      tempEl.style.color = color;
+      tempEl.style.position = 'absolute';
+      tempEl.style.visibility = 'hidden';
+      tempEl.style.opacity = '0';
+      document.body.appendChild(tempEl);
+      const computedColor = getComputedStyle(tempEl).color;
+      document.body.removeChild(tempEl);
+
+      // Parse rgb(r, g, b) or rgba(r, g, b, a) to hex
+      const rgbMatch = computedColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (rgbMatch) {
+        const r = parseInt(rgbMatch[1]).toString(16).padStart(2, '0');
+        const g = parseInt(rgbMatch[2]).toString(16).padStart(2, '0');
+        const b = parseInt(rgbMatch[3]).toString(16).padStart(2, '0');
+        return `#${r}${g}${b}`;
+      }
+    }
+    // Fallback
+    return '#000000';
+  };
+
+  // Helper to add opacity to a color (works with OKLCH and other formats)
+  const addOpacity = (color: string, opacity: number): string => {
+    if (!color) return '';
+    // If it's already OKLCH, add opacity
+    if (color.startsWith('oklch(')) {
+      // Remove closing paren and add opacity
+      return color.replace(/\)$/, ` / ${opacity})`);
+    }
+    // For hex colors, convert to rgba
+    if (color.startsWith('#')) {
+      const r = parseInt(color.slice(1, 3), 16);
+      const g = parseInt(color.slice(3, 5), 16);
+      const b = parseInt(color.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+    }
+    // Fallback: try to use color-mix
+    return `color-mix(in srgb, ${color} ${opacity * 100}%, transparent)`;
+  };
+
   // Helper function to create icon element from Lucide icon
-  const createIconElement = (iconComponent: typeof Building2 | typeof User, color: string, size: number = 32): HTMLElement => {
+  const createIconElement = (iconComponent: typeof Home | typeof User, color: string, size: number = 32): HTMLElement => {
     const el = document.createElement('div');
     el.style.width = `${size}px`;
     el.style.height = `${size}px`;
@@ -205,27 +376,16 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
     svg.setAttribute('stroke-linecap', 'round');
     svg.setAttribute('stroke-linejoin', 'round');
 
-    if (iconComponent === Building2) {
+    if (iconComponent === Home) {
+      // Simple house icon - roof and base
       const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path1.setAttribute('d', 'M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z');
+      path1.setAttribute('d', 'm3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z');
       path1.setAttribute('fill', 'white');
       path1.setAttribute('fill-opacity', '0.9');
       svg.appendChild(path1);
       const path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path2.setAttribute('d', 'M6 12h12');
+      path2.setAttribute('d', 'M9 22V12h6v10');
       svg.appendChild(path2);
-      const path3 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path3.setAttribute('d', 'M6 20h12');
-      svg.appendChild(path3);
-      const path4 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path4.setAttribute('d', 'M10 6h4');
-      svg.appendChild(path4);
-      const path5 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path5.setAttribute('d', 'M10 8h4');
-      svg.appendChild(path5);
-      const path6 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path6.setAttribute('d', 'M10 16h4');
-      svg.appendChild(path6);
     } else if (iconComponent === User) {
       const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path1.setAttribute('d', 'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2');
@@ -263,48 +423,56 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
 
     // Helper to create popup content
     const createJobPopupContent = (job: JobRequest, statusLabel: string, statusBg: string, statusColor: string) => {
-      const priorityColors: Record<string, string> = {
-        urgent: '#ef4444',
-        rush: '#f59e0b',
-        standard: '#6b7280',
+      const priorityColor = getPriorityColor(job.priority);
+      const priorityColorValue = getCSSVar(`--priority-${job.priority}`);
+      const priorityBgMap: Record<string, string> = {
+        urgent: priorityColorValue ? addOpacity(priorityColorValue, 0.2) : '#fee2e2',
+        rush: priorityColorValue ? addOpacity(priorityColorValue, 0.2) : '#fef3c7',
+        standard: getMutedBackgroundColor(),
       };
+      const priorityBg = priorityBgMap[job.priority] || getMutedBackgroundColor();
 
       // Only show images for delivered jobs (when photographer has completed the job)
       const hasImage = !!(job.propertyImage && job.propertyImage.trim() !== '' && job.status === 'delivered');
 
       return `
-        <div style="padding: 0; min-width: 240px; max-width: 280px; border-radius: 8px; overflow: hidden;">
+        <div style="display: flex; align-items: stretch; min-width: 280px; max-width: 340px; border-radius: 8px; overflow: hidden;">
           ${hasImage ? `
-            <img src="${job.propertyImage}" alt="${job.propertyAddress}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px 8px 0 0; display: block;" />
+            <div style="width: 80px; min-width: 80px; background-image: url('${job.propertyImage}'); background-size: cover; background-position: center;"></div>
           ` : ''}
-          <div style="padding: 10px; ${!hasImage ? 'border-radius: 8px;' : ''}">
-            <div style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 8px; line-height: 1.3;">
+          <div style="padding: 10px; flex: 1; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-size: 13px; font-weight: 600; color: ${getTextColor()}; margin-bottom: 5px; line-height: 1.2;">
               ${job.propertyAddress}
             </div>
-            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
-              <span style="padding: 3px 8px; background: ${statusBg}; color: ${statusColor}; border-radius: 4px; font-size: 10px; font-weight: 500;">
+            <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px;">
+              <span style="padding: 1px 5px; background: ${statusBg}; color: ${statusColor}; border-radius: 3px; font-size: 9px; font-weight: 500;">
                 ${statusLabel}
               </span>
-              <span style="padding: 3px 8px; background: ${priorityColors[job.priority] === '#ef4444' ? '#fee2e2' : priorityColors[job.priority] === '#f59e0b' ? '#fef3c7' : '#f3f4f6'}; color: ${priorityColors[job.priority]}; border-radius: 4px; font-size: 10px; font-weight: 500; text-transform: capitalize;">
+              <span style="padding: 1px 5px; background: ${priorityBg}; color: ${priorityColor}; border-radius: 3px; font-size: 9px; font-weight: 500; text-transform: capitalize;">
                 ${job.priority}
               </span>
             </div>
-            <div style="font-size: 12px; color: #6b7280; margin-bottom: 6px;">
-              <strong>Client:</strong> ${job.clientName}
+            <div style="font-size: 10px; color: ${getMutedTextColor()}; margin-bottom: 3px;">
+              <span style="font-weight: 500;">Client:</span> ${job.clientName}
             </div>
-            <div style="font-size: 12px; color: #6b7280; margin-bottom: 10px;">
-              <strong>Schedule:</strong> ${job.scheduledDate} at ${job.scheduledTime}
+            <div style="font-size: 10px; color: ${getMutedTextColor()}; margin-bottom: 6px;">
+              <span style="font-weight: 500;">Schedule:</span> ${job.scheduledDate} • ${job.scheduledTime}
             </div>
-            <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px;">
-              ${job.mediaType.map((type) => `
-                <span style="padding: 3px 8px; background: #f3f4f6; border-radius: 4px; font-size: 10px; color: #374151; text-transform: capitalize;">
+            <div style="display: flex; gap: 3px; flex-wrap: wrap;">
+              ${job.mediaType.slice(0, 3).map((type) => `
+                <span style="padding: 1px 5px; background: ${getMutedBackgroundColor()}; border-radius: 3px; font-size: 9px; color: ${getTextColor()}; text-transform: capitalize;">
                   ${type}
                 </span>
               `).join('')}
+              ${job.mediaType.length > 3 ? `
+                <span style="padding: 1px 5px; background: ${getMutedBackgroundColor()}; border-radius: 3px; font-size: 9px; color: ${getTextColor()};">
+                  +${job.mediaType.length - 3}
+                </span>
+              ` : ''}
             </div>
             ${job.estimatedDuration ? `
-              <div style="font-size: 11px; color: #6b7280; margin-top: 6px; padding-top: 6px; border-top: 1px solid #e5e7eb;">
-                Duration: ${job.estimatedDuration} minutes
+              <div style="font-size: 9px; color: ${getMutedTextColor()}; margin-top: 5px; padding-top: 5px; border-top: 1px solid ${getCSSVar('--border') || '#e5e7eb'};">
+                Duration: ${job.estimatedDuration} min
               </div>
             ` : ''}
           </div>
@@ -317,7 +485,11 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
       const lngLat = [job.location.lng, job.location.lat] as [number, number];
       bounds.extend(lngLat);
 
-      const el = createIconElement(Building2, '#ef4444', 32);
+      const pendingColor = getStatusColor('pending');
+      const pendingColorValue = getCSSVar('--status-pending');
+      const pendingBg = pendingColorValue ? addOpacity(pendingColorValue, 0.2) : '#fee2e2';
+      const pendingText = getCSSVar('--status-pending-foreground') || getTextColor();
+      const el = createIconElement(Home, pendingColor, 32);
       if (selectedJob?.id === job.id) {
         el.style.animation = 'bounce 0.6s ease-in-out';
         setTimeout(() => {
@@ -331,7 +503,7 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
 
       const popup = new mapboxgl.Popup({ offset: 25, closeButton: false, closeOnClick: true })
         .setLngLat(lngLat)
-        .setHTML(createJobPopupContent(job, 'Pending', '#fee2e2', '#991b1b'))
+        .setHTML(createJobPopupContent(job, 'Pending', pendingBg, pendingText))
         .setMaxWidth('280px');
 
       if (!disablePopovers) {
@@ -362,7 +534,8 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
       const lngLat = [job.location.lng, job.location.lat] as [number, number];
       bounds.extend(lngLat);
 
-      const el = createIconElement(Building2, '#3b82f6', 32);
+      const assignedColor = getStatusColor(job.status === 'assigned' ? 'assigned' : 'in_progress');
+      const el = createIconElement(Home, assignedColor, 32);
       if (selectedJob?.id === job.id) {
         el.style.animation = 'bounce 0.6s ease-in-out';
         setTimeout(() => {
@@ -373,15 +546,20 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
       const assignedPhotographer = photographers.find((p) => p.id === job.assignedPhotographerId);
       const statusLabel = job.status === 'in_progress' ? 'In Progress' : 'Assigned';
 
-      const popupContent = createJobPopupContent(job, statusLabel, '#dbeafe', '#1e40af');
+      const statusKey = job.status === 'assigned' ? 'assigned' : 'in-progress';
+      const assignedColorValue = getCSSVar(`--status-${statusKey}`);
+      const assignedBg = assignedColorValue ? addOpacity(assignedColorValue, 0.2) : '#dbeafe';
+      // Use the status color itself for text (not foreground) to ensure good contrast on light background
+      const assignedText = assignedColor || getTextColor();
+      const popupContent = createJobPopupContent(job, statusLabel, assignedBg, assignedText);
       const popupContentWithPhotographer = assignedPhotographer
         ? popupContent.replace(
-            '<div style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">',
-            `<div style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">
+          `<div style="font-size: 13px; color: ${getMutedTextColor()}; margin-bottom: 8px;">`,
+          `<div style="font-size: 13px; color: ${getMutedTextColor()}; margin-bottom: 8px;">
               <strong>Photographer:</strong> ${assignedPhotographer.name}
             </div>
-            <div style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">`
-          )
+            <div style="font-size: 13px; color: ${getMutedTextColor()}; margin-bottom: 8px;">`
+        )
         : popupContent;
 
       const marker = new mapboxgl.Marker({ element: el })
@@ -421,15 +599,19 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
       const lngLat = [job.location.lng, job.location.lat] as [number, number];
       bounds.extend(lngLat);
 
-      const el = createIconElement(Building2, '#9ca3af', 32);
+      const otherColor = getStatusColor(job.status);
+      const el = createIconElement(Home, otherColor, 32);
 
-      const statusColors: Record<string, { bg: string; color: string }> = {
-        delivered: { bg: '#d1fae5', color: '#065f46' },
-        cancelled: { bg: '#fee2e2', color: '#991b1b' },
-        editing: { bg: '#fef3c7', color: '#92400e' },
+      const getStatusConfig = (status: string) => {
+        const statusColor = getStatusColor(status);
+        const statusVarName = status.replace('_', '-'); // Convert in_progress to in-progress
+        const statusColorValue = getCSSVar(`--status-${statusVarName}`);
+        const statusBg = statusColorValue ? addOpacity(statusColorValue, 0.2) : getMutedBackgroundColor();
+        const statusText = getCSSVar(`--status-${statusVarName}-foreground`) || getTextColor();
+        return { bg: statusBg, color: statusText };
       };
 
-      const statusConfig = statusColors[job.status] || { bg: '#f3f4f6', color: '#374151' };
+      const statusConfig = getStatusConfig(job.status) || { bg: getMutedBackgroundColor(), color: getTextColor() };
 
       const marker = new mapboxgl.Marker({ element: el })
         .setLngLat(lngLat)
@@ -472,63 +654,85 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
       const isAvailable =
         photographer.availability.find((a) => a.date === today)?.available || false;
 
-      const el = createIconElement(User, isAvailable ? '#22c55e' : '#9ca3af', 32);
+      // Use neutral color for photographer markers
+      const photographerColor = getCSSVar('--muted-foreground') || '#6b7280';
+      const el = createIconElement(User, photographerColor, 32);
+
+      // Keep availableColor for popup styling (availability badges, etc.)
+      const availableColor = isAvailable ? getStatusColor('delivered') : getStatusColor('cancelled');
+
+      const deliveredColor = getStatusColor('delivered');
+      const deliveredColorValue = getCSSVar('--status-delivered');
+      const deliveredBg = deliveredColorValue ? addOpacity(deliveredColorValue, 0.2) : '#d1fae5';
+      // Use the status color itself for text (not foreground) to ensure good contrast on light background
+      const deliveredText = deliveredColor || getTextColor();
+      const cancelledColor = getStatusColor('cancelled');
+      const cancelledColorValue = getCSSVar('--status-cancelled');
+      const cancelledBg = cancelledColorValue ? addOpacity(cancelledColorValue, 0.2) : getMutedBackgroundColor();
+      // Use the status color itself for text (not foreground) to ensure good contrast on light background
+      const cancelledText = cancelledColor || getMutedTextColor();
+      const rushColorValue = getCSSVar('--priority-rush');
+      const rushBg = rushColorValue ? addOpacity(rushColorValue, 0.2) : '#fef3c7';
+      const rushText = rushColorValue || '#92400e';
 
       const popupContent = `
-          <div style="padding: 0; min-width: 240px; max-width: 280px;">
-            <div style="padding: 10px;">
-              <div style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 8px; line-height: 1.3;">
+          <div style="display: flex; align-items: stretch; min-width: 280px; max-width: 340px; border-radius: 8px; overflow: hidden;">
+            <div style="width: 64px; min-width: 64px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 12px; background: ${getMutedBackgroundColor()};">
+              ${photographer.avatar ? `
+                <img src="${photographer.avatar}" alt="${photographer.name}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid ${availableColor};" />
+              ` : `
+                <div style="width: 40px; height: 40px; border-radius: 50%; background: ${isAvailable ? deliveredBg : cancelledBg}; display: flex; align-items: center; justify-content: center; border: 2px solid ${availableColor}; color: ${isAvailable ? deliveredText : cancelledText}; font-weight: 600; font-size: 16px;">
+                  ${photographer.name.split(' ').map(n => n[0]).join('')}
+                </div>
+              `}
+              <div style="margin-top: 6px; display: flex; flex-direction: column; align-items: center; gap: 3px;">
+                <span style="padding: 1px 5px; background: ${isAvailable ? deliveredBg : cancelledBg}; color: ${isAvailable ? deliveredText : cancelledText}; border-radius: 3px; font-size: 8px; font-weight: 500;">
+                  ${isAvailable ? 'Available' : 'Unavailable'}
+                </span>
+                ${photographer.rating.overall ? `
+                  <span style="padding: 1px 5px; background: ${rushBg}; color: ${rushText}; border-radius: 3px; font-size: 8px; font-weight: 500;">
+                    ⭐ ${photographer.rating.overall}
+                  </span>
+                ` : ''}
+              </div>
+            </div>
+            
+            <div style="padding: 10px; flex: 1; display: flex; flex-direction: column; justify-content: center;">
+              <div style="font-size: 13px; font-weight: 600; color: ${getTextColor()}; margin-bottom: 3px; line-height: 1.2;">
                 ${photographer.name}
               </div>
-              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                ${photographer.avatar ? `
-                  <img src="${photographer.avatar}" alt="${photographer.name}" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid ${isAvailable ? '#22c55e' : '#9ca3af'};" />
-                ` : `
-                  <div style="width: 48px; height: 48px; border-radius: 50%; background: ${isAvailable ? '#d1fae5' : '#f3f4f6'}; display: flex; align-items: center; justify-content: center; border: 2px solid ${isAvailable ? '#22c55e' : '#9ca3af'}; color: ${isAvailable ? '#065f46' : '#6b7280'}; font-weight: 600; font-size: 18px;">
-                    ${photographer.name.split(' ').map(n => n[0]).join('')}
-                  </div>
-                `}
-                <div style="flex: 1;">
-                  <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                    <span style="padding: 3px 8px; background: ${isAvailable ? '#d1fae5' : '#f3f4f6'}; color: ${isAvailable ? '#065f46' : '#6b7280'}; border-radius: 4px; font-size: 10px; font-weight: 500;">
-                      ${isAvailable ? 'Available' : 'Unavailable'}
-                    </span>
-                    ${photographer.rating.overall ? `
-                      <span style="padding: 3px 8px; background: #fef3c7; color: #92400e; border-radius: 4px; font-size: 10px; font-weight: 500;">
-                        ⭐ ${photographer.rating.overall}
-                      </span>
-                    ` : ''}
-                  </div>
-                </div>
+              
+              <div style="font-size: 10px; color: ${getMutedTextColor()}; margin-bottom: 3px;">
+                <span style="font-weight: 500;">Location:</span> ${getLocationDisplay(photographer.homeLocation.address, true)}
               </div>
-              <div style="font-size: 12px; color: #6b7280; margin-bottom: 6px;">
-                <strong>Location:</strong> ${getLocationDisplay(photographer.homeLocation.address, true)}
-              </div>
+              
               ${photographer.companyName ? `
-                <div style="font-size: 12px; color: #6b7280; margin-bottom: 6px;">
-                  <strong>Company:</strong> ${photographer.companyName}
+                <div style="font-size: 10px; color: ${getMutedTextColor()}; margin-bottom: 3px;">
+                  <span style="font-weight: 500;">Company:</span> ${photographer.companyName}
                 </div>
               ` : photographer.isIndependent ? `
-                <div style="font-size: 12px; color: #6b7280; margin-bottom: 6px;">
-                  <strong>Status:</strong> Independent
+                <div style="font-size: 10px; color: ${getMutedTextColor()}; margin-bottom: 3px;">
+                  <span style="font-weight: 500;">Status:</span> Independent
                 </div>
               ` : ''}
-              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb;">
+              
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-top: 6px; padding-top: 6px; border-top: 1px solid ${getCSSVar('--border') || '#e5e7eb'};">
                 <div style="text-align: center;">
-                  <div style="font-size: 16px; font-weight: 600; color: #1f2937;">${photographer.reliability.totalJobs}</div>
-                  <div style="font-size: 10px; color: #6b7280;">Jobs</div>
+                  <div style="font-size: 12px; font-weight: 600; color: ${getTextColor()};">${photographer.reliability.totalJobs}</div>
+                  <div style="font-size: 8px; color: ${getMutedTextColor()};">Jobs</div>
                 </div>
                 <div style="text-align: center;">
-                  <div style="font-size: 16px; font-weight: 600; color: #1f2937;">${(photographer.reliability.onTimeRate * 100).toFixed(0)}%</div>
-                  <div style="font-size: 10px; color: #6b7280;">On-Time</div>
+                  <div style="font-size: 12px; font-weight: 600; color: ${getTextColor()};">${(photographer.reliability.onTimeRate * 100).toFixed(0)}%</div>
+                  <div style="font-size: 8px; color: ${getMutedTextColor()};">On-Time</div>
                 </div>
                 <div style="text-align: center;">
-                  <div style="font-size: 16px; font-weight: 600; color: #1f2937;">${photographer.rating.overall}</div>
-                  <div style="font-size: 10px; color: #6b7280;">Rating</div>
+                  <div style="font-size: 12px; font-weight: 600; color: ${getTextColor()};">${photographer.rating.overall}</div>
+                  <div style="font-size: 8px; color: ${getMutedTextColor()};">Rating</div>
                 </div>
               </div>
+              
               ${photographer.bio ? `
-                <div style="font-size: 11px; color: #6b7280; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb; line-height: 1.4;">
+                <div style="font-size: 9px; color: ${getMutedTextColor()}; margin-top: 6px; padding-top: 6px; border-top: 1px solid ${getCSSVar('--border') || '#e5e7eb'}; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                   ${photographer.bio}
                 </div>
               ` : ''}
@@ -540,10 +744,10 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
         .setLngLat(lngLat)
         .addTo(map);
 
-      const popup = new mapboxgl.Popup({ 
-        offset: 25, 
-        closeButton: false, 
-        closeOnClick: true 
+      const popup = new mapboxgl.Popup({
+        offset: 25,
+        closeButton: false,
+        closeOnClick: true
       })
         .setLngLat(lngLat)
         .setHTML(popupContent)
@@ -600,7 +804,7 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
         currentlyOpenPopupRef.current.remove();
         currentlyOpenPopupRef.current = null;
       }
-      
+
       // Reset map view to show all markers
       if (markersRef.current.length > 0) {
         const bounds = new mapboxgl.LngLatBounds();
@@ -608,7 +812,7 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
           const lngLat = marker.getLngLat();
           bounds.extend([lngLat.lng, lngLat.lat]);
         });
-        
+
         const ne = bounds.getNorthEast();
         const sw = bounds.getSouthWest();
         if (ne.lat !== sw.lat || ne.lng !== sw.lng) {
@@ -661,13 +865,21 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
         animationIntervalRef.current = null;
       }
       // Remove route layer and source if they exist
+      // Remove route layer and source if they exist
       if (mapRef.current) {
         const map = mapRef.current;
-        if (map.getLayer('route')) {
-          map.removeLayer('route');
-        }
-        if (map.getSource('route')) {
-          map.removeSource('route');
+        try {
+          if (map.getLayer('route-flow')) {
+            map.removeLayer('route-flow');
+          }
+          if (map.getLayer('route')) {
+            map.removeLayer('route');
+          }
+          if (map.getSource('route')) {
+            map.removeSource('route');
+          }
+        } catch (err) {
+          console.warn('Error cleaning up route:', err);
         }
       }
       return;
@@ -697,6 +909,9 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
 
           // Remove existing route layer and source if they exist
           try {
+            if (currentMap.getLayer('route-flow')) {
+              currentMap.removeLayer('route-flow');
+            }
             if (currentMap.getLayer('route')) {
               currentMap.removeLayer('route');
             }
@@ -711,6 +926,7 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
           try {
             currentMap.addSource('route', {
               type: 'geojson',
+              lineMetrics: true, // Enable line metrics for gradient
               data: {
                 type: 'Feature',
                 properties: {},
@@ -728,13 +944,118 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
                 'line-cap': 'round',
               },
               paint: {
-                'line-color': '#3b82f6',
+                'line-color': '#3b82f6', // Blue color for travel path
                 'line-width': 5,
                 'line-opacity': 0.8,
               },
             });
 
-            // Fit bounds to route
+            // Add route flow layer (animated gradient)
+            currentMap.addLayer({
+              id: 'route-flow',
+              type: 'line',
+              source: 'route',
+              layout: {
+                'line-join': 'round',
+                'line-cap': 'round',
+              },
+              paint: {
+                'line-width': 5,
+                'line-opacity': 1,
+                // Initial gradient (will be updated by animation)
+                'line-gradient': [
+                  'interpolate',
+                  ['linear'],
+                  ['line-progress'],
+                  0, 'rgba(59, 130, 246, 0)',
+                  1, 'rgba(59, 130, 246, 0)'
+                ]
+              },
+            });
+
+            // Animation loop for sweeping gradient
+            const startTime = Date.now();
+            const duration = 3000; // 3 seconds per full cycle (including delay)
+
+            const animateGradient = () => {
+              const elapsed = Date.now() - startTime;
+              const rawProgress = (elapsed % duration) / duration;
+
+              // Map progress to a wider range to allow entering and exiting smoothly
+              // Range: -0.5 to 1.5
+              const progress = (rawProgress * 2) - 0.5;
+
+              // Comet configuration
+              const tailLength = 0.4;
+              const headLength = 0.1;
+
+              const peak = progress;
+              const tail = peak - tailLength;
+              const head = peak + headLength;
+
+              // Helper to calculate opacity at any given position (0 to 1) based on comet position
+              const getOpacity = (pos: number) => {
+                // If outside the comet, opacity is 0
+                if (pos < tail || pos > head) return 0;
+
+                // If in the tail section (tail to peak)
+                if (pos < peak) {
+                  return (pos - tail) / tailLength;
+                }
+
+                // If in the head section (peak to head)
+                return 1 - (pos - peak) / headLength;
+              };
+
+              // We need strictly increasing stops between 0 and 1
+              // We ALWAYS include 0 and 1 with their calculated opacity to ensure smooth entry/exit
+              const stops: [number, string][] = [];
+
+              // Stop at 0
+              stops.push([0, `rgba(255, 255, 255, ${getOpacity(0)})`]);
+
+              // Intermediate stops (tail, peak, head) - ONLY if they are strictly inside (0, 1)
+              if (tail > 0.001 && tail < 0.999) {
+                stops.push([tail, 'rgba(255, 255, 255, 0)']);
+              }
+
+              if (peak > 0.001 && peak < 0.999) {
+                stops.push([peak, 'rgba(255, 255, 255, 1)']);
+              }
+
+              if (head > 0.001 && head < 0.999) {
+                stops.push([head, 'rgba(255, 255, 255, 0)']);
+              }
+
+              // Stop at 1
+              stops.push([1, `rgba(255, 255, 255, ${getOpacity(1)})`]);
+
+              // Filter and sort to ensure validity
+              const uniqueStops = new Map<number, string>();
+              stops.forEach(([pos, color]) => {
+                // Round to 3 decimals to avoid tiny floating point issues
+                const p = Math.round(pos * 1000) / 1000;
+                uniqueStops.set(p, color);
+              });
+
+              const sortedStops = Array.from(uniqueStops.entries())
+                .sort((a, b) => a[0] - b[0]);
+
+              // Construct the expression
+              const gradientExpression: any[] = ['interpolate', ['linear'], ['line-progress']];
+              sortedStops.forEach(([pos, color]) => {
+                gradientExpression.push(pos);
+                gradientExpression.push(color);
+              });
+
+              if (currentMap.getLayer('route-flow')) {
+                currentMap.setPaintProperty('route-flow', 'line-gradient', gradientExpression as any);
+              }
+
+              animationFrameRef.current = requestAnimationFrame(animateGradient);
+            };
+
+            animateGradient();
             const bounds = new mapboxgl.LngLatBounds();
             const coordinates = route.coordinates as [number, number][];
             coordinates.forEach((coord) => {
@@ -756,11 +1077,14 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
 
     return () => {
       isCancelled = true;
-      
+
       // Clean up route layer and source if map still exists
       if (mapRef.current) {
         try {
           const currentMap = mapRef.current;
+          if (currentMap.getLayer('route-flow')) {
+            currentMap.removeLayer('route-flow');
+          }
           if (currentMap.getLayer('route')) {
             currentMap.removeLayer('route');
           }
@@ -772,10 +1096,15 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
           console.warn('Error cleaning up route:', err);
         }
       }
-      
+
       if (animationIntervalRef.current) {
         clearInterval(animationIntervalRef.current);
         animationIntervalRef.current = null;
+      }
+
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
     };
   }, [mapRef.current, isLoaded, selectedPhotographer?.id, selectedJob?.id, photographers]);
@@ -794,8 +1123,8 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
   return (
     <div className="relative w-full h-full md:min-h-[400px]">
       {/* Map container - always rendered so map can initialize */}
-      <div ref={mapContainerRef} className="w-full h-full md:min-h-[400px]" />
-      
+      <div ref={mapContainerRef} className="w-full h-full min-h-[400px]" />
+
       {/* Loading overlay - shown when map is not loaded */}
       {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-lg z-10">
@@ -807,7 +1136,7 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
       )}
 
       {/* Legend */}
-      <Card className="absolute bottom-4 left-4 bg-card/95 backdrop-blur-sm rounded-lg p-3 shadow-lg border border-border z-10 md:opacity-100 opacity-25 hover:opacity-100 transition-opacity duration-300">
+      {false && <Card className="absolute bottom-4 left-4 bg-card/95 backdrop-blur-sm rounded-lg p-3 shadow-lg border border-border z-10 md:opacity-100 opacity-25 hover:opacity-100 transition-opacity duration-300">
         <CardContent className="space-y-2 p-0!">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-red-500 border-2 border-white" />
@@ -826,7 +1155,7 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
             <Small className="text-muted-foreground">Unavailable</Small>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }

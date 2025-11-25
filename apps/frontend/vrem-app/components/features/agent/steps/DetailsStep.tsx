@@ -1,24 +1,20 @@
-import { Button } from '../../../ui/button';
-import { Input } from '../../../ui/input';
-import { Label } from '../../../ui/label';
-import { Textarea } from '../../../ui/textarea';
-import { Checkbox } from '../../../ui/checkbox';
-import { Calendar as CalendarComponent } from '../../../ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '../../../ui/popover';
+import { Button } from "../../../ui/button";
+import { Input } from "../../../ui/input";
+import { Label } from "../../../ui/label";
+import { Textarea } from "../../../ui/textarea";
+import { Checkbox } from "../../../ui/checkbox";
+import { Calendar as CalendarComponent } from "../../../ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "../../../ui/popover";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../../../ui/select';
-import { motion } from 'framer-motion';
-import { format } from 'date-fns';
-import { H2, Small, Muted, Large } from '../../../ui/typography';
+} from "../../../ui/select";
+import { motion } from "framer-motion";
+import { format } from "date-fns";
+import { H2, Small, Muted, Large } from "../../../ui/typography";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -30,30 +26,18 @@ import {
   ArrowLeft,
   CheckCircle2,
   Home,
-} from 'lucide-react';
+} from "lucide-react";
+import { JobDetails } from "../../../../types";
+import { mediaTypeOptions, toggleMediaType } from '../../../shared/jobs/utils';
+import { ToggleGroup, ToggleGroupItem } from "../../../ui/toggle-group";
 
 interface DetailsStepProps {
   selectedAddress: string;
-  jobDetails: {
-    clientName: string;
-    scheduledDate: string;
-    scheduledTime: string;
-    mediaTypes: string[];
-    priority: 'standard' | 'rush' | 'urgent';
-    estimatedDuration: number;
-    requirements: string;
-  };
-  onJobDetailsChange: (details: any) => void;
+  jobDetails: JobDetails;
+  onJobDetailsChange: (details: JobDetails) => void;
   onBack: () => void;
   onNext: () => void;
 }
-
-const mediaTypeOptions = [
-  { id: 'photo', label: 'Photography', icon: Camera, color: '' },
-  { id: 'video', label: 'Video', icon: Video, color: '' },
-  { id: 'aerial', label: 'Aerial/Drone', icon: Plane, color: '' },
-  { id: 'twilight', label: 'Twilight', icon: Sunset, color: '' },
-];
 
 export function DetailsStep({
   selectedAddress,
@@ -70,7 +54,10 @@ export function DetailsStep({
       exit={{ opacity: 0, x: -100 }}
       className="min-h-screen container mx-auto p-6 h-full"
     >
-      <div className="container mx-auto px-6 space-y-6" style={{ maxWidth: '896px', marginLeft: 'auto', marginRight: 'auto' }}>
+      <div
+        className="container mx-auto px-6 space-y-6"
+        style={{ maxWidth: "896px", marginLeft: "auto", marginRight: "auto" }}
+      >
         {/* Progress */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -89,15 +76,13 @@ export function DetailsStep({
                 <Home className="h-6 w-6 text-emerald-600" />
               </div>
               <div>
-                <div className="text-xs text-muted-foreground/80 mb-1">Property Location</div>
+                <div className="text-xs text-muted-foreground/80 mb-1">
+                  Property Location
+                </div>
                 <div className="text-lg text-foreground">{selectedAddress}</div>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBack}
-            >
+            <Button variant="ghost" size="sm" onClick={onBack}>
               Change
             </Button>
           </div>
@@ -107,6 +92,7 @@ export function DetailsStep({
         <div className="bg-card rounded-2xl border-2 border-border p-8 shadow-sm space-y-6">
           <H2 className="text-2xl border-0">Tell us about the shoot</H2>
 
+          {/* Shoot Date and Time */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label>Shoot Date *</Label>
@@ -120,9 +106,11 @@ export function DetailsStep({
                     {jobDetails.scheduledDate ? (
                       (() => {
                         try {
-                          const date = new Date(jobDetails.scheduledDate + 'T00:00:00');
+                          const date = new Date(
+                            jobDetails.scheduledDate + "T00:00:00"
+                          );
                           if (!isNaN(date.getTime())) {
-                            return format(date, 'PPP');
+                            return format(date, "PPP");
                           }
                         } catch (e) {
                           // Fallback to original value if parsing fails
@@ -141,7 +129,9 @@ export function DetailsStep({
                       jobDetails.scheduledDate
                         ? (() => {
                             try {
-                              const date = new Date(jobDetails.scheduledDate + 'T00:00:00');
+                              const date = new Date(
+                                jobDetails.scheduledDate + "T00:00:00"
+                              );
                               return !isNaN(date.getTime()) ? date : undefined;
                             } catch {
                               return undefined;
@@ -153,11 +143,13 @@ export function DetailsStep({
                       if (date) {
                         onJobDetailsChange({
                           ...jobDetails,
-                          scheduledDate: format(date, 'yyyy-MM-dd'),
+                          scheduledDate: format(date, "yyyy-MM-dd"),
                         });
                       }
                     }}
-                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                    disabled={(date) =>
+                      date < new Date(new Date().setHours(0, 0, 0, 0))
+                    }
                     initialFocus
                   />
                 </PopoverContent>
@@ -176,10 +168,16 @@ export function DetailsStep({
                     {jobDetails.scheduledTime ? (
                       (() => {
                         try {
-                          const [hours, minutes] = jobDetails.scheduledTime.split(':');
+                          const [hours, minutes] =
+                            jobDetails.scheduledTime.split(":");
                           const hour24 = parseInt(hours, 10);
-                          const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
-                          const ampm = hour24 >= 12 ? 'PM' : 'AM';
+                          const hour12 =
+                            hour24 === 0
+                              ? 12
+                              : hour24 > 12
+                              ? hour24 - 12
+                              : hour24;
+                          const ampm = hour24 >= 12 ? "PM" : "AM";
                           return `${hour12}:${minutes} ${ampm}`;
                         } catch {
                           return jobDetails.scheduledTime;
@@ -197,25 +195,43 @@ export function DetailsStep({
                         value={
                           jobDetails.scheduledTime
                             ? (() => {
-                                const [hours] = jobDetails.scheduledTime.split(':');
+                                const [hours] =
+                                  jobDetails.scheduledTime.split(":");
                                 const hour24 = parseInt(hours, 10);
-                                const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+                                const hour12 =
+                                  hour24 === 0
+                                    ? 12
+                                    : hour24 > 12
+                                    ? hour24 - 12
+                                    : hour24;
                                 return hour12.toString();
                               })()
-                            : '9'
+                            : "9"
                         }
                         onValueChange={(hour12) => {
                           const currentMinute = jobDetails.scheduledTime
-                            ? jobDetails.scheduledTime.split(':')[1] || '00'
-                            : '00';
+                            ? jobDetails.scheduledTime.split(":")[1] || "00"
+                            : "00";
                           const currentHour24 = jobDetails.scheduledTime
-                            ? parseInt(jobDetails.scheduledTime.split(':')[0], 10)
+                            ? parseInt(
+                                jobDetails.scheduledTime.split(":")[0],
+                                10
+                              )
                             : 9;
                           const isPM = currentHour24 >= 12;
-                          const hour24 = hour12 === '12' ? (isPM ? 12 : 0) : (isPM ? parseInt(hour12, 10) + 12 : parseInt(hour12, 10));
+                          const hour24 =
+                            hour12 === "12"
+                              ? isPM
+                                ? 12
+                                : 0
+                              : isPM
+                              ? parseInt(hour12, 10) + 12
+                              : parseInt(hour12, 10);
                           onJobDetailsChange({
                             ...jobDetails,
-                            scheduledTime: `${hour24.toString().padStart(2, '0')}:${currentMinute}`,
+                            scheduledTime: `${hour24
+                              .toString()
+                              .padStart(2, "0")}:${currentMinute}`,
                           });
                         }}
                       >
@@ -233,16 +249,21 @@ export function DetailsStep({
                       <Select
                         value={
                           jobDetails.scheduledTime
-                            ? jobDetails.scheduledTime.split(':')[1] || '00'
-                            : '00'
+                            ? jobDetails.scheduledTime.split(":")[1] || "00"
+                            : "00"
                         }
                         onValueChange={(minute) => {
                           const currentHour24 = jobDetails.scheduledTime
-                            ? parseInt(jobDetails.scheduledTime.split(':')[0], 10)
+                            ? parseInt(
+                                jobDetails.scheduledTime.split(":")[0],
+                                10
+                              )
                             : 9;
                           onJobDetailsChange({
                             ...jobDetails,
-                            scheduledTime: `${currentHour24.toString().padStart(2, '0')}:${minute.padStart(2, '0')}`,
+                            scheduledTime: `${currentHour24
+                              .toString()
+                              .padStart(2, "0")}:${minute.padStart(2, "0")}`,
                           });
                         }}
                       >
@@ -251,8 +272,11 @@ export function DetailsStep({
                         </SelectTrigger>
                         <SelectContent>
                           {[0, 15, 30, 45].map((min) => (
-                            <SelectItem key={min} value={min.toString().padStart(2, '0')}>
-                              {min.toString().padStart(2, '0')}
+                            <SelectItem
+                              key={min}
+                              value={min.toString().padStart(2, "0")}
+                            >
+                              {min.toString().padStart(2, "0")}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -261,26 +285,42 @@ export function DetailsStep({
                         value={
                           jobDetails.scheduledTime
                             ? (() => {
-                                const [hours] = jobDetails.scheduledTime.split(':');
+                                const [hours] =
+                                  jobDetails.scheduledTime.split(":");
                                 const hour24 = parseInt(hours, 10);
-                                return hour24 >= 12 ? 'PM' : 'AM';
+                                return hour24 >= 12 ? "PM" : "AM";
                               })()
-                            : 'AM'
+                            : "AM"
                         }
                         onValueChange={(ampm) => {
                           const currentMinute = jobDetails.scheduledTime
-                            ? jobDetails.scheduledTime.split(':')[1] || '00'
-                            : '00';
+                            ? jobDetails.scheduledTime.split(":")[1] || "00"
+                            : "00";
                           const currentHour24 = jobDetails.scheduledTime
-                            ? parseInt(jobDetails.scheduledTime.split(':')[0], 10)
+                            ? parseInt(
+                                jobDetails.scheduledTime.split(":")[0],
+                                10
+                              )
                             : 9;
-                          const currentHour12 = currentHour24 === 0 ? 12 : currentHour24 > 12 ? currentHour24 - 12 : currentHour24;
-                          const newHour24 = ampm === 'PM'
-                            ? (currentHour12 === 12 ? 12 : currentHour12 + 12)
-                            : (currentHour12 === 12 ? 0 : currentHour12);
+                          const currentHour12 =
+                            currentHour24 === 0
+                              ? 12
+                              : currentHour24 > 12
+                              ? currentHour24 - 12
+                              : currentHour24;
+                          const newHour24 =
+                            ampm === "PM"
+                              ? currentHour12 === 12
+                                ? 12
+                                : currentHour12 + 12
+                              : currentHour12 === 12
+                              ? 0
+                              : currentHour12;
                           onJobDetailsChange({
                             ...jobDetails,
-                            scheduledTime: `${newHour24.toString().padStart(2, '0')}:${currentMinute}`,
+                            scheduledTime: `${newHour24
+                              .toString()
+                              .padStart(2, "0")}:${currentMinute}`,
                           });
                         }}
                       >
@@ -299,61 +339,53 @@ export function DetailsStep({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <Label>What media do you need? *</Label>
-            <div className="grid grid-cols-2 gap-3">
+          {/* Media Types */}
+          <div className="space-y-2">
+            <Label className="text-sm">What media do you need? *</Label>
+            <ToggleGroup
+              type="multiple"
+              value={jobDetails.mediaTypes}
+              onValueChange={(value) => {
+                onJobDetailsChange({
+                  ...jobDetails,
+                  mediaTypes: value,
+                });
+              }}
+              className="grid grid-cols-2 gap-3 w-full"
+            >
               {mediaTypeOptions.map((type) => {
                 const Icon = type.icon;
-                const isSelected = jobDetails.mediaTypes.includes(type.id);
                 return (
-                  <div
+                  <ToggleGroupItem
                     key={type.id}
-                    className={`relative overflow-hidden rounded-xl border-2 transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-primary bg-accent'
-                        : 'border-border bg-card hover:border-border'
-                    }`}
-                    onClick={() => {
-                      onJobDetailsChange({
-                        ...jobDetails,
-                        mediaTypes: jobDetails.mediaTypes.includes(type.id)
-                          ? jobDetails.mediaTypes.filter((t) => t !== type.id)
-                          : [...jobDetails.mediaTypes, type.id],
-                      });
-                    }}
+                    value={type.id}
+                    className="flex items-center gap-3 p-4 h-auto data-[state=on]:bg-accent data-[state=on]:border-primary"
                   >
-                    <div className="p-4 flex items-center gap-3">
-                      <div
-                        className={`p-2.5 rounded-lg bg-primary ${
-                          isSelected ? 'opacity-100' : 'opacity-60'
-                        }`}
-                      >
-                        <Icon className="h-5 w-5 text-primary-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <div
-                          className={`text-sm ${
-                            isSelected ? 'text-foreground' : 'text-muted-foreground'
-                          }`}
-                        >
-                          {type.label}
-                        </div>
-                      </div>
-                      <Checkbox checked={isSelected} />
+                    <div className="p-2.5 rounded-lg bg-primary">
+                      <Icon className="h-5 w-5 text-primary-foreground" />
                     </div>
-                  </div>
+                    <div className="flex-1 text-left">
+                      <div className="text-sm font-medium">{type.label}</div>
+                    </div>
+                  </ToggleGroupItem>
                 );
               })}
-            </div>
+            </ToggleGroup>
           </div>
 
+          {/* Special Instructions */}
           <div className="space-y-2">
-            <Label htmlFor="requirements">Special Instructions (Optional)</Label>
+            <Label htmlFor="requirements">
+              Special Instructions (Optional)
+            </Label>
             <Textarea
               id="requirements"
               value={jobDetails.requirements}
               onChange={(e) =>
-                onJobDetailsChange({ ...jobDetails, requirements: e.target.value })
+                onJobDetailsChange({
+                  ...jobDetails,
+                  requirements: e.target.value,
+                })
               }
               placeholder="Any special requests, access codes, or details..."
               rows={4}
@@ -361,19 +393,13 @@ export function DetailsStep({
             />
           </div>
 
+          {/* Next Button */}
           <div className="flex gap-3 pt-4">
-            <Button
-              variant="outline"
-              onClick={onBack}
-              className="flex-1"
-            >
+            <Button variant="outline" onClick={onBack} className="flex-1">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <Button
-              onClick={onNext}
-              className="flex-1 bg-primary"
-            >
+            <Button onClick={onNext} className="flex-1 bg-primary">
               Find Photographer
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
@@ -383,4 +409,3 @@ export function DetailsStep({
     </motion.div>
   );
 }
-

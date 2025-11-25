@@ -5,6 +5,7 @@ import { Input } from '../../ui/input';
 import { Spinner } from '../../ui/spinner';
 import { MapPin, Search, Sparkles, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { P } from '@/components/ui/typography';
 
 interface AddressSearchProps {
   onAddressSelect: (address: string, location: { lat: number; lng: number }) => void;
@@ -137,7 +138,8 @@ export function AddressSearch({ onAddressSelect }: AddressSearchProps) {
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setIsFocused(true)}
             placeholder="Enter property address..."
-            className="h-16 pl-16 pr-6 text-lg rounded-2xl border-2 border-border shadow-lg focus:border-black focus:ring-4 focus:ring-slate-100 transition-all"
+            className="h-16 pl-16 pr-6 text-lg rounded-2xl transition-all md:rounded-3xl"
+            variant="muted"
             disabled={!!error}
           />
           {isLoading ? (
@@ -170,10 +172,10 @@ export function AddressSearch({ onAddressSelect }: AddressSearchProps) {
           >
             <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm text-red-800">{error}</p>
-              <p className="text-xs text-destructive mt-1">
+              <P className="text-sm text-red-800">{error}</P>
+              <P className="text-xs text-destructive mt-1">
                 Add NEXT_PUBLIC_MAPBOX_TOKEN to your .env.local file
-              </p>
+              </P>
             </div>
           </motion.div>
         )}
@@ -242,8 +244,8 @@ export function AddressSearch({ onAddressSelect }: AddressSearchProps) {
               className="absolute top-full mt-2 w-full bg-card rounded-2xl border-2 border-border shadow-2xl overflow-hidden z-50 p-6 text-center"
             >
               <MapPin className="h-12 w-12 mx-auto mb-2 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">No addresses found</p>
-              <p className="text-xs text-muted-foreground/80 mt-1">Try a different search term</p>
+              <P className="text-sm text-muted-foreground">No addresses found</P>
+              <P className="text-xs text-muted-foreground/80 mt-1">Try a different search term</P>
             </motion.div>
           )}
 

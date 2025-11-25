@@ -1,30 +1,21 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '../../ui/button';
-import { ScrollArea } from '../../ui/scroll-area';
-import { JobRequestForm } from '../../shared/jobs';
-import { PhotographerManagement } from '../photographer';
-import { AuditLog } from './AuditLog';
-import { PhotographerCard } from '../photographer';
-import { MapWithSidebar } from '../../shared/dashboard/MapWithSidebar';
+import { useState, useEffect } from "react";
+import { RankingsDialog } from "./dialogs";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '../../ui/dialog';
-import { JobRequest, Photographer, AuditLogEntry, Metrics } from '../../../types';
-import { ChatMessage } from '../../../types/chat';
-import { JobTaskView } from '../../shared/tasks/JobTaskView';
-import { toast } from 'sonner';
-import {
-  LayoutDashboard,
-  Briefcase,
-  Users,
-  FileText,
-} from 'lucide-react';
-import { DashboardView, JobsView, LiveJobMapView } from './views';
+  JobRequest,
+  Photographer,
+  AuditLogEntry,
+  Metrics,
+} from "../../../types";
+import { ChatMessage } from "../../../types/chat";
+import { JobTaskView } from "../../shared/tasks/JobTaskView";
+import { DashboardView, JobsView, LiveJobMapView, TeamView, AuditView } from "./views";
+import { CalendarView } from "../calendar";
+import { SettingsView } from "../../shared/settings";
+import { dispatcherSettingsConfig } from "../../shared/settings/settings-config";
+import { dispatcherSettingsComponents } from "./settings";
+import type { SettingsSubView } from "../../shared/settings";
 
 interface DispatcherDashboardProps {
   jobs: JobRequest[];
@@ -33,10 +24,16 @@ interface DispatcherDashboardProps {
   metrics: Metrics;
   onJobCreate: (job: Partial<JobRequest>) => void;
   onJobAssign: (jobId: string, photographerId: string, score: number) => void;
-  onJobStatusChange?: (jobId: string, newStatus: JobRequest['status']) => void;
-  activeView?: 'dashboard' | 'jobs' | 'team' | 'audit' | 'map';
+  onJobStatusChange?: (jobId: string, newStatus: JobRequest["status"]) => void;
+  activeView?: "dashboard" | "jobs" | "team" | "audit" | "map" | "calendar" | "settings";
   onNavigateToJobsView?: () => void;
-  onNewJobClick?: () => void;
+  onNavigateToMapView?: () => void;
+  onNavigateToCalendarView?: () => void;
+  onNewJobClick?: (initialValues?: {
+    scheduledDate?: string;
+    scheduledTime?: string;
+    estimatedDuration?: number;
+  }) => void;
 }
 
 export function DispatcherDashboard({
@@ -47,8 +44,10 @@ export function DispatcherDashboard({
   onJobCreate,
   onJobAssign,
   onJobStatusChange,
-  activeView = 'dashboard',
+  activeView = "dashboard",
   onNavigateToJobsView,
+  onNavigateToMapView,
+  onNavigateToCalendarView,
   onNewJobClick,
 }: DispatcherDashboardProps) {
   const [selectedJob, setSelectedJob] = useState<JobRequest | null>(null);
@@ -57,12 +56,30 @@ export function DispatcherDashboard({
   const [showTaskView, setShowTaskView] = useState(false);
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [newJobInitialValues, setNewJobInitialValues] = useState<{
+    scheduledDate?: string;
+    scheduledTime?: string;
+    estimatedDuration?: number;
+  }>();
+  const [settingsSubView, setSettingsSubView] = useState<SettingsSubView>(null);
+
+  // Reset settings sub-view when navigating away from settings
+  useEffect(() => {
+    if (activeView !== "settings") {
+      setSettingsSubView(null);
+    }
+  }, [activeView]);
 
   // If onNewJobClick is provided, use it; otherwise use local state
-  const handleNewJobClick = () => {
+  const handleNewJobClick = (initialValues?: {
+    scheduledDate?: string;
+    scheduledTime?: string;
+    estimatedDuration?: number;
+  }) => {
     if (onNewJobClick) {
-      onNewJobClick();
+      onNewJobClick(initialValues);
     } else {
+      setNewJobInitialValues(initialValues);
       setShowNewJobForm(true);
     }
   };
@@ -72,7 +89,11 @@ export function DispatcherDashboard({
     setShowRankings(true);
   };
 
-  const handleJobAssign = (jobId: string, photographerId: string, score: number) => {
+  const handleJobAssign = (
+    jobId: string,
+    photographerId: string,
+    score: number
+  ) => {
     onJobAssign(jobId, photographerId, score);
     setShowRankings(false);
     setSelectedJob(null);
@@ -102,14 +123,18 @@ export function DispatcherDashboard({
     }
   };
 
-  const handleSendMessage = (content: string, chatType: 'client' | 'team', threadId?: string) => {
+  const handleSendMessage = (
+    content: string,
+    chatType: "client" | "team",
+    threadId?: string
+  ) => {
     if (!selectedJob) return;
 
     const newMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
       jobId: selectedJob.id,
-      userId: 'current-user-id', // In real app, get from auth context
-      userName: 'Current User', // In real app, get from auth context
+      userId: "current-user-id", // In real app, get from auth context
+      userName: "Current User", // In real app, get from auth context
       content,
       createdAt: new Date(),
       threadId,
@@ -122,9 +147,7 @@ export function DispatcherDashboard({
 
   const handleEditMessage = (messageId: string, content: string) => {
     setChatMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === messageId ? { ...msg, content } : msg
-      )
+      prev.map((msg) => (msg.id === messageId ? { ...msg, content } : msg))
     );
     // In a real app, this would update the message on the backend
   };
@@ -152,12 +175,10 @@ export function DispatcherDashboard({
     }
   };
 
-
   return (
     <div className="w-full overflow-x-hidden h-full">
-
       {/* Views */}
-      {activeView === 'dashboard' && (
+      {activeView === "dashboard" && (
         <DashboardView
           jobs={jobs}
           photographers={photographers}
@@ -166,6 +187,8 @@ export function DispatcherDashboard({
           onViewRankings={handleViewRankings}
           onSelectJob={handleJobSelect}
           onNavigateToJobsView={onNavigateToJobsView}
+          onNavigateToMapView={onNavigateToMapView}
+          onNavigateToCalendarView={onNavigateToCalendarView}
           onNavigateToJobInProjectManagement={(job) => {
             setSelectedJob(job);
             if (onNavigateToJobsView) {
@@ -177,32 +200,31 @@ export function DispatcherDashboard({
             }, 100);
           }}
           onJobAssign={handleJobAssign}
+          onJobClick={handleJobClick}
         />
       )}
 
-      {activeView === 'jobs' && (
+      {activeView === "jobs" && (
         <JobsView
           jobs={jobs}
           photographers={photographers}
+          messages={chatMessages}
           onViewRankings={handleViewRankings}
+          onChangePhotographer={handleViewRankings} // Reuse the same handler - it opens rankings dialog
           onJobStatusChange={onJobStatusChange}
           onJobClick={handleJobClick}
         />
       )}
 
-      {activeView === 'team' && (
-        <main className="container mx-auto p-6 h-full">
-          <PhotographerManagement photographers={photographers} />
-        </main>
+      {activeView === "team" && (
+        <TeamView photographers={photographers} />
       )}
 
-      {activeView === 'audit' && (
-        <main className="container mx-auto p-6 h-full">
-          <AuditLog entries={auditLog} />
-        </main>
+      {activeView === "audit" && (
+        <AuditView auditLog={auditLog} />
       )}
 
-      {activeView === 'map' && (
+      {activeView === "map" && (
         <LiveJobMapView
           jobs={jobs}
           photographers={photographers}
@@ -222,51 +244,42 @@ export function DispatcherDashboard({
         />
       )}
 
-      {/* Rankings Dialog - Standalone (when not in pending assignments modal) */}
-      <Dialog open={showRankings} onOpenChange={setShowRankings}>
-        <DialogContent className="md:min-w-[90vw] min-w-[calc(100vw-1rem)] md:max-w-[90vw] md:h-[90vh] h-[calc(100vh-1rem)] md:max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col">
-          {selectedJob && (
-            <div className="flex-1 min-h-0 overflow-hidden h-full">
-              <MapWithSidebar
-                jobs={[selectedJob]}
-                photographers={photographers}
-                selectedJob={selectedJob}
-                onSelectJob={() => {}}
-                onJobAssign={(jobId: string, photographerId: string, score: number) =>
-                  handleJobAssign(jobId, photographerId, score)
-                }
-                className="h-full w-full"
-                fullScreen={true}
-                initialSidebarView="rankings"
-                initialJobForRankings={selectedJob}
-                onGoBack={() => setShowRankings(false)}
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {activeView === "calendar" && (
+        <CalendarView
+          jobs={jobs}
+          photographers={photographers}
+          onJobClick={handleJobClick}
+          onCreateJob={handleNewJobClick}
+        />
+      )}
 
-      {/* New Job Form Dialog */}
-      <Dialog open={showNewJobForm} onOpenChange={setShowNewJobForm}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create New Job Request</DialogTitle>
-          </DialogHeader>
-          <JobRequestForm
-            onSubmit={(job) => {
-              onJobCreate(job);
-              setShowNewJobForm(false);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+      {activeView === "settings" && (
+        <SettingsView
+          subView={settingsSubView}
+          onNavigate={(subView) => setSettingsSubView(subView)}
+          config={dispatcherSettingsConfig}
+          accountType="dispatcher"
+          componentRegistry={dispatcherSettingsComponents}
+        />
+      )}
+
+      {/* Rankings Dialog */}
+      <RankingsDialog
+        open={showRankings}
+        onOpenChange={setShowRankings}
+        selectedJob={selectedJob}
+        photographers={photographers}
+        onJobAssign={handleJobAssign}
+      />
 
       {/* Job Task View - Sheet (Dashboard) */}
       <JobTaskView
         job={selectedJob}
         photographer={
           selectedJob?.assignedPhotographerId
-            ? photographers.find((p) => p.id === selectedJob.assignedPhotographerId)
+            ? photographers.find(
+              (p) => p.id === selectedJob.assignedPhotographerId
+            )
             : undefined
         }
         messages={chatMessages.filter((m) => m.jobId === selectedJob?.id)}
@@ -289,6 +302,12 @@ export function DispatcherDashboard({
             setShowTaskView(false);
           }
         }}
+        onChangePhotographer={() => {
+          if (selectedJob) {
+            handleViewRankings(selectedJob);
+            setShowTaskView(false);
+          }
+        }}
         variant="sheet"
         onFullScreen={handleFullScreen}
       />
@@ -298,7 +317,9 @@ export function DispatcherDashboard({
         job={selectedJob}
         photographer={
           selectedJob?.assignedPhotographerId
-            ? photographers.find((p) => p.id === selectedJob.assignedPhotographerId)
+            ? photographers.find(
+              (p) => p.id === selectedJob.assignedPhotographerId
+            )
             : undefined
         }
         messages={chatMessages.filter((m) => m.jobId === selectedJob?.id)}
@@ -316,6 +337,12 @@ export function DispatcherDashboard({
           }
         }}
         onAssignPhotographer={() => {
+          if (selectedJob) {
+            handleViewRankings(selectedJob);
+            setShowTaskDialog(false);
+          }
+        }}
+        onChangePhotographer={() => {
           if (selectedJob) {
             handleViewRankings(selectedJob);
             setShowTaskDialog(false);
