@@ -9,13 +9,17 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  async register(@Body() body: { email: string; name: string; password: string;}) {
+  async register(
+    @Body() body: { email: string; name: string; password: string; role: Role }
+  ) {
     return this.authService.register(
       body.email,
       body.name,
       body.password,
+      body.role,
     );
   }
+
 
   @Public()
   @Post('login')

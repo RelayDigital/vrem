@@ -46,7 +46,7 @@ model User {
   email     String   @unique
   name      String
   password  String
-  role      Role     @default(AGENT)   // Kept for onboarding identity, not for permissions
+  role      Role     @default(AGENT) // Kept for onboarding identity, not for permissions
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -70,8 +70,9 @@ model Organization {
   name      String
   createdAt DateTime @default(now())
 
-  members   OrganizationMember[]
-  projects  Project[]
+  members     OrganizationMember[]
+  projects    Project[]
+  invitations Invitation[]
 }
 
 //
@@ -81,13 +82,13 @@ model Organization {
 // ----------------------
 //
 model OrganizationMember {
-  id        String       @id @default(uuid())
+  id        String   @id @default(uuid())
   userId    String
   orgId     String
   role      OrgRole
-  createdAt DateTime     @default(now())
+  createdAt DateTime @default(now())
 
-  user        User         @relation(fields: [userId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
   organization Organization @relation(fields: [orgId], references: [id])
 
   @@unique([userId, orgId]) // user can only have one membership per organization
@@ -99,16 +100,16 @@ model OrganizationMember {
 // ----------------------
 //
 model Media {
-  id          String   @id @default(cuid())
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id])
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id])
 
-  key         String
-  cdnUrl      String?
-  filename    String
-  size        Int
-  type        MediaType
-  createdAt   DateTime @default(now())
+  key       String
+  cdnUrl    String?
+  filename  String
+  size      Int
+  type      MediaType
+  createdAt DateTime  @default(now())
 }
 
 //
@@ -133,27 +134,27 @@ model Message {
 // ----------------------
 //
 model Project {
-  id            String        @id @default(uuid())
+  id String @id @default(uuid())
 
-  orgId         String
-  organization  Organization  @relation(fields: [orgId], references: [id])
+  orgId        String
+  organization Organization @relation(fields: [orgId], references: [id])
 
-  agentId       String
-  agent         User          @relation("AgentProjects", fields: [agentId], references: [id])
+  agentId String
+  agent   User   @relation("AgentProjects", fields: [agentId], references: [id])
 
   address       String
   notes         String?
   scheduledTime DateTime
   status        ProjectStatus @default(BOOKED)
 
-  technicianId  String?
-  technician    User?         @relation("TechProjects", fields: [technicianId], references: [id])
+  technicianId String?
+  technician   User?   @relation("TechProjects", fields: [technicianId], references: [id])
 
-  editorId      String?
-  editor        User?         @relation("EditorProjects", fields: [editorId], references: [id])
+  editorId String?
+  editor   User?   @relation("EditorProjects", fields: [editorId], references: [id])
 
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   media         Media[]
   messages      Message[]
@@ -187,14 +188,14 @@ enum ProjectStatus {
 // Inquiries (not org-scoped unless needed)
 // ----------------------
 model Inquiry {
-  id        String         @id @default(uuid())
+  id        String        @id @default(uuid())
   name      String
   email     String
   phone     String?
   address   String?
   message   String?
-  status    InquiryStatus  @default(PENDING)
-  createdAt DateTime       @default(now())
+  status    InquiryStatus @default(PENDING)
+  createdAt DateTime      @default(now())
 }
 
 enum InquiryStatus {
@@ -210,11 +211,23 @@ enum InquiryStatus {
 // Calendar Events
 // ----------------------
 model CalendarEvent {
-  id              String   @id @default(uuid())
-  projectId       String   @unique
-  cronofyEventId  String
-  calendarId      String
-  createdAt       DateTime @default(now())
+  id             String   @id @default(uuid())
+  projectId      String   @unique
+  cronofyEventId String
+  calendarId     String
+  createdAt      DateTime @default(now())
 
-  project         Project  @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+model Invitation {
+  id        String   @id @default(uuid())
+  email     String
+  orgId     String
+  role      OrgRole
+  token     String   @unique
+  accepted  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id])
 }
