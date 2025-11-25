@@ -8,16 +8,16 @@ import { Role } from '@prisma/client';
 export class AuthService {
   constructor(private prisma: PrismaService, private jwtService: JwtService) {}
 
-  async register(email: string, name: string, password: string, role: Role) {
+  async register(email: string, name: string, password: string) {
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new UnauthorizedException('Email already registered');
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await this.prisma.user.create({
-      data: { email, name, password: hashedPassword, role },
+      data: { email, name, password: hashedPassword,},
     });
 
-    const token = this.jwtService.sign({ sub: user.id, role: user.role });
+    const token = this.jwtService.sign({ sub: user.id});
     return { user, token };
   }
 
