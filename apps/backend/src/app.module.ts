@@ -7,10 +7,11 @@ import { ProjectsModule } from './projects/projects.module';
 import { MediaModule } from './media/media.module';
 import { MessagesModule } from './messages/messages.module';
 import { InquiriesModule } from './inquiries/inquires.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 
 @Module({
-  imports: [UsersModule, AuthModule, ProjectsModule, MediaModule, MessagesModule, InquiriesModule],
+  imports: [UsersModule, AuthModule, ProjectsModule, MediaModule, MessagesModule, InquiriesModule, DashboardModule],
   controllers: [AppController],
   providers: [AppService],
 })
