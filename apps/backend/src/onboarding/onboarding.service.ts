@@ -57,13 +57,18 @@ export class OnboardingService {
     // PROJECT MANAGER + TECHNICIAN + EDITOR + AGENT FLOW
     //
 
-    // No organizations → must join one
+    // No organizations yet, but user can still continue
     if (membershipCount === 0) {
       return {
-        step: 'join-organization',
-        message: 'You must join an organization to continue',
+        step: 'no-organizations-yet',
+        canCreateOrganization: user.role === Role.ADMIN,
+        canJoinOrganization: true,
+        showCreateOrgCTA: user.role === Role.ADMIN,
+        showJoinOrgCTA: true,
+        message: 'You are not part of any organization yet.',
       };
     }
+
 
     // Exactly one organization → go straight to dashboard
     if (membershipCount === 1) {
