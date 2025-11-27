@@ -133,7 +133,7 @@ export function ListView({
                                 <h4 className="font-semibold">{event.title}</h4>
                                 {technicianColor && (
                                   <div
-                                    className="w-3 h-3 rounded-full flex-shrink-0"
+                                    className="w-3 h-3 rounded-full shrink-0"
                                     style={{ backgroundColor: technicianColor }}
                                   />
                                 )}
@@ -163,7 +163,7 @@ export function ListView({
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="flex items-center gap-2 shrink-0">
                               {technician && (
                                 <Badge variant="secondary" className="text-xs">
                                   {technician.name}

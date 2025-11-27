@@ -37,40 +37,6 @@ export function DispatcherSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { state } = useSidebar();
-  const [headerHeight, setHeaderHeight] = useState(73); // Default fallback
-
-  useEffect(() => {
-    const measureHeader = () => {
-      const header = document.querySelector("header");
-      if (header) {
-        setHeaderHeight(header.offsetHeight);
-      }
-    };
-
-    // Measure on mount
-    measureHeader();
-
-    // Measure on resize
-    window.addEventListener("resize", measureHeader);
-
-    // Also use ResizeObserver for more accurate measurements
-    const header = document.querySelector("header");
-    let resizeObserver: ResizeObserver | null = null;
-
-    if (header) {
-      resizeObserver = new ResizeObserver(() => {
-        measureHeader();
-      });
-      resizeObserver.observe(header);
-    }
-
-    return () => {
-      window.removeEventListener("resize", measureHeader);
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-    };
-  }, []);
 
   // Determine if a route is active
   const isActive = (path: string) => {
@@ -176,12 +142,12 @@ export function DispatcherSidebar() {
       variant="sidebar"
       style={
         {
-          "--header-height": `${headerHeight}px`,
+          "--header-height": "var(--header-h)",
         } as React.CSSProperties
       }
       className={`**:data-[slot=sidebar-container]:top-(--header-height)! **:data-[slot=sidebar-container]:h-[calc(100vh-var(--header-height))]! **:data-[slot=sidebar-container]:bottom-auto!`}
     >
-      <SidebarContent style={{ paddingTop: `${headerHeight}px` }}>
+      <SidebarContent className="pt-header-h">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>

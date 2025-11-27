@@ -66,7 +66,6 @@ export function JobsView({
   const [kanbanSelectedFilter, setKanbanSelectedFilter] =
     useState<string>("all");
   const [kanbanSortBy, setKanbanSortBy] = useState<string>("date-desc");
-  const [headerHeight, setHeaderHeight] = useState(0);
 
   // Filter and sort jobs for kanban view
   const filteredAndSortedJobs = useMemo(() => {

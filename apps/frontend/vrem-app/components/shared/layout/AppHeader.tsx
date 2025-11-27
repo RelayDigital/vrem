@@ -136,7 +136,7 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
 
   return (
     <>
-      <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-xl shadow-sm w-full px-4">
+      <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-xl shadow-sm w-full px-4 h-header-h">
         <div className="w-full max-w-full py-3 overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

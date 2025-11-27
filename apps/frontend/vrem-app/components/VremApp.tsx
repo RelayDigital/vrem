@@ -90,7 +90,6 @@ export default function VremApp(props: VremAppProps = {}) {
   const { initialAccountType = "dispatcher" } = props;
   const { theme, setTheme } = useTheme();
   const [isAuthenticated, setIsAuthenticated] = useState(true); // Start authenticated when coming from login
-  const [headerHeight, setHeaderHeight] = useState(73); // Default fallback
   
   // Initialize user based on account type
   const getInitialUser = (): User => {
@@ -409,44 +408,9 @@ export default function VremApp(props: VremAppProps = {}) {
     (p) => p.id === currentUser.id
   );
 
-  // Measure header height for sidebar positioning
-  useEffect(() => {
-    if (isAuthenticated && currentUser.role === "dispatcher") {
-      const measureHeader = () => {
-        const header = document.querySelector("header");
-        if (header) {
-          setHeaderHeight(header.offsetHeight);
-        }
-      };
-
-      // Measure on mount
-      measureHeader();
-
-      // Measure on resize
-      window.addEventListener("resize", measureHeader);
-
-      // Also use ResizeObserver for more accurate measurements
-      const header = document.querySelector("header");
-      let resizeObserver: ResizeObserver | null = null;
-
-      if (header) {
-        resizeObserver = new ResizeObserver(() => {
-          measureHeader();
-        });
-        resizeObserver.observe(header);
-      }
-
-      return () => {
-        window.removeEventListener("resize", measureHeader);
-        if (resizeObserver) {
-          resizeObserver.disconnect();
-        }
-      };
-    }
-  }, [isAuthenticated, currentUser.role]);
 
   const renderHeader = () => (
-    <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-xl shadow-sm w-full px-4">
+    <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-xl shadow-sm w-full px-4 h-header-h">
       <div className="w-full max-w-full py-3 overflow-hidden">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -645,8 +609,7 @@ export default function VremApp(props: VremAppProps = {}) {
           
           {/* Main Content */}
           <SidebarInset
-            className="min-w-0"
-            style={{ paddingTop: `${headerHeight}px` }}
+            className="min-w-0 pt-header-h"
           >
             {/* Dispatcher Dashboard */}
             <div className="flex-1 overflow-x-hidden min-w-0">

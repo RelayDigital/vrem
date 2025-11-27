@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { JobTaskView } from '@/components/shared/tasks/JobTaskView';
@@ -18,7 +18,6 @@ export default function JobTaskPage() {
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
   const [photographers] = useState(initialPhotographers);
-  const [headerHeight, setHeaderHeight] = useState(73); // Default fallback
   const isMobile = useIsMobile();
   const jobId = params?.jobId as string;
 
@@ -39,40 +38,6 @@ export default function JobTaskPage() {
   // When collapsed to icon: 3rem (48px), when expanded: 16rem (256px)
   // On mobile, no offset (sidebar doesn't affect layout)
   const leftOffset = isMobile ? '0' : (sidebarState === 'collapsed' ? '3rem' : '16rem');
-
-  // Measure header height
-  useEffect(() => {
-    const measureHeader = () => {
-      const header = document.querySelector('header');
-      if (header) {
-        setHeaderHeight(header.offsetHeight);
-      }
-    };
-
-    // Measure on mount
-    measureHeader();
-
-    // Measure on resize
-    window.addEventListener('resize', measureHeader);
-
-    // Also use ResizeObserver for more accurate measurements
-    const header = document.querySelector('header');
-    let resizeObserver: ResizeObserver | null = null;
-
-    if (header) {
-      resizeObserver = new ResizeObserver(() => {
-        measureHeader();
-      });
-      resizeObserver.observe(header);
-    }
-
-    return () => {
-      window.removeEventListener('resize', measureHeader);
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-    };
-  }, []);
 
   // Trigger resize when sidebar state changes
   useEffect(() => {
@@ -135,11 +100,11 @@ export default function JobTaskPage() {
     <div
       className="fixed overflow-hidden transition-[left] duration-200 ease-linear"
       style={{
-        top: `${headerHeight}px`,
+        top: 'var(--header-h)',
         left: leftOffset,
         right: 0,
         bottom: 0,
-        height: `calc(100vh - ${headerHeight}px)`
+        height: 'calc(100vh - var(--header-h))'
       }}
     >
       <JobTaskView
