@@ -3,6 +3,10 @@
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { AppHeader } from '@/components/shared/layout/AppHeader';
 import { Skeleton } from '@/components/ui/skeleton';
+import { JobCreationProvider, useJobCreation } from '@/context/JobCreationContext';
+import { MessagingProvider } from '@/context/MessagingContext';
+import { JobManagementProvider, useJobManagement } from '@/context/JobManagementContext';
+import { ReactNode } from 'react';
 
 export default function PhotographerLayout({
   children,
@@ -49,12 +53,66 @@ export default function PhotographerLayout({
   }
 
   return (
+    <JobManagementProvider
+      defaultUserId={user?.id}
+      defaultOrganizationId={user?.organizationId}
+    >
+      <JobCreationProviderWrapper
+        defaultUserId={user?.id}
+        defaultOrganizationId={user?.organizationId}
+      >
+        <MessagingProvider
+          defaultUserId={user?.id}
+          defaultUserName={user?.name}
+        >
+          <PhotographerLayoutContent user={user}>
+            {children}
+          </PhotographerLayoutContent>
+        </MessagingProvider>
+      </JobCreationProviderWrapper>
+    </JobManagementProvider>
+  );
+}
+
+// Wrapper component to connect JobManagementContext with JobCreationContext
+function JobCreationProviderWrapper({
+  children,
+  defaultUserId,
+  defaultOrganizationId,
+}: {
+  children: ReactNode;
+  defaultUserId?: string;
+  defaultOrganizationId?: string;
+}) {
+  const jobManagement = useJobManagement();
+  
+  return (
+    <JobCreationProvider 
+      defaultUserId={defaultUserId}
+      defaultOrganizationId={defaultOrganizationId}
+      createJobHandler={jobManagement.createJob}
+    >
+      {children}
+    </JobCreationProvider>
+  );
+}
+
+function PhotographerLayoutContent({
+  children,
+  user,
+}: {
+  children: React.ReactNode;
+  user: any;
+}) {
+  return (
     <>
       {/* Header */}
-      <AppHeader user={user} />
+      <div className="fixed top-0 left-0 right-0 z-50">
+        <AppHeader user={user} />
+      </div>
       
       {/* Main Content */}
-      <main>
+      <main className="pt-header-h">
         {children}
       </main>
     </>

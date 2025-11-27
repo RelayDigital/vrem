@@ -124,6 +124,7 @@
 
 :root {
   --radius: 0.5rem;
+  --header-h: 4rem; /* Application-wide header height */
   
   /* Uber-inspired Color Scheme */
   /* Main colors - Clean whites and blacks */
@@ -298,6 +299,14 @@
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Chrome, Safari and Opera */
+}
+
+.h-header-h {
+  height: var(--header-h);
+}
+
+.pt-header-h {
+  padding-top: var(--header-h);
 }
 
 /* Uploadcare Custom Theme */

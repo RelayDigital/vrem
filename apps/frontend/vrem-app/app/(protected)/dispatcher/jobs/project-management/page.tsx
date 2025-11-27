@@ -30,7 +30,6 @@ export default function ProjectManagementPage() {
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
   const [photographers] = useState(initialPhotographers);
-  const [headerHeight, setHeaderHeight] = useState(73); // Default fallback
   const isMobile = useIsMobile();
 
   // Get sidebar state to adjust left offset
@@ -50,40 +49,6 @@ export default function ProjectManagementPage() {
   // When collapsed to icon: 3rem (48px), when expanded: 16rem (256px)
   // On mobile, no offset (sidebar doesn't affect layout)
   const leftOffset = isMobile ? '0' : (sidebarState === 'collapsed' ? '3rem' : '16rem');
-
-  // Measure header height
-  useEffect(() => {
-    const measureHeader = () => {
-      const header = document.querySelector('header');
-      if (header) {
-        setHeaderHeight(header.offsetHeight);
-      }
-    };
-
-    // Measure on mount
-    measureHeader();
-
-    // Measure on resize
-    window.addEventListener('resize', measureHeader);
-
-    // Also use ResizeObserver for more accurate measurements
-    const header = document.querySelector('header');
-    let resizeObserver: ResizeObserver | null = null;
-
-    if (header) {
-      resizeObserver = new ResizeObserver(() => {
-        measureHeader();
-      });
-      resizeObserver.observe(header);
-    }
-
-    return () => {
-      window.removeEventListener('resize', measureHeader);
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-    };
-  }, []);
 
   // Trigger resize when sidebar state changes
   useEffect(() => {
@@ -139,14 +104,14 @@ export default function ProjectManagementPage() {
     <div
       className="fixed overflow-hidden transition-[left] duration-200 ease-linear flex flex-col"
       style={{
-        top: `${headerHeight}px`,
+        top: 'var(--header-h)',
         left: leftOffset,
         right: 0,
         bottom: 0,
-        height: `calc(100vh - ${headerHeight}px)`
+        height: 'calc(100vh - var(--header-h))'
       }}
     >
-      <div className="container relative mx-auto px-md pt-md flex-shrink-0">
+      <div className="container relative mx-auto px-md pt-md shrink-0">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>

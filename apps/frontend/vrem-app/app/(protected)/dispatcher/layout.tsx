@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { JobRequestForm } from '@/components/shared/jobs';
 import { RankingsDialog } from '@/components/features/dispatcher/dialogs';
 import { photographers as initialPhotographers } from '@/lib/mock-data';
-import { useState, useEffect, ReactNode } from 'react';
+import { ReactNode } from 'react';
 
 export default function DispatcherLayout({
   children,
@@ -21,40 +21,6 @@ export default function DispatcherLayout({
   children: React.ReactNode;
 }) {
   const { user, isLoading } = useRequireRole(['dispatcher', 'admin', 'project_manager']);
-  const [headerHeight, setHeaderHeight] = useState(73); // Default fallback
-
-  useEffect(() => {
-    const measureHeader = () => {
-      const header = document.querySelector('header');
-      if (header) {
-        setHeaderHeight(header.offsetHeight);
-      }
-    };
-
-    // Measure on mount
-    measureHeader();
-
-    // Measure on resize
-    window.addEventListener('resize', measureHeader);
-
-    // Also use ResizeObserver for more accurate measurements
-    const header = document.querySelector('header');
-    let resizeObserver: ResizeObserver | null = null;
-
-    if (header) {
-      resizeObserver = new ResizeObserver(() => {
-        measureHeader();
-      });
-      resizeObserver.observe(header);
-    }
-
-    return () => {
-      window.removeEventListener('resize', measureHeader);
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
-    };
-  }, []);
 
   if (isLoading) {
     return (
@@ -76,7 +42,7 @@ export default function DispatcherLayout({
         </div>
 
         {/* Sidebar Skeleton */}
-        <div className="fixed left-0 top-[73px] bottom-0 w-64 border-r bg-background p-4">
+        <div className="fixed left-0 bottom-0 w-64 border-r bg-background p-4" style={{ top: 'var(--header-h)' }}>
           <div className="space-y-2">
             {Array.from({ length: 7 }).map((_, i) => (
               <Skeleton key={i} className="h-10 w-full" />
@@ -85,7 +51,7 @@ export default function DispatcherLayout({
         </div>
 
         {/* Content Skeleton */}
-        <div className="ml-64 pt-[73px] p-6">
+        <div className="ml-64 p-6 pt-header-h">
           <Skeleton className="h-8 w-48 mb-6" />
           <div className="space-y-4">
             <Skeleton className="h-32 w-full" />
@@ -115,7 +81,7 @@ export default function DispatcherLayout({
           defaultUserName={user?.name}
         >
           <DispatcherNavigationProvider>
-            <DispatcherLayoutContent user={user} headerHeight={headerHeight}>
+            <DispatcherLayoutContent user={user}>
               {children}
             </DispatcherLayoutContent>
           </DispatcherNavigationProvider>
@@ -151,11 +117,9 @@ function JobCreationProviderWrapper({
 function DispatcherLayoutContent({
   children,
   user,
-  headerHeight,
 }: {
   children: React.ReactNode;
   user: any;
-  headerHeight: number;
 }) {
   const jobCreation = useJobCreation();
   const jobManagement = useJobManagement();
@@ -172,8 +136,7 @@ function DispatcherLayoutContent({
       
       {/* Main Content */}
       <SidebarInset
-        className="min-w-0"
-        style={{ paddingTop: `${headerHeight}px` }}
+        className="min-w-0 pt-header-h"
       >
         {children}
       </SidebarInset>

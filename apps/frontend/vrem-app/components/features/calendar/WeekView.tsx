@@ -64,7 +64,7 @@ export function WeekView({
 
   return (
     <ScrollArea className="flex-1 relative">
-      <div className="space-y-6 absolute w-full">
+      <div className="absolute w-full">
         {/* Mobile: Horizontal scrollable wrapper */}
         <div className="flex-1 flex flex-col overflow-x-auto md:overflow-x-visible">
           {/* Container that holds both headers and grid, scrolls together */}
@@ -92,7 +92,7 @@ export function WeekView({
 
             {/* Calendar Grid */}
             <div className="flex-1 overflow-y-auto">
-              <div className="grid grid-cols-7 h-full">
+              <div className="grid grid-cols-7 min-h-screen">
                 {weekDays.map((day, dayIndex) => {
                   const dayEvents = getEventsForDaySorted(day);
 
