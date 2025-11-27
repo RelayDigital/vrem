@@ -44,6 +44,7 @@ import {
   organizations as initialOrganizations,
   currentUser as initialUser,
   photographers as initialPhotographers,
+  technicians as initialTechnicians,
   jobRequests as initialJobRequests,
   auditLog as initialAuditLog,
   metrics,
@@ -276,8 +277,10 @@ export default function VremApp(props: VremAppProps = {}) {
 
     const newApplication: CompanyApplication = {
       id: `app-${Date.now()}`,
-      photographerId: photographer.id,
-      photographerName: photographer.name,
+      photographerId: photographer.id, // Deprecated
+      technicianId: photographer.id,
+      photographerName: photographer.name, // Deprecated
+      technicianName: photographer.name,
       companyId: company.id,
       companyName: company.name,
       status: "pending",
@@ -638,10 +641,7 @@ export default function VremApp(props: VremAppProps = {}) {
           </div>
 
           {/* Sidebar */}
-          <DispatcherSidebar
-            currentView={dispatcherView}
-            onViewChange={setDispatcherView}
-          />
+          <DispatcherSidebar />
           
           {/* Main Content */}
           <SidebarInset
@@ -711,12 +711,14 @@ export default function VremApp(props: VremAppProps = {}) {
               <AgentJobsView
                 jobs={jobs}
                 photographers={photographers}
+                technicians={photographers}
                 organizationId={currentUser.organizationId}
                 onNewJobClick={() => setAgentView("booking")}
               />
             ) : (
               <AgentBookingFlow
                 photographers={photographers}
+                technicians={photographers}
                 companies={organizations}
                 preferredVendors={preferredVendors.map((v) => v.vendorId)}
                 onJobCreate={(job) => {

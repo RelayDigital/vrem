@@ -6,7 +6,8 @@ export interface Organization {
   avatar?: string;
   description?: string;
   services?: string[];
-  photographerCount?: number;
+  technicianCount?: number;
+  photographerCount?: number; // Deprecated: use technicianCount
   rating?: number;
   reviewCount?: number;
   coverageArea?: string[];
@@ -22,8 +23,10 @@ export interface PreferredVendor {
 
 export interface CompanyApplication {
   id: string;
-  photographerId: string;
-  photographerName: string;
+  photographerId: string; // Deprecated: use technicianId
+  technicianId: string;
+  photographerName: string; // Deprecated: use technicianName
+  technicianName: string;
   companyId: string;
   companyName: string;
   status: 'pending' | 'approved' | 'rejected';
@@ -41,7 +44,7 @@ export interface User {
   organizationType?: 'media_company' | 'real_estate_team' | 'agent';
 }
 
-export interface Photographer {
+export interface Technician {
   id: string;
   name: string;
   email: string;
@@ -101,6 +104,9 @@ export interface Photographer {
   certifications?: string[];
 }
 
+// Backwards compatibility: Photographer is now Technician
+export type Photographer = Technician;
+
 export interface JobRequest {
   id: string;
   orderNumber: string;
@@ -116,7 +122,8 @@ export interface JobRequest {
   mediaType: ('photo' | 'video' | 'aerial' | 'twilight')[];
   priority: 'standard' | 'rush' | 'urgent';
   status: 'pending' | 'assigned' | 'in_progress' | 'editing' | 'delivered' | 'cancelled';
-  assignedPhotographerId?: string;
+  assignedPhotographerId?: string; // Deprecated: use assignedTechnicianId
+  assignedTechnicianId?: string;
   estimatedDuration: number; // minutes
   requirements: string;
   createdBy: string;
@@ -136,6 +143,21 @@ export interface JobDetails {
   requirements: string;
 }
 
+export interface TechnicianRanking {
+  technician: Technician;
+  score: number;
+  factors: {
+    availability: number;
+    distance: number;
+    distanceKm: number;
+    reliability: number;
+    skillMatch: number;
+    preferredRelationship: number;
+  };
+  recommended: boolean;
+}
+
+// Backwards compatibility: PhotographerRanking is now TechnicianRanking
 export interface PhotographerRanking {
   photographer: Photographer;
   score: number;
@@ -157,7 +179,7 @@ export interface AuditLogEntry {
   userName: string;
   organizationId: string;
   action: string;
-  resourceType: 'job' | 'photographer' | 'organization' | 'user';
+  resourceType: 'job' | 'photographer' | 'technician' | 'organization' | 'user';
   resourceId: string;
   details: Record<string, any>;
   ipAddress?: string;
@@ -174,6 +196,11 @@ export interface Metrics {
     cancelled: number;
   };
   photographers: {
+    active: number;
+    available: number;
+    utilization: number;
+  }; // Deprecated: use technicians
+  technicians: {
     active: number;
     available: number;
     utilization: number;

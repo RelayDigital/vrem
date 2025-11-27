@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { JobRequest, Photographer } from '../../../types';
+import { JobRequest, Technician, Photographer } from '../../../types';
 import { AlertCircle, User, Home } from 'lucide-react';
 import { Small, Muted } from '../../ui/typography';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,13 +14,18 @@ import { useTheme } from 'next-themes';
 
 interface MapViewProps {
   jobs: JobRequest[];
-  photographers: Photographer[];
+  photographers?: Photographer[]; // Deprecated: use technicians
+  technicians?: Technician[];
   selectedJob?: JobRequest | null;
-  selectedPhotographer?: Photographer | null;
+  selectedPhotographer?: Photographer | null; // Deprecated: use selectedTechnician
+  selectedTechnician?: Technician | null;
   disablePopovers?: boolean;
 }
 
-export function MapView({ jobs, photographers, selectedJob, selectedPhotographer, disablePopovers = false }: MapViewProps) {
+export function MapView({ jobs, photographers, technicians, selectedJob, selectedPhotographer, selectedTechnician, disablePopovers = false }: MapViewProps) {
+  // Use technicians if provided, fallback to photographers for backwards compatibility
+  const effectiveTechnicians = technicians || photographers || [];
+  const effectiveSelectedTechnician = selectedTechnician || selectedPhotographer || null;
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -543,7 +548,8 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
         }, 2000);
       }
 
-      const assignedPhotographer = photographers.find((p) => p.id === job.assignedPhotographerId);
+      const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+      const assignedPhotographer = assignedId ? effectiveTechnicians.find((p) => p.id === assignedId) : undefined;
       const statusLabel = job.status === 'in_progress' ? 'In Progress' : 'Assigned';
 
       const statusKey = job.status === 'assigned' ? 'assigned' : 'in-progress';
@@ -646,7 +652,7 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
     });
 
     // Create markers for photographers
-    photographers.forEach((photographer) => {
+    effectiveTechnicians.forEach((photographer) => {
       const lngLat = [photographer.homeLocation.lng, photographer.homeLocation.lat] as [number, number];
       bounds.extend(lngLat);
 
@@ -859,7 +865,7 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
 
   // Draw polyline from selected photographer to job location
   useEffect(() => {
-    if (!mapRef.current || !isLoaded || !selectedPhotographer || !selectedJob) {
+    if (!mapRef.current || !isLoaded || !effectiveSelectedTechnician || !selectedJob) {
       if (animationIntervalRef.current) {
         clearInterval(animationIntervalRef.current);
         animationIntervalRef.current = null;
@@ -887,8 +893,8 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
 
     const map = mapRef.current;
     const photographerLngLat: [number, number] = [
-      selectedPhotographer.homeLocation.lng,
-      selectedPhotographer.homeLocation.lat,
+      effectiveSelectedTechnician.homeLocation.lng,
+      effectiveSelectedTechnician.homeLocation.lat,
     ];
     const jobLngLat: [number, number] = [selectedJob.location.lng, selectedJob.location.lat];
 
@@ -1107,7 +1113,7 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
         animationFrameRef.current = null;
       }
     };
-  }, [mapRef.current, isLoaded, selectedPhotographer?.id, selectedJob?.id, photographers]);
+  }, [mapRef.current, isLoaded, effectiveSelectedTechnician?.id, selectedJob?.id, effectiveTechnicians]);
 
   if (error) {
     return (
@@ -1148,7 +1154,7 @@ export function MapView({ jobs, photographers, selectedJob, selectedPhotographer
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
-            <Small className="text-muted-foreground">Available Photographers</Small>
+            <Small className="text-muted-foreground">Available Technicians</Small>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-gray-400 border-2 border-white" />

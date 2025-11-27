@@ -25,7 +25,7 @@ export function AddressStep({ onAddressSelect }: AddressStepProps) {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-full text-foreground/90 text-sm mb-2">
             <Sparkles className="h-4 w-4" />
-            <span>AI-Powered Photographer Matching</span>
+            <span>AI-Powered Technician Matching</span>
           </div>
           <H1 className="text-4xl md:text-5xl font-bold text-foreground">
             Where's the property?

@@ -3,6 +3,7 @@
 import type {
   Announcements,
   DndContextProps,
+  DragCancelEvent,
   DragEndEvent,
   DragOverEvent,
   DragStartEvent,
@@ -55,12 +56,14 @@ type KanbanContextProps<
   columns: C[];
   data: T[];
   activeCardId: string | null;
+  overColumnId: string | null;
 };
 
 const KanbanContext = createContext<KanbanContextProps>({
   columns: [],
   data: [],
   activeCardId: null,
+  overColumnId: null,
 });
 
 export type KanbanBoardProps = {
@@ -77,11 +80,12 @@ export const KanbanBoard = ({ id, children, className }: KanbanBoardProps) => {
   return (
     <div
       className={cn(
-        'flex size-full min-h-40 flex-col divide-y overflow-hidden rounded-md border bg-secondary text-xs shadow-sm ring-2 transition-all',
+        'flex h-full w-full flex-col divide-y overflow-hidden rounded-md border bg-secondary text-xs shadow-sm ring-2 transition-all',
         isOver ? 'ring-primary' : 'ring-transparent',
         className
       )}
       ref={setNodeRef}
+      style={{ maxHeight: '100%' }}
     >
       {children}
     </div>
@@ -157,18 +161,30 @@ export const KanbanCards = <T extends KanbanItemProps = KanbanItemProps>({
   className,
   ...props
 }: KanbanCardsProps<T>) => {
-  const { data } = useContext(KanbanContext) as KanbanContextProps<T>;
+  const { data, activeCardId, overColumnId } = useContext(KanbanContext) as KanbanContextProps<T>;
   const filteredData = data.filter((item) => item.column === props.id);
   const items = filteredData.map((item) => item.id);
+  // const showPlaceholder = activeCardId !== null && overColumnId === props.id;
+  const showPlaceholder = false;
 
   return (
-    <ScrollArea className="overflow-hidden">
+    <ScrollArea className="h-full overflow-hidden">
       <SortableContext items={items}>
         <div
           className={cn('flex size-full flex-col space-y-2 p-2', className)}
           {...props}
         >
           {filteredData.map(children)}
+          {showPlaceholder && (
+            <div className="rounded-md border-2 border-dashed border-primary bg-primary/5 p-3 min-h-[120px] flex flex-col gap-2 animate-pulse">
+              <div className="h-4 bg-primary/20 rounded w-3/4"></div>
+              <div className="h-3 bg-primary/10 rounded w-1/2"></div>
+              <div className="flex gap-2 mt-2">
+                <div className="h-6 w-16 bg-primary/10 rounded"></div>
+                <div className="h-6 w-16 bg-primary/10 rounded"></div>
+              </div>
+            </div>
+          )}
         </div>
       </SortableContext>
       <ScrollBar orientation="vertical" />
@@ -211,6 +227,7 @@ export const KanbanProvider = <
   ...props
 }: KanbanProviderProps<T, C>) => {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [overColumnId, setOverColumnId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(MouseSensor),
@@ -230,6 +247,7 @@ export const KanbanProvider = <
     const { active, over } = event;
 
     if (!over) {
+      setOverColumnId(null);
       return;
     }
 
@@ -237,6 +255,7 @@ export const KanbanProvider = <
     const overItem = data.find((item) => item.id === over.id);
 
     if (!(activeItem)) {
+      setOverColumnId(null);
       return;
     }
 
@@ -245,6 +264,11 @@ export const KanbanProvider = <
       overItem?.column ||
       columns.find(col => col.id === over.id)?.id ||
       columns[0]?.id;
+
+    // Set the over column ID for placeholder display
+    if (overColumn) {
+      setOverColumnId(overColumn);
+    }
 
     if (activeColumn !== overColumn) {
       let newData = [...data];
@@ -262,6 +286,7 @@ export const KanbanProvider = <
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveCardId(null);
+    setOverColumnId(null);
 
     onDragEnd?.(event);
 
@@ -279,6 +304,11 @@ export const KanbanProvider = <
     newData = arrayMove(newData, oldIndex, newIndex);
 
     onDataChange?.(newData);
+  };
+
+  const handleDragCancel = () => {
+    setActiveCardId(null);
+    setOverColumnId(null);
   };
 
   const announcements: Announcements = {
@@ -307,10 +337,11 @@ export const KanbanProvider = <
   };
 
   return (
-    <KanbanContext.Provider value={{ columns, data, activeCardId }}>
+    <KanbanContext.Provider value={{ columns, data, activeCardId, overColumnId }}>
       <DndContext
         accessibility={{ announcements }}
         collisionDetection={closestCenter}
+        onDragCancel={handleDragCancel}
         onDragEnd={handleDragEnd}
         onDragOver={handleDragOver}
         onDragStart={handleDragStart}
@@ -318,11 +349,11 @@ export const KanbanProvider = <
         {...props}
       >
         {/* Responsive horizontal scroll: different column counts per breakpoint */}
-        <div className="size-full overflow-x-auto scroll-smooth">
+        <div className="h-full w-full overflow-x-auto overflow-y-hidden scroll-smooth">
           <div
             className={cn(
               // Always use flex with horizontal scroll and gap
-              'flex h-full flex-row gap-2',
+              'flex h-full flex-row gap-2 min-h-0',
               // Large screens: switch to grid with all columns visible
               '2xl:grid 2xl:size-full 2xl:auto-cols-fr 2xl:grid-flow-col 2xl:gap-4 2xl:overflow-x-visible',
               className
@@ -341,7 +372,9 @@ export const KanbanProvider = <
                   // Extra Large (xl, 1280px+): 4 columns visible
                   'xl:flex-[0_0_calc(25%-0.375rem)]',
                   // 2XL (1536px+): Grid takes over, auto-sized columns
-                  '2xl:flex-none 2xl:min-w-0'
+                  '2xl:flex-none 2xl:min-w-0',
+                  // Height constraint to prevent expansion
+                  'h-full min-h-0'
                 )}
               >
                 {children(column)}

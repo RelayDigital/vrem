@@ -5,7 +5,6 @@ import { JobRequest, Photographer } from "../../../../types";
 import { ChatMessage } from "../../../../types/chat";
 import { JobCard, PaginatedJobGrid } from "../../../shared/jobs";
 import { JobKanbanBoard } from "../../../shared/kanban";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../ui/tabs";
 import {
   Briefcase,
   Kanban,
@@ -37,6 +36,7 @@ import {
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../../ui/tooltip";
 import { H2, P } from "@/components/ui/typography";
+import { cn } from "../../../ui/utils";
 
 interface JobsViewProps {
   jobs: JobRequest[];
@@ -47,6 +47,7 @@ interface JobsViewProps {
   onJobStatusChange?: (jobId: string, newStatus: JobRequest["status"]) => void;
   onJobClick?: (job: JobRequest) => void;
   disableContextMenu?: boolean;
+  activeView?: "all" | "kanban"; // New prop to control which view to show
 }
 
 export function JobsView({
@@ -58,6 +59,7 @@ export function JobsView({
   onJobStatusChange,
   onJobClick,
   disableContextMenu = false,
+  activeView = "all",
 }: JobsViewProps) {
   // Kanban view search, filter, and sort state
   const [kanbanSearchQuery, setKanbanSearchQuery] = useState("");
@@ -253,29 +255,13 @@ export function JobsView({
   // }, []);
 
   return (
-    <main className="container relative mx-auto">
-      <article className="flex flex-col gap-2xl md:gap-3xl px-md">
-        <div className="@container w-full mt-md mb-md">
+    <main className={cn("container relative mx-auto", activeView === "kanban" ? "h-full flex flex-col" : "")}>
+      <article className={cn("flex flex-col gap-2xl md:gap-3xl px-md", activeView === "kanban" ? "flex-1 min-h-0" : "")}>
+        <div className={cn("@container w-full mt-md mb-md", activeView === "kanban" ? "flex flex-col flex-1 min-h-0" : "")}>
           <H2 className="text-4xl mb-xs">Jobs</H2>
-          <Tabs defaultValue="all" className="gap-0 size-full">
-            <TabsList className="grid w-full grid-cols-2 max-w-md mb-6">
-              <TabsTrigger
-                value="all"
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <Briefcase className="h-4 w-4" />
-                All Jobs
-              </TabsTrigger>
-              <TabsTrigger
-                value="kanban"
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <Kanban className="h-4 w-4" />
-                Project Management
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="all" className="mt-0">
+          
+          {activeView === "all" && (
+            <div className="mt-0">
               <PaginatedJobGrid
                 items={jobs}
                 searchPlaceholder="Search by address, client, Order #..."
@@ -455,15 +441,14 @@ export function JobsView({
                 emptyDescription="Jobs will appear here once created"
                 itemsPerPage={12}
               />
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent
-              value="kanban"
-              className="mt-0"
-            >
-              <div className="flex flex-col space-y-4">
+          {activeView === "kanban" && (
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex flex-col flex-1 min-h-0 space-y-4">
                 {/* Search, Filter, and Sort Bar */}
-                <div className="flex gap-3">
+                <div className="flex gap-3 shrink-0">
                   <div className="relative flex-1 min-w-0">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
                     <Input
@@ -526,19 +511,21 @@ export function JobsView({
                 </div>
 
                 {/* Kanban Board */}
-                <JobKanbanBoard
-                  jobs={filteredAndSortedJobs}
-                  photographers={photographers}
-                  messages={messages}
-                  onViewRankings={onViewRankings}
-                  onChangePhotographer={onChangePhotographer}
-                  onJobStatusChange={onJobStatusChange}
-                  onJobClick={onJobClick}
-                  disableContextMenu={disableContextMenu}
-                />
+                <div className="flex-1 min-h-0">
+                  <JobKanbanBoard
+                    jobs={filteredAndSortedJobs}
+                    photographers={photographers}
+                    messages={messages}
+                    onViewRankings={onViewRankings}
+                    onChangePhotographer={onChangePhotographer}
+                    onJobStatusChange={onJobStatusChange}
+                    onJobClick={onJobClick}
+                    disableContextMenu={disableContextMenu}
+                  />
+                </div>
               </div>
-            </TabsContent>
-          </Tabs>
+            </div>
+          )}
         </div>
       </article>
     </main>

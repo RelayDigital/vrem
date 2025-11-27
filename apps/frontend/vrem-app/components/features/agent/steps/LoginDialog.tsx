@@ -24,7 +24,7 @@ export function LoginDialog({ open, onClose, onLogin }: LoginDialogProps) {
             Sign in to confirm booking
           </DialogTitle>
           <DialogDescription>
-            You've selected your photographer! Sign in or create an account to confirm your booking and get started.
+            You've selected your technician! Sign in or create an account to confirm your booking and get started.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 pt-4">

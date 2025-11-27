@@ -1,6 +1,7 @@
 import {
   Organization,
   User,
+  Technician,
   Photographer,
   JobRequest,
   AuditLogEntry,
@@ -19,6 +20,7 @@ export const organizations: Organization[] = [
     description: 'Premier real estate media company serving Calgary and surrounding areas',
     services: ['Photography', 'Video', 'Aerial/Drone', 'Twilight', '3D Tours', 'Virtual Staging'],
     photographerCount: 12,
+    technicianCount: 12,
     rating: 4.8,
     reviewCount: 342,
     coverageArea: ['Calgary', 'Airdrie', 'Cochrane', 'Okotoks'],
@@ -32,6 +34,7 @@ export const organizations: Organization[] = [
     description: 'Boutique media company specializing in luxury properties',
     services: ['Photography', 'Video', 'Aerial/Drone', 'Twilight'],
     photographerCount: 5,
+    technicianCount: 5,
     rating: 4.9,
     reviewCount: 128,
     coverageArea: ['Mount Royal', 'Elbow Park', 'Britannia'],
@@ -67,8 +70,10 @@ export const preferredVendors: PreferredVendor[] = [
 export const companyApplications: CompanyApplication[] = [
   {
     id: 'app-001',
-    photographerId: 'photo-005',
-    photographerName: 'Ryan OConnor',
+    photographerId: 'photo-005', // Deprecated
+    technicianId: 'photo-005',
+    photographerName: 'Ryan OConnor', // Deprecated
+    technicianName: 'Ryan OConnor',
     companyId: 'org-vx-001',
     companyName: 'VX Media',
     status: 'pending',
@@ -86,7 +91,7 @@ export const currentUser: User = {
   organizationType: 'media_company',
 };
 
-export const photographers: Photographer[] = [
+export const technicians: Technician[] = [
   {
     id: 'photo-001',
     name: 'Marcus Rodriguez',
@@ -398,6 +403,9 @@ export const photographers: Photographer[] = [
   },
 ];
 
+// Backwards compatibility: photographers is now technicians
+export const photographers: Photographer[] = technicians;
+
 export const jobRequests: JobRequest[] = [
   {
     id: 'job-001',
@@ -457,6 +465,7 @@ export const jobRequests: JobRequest[] = [
     priority: 'standard',
     status: 'assigned',
     assignedPhotographerId: 'photo-002',
+    assignedTechnicianId: 'photo-002',
     estimatedDuration: 150,
     requirements: 'Estate property with tennis court and guest house. Standard aerial package.',
     createdBy: 'user-001',
@@ -480,6 +489,7 @@ export const jobRequests: JobRequest[] = [
     priority: 'standard',
     status: 'assigned',
     assignedPhotographerId: 'photo-003',
+    assignedTechnicianId: 'photo-003',
     estimatedDuration: 90,
     requirements: 'Beach-adjacent condo. Focus on ocean views and outdoor spaces.',
     createdBy: 'user-001',
@@ -503,6 +513,7 @@ export const jobRequests: JobRequest[] = [
     priority: 'standard',
     status: 'delivered',
     assignedPhotographerId: 'photo-001',
+    assignedTechnicianId: 'photo-001',
     estimatedDuration: 240,
     requirements: 'Ultra-luxury modern estate. Full media package with cinematic video.',
     createdBy: 'user-001',
@@ -590,6 +601,7 @@ export const jobRequests: JobRequest[] = [
     priority: 'standard',
     status: 'assigned',
     assignedPhotographerId: 'photo-001',
+    assignedTechnicianId: 'photo-001',
     estimatedDuration: 90,
     requirements: 'Modern Venice bungalow. Focus on architectural details.',
     createdBy: 'user-001',
@@ -613,6 +625,7 @@ export const jobRequests: JobRequest[] = [
     priority: 'rush',
     status: 'in_progress',
     assignedPhotographerId: 'photo-002',
+    assignedTechnicianId: 'photo-002',
     estimatedDuration: 200,
     requirements: 'Luxury penthouse. Full media package with aerial city views.',
     createdBy: 'user-001',
@@ -657,6 +670,7 @@ export const jobRequests: JobRequest[] = [
     priority: 'standard',
     status: 'assigned',
     assignedPhotographerId: 'photo-003',
+    assignedTechnicianId: 'photo-003',
     estimatedDuration: 150,
     requirements: 'Elegant estate. Video tour with cinematic transitions.',
     createdBy: 'user-001',
@@ -701,6 +715,7 @@ export const jobRequests: JobRequest[] = [
     priority: 'standard',
     status: 'in_progress',
     assignedPhotographerId: 'photo-001',
+    assignedTechnicianId: 'photo-001',
     estimatedDuration: 180,
     requirements: 'Bel Air mansion. Aerial shots of property and surrounding hills.',
     createdBy: 'user-001',
@@ -745,6 +760,7 @@ export const jobRequests: JobRequest[] = [
     priority: 'rush',
     status: 'assigned',
     assignedPhotographerId: 'photo-002',
+    assignedTechnicianId: 'photo-002',
     estimatedDuration: 120,
     requirements: 'Hillside property. Twilight shoot with city lights.',
     createdBy: 'user-001',
@@ -789,6 +805,7 @@ export const jobRequests: JobRequest[] = [
     priority: 'standard',
     status: 'delivered',
     assignedPhotographerId: 'photo-003',
+    assignedTechnicianId: 'photo-003',
     estimatedDuration: 150,
     requirements: 'Canyon estate. Aerial photography of property grounds.',
     createdBy: 'user-001',
@@ -813,6 +830,7 @@ export const jobRequests: JobRequest[] = [
     priority: 'standard',
     status: 'delivered',
     assignedPhotographerId: 'photo-001',
+    assignedTechnicianId: 'photo-001',
     estimatedDuration: 120,
     requirements: 'Modern West Hollywood condo. Video walkthrough.',
     createdBy: 'user-001',
@@ -887,6 +905,8 @@ export const auditLog: AuditLogEntry[] = [
     details: {
       photographerId: 'photo-002',
       photographerName: 'Jennifer Kim',
+      technicianId: 'photo-002',
+      technicianName: 'Jennifer Kim',
       rankingScore: 87.5,
     },
   },
@@ -902,6 +922,8 @@ export const auditLog: AuditLogEntry[] = [
     details: {
       photographerId: 'photo-003',
       photographerName: 'David Thompson',
+      technicianId: 'photo-003',
+      technicianName: 'David Thompson',
       rankingScore: 92.3,
     },
   },
@@ -931,6 +953,8 @@ export const auditLog: AuditLogEntry[] = [
     details: {
       photographerId: 'photo-001',
       photographerName: 'Marcus Rodriguez',
+      technicianId: 'photo-001',
+      technicianName: 'Marcus Rodriguez',
       rankingScore: 89.2,
     },
   },
@@ -947,6 +971,11 @@ export const metrics: Metrics = {
     cancelled: 1,
   },
   photographers: {
+    active: 5,
+    available: 4,
+    utilization: 0.78,
+  },
+  technicians: {
     active: 5,
     available: 4,
     utilization: 0.78,
