@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
@@ -8,6 +8,7 @@ import { MediaModule } from './media/media.module';
 import { MessagesModule } from './messages/messages.module';
 import { InquiriesModule } from './inquiries/inquires.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ActiveOrgMiddleware } from './organizations/active-org.middleware';
 
 
 @Module({
@@ -15,4 +16,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule {
+  configure(consumer: MiddlewareConsumer){
+    consumer.apply(ActiveOrgMiddleware).forRoutes('*');
+  }
+}
