@@ -42,30 +42,41 @@ export class ProjectsService {
 
   // Get projects for logged-in user
   async findForUser(userId: string, role: Role, orgId: string) {
-    if (role === 'AGENT') {
-      return this.prisma.project.findMany({
-        where: { agentId: userId },
-        include: { media: true, messages: true },
-      });
-    }
-
-    if (role === 'TECHNICIAN') {
-      return this.prisma.project.findMany({
-        where: { technicianId: userId },
-        include: { media: true, messages: true },
-      });
-    }
-
-    if (role === 'EDITOR') {
-      return this.prisma.project.findMany({
-        where: { editorId: userId },
-        include: { media: true, messages: true },
-      });
-    }
-
-    // Admin/PM: return everything
-    return this.findAll();
+  if (role === Role.AGENT) {
+    return this.prisma.project.findMany({
+      where: { agentId: userId, orgId },
+      include: { media: true, messages: true },
+    });
   }
+
+  if (role === Role.TECHNICIAN) {
+    return this.prisma.project.findMany({
+      where: { technicianId: userId, orgId },
+      include: { media: true, messages: true },
+    });
+  }
+
+  if (role === Role.EDITOR) {
+    return this.prisma.project.findMany({
+      where: { editorId: userId, orgId },
+      include: { media: true, messages: true },
+    });
+  }
+
+  // PM / Admin → still scoped to org
+  return this.prisma.project.findMany({
+    where: { orgId },
+    include: {
+      agent: true,
+      technician: true,
+      editor: true,
+      media: true,
+      messages: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
 
   // Create project (PM or Agent booking)
   async create(dto: CreateProjectDto, orgId: string) {
