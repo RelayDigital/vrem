@@ -42,6 +42,7 @@ import {
   AtSign,
   Maximize2,
   Link,
+  ExternalLink,
   X,
   MoreHorizontal,
   Bold,
@@ -68,6 +69,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { toast } from "sonner";
 import { ImageWithFallback } from "../../common";
 import { H3, H4, P, Small, Muted } from "@/components/ui/typography";
 import {
@@ -147,8 +149,9 @@ interface JobTaskViewProps {
   onStatusChange?: (status: JobRequest["status"]) => void;
   onAssignPhotographer?: () => void;
   onChangePhotographer?: () => void; // For reassigning photographer
-  variant?: "sheet" | "dialog";
-  onFullScreen?: () => void;
+  variant?: "sheet" | "dialog" | "page";
+  onFullScreen?: () => void; // Opens larger dialog
+  onOpenInNewPage?: () => void; // Navigates to full page view
 }
 
 export function JobTaskView({
@@ -169,6 +172,7 @@ export function JobTaskView({
   onChangePhotographer,
   variant = "sheet",
   onFullScreen,
+  onOpenInNewPage,
 }: JobTaskViewProps) {
   const [activeTab, setActiveTab] = useState<
     "description" | "discussion" | "attachments" | "media"
@@ -527,8 +531,11 @@ export function JobTaskView({
   const statusConfig = getStatusConfig(job.status);
 
   const handleCopyLink = () => {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url);
+    if (!job) return;
+    
+    const jobTaskUrl = `${window.location.origin}/dispatcher/jobs/${job.id}`;
+    navigator.clipboard.writeText(jobTaskUrl);
+    toast.success('Link copied to clipboard');
   };
 
   const handleFullScreen = () => {
@@ -563,8 +570,8 @@ export function JobTaskView({
     // info.allEntries is an array of OutputFileEntry
     if (!info || !info.allEntries || info.allEntries.length === 0) return;
 
-    const newMediaItems = info.allEntries.map((entry: any) => ({
-      id: entry.uuid,
+    const newMediaItems = info.allEntries.map((entry: any, index: number) => ({
+      id: entry.uuid || `${Date.now()}-${index}-${Math.random().toString(36).substring(2, 11)}`,
       name: entry.name,
       type: category,
       url: entry.cdnUrl,
@@ -755,9 +762,9 @@ export function JobTaskView({
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {categoryMedia.map((item) => (
+                {categoryMedia.map((item, index) => (
                   <div
-                    key={item.id}
+                    key={item.id || `media-${index}-${item.url}`}
                     className="group relative aspect-square rounded-lg border border-border overflow-hidden bg-muted hover:border-primary transition-colors"
                   >
                     <div className="w-full h-full flex flex-col items-center justify-center bg-muted p-4">
@@ -876,9 +883,9 @@ export function JobTaskView({
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {categoryMedia.map((item) => (
+          {categoryMedia.map((item, index) => (
             <div
-              key={item.id}
+              key={item.id || `media-${index}-${item.url}`}
               className="group relative aspect-square rounded-lg border border-border overflow-hidden bg-muted hover:border-primary transition-colors"
             >
               {(item.type === "image" || item.type === "floor-plan") && (
@@ -1117,21 +1124,42 @@ export function JobTaskView({
         </ItemContent>
         <ItemActions className="">
           {variant === "sheet" && !isMobile && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleFullScreen}
-                    className="h-8 w-8"
-                  >
-                    <Maximize2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>View in full screen</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <>
+              {onFullScreen && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleFullScreen}
+                        className="h-8 w-8"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>View in full screen dialog</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {onOpenInNewPage && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onOpenInNewPage}
+                        className="h-8 w-8"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Open in new page</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </>
           )}
           <TooltipProvider>
             <Tooltip>
@@ -1187,9 +1215,10 @@ export function JobTaskView({
 
   // Render footer content (shared between Sheet and Dialog)
   const renderFooter = (
-    FooterComponent: typeof SheetFooter | typeof DialogFooter
-  ) => (
-    <FooterComponent className="flex flex-col! border-t p-4 md:p-6 pt-0 gap-0">
+    FooterComponent: typeof SheetFooter | typeof DialogFooter | (() => null)
+  ) => {
+    const footerContent = (
+      <>
       {/* Chat Type Tabs - Only show when Discussion tab is active */}
       {activeTab === "discussion" && (
         <div className="flex items-center gap-6 pt-2 mb-4">
@@ -1566,8 +1595,21 @@ export function JobTaskView({
           </div>
         </div>
       </div>
-    </FooterComponent>
-  );
+      </>
+    );
+
+    // For page variant, use a div wrapper instead of FooterComponent
+    if (variant === "page") {
+      return (
+        <div className="flex flex-col border-t p-4 md:p-6 pt-0 gap-0 bg-background">
+          {footerContent}
+        </div>
+      );
+    }
+
+    // For sheet and dialog variants, use FooterComponent
+    return <FooterComponent className="flex flex-col! border-t p-4 md:p-6 pt-0 gap-0">{footerContent}</FooterComponent>;
+  };
 
   // Render main content (shared between Sheet and Dialog)
   const renderContent = () => (
@@ -1575,8 +1617,8 @@ export function JobTaskView({
       <div
         ref={scrollContainerRef}
         className={cn(
-          "flex-1 overflow-y-auto",
-          variant === "dialog" ? "max-h-[calc(90vh-200px)]" : ""
+          "h-full overflow-y-auto",
+          variant === "dialog" ? "max-h-[calc(90vh-200px)]" : variant === "page" ? "h-full" : "flex-1"
         )}
       >
         <Tabs defaultValue="task" className="gap-0 size-full px-4 md:px-8">
@@ -1598,6 +1640,14 @@ export function JobTaskView({
                 </div>
                 <div className="text-sm font-medium text-foreground">
                   {job.propertyAddress}
+                </div>
+
+                {/* Client */}
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                  Client
+                </div>
+                <div className="text-sm text-foreground">
+                  {job.clientName}
                 </div>
 
                 {/* People */}
@@ -2045,7 +2095,19 @@ export function JobTaskView({
         </AlertDialogContent>
       </AlertDialog>
 
-      {variant === "dialog" ? (
+      {variant === "page" ? (
+        <div className="w-full h-full flex flex-col overflow-hidden">
+          <div className="border-b flex-shrink-0">{renderHeader(SheetTitle)}</div>
+          <div className="flex-1 overflow-hidden">
+            {renderContent()}
+          </div>
+          {activeTab === "discussion" && (
+            <div className="flex-shrink-0">
+              {renderFooter(() => null)}
+            </div>
+          )}
+        </div>
+      ) : variant === "dialog" ? (
         <Dialog open={open} onOpenChange={onOpenChange}>
           <DialogContent className="md:min-w-[90vw] min-w-[calc(100vw-1rem)] md:max-w-[90vw] md:h-[90vh] h-[calc(100vh-1rem)] md:max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col [&>button]:hidden">
             <DialogTitle className="sr-only">

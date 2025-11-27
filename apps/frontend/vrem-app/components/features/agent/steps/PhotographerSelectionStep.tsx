@@ -13,7 +13,7 @@ import {
   Search as SearchIcon,
   Sparkles,
 } from 'lucide-react';
-import { PhotographerRanking } from '../../../../types';
+import { PhotographerRanking, TechnicianRanking } from '../../../../types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { P } from '@/components/ui/typography';
 
@@ -24,9 +24,10 @@ interface PhotographerSelectionStepProps {
     scheduledTime: string;
     mediaTypes: string[];
   };
-  rankings: PhotographerRanking[];
+  rankings: PhotographerRanking[] | TechnicianRanking[];
   showPhotographerSearch: boolean;
-  photographers: any[];
+  photographers?: any[]; // Deprecated: use technicians
+  technicians?: any[];
   companies: any[];
   preferredVendors: string[];
   onToggleSearch: () => void;
@@ -40,12 +41,15 @@ export function PhotographerSelectionStep({
   rankings,
   showPhotographerSearch,
   photographers,
+  technicians,
   companies,
   preferredVendors,
   onToggleSearch,
   onPhotographerSelect,
   onBack,
 }: PhotographerSelectionStepProps) {
+  // Use technicians if provided, fallback to photographers for backwards compatibility
+  const effectiveTechnicians = technicians || photographers || [];
   return (
     <motion.div
       key="photographer"
@@ -63,7 +67,7 @@ export function PhotographerSelectionStep({
           <CheckCircle2 className="h-5 w-5 text-green-500" />
           <span>Details complete</span>
           <ArrowRight className="h-4 w-4 mx-2" />
-          <span className="text-primary">Choose photographer</span>
+          <span className="text-primary">Choose technician</span>
         </div>
 
         {/* Job Summary */}
@@ -116,7 +120,7 @@ export function PhotographerSelectionStep({
           <CardHeader className="flex items-center justify-between mb-2 p-0">
             <div className="flex items-center gap-3">
               <Sparkles className="h-6 w-6" />
-              <h3 className="text-xl">AI-Matched Photographers</h3>
+              <h3 className="text-xl">AI-Matched Technicians</h3>
             </div>
             <Button
               variant="secondary"
@@ -131,8 +135,8 @@ export function PhotographerSelectionStep({
           <CardContent className="p-0!">
           <P className="text-secondary">
             {showPhotographerSearch
-              ? 'Search for a specific photographer or your preferred media company'
-              : 'We\'ve ranked photographers based on availability, proximity, reliability, and your preferred vendors'}
+              ? 'Search for a specific technician or your preferred media company'
+              : 'We\'ve ranked technicians based on availability, proximity, reliability, and your preferred vendors'}
           </P>
           </CardContent>
         </Card>
@@ -141,7 +145,7 @@ export function PhotographerSelectionStep({
         {showPhotographerSearch ? (
           <div className="bg-card rounded-2xl border-2 border-border p-6 shadow-sm">
             <PhotographerSearch
-              photographers={photographers}
+              photographers={effectiveTechnicians}
               companies={companies}
               preferredVendors={preferredVendors}
               onSelect={onPhotographerSelect}
@@ -149,16 +153,20 @@ export function PhotographerSelectionStep({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {rankings.map((ranking, index) => (
+            {rankings.map((ranking, index) => {
+              // Handle both PhotographerRanking and TechnicianRanking
+              const technician = 'technician' in ranking ? ranking.technician : ranking.photographer;
+              return (
               <PhotographerCard
-                key={ranking.photographer.id}
-                photographer={ranking.photographer}
+                  key={technician.id}
+                  photographer={technician}
                 ranking={ranking.factors}
                 score={ranking.score}
                 recommended={ranking.recommended && index === 0}
-                onAssign={() => onPhotographerSelect(ranking.photographer.id)}
+                  onAssign={() => onPhotographerSelect(technician.id)}
               />
-            ))}
+              );
+            })}
           </div>
         )}
 

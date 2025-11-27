@@ -133,7 +133,7 @@ export function JobKanbanBoard({
   };
 
   return (
-    <div className="relative w-full overflow-x-auto">
+    <div className="h-full w-full overflow-x-auto overflow-y-hidden">
       <KanbanProvider
         columns={columns}
         data={kanbanData}
@@ -152,7 +152,7 @@ export function JobKanbanBoard({
             <KanbanBoard
               key={column.id}
               id={column.id}
-              className="relative h-[calc(70vh)]! min-h-[600px] shrink-0 w-[350px]"
+              className="relative shrink-0 w-[350px]"
             >
               <KanbanHeader className="flex items-center justify-between p-4 border-b shrink-0">
                 <div className="flex items-center gap-2">
@@ -170,7 +170,8 @@ export function JobKanbanBoard({
                   </div>
                 </div>
               ) : (
-                <KanbanCards id={column.id} className="flex-1 min-h-0">
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <KanbanCards id={column.id} className="h-full">
                   {(item) => {
                     const jobItem = item as JobKanbanItem;
                     const photographer = jobItem.job.assignedPhotographerId
@@ -214,12 +215,13 @@ export function JobKanbanBoard({
                       </div>
                     );
                   }}
-                </KanbanCards>
+                  </KanbanCards>
+                </div>
               )}
             </KanbanBoard>
           );
-        }}
-      </KanbanProvider>
+          }}
+        </KanbanProvider>
     </div>
   );
 }

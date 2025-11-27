@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from '@/types';
-import { currentUser } from '@/lib/mock-data';
+import { currentUser, photographers } from '@/lib/mock-data';
 
 interface UseRequireRoleOptions {
   redirectTo?: string;
@@ -45,8 +45,55 @@ export function useRequireRole(
     // Simulate loading
     const timer = setTimeout(() => {
       // In a real app, this would get the user from auth context/API
-      // For now, use mock data
-      const mockUser = currentUser;
+      // For now, use mock data and check localStorage for account type
+      const accountType = localStorage.getItem('accountType') as 'agent' | 'dispatcher' | 'photographer' | null;
+      
+      // Require authentication - if no accountType, redirect to login
+      if (!accountType) {
+        setUser(null);
+        setIsLoading(false);
+        router.push('/');
+        return;
+      }
+      
+      // Create user based on account type from localStorage
+      let mockUser: User = { ...currentUser };
+      
+      if (accountType === 'agent') {
+        // Set user to agent role and organization
+        mockUser = {
+          ...currentUser,
+          role: 'agent',
+          organizationId: 'org-client-001', // Agent organization
+          organizationType: 'agent',
+        };
+      } else if (accountType === 'photographer') {
+        // Set user to photographer role - find matching photographer or use first one
+        const matchingPhotographer = photographers.find((p) => p.email === currentUser.email) || photographers[0];
+        if (matchingPhotographer) {
+          mockUser = {
+            ...currentUser,
+            id: matchingPhotographer.id,
+            role: 'photographer',
+            organizationId: matchingPhotographer.organizationId,
+            organizationType: matchingPhotographer.isIndependent ? undefined : 'media_company',
+          };
+        } else {
+          mockUser = {
+            ...currentUser,
+            role: 'photographer',
+          };
+        }
+      } else if (accountType === 'dispatcher') {
+        // Set user to dispatcher role
+        mockUser = currentUser;
+      } else {
+        // Invalid account type, redirect to login
+        setUser(null);
+        setIsLoading(false);
+        router.push('/');
+        return;
+      }
 
       // Normalize role names (handle both backend and frontend role formats)
       const normalizedAllowedRoles = allowedRoles.map(role => 

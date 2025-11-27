@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Photographer } from '../../../types';
+import { Technician, Photographer } from '../../../types';
 import {
   Table,
   TableBody,
@@ -22,11 +22,14 @@ import {
 } from '../../ui/select';
 
 interface PhotographerTableProps {
-  photographers: Photographer[];
-  onRowClick?: (photographer: Photographer) => void;
+  photographers?: Photographer[]; // Deprecated: use technicians
+  technicians?: Technician[];
+  onRowClick?: (technician: Technician | Photographer) => void;
 }
 
-export function PhotographerTable({ photographers, onRowClick }: PhotographerTableProps) {
+export function PhotographerTable({ photographers, technicians, onRowClick }: PhotographerTableProps) {
+  // Use technicians if provided, fallback to photographers for backwards compatibility
+  const effectiveTechnicians = technicians || photographers || [];
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<string>('name-asc');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -34,7 +37,7 @@ export function PhotographerTable({ photographers, onRowClick }: PhotographerTab
 
   // Filter and sort photographers
   const filteredAndSortedPhotographers = useMemo(() => {
-    let result = [...photographers];
+    let result = [...effectiveTechnicians];
 
     // Apply search filter
     if (searchQuery) {
@@ -90,7 +93,7 @@ export function PhotographerTable({ photographers, onRowClick }: PhotographerTab
     });
 
     return result;
-  }, [photographers, searchQuery, sortBy, statusFilter, typeFilter]);
+  }, [effectiveTechnicians, searchQuery, sortBy, statusFilter, typeFilter]);
 
   return (
     <div className="space-y-4">
@@ -152,7 +155,7 @@ export function PhotographerTable({ photographers, onRowClick }: PhotographerTab
       {/* Results Count */}
       {filteredAndSortedPhotographers.length > 0 && (
         <div className="text-sm text-muted-foreground">
-          Showing {filteredAndSortedPhotographers.length} of {photographers.length} photographers
+          Showing {filteredAndSortedPhotographers.length} of {effectiveTechnicians.length} technicians
         </div>
       )}
 
@@ -172,7 +175,7 @@ export function PhotographerTable({ photographers, onRowClick }: PhotographerTab
         {filteredAndSortedPhotographers.length === 0 ? (
           <TableRow>
             <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
-              No photographers found
+              No technicians found
             </TableCell>
           </TableRow>
         ) : (

@@ -6,7 +6,7 @@ import { Photographer } from "@/types";
 import { TechnicianColor } from "@/types/calendar";
 import { CalendarEventCard } from "./CalendarEventCard";
 import { CalendarEventPopover } from "./CalendarEventPopover";
-import { parseISO, format } from "date-fns";
+import { parseISO, format, isToday } from "date-fns";
 import { getEventsForDay } from "@/lib/calendar-utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,7 +14,7 @@ import { cn } from "@/components/ui/utils";
 import { Wifi, WifiOff } from "lucide-react";
 import { eventsOverlap, calculateEventLayout } from "@/lib/calendar-utils";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 interface DayViewProps {
   currentDate: Date;
@@ -44,7 +44,25 @@ export function DayView({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<number | null>(null); // Minutes from midnight
   const [dragEnd, setDragEnd] = useState<number | null>(null); // Minutes from midnight
+  const [currentTime, setCurrentTime] = useState(new Date());
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Update current time every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Check if viewing today
+  const isViewingToday = isToday(currentDate);
+
+  // Calculate current time position (only if viewing today)
+  const currentTimePosition = isViewingToday
+    ? currentTime.getHours() * 60 + currentTime.getMinutes()
+    : null;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!onCreateJob || !containerRef.current) return;
@@ -309,6 +327,19 @@ export function DayView({
                     );
                   });
                 })()}
+
+                {/* Current Time Indicator */}
+                {currentTimePosition !== null && (
+                  <div
+                    className="absolute left-0 right-0 z-30 pointer-events-none"
+                    style={{
+                      top: `${currentTimePosition * 1.6}px`,
+                    }}
+                  >
+                    <div className="h-0.5 bg-red-500 w-full" />
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-red-500 rounded-full -translate-x-1/2" />
+                  </div>
+                )}
 
                 {/* Drag Selection Ghost */}
                 {isDragging && dragStart !== null && dragEnd !== null && (

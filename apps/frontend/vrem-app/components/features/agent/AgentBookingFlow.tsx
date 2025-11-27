@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { JobRequest, Photographer, Organization } from '../../../types';
+import { JobRequest, Technician, Photographer, Organization } from '../../../types';
 import { rankPhotographers } from '../../../lib/ranking';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
@@ -13,7 +13,8 @@ import {
 } from './steps';
 
 interface AgentBookingFlowProps {
-  photographers: Photographer[];
+  photographers?: Photographer[]; // Deprecated: use technicians
+  technicians: Technician[];
   companies: Organization[];
   preferredVendors: string[];
   onJobCreate: (job: Partial<JobRequest>) => void;
@@ -28,6 +29,7 @@ type Step = 'address' | 'details' | 'photographer';
 
 export function AgentBookingFlow({
   photographers,
+  technicians,
   companies,
   preferredVendors,
   onJobCreate,
@@ -37,6 +39,8 @@ export function AgentBookingFlow({
   initialAddress,
   initialLocation,
 }: AgentBookingFlowProps) {
+  // Use technicians if provided, fallback to photographers for backwards compatibility
+  const effectiveTechnicians = technicians || photographers || [];
   // If we have initial address, start at details step
   const [step, setStep] = useState<Step>(initialAddress ? 'details' : 'address');
   const [showPhotographerSearch, setShowPhotographerSearch] = useState(false);
@@ -142,7 +146,7 @@ export function AgentBookingFlow({
 
   const rankings =
     step === 'photographer' && selectedLocation
-      ? rankPhotographers(photographers, mockJob, preferredVendors)
+      ? rankPhotographers(effectiveTechnicians, mockJob, preferredVendors)
       : [];
 
   return (
@@ -171,7 +175,8 @@ export function AgentBookingFlow({
             jobDetails={jobDetails}
             rankings={rankings}
             showPhotographerSearch={showPhotographerSearch}
-            photographers={photographers}
+            photographers={effectiveTechnicians}
+            technicians={effectiveTechnicians}
             companies={companies}
             preferredVendors={preferredVendors}
             onToggleSearch={() => setShowPhotographerSearch(!showPhotographerSearch)}
