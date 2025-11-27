@@ -710,7 +710,7 @@ export function JobRequestForm({
                   ...formData,
                   estimatedDuration: 15,
                 });
-              }
+            }
             }}
             min="15"
             step="1"
