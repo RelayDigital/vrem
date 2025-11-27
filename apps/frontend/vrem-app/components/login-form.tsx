@@ -33,8 +33,15 @@ export function LoginForm({
     // Accept any login credentials - no validation needed
     // Store the selected account type in localStorage
     localStorage.setItem("accountType", accountType)
-    // Redirect to app
-    router.push("/app")
+    // Redirect directly to the appropriate route based on account type
+    if (accountType === "agent") {
+      router.push("/agent")
+    } else if (accountType === "photographer") {
+      router.push("/photographer")
+    } else {
+      // dispatcher
+      router.push("/dispatcher")
+    }
   }
 
   return (

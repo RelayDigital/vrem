@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { JobRequest, Photographer } from "@/types";
+import { JobRequest, Technician, Photographer } from "@/types";
 import {
   CalendarEvent,
   CalendarView as ViewType,
@@ -39,7 +39,8 @@ import { Filter } from "lucide-react";
 
 interface CalendarViewProps {
   jobs?: JobRequest[];
-  photographers?: Photographer[];
+  photographers?: Photographer[]; // Deprecated: use technicians
+  technicians?: Technician[];
   onJobClick?: (job: JobRequest) => void;
   onCreateJob?: (initialValues?: {
     scheduledDate?: string;
@@ -51,9 +52,12 @@ interface CalendarViewProps {
 export function CalendarView({
   jobs = [],
   photographers = [],
+  technicians,
   onJobClick,
   onCreateJob,
 }: CalendarViewProps) {
+  // Use technicians if provided, fallback to photographers for backwards compatibility
+  const effectiveTechnicians = technicians || photographers || [];
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>("week");
   const [timezone, setTimezone] = useState("America/Edmonton");
@@ -71,8 +75,8 @@ export function CalendarView({
 
   // Generate technician colors
   const technicianColors = useMemo(
-    () => generateTechnicianColors(photographers),
-    [photographers]
+    () => generateTechnicianColors(effectiveTechnicians),
+    [effectiveTechnicians]
   );
 
   // Convert jobs to calendar events
@@ -94,12 +98,12 @@ export function CalendarView({
         ).toISOString(),
         type: "External",
         externalSource: "Google Calendar",
-        technicianId: photographers[0]?.id,
+        technicianId: effectiveTechnicians[0]?.id,
       },
     ];
 
     return [...jobEvents, ...externalEvents];
-  }, [jobs, currentDate, photographers]);
+  }, [jobs, currentDate, effectiveTechnicians]);
 
   // Apply filters
   const filteredEvents = useMemo(() => {
@@ -230,7 +234,7 @@ export function CalendarView({
     const commonProps = {
       currentDate,
       events: eventsWithConflicts,
-      technicians: photographers,
+      technicians: effectiveTechnicians,
       technicianColors,
       onEventClick: handleEventClick,
     };
@@ -261,7 +265,7 @@ export function CalendarView({
       }}
       filters={filters}
       onFiltersChange={setFilters}
-      technicians={photographers}
+      technicians={effectiveTechnicians}
       technicianColors={technicianColors}
       territories={territories}
       timezone={timezone}

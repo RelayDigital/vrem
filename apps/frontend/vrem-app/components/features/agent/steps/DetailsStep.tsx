@@ -65,7 +65,7 @@ export function DetailsStep({
           <ArrowRight className="h-4 w-4 mx-2" />
           <span className="text-primary">Job details</span>
           <ArrowRight className="h-4 w-4 mx-2" />
-          <span className="text-muted-foreground/60">Find photographer</span>
+          <span className="text-muted-foreground/60">Find technician</span>
         </div>
 
         {/* Selected Address */}
@@ -400,7 +400,7 @@ export function DetailsStep({
               Back
             </Button>
             <Button onClick={onNext} className="flex-1 bg-primary">
-              Find Photographer
+              Find Technician
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>

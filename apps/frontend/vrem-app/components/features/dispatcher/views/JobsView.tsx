@@ -5,7 +5,6 @@ import { JobRequest, Photographer } from "../../../../types";
 import { ChatMessage } from "../../../../types/chat";
 import { JobCard, PaginatedJobGrid } from "../../../shared/jobs";
 import { JobKanbanBoard } from "../../../shared/kanban";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../ui/tabs";
 import {
   Briefcase,
   Kanban,
@@ -47,6 +46,7 @@ interface JobsViewProps {
   onJobStatusChange?: (jobId: string, newStatus: JobRequest["status"]) => void;
   onJobClick?: (job: JobRequest) => void;
   disableContextMenu?: boolean;
+  activeView?: "all" | "kanban"; // New prop to control which view to show
 }
 
 export function JobsView({
@@ -58,6 +58,7 @@ export function JobsView({
   onJobStatusChange,
   onJobClick,
   disableContextMenu = false,
+  activeView = "all",
 }: JobsViewProps) {
   // Kanban view search, filter, and sort state
   const [kanbanSearchQuery, setKanbanSearchQuery] = useState("");
@@ -257,25 +258,9 @@ export function JobsView({
       <article className="flex flex-col gap-2xl md:gap-3xl px-md">
         <div className="@container w-full mt-md mb-md">
           <H2 className="text-4xl mb-xs">Jobs</H2>
-          <Tabs defaultValue="all" className="gap-0 size-full">
-            <TabsList className="grid w-full grid-cols-2 max-w-md mb-6">
-              <TabsTrigger
-                value="all"
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <Briefcase className="h-4 w-4" />
-                All Jobs
-              </TabsTrigger>
-              <TabsTrigger
-                value="kanban"
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <Kanban className="h-4 w-4" />
-                Project Management
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="all" className="mt-0">
+          
+          {activeView === "all" && (
+            <div className="mt-0">
               <PaginatedJobGrid
                 items={jobs}
                 searchPlaceholder="Search by address, client, Order #..."
@@ -455,12 +440,11 @@ export function JobsView({
                 emptyDescription="Jobs will appear here once created"
                 itemsPerPage={12}
               />
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent
-              value="kanban"
-              className="mt-0"
-            >
+          {activeView === "kanban" && (
+            <div className="mt-0">
               <div className="flex flex-col space-y-4">
                 {/* Search, Filter, and Sort Bar */}
                 <div className="flex gap-3">
@@ -537,8 +521,8 @@ export function JobsView({
                   disableContextMenu={disableContextMenu}
                 />
               </div>
-            </TabsContent>
-          </Tabs>
+            </div>
+          )}
         </div>
       </article>
     </main>

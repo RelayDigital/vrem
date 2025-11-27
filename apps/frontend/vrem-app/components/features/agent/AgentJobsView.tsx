@@ -1,6 +1,6 @@
 'use client';
 
-import { JobRequest, Photographer } from '../../../types';
+import { JobRequest, Technician, Photographer } from '../../../types';
 import { JobCard } from '../../shared/jobs';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { PaginatedJobGrid } from '../../shared/jobs';
@@ -20,12 +20,15 @@ import { P } from '@/components/ui/typography';
 
 interface AgentJobsViewProps {
   jobs: JobRequest[];
-  photographers: Photographer[];
+  photographers?: Photographer[]; // Deprecated: use technicians
+  technicians: Technician[];
   organizationId: string;
   onNewJobClick: () => void;
 }
 
-export function AgentJobsView({ jobs, photographers, organizationId, onNewJobClick }: AgentJobsViewProps) {
+export function AgentJobsView({ jobs, photographers, technicians, organizationId, onNewJobClick }: AgentJobsViewProps) {
+  // Use technicians if provided, fallback to photographers for backwards compatibility
+  const effectiveTechnicians = technicians || photographers || [];
   // Filter jobs for this agent's organization
   const myJobs = jobs.filter((job) => job.organizationId === organizationId);
 
@@ -92,8 +95,9 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
   };
 
   const renderTableRow = (job: JobRequest) => {
-    const photographer = job.assignedPhotographerId
-      ? photographers.find((p) => p.id === job.assignedPhotographerId)
+    const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+    const technician = assignedId
+      ? effectiveTechnicians.find((t) => t.id === assignedId)
       : undefined;
     const priorityConfig = getPriorityConfig(job.priority);
     const statusConfig = getStatusConfig(job.status);
@@ -157,15 +161,15 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
           <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
         </TableCell>
         <TableCell>
-          {photographer ? (
+          {technician ? (
             <div className="flex items-center gap-2">
               <Avatar className="h-6 w-6">
-                <AvatarImage src={photographer.avatar} alt={photographer.name} />
+                <AvatarImage src={technician.avatar} alt={technician.name} />
                 <AvatarFallback>
-                  {photographer.name.split(' ').map(n => n[0]).join('')}
+                  {technician.name.split(' ').map(n => n[0]).join('')}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm">{photographer.name}</span>
+              <span className="text-sm">{technician.name}</span>
             </div>
           ) : (
             <span className="text-sm text-muted-foreground">Unassigned</span>
@@ -222,10 +226,11 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
               ]}
               onFilterChange={(value) => myJobs.filter((j) => value === 'all' || j.priority === value)}
               renderItem={(job) => {
-                const photographer = job.assignedPhotographerId
-                  ? photographers.find((p) => p.id === job.assignedPhotographerId)
+                const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+                const technician = assignedId
+                  ? effectiveTechnicians.find((t) => t.id === assignedId)
                   : undefined;
-                return <JobCard key={job.id} job={job} photographer={photographer} />;
+                return <JobCard key={job.id} job={job} photographer={technician} />;
               }}
               renderTableRow={renderTableRow}
               emptyMessage="No jobs yet"
@@ -252,10 +257,11 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
               ]}
               onFilterChange={(value) => pendingJobs.filter((j) => value === 'all' || j.priority === value)}
               renderItem={(job) => {
-                const photographer = job.assignedPhotographerId
-                  ? photographers.find((p) => p.id === job.assignedPhotographerId)
+                const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+                const technician = assignedId
+                  ? effectiveTechnicians.find((t) => t.id === assignedId)
                   : undefined;
-                return <JobCard key={job.id} job={job} photographer={photographer} />;
+                return <JobCard key={job.id} job={job} photographer={technician} />;
               }}
               renderTableRow={renderTableRow}
               emptyMessage="No pending jobs"
@@ -278,16 +284,17 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
               ]}
               onFilterChange={(value) => assignedJobs.filter((j) => value === 'all' || j.priority === value)}
               renderItem={(job) => {
-                const photographer = job.assignedPhotographerId
-                  ? photographers.find((p) => p.id === job.assignedPhotographerId)
+                const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+                const technician = assignedId
+                  ? effectiveTechnicians.find((t) => t.id === assignedId)
                   : undefined;
-                return <JobCard key={job.id} job={job} photographer={photographer} />;
+                return <JobCard key={job.id} job={job} photographer={technician} />;
               }}
               renderTableRow={renderTableRow}
               emptyMessage="No assigned jobs"
               emptyIcon={Briefcase}
               emptyTitle="No assigned jobs"
-              emptyDescription="Jobs will appear here once assigned to a photographer"
+              emptyDescription="Jobs will appear here once assigned to a technician"
               itemsPerPage={12}
             />
           </TabsContent>
@@ -304,10 +311,11 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
               ]}
               onFilterChange={(value) => inProgressJobs.filter((j) => value === 'all' || j.priority === value)}
               renderItem={(job) => {
-                const photographer = job.assignedPhotographerId
-                  ? photographers.find((p) => p.id === job.assignedPhotographerId)
+                const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+                const technician = assignedId
+                  ? effectiveTechnicians.find((t) => t.id === assignedId)
                   : undefined;
-                return <JobCard key={job.id} job={job} photographer={photographer} />;
+                return <JobCard key={job.id} job={job} photographer={technician} />;
               }}
               renderTableRow={renderTableRow}
               emptyMessage="No jobs in progress"
@@ -330,10 +338,11 @@ export function AgentJobsView({ jobs, photographers, organizationId, onNewJobCli
               ]}
               onFilterChange={(value) => completedJobs.filter((j) => value === 'all' || j.priority === value)}
               renderItem={(job) => {
-                const photographer = job.assignedPhotographerId
-                  ? photographers.find((p) => p.id === job.assignedPhotographerId)
+                const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+                const technician = assignedId
+                  ? effectiveTechnicians.find((t) => t.id === assignedId)
                   : undefined;
-                return <JobCard key={job.id} job={job} photographer={photographer} />;
+                return <JobCard key={job.id} job={job} photographer={technician} />;
               }}
               renderTableRow={renderTableRow}
               emptyMessage="No completed jobs"

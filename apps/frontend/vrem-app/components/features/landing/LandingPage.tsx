@@ -42,7 +42,7 @@ export function LandingPage({
   if (bookingData) {
     return (
       <AgentBookingFlow
-        photographers={photographers}
+        technicians={photographers}
         companies={companies}
         preferredVendors={preferredVendors}
         onJobCreate={(job) => {

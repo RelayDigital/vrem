@@ -33,7 +33,7 @@ import { ToggleGroup, ToggleGroupItem } from "../../ui/toggle-group";
 import { mediaTypeOptions } from "./utils";
 
 interface JobRequestFormProps {
-  onSubmit: (job: Partial<JobRequest>) => void;
+  onSubmit: (job: Partial<JobRequest>) => void | Promise<void>;
   initialValues?: {
     scheduledDate?: string;
     scheduledTime?: string;
@@ -44,6 +44,7 @@ interface JobRequestFormProps {
 interface FormData {
   clientName: string;
   propertyAddress: string;
+  location?: { lat: number; lng: number };
   scheduledDate: string;
   scheduledTime: string;
   mediaType: string[];
@@ -64,10 +65,12 @@ interface MapboxGeocodingResponse {
 
 interface AddressAutocompleteProps {
   value: string;
-  onChange: (address: string) => void;
+  onChange: (address: string, location?: { lat: number; lng: number }) => void;
+  onBlur?: () => void;
+  isGeocoding?: boolean;
 }
 
-function AddressAutocomplete({ value, onChange }: AddressAutocompleteProps) {
+function AddressAutocomplete({ value, onChange, onBlur, isGeocoding }: AddressAutocompleteProps) {
   const [query, setQuery] = useState(value);
   const [isFocused, setIsFocused] = useState(false);
   const [predictions, setPredictions] = useState<MapboxFeature[]>([]);
@@ -123,7 +126,9 @@ function AddressAutocomplete({ value, onChange }: AddressAutocompleteProps) {
   const handlePlaceSelect = useCallback(
     (feature: MapboxFeature) => {
       setQuery(feature.place_name);
-      onChange(feature.place_name);
+      // Mapbox returns coordinates as [lng, lat], we need [lat, lng]
+      const [lng, lat] = feature.center;
+      onChange(feature.place_name, { lat, lng });
       setPredictions([]);
       setIsFocused(false);
     },
@@ -157,13 +162,15 @@ function AddressAutocomplete({ value, onChange }: AddressAutocompleteProps) {
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
-            onChange(e.target.value);
+            // Clear location when address is manually edited (not from autocomplete)
+            onChange(e.target.value, undefined);
           }}
           onFocus={() => setIsFocused(true)}
+          onBlur={onBlur}
           placeholder="Full street address including city and state"
           className="pl-11 h-11"
         />
-        {isLoading && (
+        {(isLoading || isGeocoding) && (
           <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
         )}
       </div>
@@ -201,6 +208,7 @@ export function JobRequestForm({
   const [formData, setFormData] = useState<FormData>({
     clientName: "",
     propertyAddress: "",
+    location: undefined,
     scheduledDate: initialValues?.scheduledDate || "",
     scheduledTime: initialValues?.scheduledTime || "",
     mediaType: [],
@@ -208,8 +216,60 @@ export function JobRequestForm({
     estimatedDuration: initialValues?.estimatedDuration || 120,
     requirements: "",
   });
+  const [isGeocoding, setIsGeocoding] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number; placeName: string } | null> => {
+    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    if (!token) {
+      console.warn('Mapbox token not configured');
+      return null;
+    }
+
+    try {
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+        address
+      )}.json?access_token=${token}&types=address&country=us,ca&limit=1`;
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Geocoding request failed');
+      }
+
+      const data: MapboxGeocodingResponse = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        const feature = data.features[0];
+        // Mapbox returns coordinates as [lng, lat], we need [lat, lng]
+        const [lng, lat] = feature.center;
+        return { lat, lng, placeName: feature.place_name };
+      }
+      
+      return null;
+    } catch (err) {
+      console.error('Geocoding error:', err);
+      return null;
+    }
+  };
+
+  const handleAddressBlur = async () => {
+    // Only geocode if address is manually entered (no location set) and address is not empty
+    if (!formData.location && formData.propertyAddress.trim()) {
+      setIsGeocoding(true);
+      const trimmedAddress = formData.propertyAddress.trim();
+      const geocodedResult = await geocodeAddress(trimmedAddress);
+      
+      if (geocodedResult) {
+        setFormData((prev) => ({ 
+          ...prev, 
+          location: { lat: geocodedResult.lat, lng: geocodedResult.lng },
+          propertyAddress: geocodedResult.placeName // Update to use corrected address
+        }));
+      }
+      setIsGeocoding(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
@@ -238,35 +298,63 @@ export function JobRequestForm({
       return;
     }
 
-    // Submit the form
-    onSubmit({
-      clientName: formData.clientName.trim(),
-      propertyAddress: formData.propertyAddress.trim(),
-      scheduledDate: formData.scheduledDate,
-      scheduledTime: formData.scheduledTime,
-      mediaType: formData.mediaType as (
-        | "photo"
-        | "video"
-        | "aerial"
-        | "twilight"
-      )[],
-      priority: formData.priority,
-      estimatedDuration: formData.estimatedDuration,
-      requirements: formData.requirements.trim(),
-      status: "pending",
-    });
+    // Geocode address if location is not set (manually typed address)
+    let location = formData.location;
+    let addressToUse = formData.propertyAddress.trim();
+    
+    if (!location && formData.propertyAddress.trim()) {
+      const trimmedAddress = formData.propertyAddress.trim();
+      toast.loading("Geocoding address...", { id: "geocoding" });
+      
+      const geocodedResult = await geocodeAddress(trimmedAddress);
+      
+      if (geocodedResult) {
+        location = { lat: geocodedResult.lat, lng: geocodedResult.lng };
+        addressToUse = geocodedResult.placeName; // Use corrected address
+        toast.success("Address geocoded successfully", { id: "geocoding" });
+      } else {
+        toast.error("Could not find location for this address. Using default location.", { id: "geocoding" });
+        // Fallback to default location if geocoding fails
+        location = { lat: 51.0447, lng: -114.0719 };
+      }
+    }
 
-    // Reset form
-    setFormData({
-      clientName: "",
-      propertyAddress: "",
-      scheduledDate: initialValues?.scheduledDate || "",
-      scheduledTime: initialValues?.scheduledTime || "",
-      mediaType: [],
-      priority: "standard",
-      estimatedDuration: initialValues?.estimatedDuration || 120,
-      requirements: "",
-    });
+    // Submit the form
+    try {
+      await onSubmit({
+        clientName: formData.clientName.trim(),
+        propertyAddress: addressToUse, // Use corrected address if geocoded, otherwise use original
+        location: location,
+        scheduledDate: formData.scheduledDate,
+        scheduledTime: formData.scheduledTime,
+        mediaType: formData.mediaType as (
+          | "photo"
+          | "video"
+          | "aerial"
+          | "twilight"
+        )[],
+        priority: formData.priority,
+        estimatedDuration: formData.estimatedDuration,
+        requirements: formData.requirements.trim(),
+        status: "pending",
+      });
+
+      // Only reset form after successful submission
+      setFormData({
+        clientName: "",
+        propertyAddress: "",
+        location: undefined,
+        scheduledDate: initialValues?.scheduledDate || "",
+        scheduledTime: initialValues?.scheduledTime || "",
+        mediaType: [],
+        priority: "standard",
+        estimatedDuration: initialValues?.estimatedDuration || 120,
+        requirements: "",
+      });
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      // Don't reset form on error
+    }
   };
 
   const priorityOptions = [
@@ -348,9 +436,11 @@ export function JobRequestForm({
         </Label>
         <AddressAutocomplete
           value={formData.propertyAddress}
-          onChange={(address) =>
-            setFormData({ ...formData, propertyAddress: address })
+          onChange={(address, location) =>
+            setFormData({ ...formData, propertyAddress: address, location })
           }
+          onBlur={handleAddressBlur}
+          isGeocoding={isGeocoding}
         />
       </div>
 
