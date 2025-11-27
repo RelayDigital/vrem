@@ -694,14 +694,26 @@ export function JobRequestForm({
             id="duration"
             type="number"
             value={formData.estimatedDuration}
-            onChange={(e) =>
+            onChange={(e) => {
+              const value = e.target.value === '' ? '' : parseInt(e.target.value);
+              // Allow free typing, minimum validation handled by HTML min attribute
               setFormData({
                 ...formData,
-                estimatedDuration: parseInt(e.target.value) || 120,
-              })
-            }
-            min="30"
-            step="30"
+                estimatedDuration: value === '' ? 120 : (isNaN(value as number) ? 120 : value as number),
+              });
+            }}
+            onBlur={(e) => {
+              // Enforce minimum of 15 minutes on blur
+              const value = parseInt(e.target.value);
+              if (isNaN(value) || value < 15) {
+                setFormData({
+                  ...formData,
+                  estimatedDuration: 15,
+                });
+              }
+            }}
+            min="15"
+            step="1"
             className="h-11"
           />
         </div>

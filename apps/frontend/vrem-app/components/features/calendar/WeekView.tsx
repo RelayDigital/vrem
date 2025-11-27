@@ -63,95 +63,101 @@ export function WeekView({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden">
-      {/* Mobile: Horizontal scrollable wrapper */}
-      <div className="flex-1 flex flex-col overflow-x-auto md:overflow-x-visible">
-        {/* Container that holds both headers and grid, scrolls together */}
-        <div className="min-w-[1200px] md:min-w-0 flex flex-col h-full">
-          {/* Week Day Headers */}
-          <div className="grid grid-cols-7 border-b bg-muted/30 shrink-0">
-            {weekDays.map((day, index) => (
-              <div
-                key={index}
-                className={cn(
-                  "p-3 text-center border-r last:border-r-0",
-                  format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd") &&
-                    "bg-primary/10"
-                )}
-              >
-                <div className="text-xs text-muted-foreground mb-1">
-                  {format(day, "EEE")}
+    <ScrollArea className="flex-1 relative">
+      <div className="space-y-6 absolute w-full">
+        {/* Mobile: Horizontal scrollable wrapper */}
+        <div className="flex-1 flex flex-col overflow-x-auto md:overflow-x-visible">
+          {/* Container that holds both headers and grid, scrolls together */}
+          <div className="min-w-[1200px] md:min-w-0 flex flex-col h-full">
+            {/* Week Day Headers */}
+            <div className="sticky top-0 z-10 grid grid-cols-7 border-b bg-muted shrink-0">
+              {weekDays.map((day, index) => (
+                <div
+                  key={index}
+                  className={cn(
+                    "p-3 text-center border-r last:border-r-0",
+                    format(day, "yyyy-MM-dd") ===
+                      format(new Date(), "yyyy-MM-dd") && "bg-primary/10"
+                  )}
+                >
+                  <div className="text-xs text-muted-foreground mb-1">
+                    {format(day, "EEE")}
+                  </div>
+                  <div className="text-sm font-semibold">
+                    {format(day, "d")}
+                  </div>
                 </div>
-                <div className="text-sm font-semibold">{format(day, "d")}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
-          {/* Calendar Grid */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-7 h-full">
-              {weekDays.map((day, dayIndex) => {
-                const dayEvents = getEventsForDaySorted(day);
+            {/* Calendar Grid */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="grid grid-cols-7 h-full">
+                {weekDays.map((day, dayIndex) => {
+                  const dayEvents = getEventsForDaySorted(day);
 
-                return (
-                  <div
-                    key={dayIndex}
-                    className={cn(
-                      "border-r last:border-r-0 p-2 space-y-2",
-                      format(day, "yyyy-MM-dd") ===
-                        format(new Date(), "yyyy-MM-dd") && "bg-primary/5"
-                    )}
-                  >
-                    {dayEvents.map((event) => {
-                      const technician = getTechnician(event.technicianId);
-                      const technicianColor = getTechnicianColor(
-                        event.technicianId
-                      );
+                  return (
+                    <div
+                      key={dayIndex}
+                      className={cn(
+                        "border-r last:border-r-0 p-2 space-y-2",
+                        format(day, "yyyy-MM-dd") ===
+                          format(new Date(), "yyyy-MM-dd") && "bg-primary/5"
+                      )}
+                    >
+                      {dayEvents.map((event) => {
+                        const technician = getTechnician(event.technicianId);
+                        const technicianColor = getTechnicianColor(
+                          event.technicianId
+                        );
 
-                      if (
-                        event.type === "External" ||
-                        event.type === "Unscheduled"
-                      ) {
+                        if (
+                          event.type === "External" ||
+                          event.type === "Unscheduled"
+                        ) {
+                          return (
+                            <CalendarEventPopover
+                              key={event.id}
+                              event={event}
+                              technician={technician}
+                              technicianColor={technicianColor}
+                              onOpenJob={() =>
+                                event.jobId && onEventClick(event)
+                              }
+                              onAssignTechnician={() =>
+                                event.jobId && onEventClick(event)
+                              }
+                            >
+                              <div>
+                                <CalendarEventCard
+                                  event={event}
+                                  technician={technician}
+                                  technicianColor={technicianColor}
+                                  onClick={() => onEventClick(event)}
+                                />
+                              </div>
+                            </CalendarEventPopover>
+                          );
+                        }
+
                         return (
-                          <CalendarEventPopover
+                          <CalendarEventCard
                             key={event.id}
                             event={event}
                             technician={technician}
                             technicianColor={technicianColor}
-                            onOpenJob={() => event.jobId && onEventClick(event)}
-                            onAssignTechnician={() =>
-                              event.jobId && onEventClick(event)
-                            }
-                          >
-                            <div>
-                              <CalendarEventCard
-                                event={event}
-                                technician={technician}
-                                technicianColor={technicianColor}
-                                onClick={() => onEventClick(event)}
-                              />
-                            </div>
-                          </CalendarEventPopover>
+                            onClick={() => onEventClick(event)}
+                          />
                         );
-                      }
-
-                      return (
-                        <CalendarEventCard
-                          key={event.id}
-                          event={event}
-                          technician={technician}
-                          technicianColor={technicianColor}
-                          onClick={() => onEventClick(event)}
-                        />
-                      );
-                    })}
-                  </div>
-                );
-              })}
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </ScrollArea>
   );
 }

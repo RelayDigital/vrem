@@ -285,9 +285,9 @@ export function CalendarView({
         onCreateJob={onCreateJob}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-8 overflow-hidden relative h-full">
+      <div className="grid grid-cols-1 lg:grid-cols-5 min-[2560px]:grid-cols-7! overflow-hidden relative h-full">
         {/* Main Calendar Area */}
-        <div className="col-span-1 md:col-span-7 overflow-auto">{renderView()}</div>
+        <div className="col-span-1 md:col-span-4 min-[2560px]:col-span-6! overflow-auto">{renderView()}</div>
 
         {/* Right Sidebar */}
         {isMobile ? (
