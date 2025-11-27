@@ -36,6 +36,7 @@ import {
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../../ui/tooltip";
 import { H2, P } from "@/components/ui/typography";
+import { cn } from "../../../ui/utils";
 
 interface JobsViewProps {
   jobs: JobRequest[];
@@ -254,9 +255,9 @@ export function JobsView({
   // }, []);
 
   return (
-    <main className="container relative mx-auto">
-      <article className="flex flex-col gap-2xl md:gap-3xl px-md">
-        <div className="@container w-full mt-md mb-md">
+    <main className={cn("container relative mx-auto", activeView === "kanban" ? "h-full flex flex-col" : "")}>
+      <article className={cn("flex flex-col gap-2xl md:gap-3xl px-md", activeView === "kanban" ? "flex-1 min-h-0" : "")}>
+        <div className={cn("@container w-full mt-md mb-md", activeView === "kanban" ? "flex flex-col flex-1 min-h-0" : "")}>
           <H2 className="text-4xl mb-xs">Jobs</H2>
           
           {activeView === "all" && (
@@ -444,10 +445,10 @@ export function JobsView({
           )}
 
           {activeView === "kanban" && (
-            <div className="mt-0">
-              <div className="flex flex-col space-y-4">
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex flex-col flex-1 min-h-0 space-y-4">
                 {/* Search, Filter, and Sort Bar */}
-                <div className="flex gap-3">
+                <div className="flex gap-3 shrink-0">
                   <div className="relative flex-1 min-w-0">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60" />
                     <Input
@@ -510,16 +511,18 @@ export function JobsView({
                 </div>
 
                 {/* Kanban Board */}
-                <JobKanbanBoard
-                  jobs={filteredAndSortedJobs}
-                  photographers={photographers}
-                  messages={messages}
-                  onViewRankings={onViewRankings}
-                  onChangePhotographer={onChangePhotographer}
-                  onJobStatusChange={onJobStatusChange}
-                  onJobClick={onJobClick}
-                  disableContextMenu={disableContextMenu}
-                />
+                <div className="flex-1 min-h-0">
+                  <JobKanbanBoard
+                    jobs={filteredAndSortedJobs}
+                    photographers={photographers}
+                    messages={messages}
+                    onViewRankings={onViewRankings}
+                    onChangePhotographer={onChangePhotographer}
+                    onJobStatusChange={onJobStatusChange}
+                    onJobClick={onJobClick}
+                    disableContextMenu={disableContextMenu}
+                  />
+                </div>
               </div>
             </div>
           )}

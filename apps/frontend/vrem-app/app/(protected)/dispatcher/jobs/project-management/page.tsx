@@ -21,6 +21,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
+import { useSidebar } from '@/components/ui/sidebar';
+import { useIsMobile } from '@/components/ui/use-mobile';
 
 export default function ProjectManagementPage() {
   const router = useRouter();
@@ -28,6 +30,71 @@ export default function ProjectManagementPage() {
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
   const [photographers] = useState(initialPhotographers);
+  const [headerHeight, setHeaderHeight] = useState(73); // Default fallback
+  const isMobile = useIsMobile();
+
+  // Get sidebar state to adjust left offset
+  let sidebarState: string | undefined;
+  let sidebarOpen: boolean | undefined;
+  try {
+    const sidebar = useSidebar();
+    sidebarState = sidebar.state;
+    sidebarOpen = sidebar.open;
+  } catch {
+    // Not within SidebarProvider, use defaults
+    sidebarState = 'expanded';
+    sidebarOpen = true;
+  }
+
+  // Calculate left offset based on sidebar state
+  // When collapsed to icon: 3rem (48px), when expanded: 16rem (256px)
+  // On mobile, no offset (sidebar doesn't affect layout)
+  const leftOffset = isMobile ? '0' : (sidebarState === 'collapsed' ? '3rem' : '16rem');
+
+  // Measure header height
+  useEffect(() => {
+    const measureHeader = () => {
+      const header = document.querySelector('header');
+      if (header) {
+        setHeaderHeight(header.offsetHeight);
+      }
+    };
+
+    // Measure on mount
+    measureHeader();
+
+    // Measure on resize
+    window.addEventListener('resize', measureHeader);
+
+    // Also use ResizeObserver for more accurate measurements
+    const header = document.querySelector('header');
+    let resizeObserver: ResizeObserver | null = null;
+
+    if (header) {
+      resizeObserver = new ResizeObserver(() => {
+        measureHeader();
+      });
+      resizeObserver.observe(header);
+    }
+
+    return () => {
+      window.removeEventListener('resize', measureHeader);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, []);
+
+  // Trigger resize when sidebar state changes
+  useEffect(() => {
+    // Small delay to ensure DOM has updated after sidebar transition
+    const timeoutId = setTimeout(() => {
+      // Trigger resize event
+      window.dispatchEvent(new Event('resize'));
+    }, 250); // Match sidebar transition duration (200ms) + buffer
+
+    return () => clearTimeout(timeoutId);
+  }, [sidebarState]);
 
   // Listen for navigation events to open job task view
   useEffect(() => {
@@ -68,8 +135,18 @@ export default function ProjectManagementPage() {
   const handleTaskViewClose = jobManagement.handleTaskViewClose;
 
   return (
-    <div className="w-full overflow-x-hidden h-full">
-      <div className="container relative mx-auto px-md pt-md">
+    <>
+    <div
+      className="fixed overflow-hidden transition-[left] duration-200 ease-linear flex flex-col"
+      style={{
+        top: `${headerHeight}px`,
+        left: leftOffset,
+        right: 0,
+        bottom: 0,
+        height: `calc(100vh - ${headerHeight}px)`
+      }}
+    >
+      <div className="container relative mx-auto px-md pt-md flex-shrink-0">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -84,7 +161,8 @@ export default function ProjectManagementPage() {
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      <JobsView
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        <JobsView
         jobs={jobManagement.jobs}
         photographers={photographers}
         messages={messaging.messages}
@@ -94,9 +172,11 @@ export default function ProjectManagementPage() {
         onJobClick={handleJobClick}
         activeView="kanban"
       />
+      </div>
+    </div>
 
-      {/* Job Task View - Sheet */}
-      <JobTaskView
+    {/* Job Task View - Sheet */}
+    <JobTaskView
         job={jobManagement.selectedJob}
         photographer={
           jobManagement.selectedJob?.assignedPhotographerId
@@ -150,7 +230,7 @@ export default function ProjectManagementPage() {
         onChangePhotographer={jobManagement.handleChangePhotographer}
         variant="dialog"
       />
-    </div>
+    </>
   );
 }
 

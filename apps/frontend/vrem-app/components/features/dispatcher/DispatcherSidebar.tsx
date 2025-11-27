@@ -216,12 +216,12 @@ export function DispatcherSidebar() {
                       }}
                     >
                       <SidebarMenuItem>
-                        <div className="flex items-center w-full group/menu-item">
+                        <div className="flex items-center w-full relative group/menu-item">
                           <SidebarMenuButton
                             asChild
                             isActive={isSubmenuActive || isItemActive}
                             tooltip={item.tooltip}
-                            className="flex-1"
+                            className="flex-1 pr-8"
                           >
                             <Link href={defaultPath}>
                               <Icon />
@@ -232,10 +232,26 @@ export function DispatcherSidebar() {
                             <CollapsibleTrigger asChild>
                               <button
                                 type="button"
-                                className="ml-auto w-8 h-8 p-0 flex items-center justify-center hover:bg-sidebar-accent rounded-md transition-colors"
+                                className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 p-0 flex items-center justify-center rounded-sm transition-transform pointer-events-auto z-10 hover:bg-transparent focus:bg-transparent active:bg-transparent focus:outline-none"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (isJobsItem) {
+                                    setJobsSubmenuOpen(!jobsSubmenuOpen);
+                                  } else if (isSettingsItem) {
+                                    setSettingsSubmenuOpen(!settingsSubmenuOpen);
+                                  }
+                                }}
+                                onMouseDown={(e) => {
+                                  // Prevent the menu item click from firing
+                                  e.stopPropagation();
+                                }}
                               >
                                 <ChevronRight className={cn(
-                                  "h-4 w-4 transition-transform duration-200 text-sidebar-foreground/60",
+                                  "h-3.5 w-3.5 transition-transform duration-200",
+                                  // Inherit color from parent menu item state
+                                  "text-sidebar-foreground/50 group-hover/menu-item:text-sidebar-accent-foreground/70",
+                                  (isSubmenuActive || isItemActive) && "text-sidebar-accent-foreground/70",
                                   shouldBeOpen && "rotate-90"
                                 )} />
                               </button>
