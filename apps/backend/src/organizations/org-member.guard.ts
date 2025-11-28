@@ -12,8 +12,16 @@ export class OrgMemberGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
+    
+    // If middleware already validated membership, we're good
+    if (req.activeOrgMembership) {
+      req.membership = req.activeOrgMembership;
+      return true;
+    }
+
     const user = req.user;
-    const orgId = req.params.orgId || req.body.orgId;
+    // Check params, body, activeOrgId (from middleware), or header
+    const orgId = req.params.orgId || req.body.orgId || req.activeOrgId || req.headers['x-org-id'];
 
     if (!orgId) throw new ForbiddenException('Organization ID missing');
 

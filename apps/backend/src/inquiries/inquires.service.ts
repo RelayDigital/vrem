@@ -32,11 +32,12 @@ export class InquiriesService {
     });
   }
 
-  async convertToProject(id: string) {
+  async convertToProject(id: string, orgId: string) {
     const inquiry = await this.getInquiryById(id);
 
     const project = await this.prisma.project.create({
       data: {
+        orgId,
         agentId: '', // to be filled by PM later or from auth
         address: inquiry.address || '',
         notes: inquiry.message || '',

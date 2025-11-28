@@ -1,4 +1,4 @@
-import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
@@ -9,15 +9,23 @@ import { MessagesModule } from './messages/messages.module';
 import { InquiriesModule } from './inquiries/inquires.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ActiveOrgMiddleware } from './organizations/active-org.middleware';
-
+import { PrismaService } from './prisma/prisma.service';
 
 @Module({
-  imports: [UsersModule, AuthModule, ProjectsModule, MediaModule, MessagesModule, InquiriesModule, DashboardModule],
+  imports: [
+    UsersModule,
+    AuthModule,
+    ProjectsModule,
+    MediaModule,
+    MessagesModule,
+    InquiriesModule,
+    DashboardModule,
+  ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, PrismaService, ActiveOrgMiddleware],
 })
-export class AppModule {
-  configure(consumer: MiddlewareConsumer){
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
     consumer.apply(ActiveOrgMiddleware).forRoutes('*');
   }
 }
