@@ -29,6 +29,7 @@
     "@nestjs/websockets": "^11.1.9",
     "@prisma/client": "^6.19.0",
     "@supabase/supabase-js": "^2.84.0",
+    "@uploadcare/rest-client": "^6.18.2",
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
