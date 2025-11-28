@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { JobRequest, Photographer, Metrics } from "../../../../types";
 import { MetricsDashboard } from "../../../shared/metrics";
+import { USE_MOCK_DATA } from "../../../../lib/utils";
 import { JobCard } from "../../../shared/jobs";
 import { MapWithSidebar } from "../../../shared/dashboard/MapWithSidebar";
 import { MonthView } from "../../../features/calendar/MonthView";
@@ -56,10 +57,13 @@ export function DashboardView({
     return jobs.map((job) => jobToCalendarEvent(job));
   }, [jobs]);
 
+  // Use empty array when mock data is disabled
+  const displayPhotographers = USE_MOCK_DATA ? photographers : [];
+
   // Generate technician colors
   const technicianColors = useMemo(
-    () => generateTechnicianColors(photographers),
-    [photographers]
+    () => generateTechnicianColors(displayPhotographers),
+    [displayPhotographers]
   );
 
   // Handle event click
@@ -79,12 +83,45 @@ export function DashboardView({
     }
   };
 
+  // Use empty metrics when mock data is disabled
+  const displayMetrics = USE_MOCK_DATA ? metrics : {
+    organizationId: '',
+    period: 'week' as const,
+    jobs: {
+      total: 0,
+      pending: 0,
+      assigned: 0,
+      completed: 0,
+      cancelled: 0,
+    },
+    photographers: {
+      active: 0,
+      available: 0,
+      utilization: 0,
+    },
+    technicians: {
+      active: 0,
+      available: 0,
+      utilization: 0,
+    },
+    performance: {
+      averageAssignmentTime: 0,
+      averageDeliveryTime: 0,
+      onTimeRate: 0,
+      clientSatisfaction: 0,
+    },
+    revenue: {
+      total: 0,
+      perJob: 0,
+    },
+  };
+
   return (
     <main className="container relative mx-auto">
       <article className="flex flex-col gap-2xl md:gap-3xl px-md">
         {/* Metrics */}
         <div className="@container w-full mt-md">
-          <MetricsDashboard metrics={metrics} />
+          <MetricsDashboard metrics={displayMetrics} />
         </div>
         {/* Calendar */}
         <div className="@container w-full">
@@ -98,7 +135,7 @@ export function DashboardView({
             <MonthView
               currentDate={currentDate}
               events={calendarEvents}
-              technicians={photographers}
+              technicians={displayPhotographers}
               technicianColors={technicianColors}
               onEventClick={handleEventClick}
               onDayClick={handleDayClick}
@@ -118,7 +155,7 @@ export function DashboardView({
 
           <MapWithSidebar
             jobs={jobs}
-            photographers={photographers}
+            photographers={displayPhotographers}
             selectedJob={selectedJob}
             onSelectJob={onSelectJob}
             onNavigateToJobInProjectManagement={

@@ -8,7 +8,7 @@ import { photographers as initialPhotographers } from '@/lib/mock-data';
 import { TeamLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
 
 export default function DispatcherTeamPage() {
-  const { user, isLoading } = useRequireRole(['dispatcher', 'admin', 'project_manager']);
+  const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
   const [photographers] = useState(initialPhotographers);
 
   if (isLoading) {

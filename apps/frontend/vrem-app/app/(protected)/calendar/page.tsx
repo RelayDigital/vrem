@@ -11,7 +11,7 @@ export default function CalendarPage() {
     useEffect(() => {
         if (!isLoading && user) {
             // For agents, redirect to agent calendar route
-            if (user.role === 'agent') {
+            if (user.role === 'AGENT') {
                 router.replace('/agent/calendar');
             } else {
                 // For other roles, keep existing behavior

@@ -2,12 +2,15 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { ChatMessage } from '@/types/chat';
+import { api } from '@/lib/api';
+import { toast } from 'sonner';
 
 interface MessagingContextType {
   // Message state
   messages: ChatMessage[];
   getMessagesForJob: (jobId: string) => ChatMessage[];
-  
+  fetchMessages: (jobId: string) => Promise<void>;
+
   // Message handlers
   sendMessage: (
     jobId: string,
@@ -17,7 +20,7 @@ interface MessagingContextType {
   ) => void;
   editMessage: (messageId: string, content: string) => void;
   deleteMessage: (messageId: string) => void;
-  
+
   // User info (for message creation)
   currentUserId?: string;
   currentUserName?: string;
@@ -27,12 +30,12 @@ interface MessagingContextType {
 
 const MessagingContext = createContext<MessagingContextType | undefined>(undefined);
 
-export function MessagingProvider({ 
+export function MessagingProvider({
   children,
   defaultUserId,
   defaultUserName,
   defaultUserAvatar,
-}: { 
+}: {
   children: ReactNode;
   defaultUserId?: string;
   defaultUserName?: string;
@@ -47,7 +50,27 @@ export function MessagingProvider({
     return messages.filter((msg) => msg.jobId === jobId);
   }, [messages]);
 
-  const sendMessage = useCallback((
+  const fetchMessages = useCallback(async (jobId: string) => {
+    try {
+      const fetchedMessages = await api.chat.getMessages(jobId);
+      // Convert date strings to Date objects if needed
+      const processedMessages = fetchedMessages.map((msg: any) => ({
+        ...msg,
+        createdAt: new Date(msg.createdAt),
+      }));
+
+      setMessages((prev) => {
+        // Remove existing messages for this job to avoid duplicates
+        const otherMessages = prev.filter((msg) => msg.jobId !== jobId);
+        return [...otherMessages, ...processedMessages];
+      });
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      // Don't show toast here to avoid spamming if called frequently
+    }
+  }, []);
+
+  const sendMessage = useCallback(async (
     jobId: string,
     content: string,
     chatType: 'client' | 'team',
@@ -58,54 +81,56 @@ export function MessagingProvider({
       return;
     }
 
-    const newMessage: ChatMessage = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
-      jobId,
-      userId: currentUserId,
-      userName: currentUserName,
-      userAvatar: currentUserAvatar,
-      content,
-      createdAt: new Date(),
-      threadId,
-      chatType,
-    };
+    try {
+      const response = await api.chat.sendMessage(jobId, content);
 
-    setMessages((prev) => [...prev, newMessage]);
-    
-    // Store in localStorage for persistence
-    const storedMessages = localStorage.getItem('chatMessages');
-    const allMessages = storedMessages ? JSON.parse(storedMessages) : [];
-    allMessages.push(newMessage);
-    localStorage.setItem('chatMessages', JSON.stringify(allMessages));
-    
-    // Dispatch event for real-time updates
-    window.dispatchEvent(new CustomEvent('messageCreated', { detail: newMessage }));
+      const newMessage: ChatMessage = {
+        ...response,
+        jobId,
+        userId: currentUserId,
+        userName: currentUserName,
+        userAvatar: currentUserAvatar,
+        content,
+        chatType,
+        threadId,
+        // Ensure createdAt is a Date object
+        createdAt: new Date(response.createdAt || new Date()),
+      };
+
+      setMessages((prev) => [...prev, newMessage]);
+
+      // Dispatch event for real-time updates
+      window.dispatchEvent(new CustomEvent('messageCreated', { detail: newMessage }));
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error('Failed to send message');
+    }
   }, [currentUserId, currentUserName, currentUserAvatar]);
 
   const editMessage = useCallback((messageId: string, content: string) => {
     setMessages((prev) =>
       prev.map((msg) => (msg.id === messageId ? { ...msg, content } : msg))
     );
-    
+
     // Update in localStorage
     const storedMessages = localStorage.getItem('chatMessages');
     if (storedMessages) {
       const allMessages: ChatMessage[] = JSON.parse(storedMessages);
-      const updatedMessages = allMessages.map((msg) => 
+      const updatedMessages = allMessages.map((msg) =>
         msg.id === messageId ? { ...msg, content } : msg
       );
       localStorage.setItem('chatMessages', JSON.stringify(updatedMessages));
     }
-    
+
     // Dispatch event
-    window.dispatchEvent(new CustomEvent('messageUpdated', { 
-      detail: { messageId, content } 
+    window.dispatchEvent(new CustomEvent('messageUpdated', {
+      detail: { messageId, content }
     }));
   }, []);
 
   const deleteMessage = useCallback((messageId: string) => {
     setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
-    
+
     // Update in localStorage
     const storedMessages = localStorage.getItem('chatMessages');
     if (storedMessages) {
@@ -113,10 +138,10 @@ export function MessagingProvider({
       const updatedMessages = allMessages.filter((msg) => msg.id !== messageId);
       localStorage.setItem('chatMessages', JSON.stringify(updatedMessages));
     }
-    
+
     // Dispatch event
-    window.dispatchEvent(new CustomEvent('messageDeleted', { 
-      detail: { messageId } 
+    window.dispatchEvent(new CustomEvent('messageDeleted', {
+      detail: { messageId }
     }));
   }, []);
 
@@ -130,22 +155,10 @@ export function MessagingProvider({
     setCurrentUserAvatar(userAvatar);
   }, []);
 
-  // Load messages from localStorage on mount
+  // Load messages from localStorage on mount - REMOVED in favor of API
+  // We now fetch messages per job when needed
   useEffect(() => {
-    const storedMessages = localStorage.getItem('chatMessages');
-    if (storedMessages) {
-      try {
-        const parsedMessages: ChatMessage[] = JSON.parse(storedMessages);
-        // Convert date strings back to Date objects
-        const messagesWithDates = parsedMessages.map((msg) => ({
-          ...msg,
-          createdAt: new Date(msg.createdAt),
-        }));
-        setMessages(messagesWithDates);
-      } catch (error) {
-        console.error('Error loading messages from localStorage:', error);
-      }
-    }
+    // Optional: Load some initial messages or clear state
   }, []);
 
   return (
@@ -153,6 +166,7 @@ export function MessagingProvider({
       value={{
         messages,
         getMessagesForJob,
+        fetchMessages,
         sendMessage,
         editMessage,
         deleteMessage,

@@ -376,7 +376,7 @@ export function JobCard({
         onClick={onClick}
       >
         {/* Media Section */}
-        <CardHeader className="relative flex flex-col justify-between w-full aspect-square md:aspect-16/9 overflow-hidden p-2!">
+        <CardHeader className="relative flex flex-col justify-between w-full aspect-video overflow-hidden p-2!">
           {job.propertyImage && job.status === "delivered" ? (
             <ImageWithFallback
               src={job.propertyImage}

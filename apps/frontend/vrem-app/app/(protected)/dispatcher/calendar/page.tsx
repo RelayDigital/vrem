@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { CalendarView } from '@/components/features/calendar/CalendarView';
@@ -16,7 +16,7 @@ import { useJobCreation } from '@/context/JobCreationContext';
 
 export default function DispatcherCalendarPage() {
   const router = useRouter();
-  const { user, isLoading } = useRequireRole(['dispatcher', 'admin', 'project_manager']);
+  const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
   const jobCreation = useJobCreation();
@@ -51,6 +51,13 @@ export default function DispatcherCalendarPage() {
     jobCreation.openJobCreationDialog(initialValues);
   };
 
+  // Fetch messages when selected job changes
+  useEffect(() => {
+    if (jobManagement.selectedJob) {
+      messaging.fetchMessages(jobManagement.selectedJob.id);
+    }
+  }, [jobManagement.selectedJob, messaging]);
+
   return (
     <div className="w-full overflow-x-hidden h-full">
       <CalendarView
@@ -77,7 +84,7 @@ export default function DispatcherCalendarPage() {
         onSendMessage={(content, chatType, threadId) => messaging.sendMessage(jobManagement.selectedJob?.id || '', content, chatType, threadId)}
         onEditMessage={(messageId, content) => messaging.editMessage(messageId, content)}
         onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
-        onStatusChange={() => {}}
+        onStatusChange={() => { }}
         onAssignPhotographer={jobManagement.handleAssignPhotographer}
         onChangePhotographer={jobManagement.handleChangePhotographer}
         variant="sheet"
@@ -102,7 +109,7 @@ export default function DispatcherCalendarPage() {
         onSendMessage={(content, chatType, threadId) => messaging.sendMessage(jobManagement.selectedJob?.id || '', content, chatType, threadId)}
         onEditMessage={(messageId, content) => messaging.editMessage(messageId, content)}
         onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
-        onStatusChange={() => {}}
+        onStatusChange={() => { }}
         onAssignPhotographer={jobManagement.handleAssignPhotographer}
         onChangePhotographer={jobManagement.handleChangePhotographer}
         variant="dialog"

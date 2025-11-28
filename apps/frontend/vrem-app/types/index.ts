@@ -39,7 +39,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'dispatcher' | 'photographer' | 'agent' | 'editor' | 'project_manager';
+  role: 'ADMIN' | 'PROJECT_MANAGER' | 'TECHNICIAN' | 'EDITOR' | 'AGENT';
   organizationId: string;
   organizationType?: 'media_company' | 'real_estate_team' | 'agent';
 }

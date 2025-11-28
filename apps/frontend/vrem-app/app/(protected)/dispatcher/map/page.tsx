@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { LiveJobMapView } from '@/components/features/dispatcher/views/LiveJobMapView';
-import { Photographer } from '@/types';
+import { JobRequest, Photographer } from '@/types';
 import {
   photographers as initialPhotographers,
 } from '@/lib/mock-data';
@@ -12,7 +12,7 @@ import { MapLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadin
 import { useJobManagement } from '@/context/JobManagementContext';
 
 export default function DispatcherMapPage() {
-  const { user, isLoading } = useRequireRole(['dispatcher', 'admin', 'project_manager']);
+  const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
   const router = useRouter();
   const jobManagement = useJobManagement();
   const [photographers] = useState(initialPhotographers);

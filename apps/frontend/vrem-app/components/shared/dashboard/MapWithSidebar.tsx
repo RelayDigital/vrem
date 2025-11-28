@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "../../ui/use-mobile";
 import { JobRequest, Photographer, PhotographerRanking } from "../../../types";
+import { USE_MOCK_DATA } from "../../../lib/utils";
 import { MapView } from "../map";
 import { PhotographerCard } from "../../features/photographer/PhotographerCard";
 import { PhotographerCardMinimal } from "../../features/photographer/PhotographerCardMinimal";
@@ -20,9 +21,18 @@ import {
   TrendingUp,
   Plus,
   X,
+  Filter,
+  Eye,
 } from "lucide-react";
 import { Input } from "../../ui/input";
 import { Search } from "lucide-react";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "../../ui/drawer";
 import {
   Select,
   SelectContent,
@@ -62,9 +72,9 @@ function calculateDistanceLocal(
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLng / 2) *
-    Math.sin(dLng / 2);
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -89,6 +99,7 @@ export function MapWithSidebar({
     initialJobForRankings
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [priorityOrder, setPriorityOrder] = useState<PriorityFactor[]>([
     "availability",
     "distance",
@@ -116,6 +127,7 @@ export function MapWithSidebar({
     setSelectedPhotographerId(null); // Clear selected photographer
     setJobForRankings(job);
     setSidebarView("rankings");
+    // Keep drawer open on mobile when navigating to rankings
   };
 
   const handleGoBack = () => {
@@ -125,14 +137,18 @@ export function MapWithSidebar({
       setSelectedPhotographerId(null); // Clear selected photographer
       setSidebarView("pending");
       setJobForRankings(null);
+      // Drawer stays open on mobile when going back to pending
     }
   };
+
+  // Use empty array when mock data is disabled
+  const displayPhotographers = USE_MOCK_DATA ? photographers : [];
 
   // Calculate ranked photographers when in rankings view
   const rankedPhotographers = useMemo(() => {
     if (!jobForRankings) return [];
 
-    const photographerScores = photographers
+    const photographerScores = displayPhotographers
       .filter((p) => p.status === "active")
       .map((photographer) => {
         const distanceKm = calculateDistanceLocal(
@@ -251,7 +267,7 @@ export function MapWithSidebar({
       recommended: index === 0 && item.isAvailable && item.overallScore >= 60,
       rank: index + 1,
     })) as (PhotographerRanking & { rank: number })[];
-  }, [jobForRankings, photographers, priorityOrder]);
+  }, [jobForRankings, displayPhotographers, priorityOrder]);
 
   const handleAssign = async (photographerId: string, score: number) => {
     setAssigningId(photographerId);
@@ -311,7 +327,7 @@ export function MapWithSidebar({
   const mapPhotographers =
     sidebarView === "rankings" && jobForRankings
       ? rankedPhotographers.map((r) => r.photographer)
-      : photographers;
+      : displayPhotographers;
 
   // Create a Map of photographer rankings for MapView
   const photographerRankingsMap = useMemo(() => {
@@ -334,12 +350,339 @@ export function MapWithSidebar({
     return map;
   }, [sidebarView, jobForRankings, rankedPhotographers]);
 
+  // Pending Assignments Content (reusable for both Card and Drawer)
+  const pendingAssignmentsContent = (
+    <>
+      {sidebarView === "pending" ? (
+        <>
+          {/* Pending Assignments Header */}
+          <CardHeader
+            className={`py-4 px-4 md:px-0! space-y-3 gap-0! md:relative sticky top-0 z-50 bg-background`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <H3 className="text-lg border-0">Pending Assignments</H3>
+                <Muted className="text-xs">
+                  {pendingJobs.length}{" "}
+                  {pendingJobs.length === 1 ? "job" : "jobs"}
+                </Muted>
+              </div>
+              <Badge
+                variant="outline"
+                className="text-orange-600 border-orange-200"
+              >
+                {pendingJobs.length}
+              </Badge>
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by address, client name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+          </CardHeader>
+
+          {/* Pending Jobs List - Vertical Scroll */}
+          <CardContent
+            className={`relative flex-1 p-0! min-h-0 overflow-hidden flex flex-col w-full min-w-0 max-w-full ${
+              fullScreen ? "py-4 px-4 md:px-0!" : ""
+            }`}
+          >
+            <ScrollArea className="size-full min-w-0 max-w-full overflow-x-hidden">
+              <div className="px-4 pb-4 md:px-0! md:pb-0 space-y-3 min-w-0 w-full max-w-full box-border">
+                {filteredPendingJobs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                    <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
+                    <H3 className="text-lg mb-2">All caught up!</H3>
+                    <Muted>No pending assignments</Muted>
+                  </div>
+                ) : (
+                  filteredPendingJobs.map((job) => (
+                    <div
+                      key={job.id}
+                      className="w-full min-w-0 max-w-full box-border"
+                    >
+                      <JobCard
+                        job={job}
+                        horizontal={true}
+                        hideRequirements={true}
+                        onClick={() => handleFindPhotographer(job)}
+                        onViewInProjectManagement={
+                          onNavigateToJobInProjectManagement
+                            ? () => onNavigateToJobInProjectManagement(job)
+                            : undefined
+                        }
+                        selected={selectedJob?.id === job.id}
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </>
+      ) : (
+        <>
+          {/* Ranked Photographers Header */}
+          <CardHeader
+            className={`py-4 px-4 md:px-0! space-y-3 gap-0! md:relative sticky top-0 z-50 bg-background`}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleGoBack}
+                className="h-8 w-8"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <H3 className="text-lg border-0">Ranked Photographers</H3>
+            </div>
+            {jobForRankings && (
+              <Muted className="text-xs mb-2">
+                {jobForRankings.propertyAddress}
+              </Muted>
+            )}
+            <div>
+              <Muted className="text-xs">
+                {rankedPhotographers.length} available
+              </Muted>
+            </div>
+            {/* Priority Controls */}
+            <div className="bg-background py-4 px-0! md:hidden block">
+              <div className="space-y-3">
+                {/* Priority Controls */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Small className="text-xs font-semibold text-muted-foreground">
+                      Sort Priority
+                    </Small>
+                    {priorityOrder.length < 3 && (
+                      <button
+                        onClick={handleAddPriority}
+                        className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                        type="button"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Add
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {priorityOrder.map((priority, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <div className="flex items-center justify-center rounded bg-muted text-xs font-semibold w-6 h-6">
+                          {index + 1}
+                        </div>
+                        <Select
+                          value={priority}
+                          onValueChange={(value) =>
+                            handlePriorityChange(index, value as PriorityFactor)
+                          }
+                        >
+                          <SelectTrigger className="text-xs flex-1 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="availability">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Availability
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="distance">
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-3 w-3" />
+                                Distance
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="score">
+                              <div className="flex items-center gap-2">
+                                <TrendingUp className="h-3 w-3" />
+                                Overall Score
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {priorityOrder.length > 1 && (
+                          <button
+                            onClick={() => handleRemovePriority(index)}
+                            className="flex items-center justify-center w-6 h-6 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                            type="button"
+                            aria-label="Remove priority"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+
+          {/* Ranked Photographers Content */}
+          <CardContent
+            className={`relative flex-1 p-0! min-h-0 overflow-hidden flex flex-col ${
+              fullScreen ? "py-4 px-4 md:px-0!" : ""
+            }`}
+          >
+            {jobForRankings && (
+              <div className="flex-1 min-h-0">
+                <ScrollArea
+                  key={`photographer-list-${jobForRankings?.id || "none"}`}
+                  className="h-full"
+                >
+                  <div className="space-y-0">
+                    {/* Priority Controls */}
+                    <div className="bg-background py-4 px-4 md:px-0! md:block hidden">
+                      <div className="space-y-3">
+                        {/* Priority Controls */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Small className="text-xs font-semibold text-muted-foreground">
+                              Sort Priority
+                            </Small>
+                            {priorityOrder.length < 3 && (
+                              <button
+                                onClick={handleAddPriority}
+                                className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+                                type="button"
+                              >
+                                <Plus className="h-3 w-3" />
+                                Add
+                              </button>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            {priorityOrder.map((priority, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center gap-2"
+                              >
+                                <div className="flex items-center justify-center rounded bg-muted text-xs font-semibold w-6 h-6">
+                                  {index + 1}
+                                </div>
+                                <Select
+                                  value={priority}
+                                  onValueChange={(value) =>
+                                    handlePriorityChange(
+                                      index,
+                                      value as PriorityFactor
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger className="text-xs flex-1 h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="availability">
+                                      <div className="flex items-center gap-2">
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        Availability
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="distance">
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="h-3 w-3" />
+                                        Distance
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="score">
+                                      <div className="flex items-center gap-2">
+                                        <TrendingUp className="h-3 w-3" />
+                                        Overall Score
+                                      </div>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                {priorityOrder.length > 1 && (
+                                  <button
+                                    onClick={() => handleRemovePriority(index)}
+                                    className="flex items-center justify-center w-6 h-6 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                                    type="button"
+                                    aria-label="Remove priority"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Photographer List */}
+                    <div className="py-4 px-4 md:px-0! space-y-3">
+                      {rankedPhotographers.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Muted>No photographers available</Muted>
+                        </div>
+                      ) : (
+                        rankedPhotographers.map((ranking) => {
+                          const isSelected =
+                            selectedPhotographerId === ranking.photographer.id;
+                          const isAssigning =
+                            assigningId === ranking.photographer.id;
+
+                          return (
+                            <PhotographerCardMinimal
+                              key={ranking.photographer.id}
+                              photographer={ranking.photographer}
+                              ranking={ranking.factors}
+                              score={ranking.score}
+                              recommended={ranking.recommended}
+                              selected={isSelected}
+                              isAssigning={isAssigning}
+                              onClick={() =>
+                                setSelectedPhotographerId(
+                                  ranking.photographer.id
+                                )
+                              }
+                              onCollapse={() => {
+                                // Only reset if this photographer was selected
+                                if (
+                                  selectedPhotographerId ===
+                                  ranking.photographer.id
+                                ) {
+                                  setSelectedPhotographerId(null);
+                                }
+                              }}
+                              onAssign={() =>
+                                handleAssign(
+                                  ranking.photographer.id,
+                                  ranking.score
+                                )
+                              }
+                            />
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+          </CardContent>
+        </>
+      )}
+    </>
+  );
+
   const mapContent = (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 size-full">
       {/* Map - takes most of the space on desktop, small on mobile */}
       <div
-        className={`md:col-span-3 overflow-hidden ${fullScreen ? "" : "rounded-md"
-          }`}
+        className={`${
+          isMobile ? "col-span-1" : "md:col-span-3"
+        } overflow-hidden ${fullScreen ? "" : "rounded-md"}`}
       >
         <MapView
           jobs={mapJobs}
@@ -350,272 +693,61 @@ export function MapWithSidebar({
           selectedPhotographer={
             sidebarView === "rankings" && selectedPhotographerId
               ? mapPhotographers.find((p) => p.id === selectedPhotographerId) ||
-              null
+                null
               : null
           }
           disablePopovers={isMobile}
         />
       </div>
 
-      {/* Sidebar - bottom on mobile, right on desktop */}
-      <Card
-        className={`relative col-span-1 bg-background md:border-l border-t md:border-t-0 border-border flex flex-col shrink-0 rounded-none border-x-0! border-b-0! gap-0 flex-1 min-h-0 h-full overflow-hidden ${fullScreen ? "md:p-0! md:pr-4!" : ""
+      {/* Sidebar - Drawer on mobile, Card on desktop */}
+      {isMobile ? (
+        <>
+          {/* Mobile: Drawer Button */}
+          <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
+            <DrawerTrigger asChild>
+              <Button
+                variant="default"
+                size="icon"
+                className="fixed bottom-[calc(var(--dock-h)+0.5rem)] right-2 z-50 rounded-full size-12 p-0"
+              >
+                <Eye className="size-5" />
+              </Button>
+            </DrawerTrigger>
+            <DrawerContent className="max-h-[90vh]">
+              {/* <DrawerHeader> */}
+              <DrawerTitle className="sr-only">
+                {sidebarView === "pending"
+                  ? "Pending Assignments"
+                  : "Ranked Photographers"}
+              </DrawerTitle>
+              {/* </DrawerHeader> */}
+              <div className="overflow-y-auto size-full">
+                <Card className="border-0 shadow-none">
+                  {pendingAssignmentsContent}
+                </Card>
+              </div>
+            </DrawerContent>
+          </Drawer>
+        </>
+      ) : (
+        <Card
+          className={`relative col-span-1 bg-background md:border-l border-t md:border-t-0 border-border flex flex-col shrink-0 rounded-none border-x-0! border-b-0! gap-0 flex-1 min-h-0 h-full overflow-hidden ${
+            fullScreen ? "md:p-0! md:pr-4!" : ""
           }`}
-      >
-        {sidebarView === "pending" ? (
-          <>
-            {/* Pending Assignments Header */}
-            <CardHeader className={`py-4 px-0! space-y-3 gap-0!`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <H3 className="text-lg border-0">Pending Assignments</H3>
-                  <Muted className="text-xs">
-                    {pendingJobs.length}{" "}
-                    {pendingJobs.length === 1 ? "job" : "jobs"}
-                  </Muted>
-                </div>
-                <Badge
-                  variant="outline"
-                  className="text-orange-600 border-orange-200"
-                >
-                  {pendingJobs.length}
-                </Badge>
-              </div>
-
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by address, client name..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-9"
-                />
-              </div>
-            </CardHeader>
-
-            {/* Pending Jobs List - Vertical Scroll */}
-            <CardContent
-              className={`relative flex-1 p-0! min-h-0 overflow-hidden flex flex-col w-full min-w-0 max-w-full ${fullScreen ? "py-4 px-0!" : ""
-                }`}
-            >
-              <ScrollArea className="size-full min-w-0 max-w-full overflow-x-hidden">
-                <div className="py-4 px-0! space-y-3 min-w-0 w-full max-w-full box-border">
-                  {filteredPendingJobs.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                      <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
-                      <H3 className="text-lg mb-2">All caught up!</H3>
-                      <Muted>No pending assignments</Muted>
-                    </div>
-                  ) : (
-                    filteredPendingJobs.map((job) => (
-                      <div
-                        key={job.id}
-                        className="w-full min-w-0 max-w-full box-border"
-                      >
-                        <JobCard
-                          job={job}
-                          horizontal={true}
-                          hideRequirements={true}
-                          onClick={() => handleFindPhotographer(job)}
-                          onViewInProjectManagement={
-                            onNavigateToJobInProjectManagement
-                              ? () => onNavigateToJobInProjectManagement(job)
-                              : undefined
-                          }
-                          selected={selectedJob?.id === job.id}
-                        />
-                      </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </>
-        ) : (
-          <>
-            {/* Ranked Photographers Header */}
-            <CardHeader className={`py-4 px-0! space-y-3 gap-0!`}>
-              <div className="flex items-center gap-2 mb-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleGoBack}
-                  className="h-8 w-8"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <H3 className="text-lg border-0">Ranked Photographers</H3>
-              </div>
-              {jobForRankings && (
-                <Muted className="text-xs mb-2">
-                  {jobForRankings.propertyAddress}
-                </Muted>
-              )}
-              <div>
-                <Muted className="text-xs">
-                  {rankedPhotographers.length} available
-                </Muted>
-              </div>
-            </CardHeader>
-
-            {/* Ranked Photographers Content */}
-            <CardContent
-              className={`relative flex-1 p-0! min-h-0 overflow-hidden flex flex-col ${fullScreen ? "py-4 px-0!" : ""
-                }`}
-            >
-              {jobForRankings && (
-                <div className="flex-1 min-h-0">
-                  <ScrollArea
-                    key={`photographer-list-${jobForRankings?.id || "none"}`}
-                    className="h-full"
-                  >
-                    <div className="space-y-0">
-                      {/* Priority Controls */}
-                      <div className="bg-background py-4 px-0!">
-                        <div className="space-y-3">
-                          {/* Priority Controls */}
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Small className="text-xs font-semibold text-muted-foreground">
-                                Sort Priority
-                              </Small>
-                              {priorityOrder.length < 3 && (
-                                <button
-                                  onClick={handleAddPriority}
-                                  className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
-                                  type="button"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                  Add
-                                </button>
-                              )}
-                            </div>
-                            <div className="space-y-2">
-                              {priorityOrder.map((priority, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center gap-2"
-                                >
-                                  <div className="flex items-center justify-center rounded bg-muted text-xs font-semibold w-6 h-6">
-                                    {index + 1}
-                                  </div>
-                                  <Select
-                                    value={priority}
-                                    onValueChange={(value) =>
-                                      handlePriorityChange(
-                                        index,
-                                        value as PriorityFactor
-                                      )
-                                    }
-                                  >
-                                    <SelectTrigger className="text-xs flex-1 h-8">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="availability">
-                                        <div className="flex items-center gap-2">
-                                          <CheckCircle2 className="h-3 w-3" />
-                                          Availability
-                                        </div>
-                                      </SelectItem>
-                                      <SelectItem value="distance">
-                                        <div className="flex items-center gap-2">
-                                          <MapPin className="h-3 w-3" />
-                                          Distance
-                                        </div>
-                                      </SelectItem>
-                                      <SelectItem value="score">
-                                        <div className="flex items-center gap-2">
-                                          <TrendingUp className="h-3 w-3" />
-                                          Overall Score
-                                        </div>
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  {priorityOrder.length > 1 && (
-                                    <button
-                                      onClick={() =>
-                                        handleRemovePriority(index)
-                                      }
-                                      className="flex items-center justify-center w-6 h-6 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                                      type="button"
-                                      aria-label="Remove priority"
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Photographer List */}
-                      <div className="py-4 px-0! space-y-3">
-                        {rankedPhotographers.length === 0 ? (
-                          <div className="text-center py-8">
-                            <Muted>No photographers available</Muted>
-                          </div>
-                        ) : (
-                          rankedPhotographers.map((ranking) => {
-                            const isSelected =
-                              selectedPhotographerId ===
-                              ranking.photographer.id;
-                            const isAssigning =
-                              assigningId === ranking.photographer.id;
-
-                            return (
-                              <PhotographerCardMinimal
-                                key={ranking.photographer.id}
-                                photographer={ranking.photographer}
-                                ranking={ranking.factors}
-                                score={ranking.score}
-                                recommended={ranking.recommended}
-                                selected={isSelected}
-                                isAssigning={isAssigning}
-                                onClick={() =>
-                                  setSelectedPhotographerId(
-                                    ranking.photographer.id
-                                  )
-                                }
-                                onCollapse={() => {
-                                  // Only reset if this photographer was selected
-                                  if (
-                                    selectedPhotographerId ===
-                                    ranking.photographer.id
-                                  ) {
-                                    setSelectedPhotographerId(null);
-                                  }
-                                }}
-                                onAssign={() =>
-                                  handleAssign(
-                                    ranking.photographer.id,
-                                    ranking.score
-                                  )
-                                }
-                              />
-                            );
-                          })
-                        )}
-                      </div>
-                    </div>
-                  </ScrollArea>
-                </div>
-              )}
-            </CardContent>
-          </>
-        )}
-      </Card>
+        >
+          {pendingAssignmentsContent}
+        </Card>
+      )}
     </div>
   );
 
   if (fullScreen) {
     return (
       <div
-        className={`${className || "size-full"
-          } overflow-hidden flex flex-col h-full`}
+        className={`${
+          className || "size-full"
+        } overflow-hidden flex flex-col h-full`}
       >
         {mapContent}
       </div>

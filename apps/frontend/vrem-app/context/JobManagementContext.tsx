@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { JobRequest } from '@/types';
-import { jobRequests as initialJobRequests } from '@/lib/mock-data';
+import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface JobManagementContextType {
@@ -10,22 +10,22 @@ interface JobManagementContextType {
   jobs: JobRequest[];
   getJobById: (jobId: string) => JobRequest | undefined;
   updateJob: (jobId: string, updates: Partial<JobRequest>) => void;
-  
+
   // Job handlers
   assignJob: (jobId: string, photographerId: string, score: number) => void;
   changeJobStatus: (jobId: string, newStatus: JobRequest['status']) => void;
   createJob: (job: Partial<JobRequest>) => JobRequest;
-  
+
   // Job selection
   selectedJob: JobRequest | null;
   selectJob: (job: JobRequest | null) => void;
   toggleJobSelection: (job: JobRequest) => void;
-  
+
   // Rankings
   showRankings: boolean;
   openRankings: (job: JobRequest) => void;
   closeRankings: () => void;
-  
+
   // Task view
   showTaskView: boolean;
   showTaskDialog: boolean;
@@ -35,7 +35,7 @@ interface JobManagementContextType {
   closeTaskDialog: () => void;
   handleTaskViewClose: (open: boolean) => void;
   handleTaskDialogClose: (open: boolean) => void;
-  
+
   // Photographer assignment handlers
   handleAssignPhotographer: () => void;
   handleChangePhotographer: () => void;
@@ -43,46 +43,47 @@ interface JobManagementContextType {
 
 const JobManagementContext = createContext<JobManagementContextType | undefined>(undefined);
 
-export function JobManagementProvider({ 
+export function JobManagementProvider({
   children,
   defaultUserId,
   defaultOrganizationId,
-}: { 
+}: {
   children: ReactNode;
   defaultUserId?: string;
   defaultOrganizationId?: string;
 }) {
-  const [jobs, setJobs] = useState<JobRequest[]>(initialJobRequests);
+  const [jobs, setJobs] = useState<JobRequest[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobRequest | null>(null);
   const [showRankings, setShowRankings] = useState(false);
   const [showTaskView, setShowTaskView] = useState(false);
   const [showTaskDialog, setShowTaskDialog] = useState(false);
 
-  // Load jobs from localStorage on mount
+  // Load jobs from API on mount
   useEffect(() => {
-    const storedJobs = localStorage.getItem('dispatcherJobs');
-    if (storedJobs) {
+    const fetchJobs = async () => {
       try {
-        const parsedJobs: JobRequest[] = JSON.parse(storedJobs);
-        // Convert date strings back to Date objects
-        const jobsWithDates = parsedJobs.map((job) => ({
+        const fetchedJobs = await api.jobs.getAll();
+        // Ensure dates are Date objects
+        const jobsWithDates = fetchedJobs.map((job) => ({
           ...job,
           createdAt: new Date(job.createdAt),
           scheduledDate: job.scheduledDate,
           scheduledTime: job.scheduledTime,
           assignedAt: job.assignedAt ? new Date(job.assignedAt) : undefined,
+          completedAt: job.completedAt ? new Date(job.completedAt) : undefined,
         }));
         setJobs(jobsWithDates);
       } catch (error) {
-        console.error('Error loading jobs from localStorage:', error);
+        console.error('Error fetching jobs:', error);
+        toast.error('Failed to load jobs');
       }
-    }
+    };
+
+    fetchJobs();
   }, []);
 
-  // Save jobs to localStorage whenever they change
+  // Dispatch event for real-time updates whenever jobs change
   useEffect(() => {
-    localStorage.setItem('dispatcherJobs', JSON.stringify(jobs));
-    // Dispatch event for real-time updates
     window.dispatchEvent(new CustomEvent('jobsUpdated', { detail: jobs }));
   }, [jobs]);
 
@@ -122,7 +123,7 @@ export function JobManagementProvider({
     setShowRankings(false);
     setSelectedJob(null);
     toast.success('Photographer assigned successfully');
-    
+
     // Dispatch event
     window.dispatchEvent(new CustomEvent('jobAssigned', {
       detail: { jobId, photographerId, score }
@@ -134,7 +135,7 @@ export function JobManagementProvider({
     newStatus: JobRequest['status']
   ) => {
     updateJob(jobId, { status: newStatus });
-    
+
     // Dispatch event
     window.dispatchEvent(new CustomEvent('jobStatusChanged', {
       detail: { jobId, newStatus }
@@ -160,7 +161,7 @@ export function JobManagementProvider({
       createdAt: new Date(),
       propertyImage: job.propertyImage || 'https://images.unsplash.com/photo-1706808849780-7a04fbac83ef?w=800',
     };
-    
+
     setJobs((prev) => [newJob, ...prev]);
     return newJob;
   }, [jobs.length, defaultUserId, defaultOrganizationId]);

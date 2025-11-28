@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { H2 } from '@/components/ui/typography';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { useIsMobile } from '@/components/ui/use-mobile';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +37,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { JobRequestForm } from '@/components/shared/jobs';
 import { useJobCreation } from '@/context/JobCreationContext';
+import { useAuth } from '@/context/auth-context';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ChatMessage } from '@/types/chat';
@@ -48,7 +50,9 @@ interface AppHeaderProps {
 
 export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobClick }: AppHeaderProps) {
   const { theme, setTheme } = useTheme();
+  const { logout } = useAuth();
   const jobCreation = useJobCreation();
+  const isMobile = useIsMobile();
   const [jobs, setJobs] = useState(initialJobRequests);
   const [photographers] = useState(initialPhotographers);
   const [selectedJob, setSelectedJob] = useState<JobRequest | null>(null);
@@ -118,11 +122,11 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
   };
 
   const handleSettingsClick = () => {
-    if (user.role === 'dispatcher') {
+    if (user.role === 'ADMIN' as any || user.role === 'PROJECT_MANAGER' as any || user.role === 'EDITOR' as any) {
       router.push('/dispatcher/settings');
-    } else if (user.role === 'agent') {
+    } else if (user.role === 'AGENT' as any) {
       router.push('/agent/settings');
-    } else if (user.role === 'photographer') {
+    } else if (user.role === 'PHOTOGRAPHER' as any || user.role === 'TECHNICIAN' as any) {
       router.push('/photographer/settings');
     } else {
       router.push('/settings');
@@ -130,8 +134,10 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
   };
 
   const handleLogout = () => {
+    // Clear any additional localStorage items
     localStorage.removeItem('accountType');
-    window.location.replace('/');
+    // Use the auth context logout function which handles token removal and navigation
+    logout();
   };
 
   return (
@@ -141,12 +147,12 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <H2 className="p-0 border-0">VX Media</H2>
-              {user.role === 'dispatcher' && <SidebarTrigger />}
+              {!isMobile && (user.role === 'ADMIN' || user.role === 'PROJECT_MANAGER' || user.role === 'EDITOR') && <SidebarTrigger />}
             </div>
 
             <div className="flex items-center gap-4">
               {/* Agent View Switcher */}
-              {user.role === 'agent' && (
+              {user.role === 'AGENT' as any && (
                 <div className="flex items-center gap-2">
                   <Button
                     variant={isAgentJobsView ? "default" : "muted"}
@@ -166,7 +172,7 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
               )}
 
               {/* Photographer View Switcher */}
-              {(user.role === 'photographer') && (
+              {(user.role === 'PHOTOGRAPHER' as any || user.role === 'TECHNICIAN' as any) && (
                 <div className="flex items-center gap-2">
                   <Button
                     variant={isPhotographerJobsView ? "default" : "muted"}
@@ -196,7 +202,7 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
               )}
 
               {/* New Job Button for Dispatcher */}
-              {showNewJobButton && user.role === 'dispatcher' && (
+              {showNewJobButton && user.role === 'ADMIN' as any || user.role === 'PROJECT_MANAGER' as any || user.role === 'EDITOR' as any && (
                 <Button
                   onClick={handleNewJobClick}
                   size="sm"

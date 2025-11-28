@@ -16,11 +16,15 @@ export function PhotographerManagement({
     (p) => p.status === "active"
   );
   const avgRating =
-    photographers.reduce((sum, p) => sum + p.rating.overall, 0) /
-    photographers.length;
+    photographers.length > 0
+      ? photographers.reduce((sum, p) => sum + p.rating.overall, 0) /
+        photographers.length
+      : 0;
   const avgOnTimeRate =
-    photographers.reduce((sum, p) => sum + p.reliability.onTimeRate, 0) /
-    photographers.length;
+    photographers.length > 0
+      ? photographers.reduce((sum, p) => sum + p.reliability.onTimeRate, 0) /
+        photographers.length
+      : 0;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

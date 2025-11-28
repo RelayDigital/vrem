@@ -8,7 +8,7 @@ import { JobTaskView } from '@/components/shared/tasks/JobTaskView';
 import { JobRequest } from '@/types';
 import {
   photographers as initialPhotographers,
-  metrics,
+  metrics, // Mock data - stats/metrics are currently using mock data
 } from '@/lib/mock-data';
 import { DashboardLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -20,7 +20,7 @@ import { useDispatcherNavigation } from '@/context/DispatcherNavigationContext';
 
 export default function DispatcherDashboardPage() {
   const router = useRouter();
-  const { user, isLoading } = useRequireRole(['dispatcher', 'admin', 'project_manager']);
+  const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
   const jobCreation = useJobCreation();
   const messaging = useMessaging();
   const jobManagement = useJobManagement();
@@ -61,7 +61,7 @@ export default function DispatcherDashboardPage() {
       <DashboardView
         jobs={jobManagement.jobs}
         photographers={photographers}
-        metrics={metrics}
+        metrics={metrics} // Mock data - stats section uses mock metrics
         selectedJob={jobManagement.selectedJob}
         onViewRankings={handleViewRankings}
         onSelectJob={handleJobSelect}

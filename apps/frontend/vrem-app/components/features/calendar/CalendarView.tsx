@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { JobRequest, Technician, Photographer } from "@/types";
+import { USE_MOCK_DATA } from "@/lib/utils";
 import {
   CalendarEvent,
   CalendarView as ViewType,
@@ -57,7 +58,9 @@ export function CalendarView({
   onCreateJob,
 }: CalendarViewProps) {
   // Use technicians if provided, fallback to photographers for backwards compatibility
-  const effectiveTechnicians = technicians || photographers || [];
+  // Use empty array when mock data is disabled
+  const baseTechnicians = technicians || photographers || [];
+  const effectiveTechnicians = USE_MOCK_DATA ? baseTechnicians : [];
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>("week");
   const [timezone, setTimezone] = useState("America/Edmonton");
@@ -85,25 +88,8 @@ export function CalendarView({
       jobToCalendarEvent(job)
     );
 
-    // Add some mock external events for demonstration
-    const externalEvents: CalendarEvent[] = [
-      {
-        id: "ext-1",
-        title: "External Meeting",
-        start: new Date(
-          currentDate.getTime() + 2 * 24 * 60 * 60 * 1000
-        ).toISOString(),
-        end: new Date(
-          currentDate.getTime() + 2 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000
-        ).toISOString(),
-        type: "External",
-        externalSource: "Google Calendar",
-        technicianId: effectiveTechnicians[0]?.id,
-      },
-    ];
-
-    return [...jobEvents, ...externalEvents];
-  }, [jobs, currentDate, effectiveTechnicians]);
+    return jobEvents;
+  }, [jobs]);
 
   // Apply filters
   const filteredEvents = useMemo(() => {
@@ -296,13 +282,13 @@ export function CalendarView({
               <Button
                 variant="default"
                 size="icon"
-                className="fixed bottom-2 right-2 z-50 rounded-full size-12 p-0"
+                className="fixed bottom-[calc(var(--dock-h)+0.5rem)] right-2 z-50 rounded-full size-12 p-0"
               >
                 <Filter className="size-5" />
               </Button>
             </DrawerTrigger>
             <DrawerContent>
-              <DrawerHeader>
+              <DrawerHeader className="sr-only">
                 <DrawerTitle>Filters</DrawerTitle>
               </DrawerHeader>
               <div className="overflow-y-scroll size-full">{sidebarContent}</div>
