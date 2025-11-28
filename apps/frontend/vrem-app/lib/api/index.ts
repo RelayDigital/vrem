@@ -10,7 +10,7 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || '';
-const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
+const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA;
 
 class ApiClient {
   private baseUrl: string;
