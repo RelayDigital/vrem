@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { ChatMessage } from '@/types/chat';
 import { api } from '@/lib/api';
+import { chatSocket } from '@/lib/chat-socket';
 import { toast } from 'sonner';
 
 interface MessagingContextType {
@@ -45,6 +46,30 @@ export function MessagingProvider({
   const [currentUserId, setCurrentUserId] = useState<string | undefined>(defaultUserId);
   const [currentUserName, setCurrentUserName] = useState<string | undefined>(defaultUserName);
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | undefined>(defaultUserAvatar);
+  const [connected, setConnected] = useState(false);
+
+  // Establish socket connection on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    chatSocket.connect();
+    setConnected(true);
+    return () => {
+      chatSocket.disconnect();
+      setConnected(false);
+    };
+  }, []);
+
+  // Subscribe to incoming messages
+  useEffect(() => {
+    const handler = (incoming: ChatMessage) => {
+      setMessages((prev) => {
+        const exists = prev.some((m) => m.id === incoming.id);
+        return exists ? prev : [...prev, incoming];
+      });
+    };
+    chatSocket.onMessage(handler);
+    return () => chatSocket.offMessage(handler);
+  }, []);
 
   const getMessagesForJob = useCallback((jobId: string): ChatMessage[] => {
     return messages.filter((msg) => msg.jobId === jobId);
@@ -64,11 +89,18 @@ export function MessagingProvider({
         const otherMessages = prev.filter((msg) => msg.jobId !== jobId);
         return [...otherMessages, ...processedMessages];
       });
+
+      // Join project room for realtime updates
+      if (connected) {
+        chatSocket.joinProject(jobId).catch(() => {
+          // silently ignore join errors for now
+        });
+      }
     } catch (error) {
       console.error('Error fetching messages:', error);
       // Don't show toast here to avoid spamming if called frequently
     }
-  }, []);
+  }, [connected]);
 
   const sendMessage = useCallback(async (
     jobId: string,
@@ -82,30 +114,34 @@ export function MessagingProvider({
     }
 
     try {
-      const response = await api.chat.sendMessage(jobId, content);
+      let newMessage: ChatMessage | null = null;
 
-      const newMessage: ChatMessage = {
-        ...response,
-        jobId,
-        userId: currentUserId,
-        userName: currentUserName,
-        userAvatar: currentUserAvatar,
-        content,
-        chatType,
-        threadId,
-        // Ensure createdAt is a Date object
-        createdAt: new Date(response.createdAt || new Date()),
-      };
+      if (connected) {
+        newMessage = await chatSocket.sendMessage(jobId, content);
+      } else {
+        const response = await api.chat.sendMessage(jobId, content);
+        newMessage = {
+          ...response,
+          jobId,
+          userId: currentUserId,
+          userName: currentUserName,
+          userAvatar: currentUserAvatar,
+          content,
+          chatType,
+          threadId,
+          createdAt: new Date(response.createdAt || new Date()),
+        };
+      }
 
-      setMessages((prev) => [...prev, newMessage]);
-
-      // Dispatch event for real-time updates
-      window.dispatchEvent(new CustomEvent('messageCreated', { detail: newMessage }));
+      if (newMessage) {
+        setMessages((prev) => [...prev, newMessage!]);
+        window.dispatchEvent(new CustomEvent('messageCreated', { detail: newMessage }));
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message');
     }
-  }, [currentUserId, currentUserName, currentUserAvatar]);
+  }, [connected, currentUserId, currentUserName, currentUserAvatar]);
 
   const editMessage = useCallback((messageId: string, content: string) => {
     setMessages((prev) =>
@@ -188,4 +224,3 @@ export function useMessaging() {
   }
   return context;
 }
-

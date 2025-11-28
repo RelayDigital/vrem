@@ -1,6 +1,6 @@
 'use client';
 
-import { User } from '@/types';
+import { User, Project } from '@/types';
 import {
   JobRequest,
   Technician,
@@ -12,7 +12,8 @@ import { DispatcherDashboard } from '../dispatcher/DispatcherDashboard';
 
 interface DashboardViewProps {
   user: User;
-  jobs: JobRequest[];
+  projects: Project[];
+  jobCards: JobRequest[];
   photographers: Technician[];
   auditLog: AuditLogEntry[];
   metrics: Metrics;
@@ -20,12 +21,13 @@ interface DashboardViewProps {
 
 export function DashboardView({
   user,
-  jobs: initialJobs,
+  projects: _projects,
+  jobCards,
   photographers: initialPhotographers,
   auditLog: initialAuditLog,
   metrics: initialMetrics
 }: DashboardViewProps) {
-  const [jobs] = useState(initialJobs);
+  const [jobs] = useState(jobCards);
   const [photographers] = useState(initialPhotographers);
   const [auditLog] = useState(initialAuditLog);
   const [metrics] = useState(initialMetrics);
@@ -58,4 +60,3 @@ export function DashboardView({
     />
   );
 }
-

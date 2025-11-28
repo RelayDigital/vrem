@@ -298,24 +298,30 @@ export function JobRequestForm({
       return;
     }
 
-    // Geocode address if location is not set (manually typed address)
+    // Always geocode on submit to ensure address and location are in sync
     let location = formData.location;
     let addressToUse = formData.propertyAddress.trim();
     
-    if (!location && formData.propertyAddress.trim()) {
+    if (formData.propertyAddress.trim()) {
       const trimmedAddress = formData.propertyAddress.trim();
       toast.loading("Geocoding address...", { id: "geocoding" });
       
       const geocodedResult = await geocodeAddress(trimmedAddress);
       
       if (geocodedResult) {
+        // Always use the geocoded location and standardized address to ensure they match
         location = { lat: geocodedResult.lat, lng: geocodedResult.lng };
-        addressToUse = geocodedResult.placeName; // Use corrected address
+        addressToUse = geocodedResult.placeName; // Use standardized address from Mapbox
         toast.success("Address geocoded successfully", { id: "geocoding" });
       } else {
-        toast.error("Could not find location for this address. Using default location.", { id: "geocoding" });
-        // Fallback to default location if geocoding fails
-        location = { lat: 51.0447, lng: -114.0719 };
+        // If geocoding fails, use existing location if available, otherwise default
+        if (!location) {
+          toast.error("Could not find location for this address. Using default location.", { id: "geocoding" });
+          location = { lat: 51.0447, lng: -114.0719 };
+        } else {
+          toast.dismiss("geocoding");
+          // Keep existing location and address as-is if geocoding fails
+        }
       }
     }
 

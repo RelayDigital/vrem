@@ -7,13 +7,15 @@ import { JobCreationProvider, useJobCreation } from '@/context/JobCreationContex
 import { MessagingProvider } from '@/context/MessagingContext';
 import { JobManagementProvider, useJobManagement } from '@/context/JobManagementContext';
 import { ReactNode } from 'react';
+import { api } from '@/lib/api';
+import { JobRequest, Project } from '@/types';
 
 export default function AgentLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useRequireRole(['AGENT', 'ADMIN', 'PROJECT_MANAGER']);
+  const { user, isLoading, organizationId } = useRequireRole(['AGENT', 'ADMIN', 'PROJECT_MANAGER']);
 
   if (isLoading) {
     return (
@@ -54,11 +56,11 @@ export default function AgentLayout({
   return (
     <JobManagementProvider
       defaultUserId={user?.id}
-      defaultOrganizationId={user?.organizationId}
+      defaultOrganizationId={organizationId || undefined}
     >
       <JobCreationProviderWrapper
         defaultUserId={user?.id}
-        defaultOrganizationId={user?.organizationId}
+        defaultOrganizationId={organizationId || undefined}
       >
         <MessagingProvider
           defaultUserId={user?.id}
@@ -84,12 +86,30 @@ function JobCreationProviderWrapper({
   defaultOrganizationId?: string;
 }) {
   const jobManagement = useJobManagement();
-  
+
+  const handleCreateJob = async (job: Partial<JobRequest>): Promise<JobRequest> => {
+    // Map JobRequest (View Model) to Project (Domain)
+    const projectData: Partial<Project> = {
+      address: job.propertyAddress,
+      scheduledTime: job.scheduledDate && job.scheduledTime
+        ? new Date(`${job.scheduledDate}T${job.scheduledTime}`)
+        : undefined,
+      // Map other fields as needed
+      notes: job.requirements,
+      agentId: job.createdBy,
+      orgId: job.organizationId || defaultOrganizationId,
+      // ... copy other matching fields if any
+    };
+
+    const newProject = await jobManagement.createJob(projectData);
+    return api.mapProjectToJobCard(newProject);
+  };
+
   return (
-    <JobCreationProvider 
+    <JobCreationProvider
       defaultUserId={defaultUserId}
       defaultOrganizationId={defaultOrganizationId}
-      createJobHandler={jobManagement.createJob}
+      createJobHandler={handleCreateJob}
     >
       {children}
     </JobCreationProvider>
@@ -109,7 +129,7 @@ function AgentLayoutContent({
       <div className="fixed top-0 left-0 right-0 z-50">
         <AppHeader user={user} />
       </div>
-      
+
       {/* Main Content */}
       <main className="pt-header-h">
         {children}
@@ -117,4 +137,3 @@ function AgentLayoutContent({
     </>
   );
 }
-

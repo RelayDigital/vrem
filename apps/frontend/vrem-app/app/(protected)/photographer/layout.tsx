@@ -7,13 +7,15 @@ import { JobCreationProvider, useJobCreation } from '@/context/JobCreationContex
 import { MessagingProvider } from '@/context/MessagingContext';
 import { JobManagementProvider, useJobManagement } from '@/context/JobManagementContext';
 import { ReactNode } from 'react';
+import { api } from '@/lib/api';
+import { JobRequest, Project } from '@/types';
 
 export default function PhotographerLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useRequireRole(['TECHNICIAN', 'photographer', 'ADMIN', 'PROJECT_MANAGER']);
+  const { user, isLoading, organizationId } = useRequireRole(['TECHNICIAN', 'photographer', 'ADMIN', 'PROJECT_MANAGER']);
 
   if (isLoading) {
     return (
@@ -55,11 +57,11 @@ export default function PhotographerLayout({
   return (
     <JobManagementProvider
       defaultUserId={user?.id}
-      defaultOrganizationId={user?.organizationId}
+      defaultOrganizationId={organizationId || undefined}
     >
       <JobCreationProviderWrapper
         defaultUserId={user?.id}
-        defaultOrganizationId={user?.organizationId}
+        defaultOrganizationId={organizationId || undefined}
       >
         <MessagingProvider
           defaultUserId={user?.id}
@@ -85,12 +87,28 @@ function JobCreationProviderWrapper({
   defaultOrganizationId?: string;
 }) {
   const jobManagement = useJobManagement();
+
+  const handleCreateJob = async (job: Partial<JobRequest>): Promise<JobRequest> => {
+    // Map JobRequest (View Model) to Project (Domain)
+    const projectData: Partial<Project> = {
+      address: job.propertyAddress,
+      scheduledTime: job.scheduledDate && job.scheduledTime
+        ? new Date(`${job.scheduledDate}T${job.scheduledTime}`)
+        : undefined,
+      notes: job.requirements,
+      agentId: job.createdBy,
+      orgId: job.organizationId || defaultOrganizationId,
+    };
+
+    const newProject = await jobManagement.createJob(projectData);
+    return api.mapProjectToJobCard(newProject);
+  };
   
   return (
     <JobCreationProvider 
       defaultUserId={defaultUserId}
       defaultOrganizationId={defaultOrganizationId}
-      createJobHandler={jobManagement.createJob}
+      createJobHandler={handleCreateJob}
     >
       {children}
     </JobCreationProvider>
@@ -118,4 +136,3 @@ function PhotographerLayoutContent({
     </>
   );
 }
-

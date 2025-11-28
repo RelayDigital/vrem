@@ -31,7 +31,7 @@ const selectTriggerVariants = cva(
     variants: {
       variant: {
         default:
-          "border-input bg-input-background dark:bg-input/30 dark:hover:bg-input/50",
+          "border-input bg-input-background dark:bg-input/30 border px-3 py-1",
         outline:
           "border-2 bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50",
         ghost:

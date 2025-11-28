@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from '@/types';
 import { useAuth } from '@/context/auth-context';
+import { OrganizationMember } from '@/types';
 
 interface UseRequireRoleOptions {
   redirectTo?: string;
@@ -11,6 +12,8 @@ interface UseRequireRoleOptions {
 
 interface UseRequireRoleReturn {
   user: User | null;
+  organizationId: string | null;
+  memberships: OrganizationMember[];
   isLoading: boolean;
 }
 
@@ -38,7 +41,7 @@ export function useRequireRole(
   options: UseRequireRoleOptions = {}
 ): UseRequireRoleReturn {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, activeOrganizationId, memberships } = useAuth();
 
   useEffect(() => {
     if (isLoading) return;
@@ -81,5 +84,5 @@ export function useRequireRole(
     }
   }, [user, isLoading, allowedRoles, router, options.redirectTo]);
 
-  return { user, isLoading };
+  return { user, organizationId: activeOrganizationId, memberships, isLoading };
 }

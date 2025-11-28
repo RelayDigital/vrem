@@ -1,18 +1,16 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { useRequireRole } from '@/hooks/useRequireRole';
-import { JobsView } from '@/components/features/dispatcher/views/JobsView';
-import { JobTaskView } from '@/components/shared/tasks/JobTaskView';
-import { Photographer } from '@/types';
-import {
-  photographers as initialPhotographers,
-} from '@/lib/mock-data';
-import { useJobManagement } from '@/context/JobManagementContext';
-import { useMessaging } from '@/context/MessagingContext';
-import { JobsLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRequireRole } from "@/hooks/useRequireRole";
+import { JobsView } from "@/components/features/dispatcher/views/JobsView";
+import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
+import { Photographer, ProjectStatus } from "@/types";
+import { photographers as initialPhotographers } from "@/lib/mock-data";
+import { useJobManagement } from "@/context/JobManagementContext";
+import { useMessaging } from "@/context/MessagingContext";
+import { JobsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -20,13 +18,18 @@ import {
   BreadcrumbLink,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
-import { useSidebar } from '@/components/ui/sidebar';
-import { useIsMobile } from '@/components/ui/use-mobile';
+} from "@/components/ui/breadcrumb";
+import { useSidebar } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/components/ui/use-mobile";
 
 export default function ProjectManagementPage() {
   const router = useRouter();
-  const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
+  const { user, isLoading } = useRequireRole([
+    "dispatcher",
+    "ADMIN" as any,
+    "PROJECT_MANAGER" as any,
+    "EDITOR" as any,
+  ]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
   const [photographers] = useState(initialPhotographers);
@@ -41,21 +44,25 @@ export default function ProjectManagementPage() {
     sidebarOpen = sidebar.open;
   } catch {
     // Not within SidebarProvider, use defaults
-    sidebarState = 'expanded';
+    sidebarState = "expanded";
     sidebarOpen = true;
   }
 
   // Calculate left offset based on sidebar state
   // When collapsed to icon: 3rem (48px), when expanded: 16rem (256px)
   // On mobile, no offset (sidebar doesn't affect layout)
-  const leftOffset = isMobile ? '0' : (sidebarState === 'collapsed' ? '3rem' : '16rem');
+  const leftOffset = isMobile
+    ? "0"
+    : sidebarState === "collapsed"
+    ? "3rem"
+    : "16rem";
 
   // Trigger resize when sidebar state changes
   useEffect(() => {
     // Small delay to ensure DOM has updated after sidebar transition
     const timeoutId = setTimeout(() => {
       // Trigger resize event
-      window.dispatchEvent(new Event('resize'));
+      window.dispatchEvent(new Event("resize"));
     }, 250); // Match sidebar transition duration (200ms) + buffer
 
     return () => clearTimeout(timeoutId);
@@ -71,9 +78,15 @@ export default function ProjectManagementPage() {
       }
     };
 
-    window.addEventListener('openJobTaskView', handleOpenJobTaskView as EventListener);
+    window.addEventListener(
+      "openJobTaskView",
+      handleOpenJobTaskView as EventListener
+    );
     return () => {
-      window.removeEventListener('openJobTaskView', handleOpenJobTaskView as EventListener);
+      window.removeEventListener(
+        "openJobTaskView",
+        handleOpenJobTaskView as EventListener
+      );
     };
   }, [jobManagement]);
 
@@ -89,7 +102,6 @@ export default function ProjectManagementPage() {
   const handleViewRankings = jobManagement.openRankings;
   const handleJobAssign = jobManagement.assignJob;
   const handleJobClick = jobManagement.openTaskView;
-  const handleJobStatusChange = jobManagement.changeJobStatus;
   const handleFullScreen = jobManagement.openTaskDialog;
   const handleTaskDialogClose = jobManagement.handleTaskDialogClose;
   const handleOpenInNewPage = () => {
@@ -99,69 +111,101 @@ export default function ProjectManagementPage() {
   };
   const handleTaskViewClose = jobManagement.handleTaskViewClose;
 
+  // Wrapper to convert JobRequest status to ProjectStatus
+  const handleJobStatusChangeWrapper = (jobId: string, status: string) => {
+    const statusMap: Record<string, ProjectStatus> = {
+      'pending': ProjectStatus.BOOKED,
+      'assigned': ProjectStatus.SHOOTING,
+      'in_progress': ProjectStatus.SHOOTING,
+      'editing': ProjectStatus.EDITING,
+      'delivered': ProjectStatus.DELIVERED,
+      'cancelled': ProjectStatus.BOOKED,
+    };
+    jobManagement.changeJobStatus(jobId, statusMap[status] || ProjectStatus.BOOKED);
+  };
+
+  // Wrapper for JobTaskView onStatusChange (only receives status, not jobId)
+  const handleTaskViewStatusChange = (status: string) => {
+    if (jobManagement.selectedJob) {
+      handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
+    }
+  };
+
   return (
     <>
-    <div
-      className="fixed overflow-hidden transition-[left] duration-200 ease-linear flex flex-col"
-      style={{
-        top: 'var(--header-h)',
-        left: leftOffset,
-        right: 0,
-        bottom: 0,
-        height: 'calc(100vh - var(--header-h))'
-      }}
-    >
-      <div className="container relative mx-auto px-md pt-md shrink-0">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/dispatcher/jobs/all">Jobs</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>Project Management</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+      <div
+        className="fixed overflow-hidden transition-[left] duration-200 ease-linear flex flex-col"
+        style={{
+          top: "var(--header-h)",
+          left: leftOffset,
+          right: 0,
+          bottom: 0,
+          height: "calc(100vh - var(--header-h))",
+        }}
+      >
+        <div className="container relative mx-auto px-md pt-md shrink-0">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/dispatcher/jobs/all">Jobs</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Project Management</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <JobsView
+            jobs={jobManagement.jobs}
+            photographers={photographers}
+            messages={messaging.messages}
+            onViewRankings={handleViewRankings}
+            onChangePhotographer={handleViewRankings}
+            onJobStatusChange={handleJobStatusChangeWrapper}
+            onJobClick={handleJobClick}
+            activeView="kanban"
+          />
+        </div>
       </div>
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
-        <JobsView
-        jobs={jobManagement.jobs}
-        photographers={photographers}
-        messages={messaging.messages}
-        onViewRankings={handleViewRankings}
-        onChangePhotographer={handleViewRankings}
-        onJobStatusChange={handleJobStatusChange}
-        onJobClick={handleJobClick}
-        activeView="kanban"
-      />
-      </div>
-    </div>
 
-    {/* Job Task View - Sheet */}
-    <JobTaskView
+      {/* Job Task View - Sheet */}
+      <JobTaskView
         job={jobManagement.selectedJob}
         photographer={
           jobManagement.selectedJob?.assignedPhotographerId
-            ? photographers.find((p) => p.id === jobManagement.selectedJob?.assignedPhotographerId)
+            ? photographers.find(
+                (p) =>
+                  p.id === jobManagement.selectedJob?.assignedPhotographerId
+              )
             : undefined
         }
-        messages={jobManagement.selectedJob ? messaging.getMessagesForJob(jobManagement.selectedJob.id) : []}
-        currentUserId={user?.id || 'current-user-id'}
-        currentUserName={user?.name || 'Current User'}
+        messages={
+          jobManagement.selectedJob
+            ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
+            : []
+        }
+        currentUserId={user?.id || "current-user-id"}
+        currentUserName={user?.name || "Current User"}
         isClient={false}
         open={jobManagement.showTaskView}
         onOpenChange={handleTaskViewClose}
-        onSendMessage={(content, chatType, threadId) => messaging.sendMessage(jobManagement.selectedJob?.id || '', content, chatType, threadId)}
-        onEditMessage={(messageId, content) => messaging.editMessage(messageId, content)}
+        onSendMessage={(content, chatType, threadId) =>
+          messaging.sendMessage(
+            jobManagement.selectedJob?.id || "",
+            content,
+            chatType,
+            threadId
+          )
+        }
+        onEditMessage={(messageId, content) =>
+          messaging.editMessage(messageId, content)
+        }
         onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
-        onStatusChange={(status) => {
-          if (jobManagement.selectedJob) {
-            handleJobStatusChange(jobManagement.selectedJob.id, status);
-          }
-        }}
+        onStatusChange={handleTaskViewStatusChange}
         onAssignPhotographer={jobManagement.handleAssignPhotographer}
         onChangePhotographer={jobManagement.handleChangePhotographer}
         variant="sheet"
@@ -174,23 +218,35 @@ export default function ProjectManagementPage() {
         job={jobManagement.selectedJob}
         photographer={
           jobManagement.selectedJob?.assignedPhotographerId
-            ? photographers.find((p) => p.id === jobManagement.selectedJob?.assignedPhotographerId)
+            ? photographers.find(
+                (p) =>
+                  p.id === jobManagement.selectedJob?.assignedPhotographerId
+              )
             : undefined
         }
-        messages={jobManagement.selectedJob ? messaging.getMessagesForJob(jobManagement.selectedJob.id) : []}
-        currentUserId={user?.id || 'current-user-id'}
-        currentUserName={user?.name || 'Current User'}
+        messages={
+          jobManagement.selectedJob
+            ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
+            : []
+        }
+        currentUserId={user?.id || "current-user-id"}
+        currentUserName={user?.name || "Current User"}
         isClient={false}
         open={jobManagement.showTaskDialog}
         onOpenChange={handleTaskDialogClose}
-        onSendMessage={(content, chatType, threadId) => messaging.sendMessage(jobManagement.selectedJob?.id || '', content, chatType, threadId)}
-        onEditMessage={(messageId, content) => messaging.editMessage(messageId, content)}
+        onSendMessage={(content, chatType, threadId) =>
+          messaging.sendMessage(
+            jobManagement.selectedJob?.id || "",
+            content,
+            chatType,
+            threadId
+          )
+        }
+        onEditMessage={(messageId, content) =>
+          messaging.editMessage(messageId, content)
+        }
         onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
-        onStatusChange={(status) => {
-          if (jobManagement.selectedJob) {
-            handleJobStatusChange(jobManagement.selectedJob.id, status);
-          }
-        }}
+        onStatusChange={handleTaskViewStatusChange}
         onAssignPhotographer={jobManagement.handleAssignPhotographer}
         onChangePhotographer={jobManagement.handleChangePhotographer}
         variant="dialog"
@@ -198,4 +254,3 @@ export default function ProjectManagementPage() {
     </>
   );
 }
-

@@ -10,6 +10,7 @@ import { photographers as initialPhotographers } from '@/lib/mock-data';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/components/ui/use-mobile';
+import { ProjectStatus } from '@/types';
 
 export default function JobTaskPage() {
   const params = useParams();
@@ -131,7 +132,15 @@ export default function JobTaskPage() {
         onEditMessage={(messageId, content) => messaging.editMessage(messageId, content)}
         onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
         onStatusChange={(status) => {
-          jobManagement.changeJobStatus(job.id, status);
+          const statusMap: Record<string, ProjectStatus> = {
+            'pending': ProjectStatus.BOOKED,
+            'assigned': ProjectStatus.SHOOTING,
+            'in_progress': ProjectStatus.SHOOTING,
+            'editing': ProjectStatus.EDITING,
+            'delivered': ProjectStatus.DELIVERED,
+            'cancelled': ProjectStatus.BOOKED, // Fallback
+          };
+          jobManagement.changeJobStatus(job.id, statusMap[status] || ProjectStatus.BOOKED);
         }}
         onAssignPhotographer={jobManagement.handleAssignPhotographer}
         onChangePhotographer={jobManagement.handleChangePhotographer}

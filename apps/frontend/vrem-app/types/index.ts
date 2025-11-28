@@ -107,6 +107,88 @@ export interface Technician {
 // Backwards compatibility: Photographer is now Technician
 export type Photographer = Technician;
 
+export enum ProjectStatus {
+  BOOKED = 'BOOKED',
+  SHOOTING = 'SHOOTING',
+  EDITING = 'EDITING',
+  DELIVERED = 'DELIVERED',
+}
+
+export enum MediaType {
+  PHOTO = 'PHOTO',
+  VIDEO = 'VIDEO',
+  FLOORPLAN = 'FLOORPLAN',
+  DOCUMENT = 'DOCUMENT',
+}
+
+export interface OrganizationMember {
+  id: string;
+  userId: string;
+  orgId: string;
+  role: User['role'];
+  createdAt: Date;
+  organization?: Organization;
+}
+
+export interface CalendarEvent {
+  id: string;
+  projectId: string;
+  cronofyEventId: string;
+  calendarId: string;
+  createdAt: Date;
+}
+
+export interface Media {
+  id: string;
+  projectId: string;
+  key: string;
+  cdnUrl?: string;
+  filename: string;
+  size: number;
+  type: MediaType;
+  createdAt: Date;
+}
+
+export interface Message {
+  id: string;
+  projectId: string;
+  userId: string;
+  content: string;
+  timestamp: Date;
+  user?: User;
+}
+
+export interface Project {
+  id: string;
+  agentId: string;
+  address: string;
+  notes?: string;
+  scheduledTime: Date;
+  status: ProjectStatus;
+  technicianId?: string;
+  editorId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  orgId: string;
+  calendarEvent?: CalendarEvent | null;
+  media?: Media[];
+  messages?: Message[];
+  agent?: User;
+  editor?: User;
+  technician?: User;
+  organization?: Organization;
+}
+
+export interface ProjectAggregate extends Project {
+  media: Media[];
+  messages: Message[];
+  calendarEvent?: CalendarEvent | null;
+}
+
+/**
+ * View-model used by job card/list UIs. Canonical data should come from Project.
+ */
+
 export interface JobRequest {
   id: string;
   orderNumber: string;
@@ -215,4 +297,47 @@ export interface Metrics {
     total: number;
     perJob: number;
   };
+}
+
+// Analytics
+export interface AnalyticsSummary {
+  period: 'today' | 'week' | 'month';
+  jobs: Metrics['jobs'];
+  technicians: Metrics['technicians'];
+  revenue: Metrics['revenue'];
+  performance: Metrics['performance'];
+}
+
+// Marketplace
+export interface MarketplaceJob {
+  id: string;
+  title: string;
+  description: string;
+  location?: string;
+  compensation: number;
+  currency: string;
+  status: 'open' | 'assigned' | 'closed';
+  orgId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface JobApplication {
+  id: string;
+  jobId: string;
+  applicantId: string;
+  coverLetter?: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: Date;
+}
+
+export interface Transaction {
+  id: string;
+  jobId?: string;
+  orgId: string;
+  amount: number;
+  currency: string;
+  type: 'payout' | 'charge';
+  status: 'pending' | 'completed' | 'failed';
+  createdAt: Date;
 }

@@ -13,7 +13,10 @@ import { Briefcase } from "lucide-react";
 import { H2 } from "@/components/ui/typography";
 import { EmptyState } from "../../../common";
 import { jobToCalendarEvent } from "../../../../lib/calendar-utils";
-import { CalendarEvent, generateTechnicianColors } from "../../../../types/calendar";
+import {
+  CalendarEvent,
+  generateTechnicianColors,
+} from "../../../../types/calendar";
 
 interface DashboardViewProps {
   jobs: JobRequest[];
@@ -84,53 +87,62 @@ export function DashboardView({
   };
 
   // Use empty metrics when mock data is disabled
-  const displayMetrics = USE_MOCK_DATA ? metrics : {
-    organizationId: '',
-    period: 'week' as const,
-    jobs: {
-      total: 0,
-      pending: 0,
-      assigned: 0,
-      completed: 0,
-      cancelled: 0,
-    },
-    photographers: {
-      active: 0,
-      available: 0,
-      utilization: 0,
-    },
-    technicians: {
-      active: 0,
-      available: 0,
-      utilization: 0,
-    },
-    performance: {
-      averageAssignmentTime: 0,
-      averageDeliveryTime: 0,
-      onTimeRate: 0,
-      clientSatisfaction: 0,
-    },
-    revenue: {
-      total: 0,
-      perJob: 0,
-    },
-  };
+  const displayMetrics = USE_MOCK_DATA
+    ? metrics
+    : {
+        organizationId: "",
+        period: "week" as const,
+        jobs: {
+          total: 0,
+          pending: 0,
+          assigned: 0,
+          completed: 0,
+          cancelled: 0,
+        },
+        photographers: {
+          active: 0,
+          available: 0,
+          utilization: 0,
+        },
+        technicians: {
+          active: 0,
+          available: 0,
+          utilization: 0,
+        },
+        performance: {
+          averageAssignmentTime: 0,
+          averageDeliveryTime: 0,
+          onTimeRate: 0,
+          clientSatisfaction: 0,
+        },
+        revenue: {
+          total: 0,
+          perJob: 0,
+        },
+      };
 
   return (
     <main className="container relative mx-auto">
       <article className="flex flex-col gap-2xl md:gap-3xl px-md">
         {/* Metrics */}
         <div className="@container w-full mt-md">
+          {/* Content */}
           <MetricsDashboard metrics={displayMetrics} />
         </div>
         {/* Calendar */}
         <div className="@container w-full">
+          {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-lg border-0">Schedule</H2>
-            <Button variant="flat" className="px-0" onClick={onNavigateToCalendarView}>
+            <Button
+              variant="flat"
+              className="px-0"
+              onClick={onNavigateToCalendarView}
+            >
               View calendar
             </Button>
           </div>
+          {/* Content */}
           <div className="border rounded-md overflow-hidden">
             <MonthView
               currentDate={currentDate}
@@ -145,14 +157,20 @@ export function DashboardView({
         </div>
         {/* Merged Map and Pending Assignments */}
         <div className="@container w-full">
+          {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
             {/* <MapPin className="h-5 w-5 text-primary" /> */}
             <H2 className="text-lg border-0">Live Job Map</H2>
-            <Button variant="flat" className="px-0" onClick={onNavigateToMapView}>
+            <Button
+              variant="flat"
+              className="px-0"
+              onClick={onNavigateToMapView}
+            >
               View map
             </Button>
           </div>
 
+          {/* Content */}
           <MapWithSidebar
             jobs={jobs}
             photographers={displayPhotographers}
@@ -166,14 +184,21 @@ export function DashboardView({
         </div>
         {/* Active Jobs */}
         <div className="@container w-full mb-md">
+          {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-lg">Active Jobs</H2>
             {assignedJobs.length > 0 && onNavigateToJobsView && (
-              <Button variant="flat" className="px-0" onClick={onNavigateToJobsView}>
+              <Button
+                variant="flat"
+                className="px-0"
+                onClick={onNavigateToJobsView}
+              >
                 View all
               </Button>
             )}
           </div>
+
+          {/* Content */}
           {assignedJobs.length > 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }}

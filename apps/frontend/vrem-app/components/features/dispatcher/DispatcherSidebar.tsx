@@ -29,9 +29,11 @@ import {
   User,
   Building2,
   Beaker,
+  Handshake,
 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../ui/collapsible";
 import { cn } from "../../ui/utils";
+import { OrganizationSwitcher } from "./OrganizationSwitcher";
 
 export function DispatcherSidebar() {
   const pathname = usePathname();
@@ -93,6 +95,12 @@ export function DispatcherSidebar() {
       tooltip: "Team",
     },
     {
+      path: "/dispatcher/customers",
+      icon: Handshake,
+      label: "Customers",
+      tooltip: "Customers",
+    },
+    {
       path: "/dispatcher/audit",
       icon: FileText,
       label: "Audit Log",
@@ -148,6 +156,7 @@ export function DispatcherSidebar() {
       className={`**:data-[slot=sidebar-container]:top-(--header-height)! **:data-[slot=sidebar-container]:h-[calc(100vh-var(--header-height))]! **:data-[slot=sidebar-container]:bottom-auto!`}
     >
       <SidebarContent className="pt-header-h">
+        <OrganizationSwitcher />
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>

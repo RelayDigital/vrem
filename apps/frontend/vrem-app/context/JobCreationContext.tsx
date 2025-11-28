@@ -33,7 +33,7 @@ export function JobCreationProvider({
   children: ReactNode;
   defaultUserId?: string;
   defaultOrganizationId?: string;
-  createJobHandler?: (job: Partial<JobRequest>) => JobRequest;
+  createJobHandler?: (job: Partial<JobRequest>) => JobRequest | Promise<JobRequest>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [initialValues, setInitialValues] = useState<{
@@ -66,7 +66,7 @@ export function JobCreationProvider({
 
     // Use provided createJobHandler if available (from JobManagementContext)
     if (createJobHandler) {
-      createJobHandler(job);
+      await createJobHandler(job);
       toast.success('Job created successfully');
       closeJobCreationDialog();
       return;
@@ -134,4 +134,3 @@ export function useJobCreation() {
   }
   return context;
 }
-

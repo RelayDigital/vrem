@@ -16,13 +16,15 @@ import { RankingsDialog } from '@/components/features/dispatcher/dialogs';
 import { photographers as initialPhotographers } from '@/lib/mock-data';
 import { useIsMobile } from '@/components/ui/use-mobile';
 import { ReactNode } from 'react';
+import { api } from '@/lib/api';
+import { JobRequest, Project } from '@/types';
 
 export default function DispatcherLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
+  const { user, isLoading, organizationId } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
 
   if (isLoading) {
     return (
@@ -72,11 +74,11 @@ export default function DispatcherLayout({
   return (
     <JobManagementProvider
       defaultUserId={user?.id}
-      defaultOrganizationId={user?.organizationId}
+      defaultOrganizationId={organizationId || undefined}
     >
       <JobCreationProviderWrapper
         defaultUserId={user?.id}
-        defaultOrganizationId={user?.organizationId}
+        defaultOrganizationId={organizationId || undefined}
       >
         <MessagingProvider
           defaultUserId={user?.id}
@@ -104,12 +106,30 @@ function JobCreationProviderWrapper({
   defaultOrganizationId?: string;
 }) {
   const jobManagement = useJobManagement();
-  
+
+  const handleCreateJob = async (job: Partial<JobRequest>): Promise<JobRequest> => {
+    // Map JobRequest (View Model) to Project (Domain)
+    const projectData: Partial<Project> = {
+      address: job.propertyAddress,
+      scheduledTime: job.scheduledDate && job.scheduledTime
+        ? new Date(`${job.scheduledDate}T${job.scheduledTime}`)
+        : undefined,
+      // Map other fields as needed
+      notes: job.requirements,
+      agentId: job.createdBy,
+      orgId: job.organizationId || defaultOrganizationId,
+      // ... copy other matching fields if any
+    };
+
+    const newProject = await jobManagement.createJob(projectData);
+    return api.mapProjectToJobCard(newProject);
+  };
+
   return (
-    <JobCreationProvider 
+    <JobCreationProvider
       defaultUserId={defaultUserId}
       defaultOrganizationId={defaultOrganizationId}
-      createJobHandler={jobManagement.createJob}
+      createJobHandler={handleCreateJob}
     >
       {children}
     </JobCreationProvider>
@@ -145,7 +165,7 @@ function DispatcherLayoutContent({
 
       {/* Sidebar */}
       <DispatcherSidebar />
-      
+
       {/* Main Content */}
       <SidebarInset
         className="min-w-0 pt-header-h pb-dock-h md:pb-0!"
@@ -202,4 +222,3 @@ function DispatcherLayoutContent({
     </SidebarProvider>
   );
 }
-

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { JobsView } from '@/components/features/dispatcher/views/JobsView';
 import { JobTaskView } from '@/components/shared/tasks/JobTaskView';
-import { Photographer } from '@/types';
+import { Photographer, ProjectStatus } from '@/types';
 import {
   photographers as initialPhotographers,
 } from '@/lib/mock-data';
@@ -64,7 +64,6 @@ export default function AllJobsPage() {
   const handleViewRankings = jobManagement.openRankings;
   const handleJobAssign = jobManagement.assignJob;
   const handleJobClick = jobManagement.openTaskView;
-  const handleJobStatusChange = jobManagement.changeJobStatus;
   const handleFullScreen = jobManagement.openTaskDialog;
   const handleTaskDialogClose = jobManagement.handleTaskDialogClose;
   const handleOpenInNewPage = () => {
@@ -73,6 +72,18 @@ export default function AllJobsPage() {
     }
   };
   const handleTaskViewClose = jobManagement.handleTaskViewClose;
+
+  const handleJobStatusChangeWrapper = (jobId: string, status: string) => {
+    const statusMap: Record<string, ProjectStatus> = {
+      'pending': ProjectStatus.BOOKED,
+      'assigned': ProjectStatus.SHOOTING,
+      'in_progress': ProjectStatus.SHOOTING,
+      'editing': ProjectStatus.EDITING,
+      'delivered': ProjectStatus.DELIVERED,
+      'cancelled': ProjectStatus.BOOKED,
+    };
+    jobManagement.changeJobStatus(jobId, statusMap[status] || ProjectStatus.BOOKED);
+  };
 
   return (
     <div className="w-full overflow-x-hidden h-full">
@@ -97,7 +108,7 @@ export default function AllJobsPage() {
         messages={messaging.messages}
         onViewRankings={handleViewRankings}
         onChangePhotographer={handleViewRankings}
-        onJobStatusChange={handleJobStatusChange}
+        onJobStatusChange={handleJobStatusChangeWrapper}
         onJobClick={handleJobClick}
         activeView="all"
       />
@@ -121,7 +132,7 @@ export default function AllJobsPage() {
         onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
         onStatusChange={(status) => {
           if (jobManagement.selectedJob) {
-            handleJobStatusChange(jobManagement.selectedJob.id, status);
+            handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
           }
         }}
         onAssignPhotographer={jobManagement.handleAssignPhotographer}
@@ -150,7 +161,7 @@ export default function AllJobsPage() {
         onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
         onStatusChange={(status) => {
           if (jobManagement.selectedJob) {
-            handleJobStatusChange(jobManagement.selectedJob.id, status);
+            handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
           }
         }}
         onAssignPhotographer={jobManagement.handleAssignPhotographer}

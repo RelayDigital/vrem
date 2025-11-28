@@ -526,7 +526,7 @@ export default function VremApp(props: VremAppProps = {}) {
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/dispatcher/profile')}>
                       <UserIcon className="h-4 w-4 mr-2" />
                       Profile
                     </DropdownMenuItem>
