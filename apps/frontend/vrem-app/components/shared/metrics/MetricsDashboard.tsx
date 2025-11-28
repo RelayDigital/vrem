@@ -15,6 +15,10 @@ interface MetricsDashboardProps {
   metrics: Metrics;
 }
 
+/**
+ * MetricsDashboard - Displays dashboard statistics
+ * NOTE: Currently uses mock data. In production, metrics should be fetched from the API.
+ */
 export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
   const utilizationPercent = Math.round(
     metrics.photographers.utilization * 100

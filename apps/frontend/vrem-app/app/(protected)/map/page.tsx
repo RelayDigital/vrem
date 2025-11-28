@@ -11,7 +11,7 @@ export default function MapPage() {
     useEffect(() => {
         if (!isLoading && user) {
             // For agents, redirect to agent map route
-            if (user.role === 'agent') {
+            if (user.role === 'AGENT') {
                 router.replace('/agent/map');
             } else {
                 // For other roles, keep existing behavior

@@ -23,10 +23,60 @@ export default function PhotographerDashboardPage() {
   }
 
   // Find the photographer matching the current user
-  const currentPhotographer = photographersList.find((p) => p.id === user.id);
+  // Try matching by ID first, then by email as fallback
+  let currentPhotographer = photographersList.find((p) => p.id === user.id) ||
+    photographersList.find((p) => p.email === user.email);
 
+  // If no photographer found, create a minimal profile from user data
   if (!currentPhotographer) {
-    return <div className="flex items-center justify-center h-screen">Photographer profile not found</div>;
+    currentPhotographer = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: '',
+      organizationId: user.organizationId,
+      isIndependent: true,
+      homeLocation: {
+        lat: 51.0447,
+        lng: -114.0719,
+        address: {
+          city: 'Calgary',
+          stateProvince: 'AB',
+          country: 'Canada',
+        },
+      },
+      availability: [],
+      reliability: {
+        totalJobs: 0,
+        noShows: 0,
+        lateDeliveries: 0,
+        onTimeRate: 1.0,
+        averageDeliveryTime: 24,
+      },
+      skills: {
+        residential: 0,
+        commercial: 0,
+        aerial: 0,
+        twilight: 0,
+        video: 0,
+      },
+      rating: {
+        overall: 0,
+        count: 0,
+        recent: [],
+      },
+      preferredClients: [],
+      status: 'active' as const,
+      createdAt: new Date(),
+      services: {
+        photography: true,
+        video: false,
+        aerial: false,
+        twilight: false,
+        editing: false,
+        virtualStaging: false,
+      },
+    };
   }
 
   const handleUpdateProfile = (updates: Partial<Photographer>) => {

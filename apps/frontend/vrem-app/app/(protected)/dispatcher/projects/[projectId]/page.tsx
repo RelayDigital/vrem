@@ -58,7 +58,7 @@ export default function JobTaskPage() {
         jobManagement.selectJob(job);
       } else {
         // Job not found, redirect back to jobs page
-        router.push('/dispatcher/jobs/all');
+        router.push('/dispatcher/projects/all');
       }
     }
   }, [jobId, jobManagement, router]);
@@ -93,7 +93,7 @@ export default function JobTaskPage() {
         <div className="text-center">
           <p className="text-muted-foreground">Job not found</p>
           <button
-            onClick={() => router.push('/dispatcher/jobs')}
+            onClick={() => router.push('/dispatcher/projects')}
             className="mt-4 text-sm text-primary hover:underline"
           >
             Back to Jobs
@@ -124,7 +124,7 @@ export default function JobTaskPage() {
         open={true}
         onOpenChange={(open) => {
           if (!open) {
-            router.push('/dispatcher/jobs/all');
+            router.push('/dispatcher/projects/all');
           }
         }}
         onSendMessage={(content, chatType, threadId) => messaging.sendMessage(job.id, content, chatType, threadId)}

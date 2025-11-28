@@ -125,6 +125,7 @@
 :root {
   --radius: 0.5rem;
   --header-h: 4rem; /* Application-wide header height */
+  --dock-h: 5rem; /* Mobile menu dock height */
   
   /* Uber-inspired Color Scheme */
   /* Main colors - Clean whites and blacks */
@@ -307,6 +308,18 @@
 
 .pt-header-h {
   padding-top: var(--header-h);
+}
+
+.h-dock-h {
+  height: var(--dock-h);
+}
+
+.pb-dock-h {
+  padding-bottom: var(--dock-h);
+}
+
+.bottom-dock-h {
+  bottom: var(--dock-h);
 }
 
 /* Uploadcare Custom Theme */

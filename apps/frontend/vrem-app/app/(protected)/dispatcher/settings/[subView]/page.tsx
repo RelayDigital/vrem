@@ -11,7 +11,7 @@ import { SettingsLoadingSkeleton } from '@/components/shared/loading/DispatcherL
 export default function DispatcherSettingsSubViewPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, isLoading } = useRequireRole(['dispatcher', 'admin', 'project_manager']);
+  const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
   
   const subView = params?.subView as SettingsSubView;
 

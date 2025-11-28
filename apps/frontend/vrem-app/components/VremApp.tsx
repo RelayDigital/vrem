@@ -98,7 +98,7 @@ export default function VremApp(props: VremAppProps = {}) {
         id: "user-agent",
         name: "Emily Rodriguez",
         email: "emily@luxuryrealty.com",
-        role: "agent",
+        role: "AGENT",
         organizationId: "org-client-001",
         organizationType: "agent",
       };
@@ -107,7 +107,7 @@ export default function VremApp(props: VremAppProps = {}) {
         id: "photo-001",
         name: "Marcus Rodriguez",
         email: "marcus@vxmedia.com",
-        role: "photographer",
+        role: "TECHNICIAN",
         organizationId: "org-vx-001",
         organizationType: "media_company",
       };
@@ -319,7 +319,7 @@ export default function VremApp(props: VremAppProps = {}) {
       id: "user-agent",
       name: "Emily Rodriguez",
       email: "emily@luxuryrealty.com",
-      role: "agent",
+      role: "AGENT",
       organizationId: "org-client-001",
       organizationType: "agent",
     },
@@ -327,7 +327,7 @@ export default function VremApp(props: VremAppProps = {}) {
       id: "user-dispatcher",
       name: "Sarah Chen",
       email: "sarah@vxmedia.com",
-      role: "dispatcher",
+      role: "ADMIN",
       organizationId: "org-vx-001",
       organizationType: "media_company",
     },
@@ -335,7 +335,7 @@ export default function VremApp(props: VremAppProps = {}) {
       id: "photo-001",
       name: "Marcus Rodriguez",
       email: "marcus@vxmedia.com",
-      role: "photographer",
+      role: "TECHNICIAN",
       organizationId: "org-vx-001",
       organizationType: "media_company",
     },
@@ -346,10 +346,10 @@ export default function VremApp(props: VremAppProps = {}) {
     // If switching to photographer, find a matching photographer by email or use first photographer
     let updatedUser: User = {
       ...currentUser,
-      role: role as "agent" | "dispatcher" | "photographer",
+      role: role as "AGENT" | "ADMIN" | "TECHNICIAN",
     };
 
-    if (role === "photographer") {
+    if (role === "TECHNICIAN") {
       // Find photographer by email or use the first one
       const matchingPhotographer =
         photographers.find((p) => p.email === currentUser.email) ||
@@ -362,14 +362,14 @@ export default function VremApp(props: VremAppProps = {}) {
           organizationId: matchingPhotographer.organizationId,
         };
       }
-    } else if (role === "dispatcher") {
+    } else if (role === "ADMIN") {
       // Reset to original user ID for dispatcher
       updatedUser = {
         ...updatedUser,
         id: initialUser.id,
         organizationId: initialUser.organizationId,
       };
-    } else if (role === "agent") {
+    } else if (role === "AGENT") {
       // Use agent organization
       const agentOrg = organizations.find((o) => o.type === "real_estate_team");
       if (agentOrg) {
@@ -415,7 +415,7 @@ export default function VremApp(props: VremAppProps = {}) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <H2 className="p-0 border-0">VX Media</H2>
-            {isAuthenticated && currentUser.role === "dispatcher" && (
+            {isAuthenticated && currentUser.role === "ADMIN" && (
               <SidebarTrigger />
             )}
           </div>
@@ -425,7 +425,7 @@ export default function VremApp(props: VremAppProps = {}) {
             {isAuthenticated && (
               <>
                 {/* Dispatcher New Job Button */}
-                {currentUser.role === "dispatcher" && (
+                {currentUser.role === "ADMIN" && (
                   <Button
                     onClick={() => setShowNewJobForm(true)}
                     size="sm"
@@ -438,7 +438,7 @@ export default function VremApp(props: VremAppProps = {}) {
                 )}
 
                 {/* Agent View Switcher */}
-                {currentUser.role === "agent" && (
+                {currentUser.role === "AGENT" && (
                   <div className="flex items-center gap-2">
                     <Button
                       variant={agentView === "jobs" ? "default" : "muted"}
@@ -458,7 +458,7 @@ export default function VremApp(props: VremAppProps = {}) {
                 )}
 
                 {/* Photographer View Switcher */}
-                {currentUser.role === "photographer" && (
+                {currentUser.role === "TECHNICIAN" && (
                   <div className="flex items-center gap-2">
                     <Button
                       variant={
@@ -532,11 +532,11 @@ export default function VremApp(props: VremAppProps = {}) {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => {
-                        if (currentUser.role === "dispatcher") {
+                        if (currentUser.role === "ADMIN") {
                           setDispatcherView("settings");
-                        } else if (currentUser.role === "agent") {
+                        } else if (currentUser.role === "AGENT") {
                           setAgentView("settings");
-                        } else if (currentUser.role === "photographer") {
+                        } else if (currentUser.role === "TECHNICIAN") {
                           setPhotographerView("settings");
                         }
                       }}
@@ -597,7 +597,7 @@ export default function VremApp(props: VremAppProps = {}) {
 
   return (
     <div className="min-h-screen bg-background">
-      {isAuthenticated && currentUser.role === "dispatcher" ? (
+      {isAuthenticated && currentUser.role === "ADMIN" ? (
         <SidebarProvider>
           {/* Header */}
           <div className="fixed top-0 left-0 right-0 z-50">
@@ -661,7 +661,7 @@ export default function VremApp(props: VremAppProps = {}) {
               isAuthenticated={isAuthenticated}
               onLoginRequired={handleLogin}
             />
-          ) : currentUser.role === "agent" ? (
+          ) : currentUser.role === "AGENT" ? (
             agentView === "settings" ? (
               <SettingsView
                 subView={agentSettingsSubView}
@@ -692,7 +692,7 @@ export default function VremApp(props: VremAppProps = {}) {
                 onLoginRequired={handleLogin}
               />
             )
-          ) : currentUser.role === "photographer" && currentPhotographer ? (
+          ) : currentUser.role === "TECHNICIAN" && currentPhotographer ? (
             photographerView === "settings" ? (
               <SettingsView
                 subView={photographerSettingsSubView}

@@ -50,7 +50,13 @@ export class AuthService {
       role: user.role,
     });
 
-    return { user, token };
+    return { 
+      user: {
+        ...user,
+        organizationId: null, // New users have no org yet
+      }, 
+      token 
+    };
   }
 
 
@@ -62,10 +68,47 @@ export class AuthService {
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
     const token = this.jwtService.sign({ sub: user.id, role: user.role });
-    return { user, token };
+    
+    // Fetch user's organization
+    const membership = await this.prisma.organizationMember.findFirst({
+      where: { userId: user.id },
+      select: { orgId: true }
+    });
+
+    return { 
+      user: {
+        ...user,
+        organizationId: membership?.orgId || null,
+      }, 
+      token 
+    };
   }
 
   async validateUser(userId: string) {
     return this.prisma.user.findUnique({ where: { id: userId } });
+  }
+
+  async me(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Strip password from response
+    const { password, ...safeUser } = user;
+    
+    // Fetch user's organization
+    const membership = await this.prisma.organizationMember.findFirst({
+      where: { userId: user.id },
+      select: { orgId: true }
+    });
+
+    return {
+      ...safeUser,
+      organizationId: membership?.orgId || null,
+    };
   }
 }

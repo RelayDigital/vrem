@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/breadcrumb';
 
 export default function DispatcherSettingsAccountPage() {
-  const { user, isLoading } = useRequireRole(['dispatcher', 'admin', 'project_manager']);
+  const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
   const router = useRouter();
 
   if (isLoading) {

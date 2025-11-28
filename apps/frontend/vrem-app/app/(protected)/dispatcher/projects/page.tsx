@@ -11,7 +11,7 @@ export default function DispatcherJobsPage() {
 
   useEffect(() => {
     // Redirect to /dispatcher/jobs/all by default
-    router.replace('/dispatcher/jobs/all');
+    router.replace('/dispatcher/projects/all');
   }, [router]);
 
   if (isLoading) {

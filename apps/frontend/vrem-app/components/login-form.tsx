@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/context/auth-context"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,35 +13,26 @@ import {
   FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+
 import Link from "next/link"
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
-  const router = useRouter()
-  const [accountType, setAccountType] = useState<"agent" | "dispatcher" | "photographer">("dispatcher")
+  const { login, isLoading } = useAuth()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState("")
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    // Accept any login credentials - no validation needed
-    // Store the selected account type in localStorage
-    localStorage.setItem("accountType", accountType)
-    // Redirect directly to the appropriate route based on account type
-    if (accountType === "agent") {
-      router.push("/agent")
-    } else if (accountType === "photographer") {
-      router.push("/photographer")
-    } else {
-      // dispatcher
-      router.push("/dispatcher")
+    setError("")
+
+    try {
+      await login({ email, password })
+    } catch (err) {
+      setError("Invalid email or password")
     }
   }
 
@@ -53,25 +45,19 @@ export function LoginForm({
             Enter your email below to login to your account
           </p>
         </div>
-        <Field>
-          <FieldLabel htmlFor="account-type">Account Type</FieldLabel>
-          <Select value={accountType} onValueChange={(value: "agent" | "dispatcher" | "photographer") => setAccountType(value)}>
-            <SelectTrigger id="account-type">
-              <SelectValue placeholder="Select account type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="dispatcher">Dispatcher</SelectItem>
-              <SelectItem value="agent">Agent</SelectItem>
-              <SelectItem value="photographer">Photographer</SelectItem>
-            </SelectContent>
-          </Select>
-          <FieldDescription className="text-xs text-muted-foreground">
-            Select the account type you want to access (temporary - will be removed later)
-          </FieldDescription>
-        </Field>
+        {error && (
+          <div className="text-red-500 text-sm font-medium text-center">{error}</div>
+        )}
         <Field>
           <FieldLabel htmlFor="email">Email</FieldLabel>
-          <Input id="email" type="email" placeholder="m@example.com" required />
+          <Input
+            id="email"
+            type="email"
+            placeholder="m@example.com"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
         </Field>
         <Field>
           <div className="flex items-center">
@@ -83,10 +69,18 @@ export function LoginForm({
               Forgot your password?
             </a>
           </div>
-          <Input id="password" type="password" required />
+          <Input
+            id="password"
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
         </Field>
         <Field>
-          <Button type="submit">Login</Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? "Logging in..." : "Login"}
+          </Button>
         </Field>
         <FieldSeparator>Or continue with</FieldSeparator>
         <Field>

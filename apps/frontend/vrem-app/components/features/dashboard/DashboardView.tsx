@@ -2,25 +2,35 @@
 
 import { User } from '@/types';
 import {
-  jobRequests as initialJobRequests,
-  photographers as initialPhotographers,
-  auditLog as initialAuditLog,
-  metrics,
-} from '@/lib/mock-data';
+  JobRequest,
+  Technician,
+  AuditLogEntry,
+  Metrics
+} from '@/types';
 import { useState } from 'react';
 import { DispatcherDashboard } from '../dispatcher/DispatcherDashboard';
 
 interface DashboardViewProps {
   user: User;
+  jobs: JobRequest[];
+  photographers: Technician[];
+  auditLog: AuditLogEntry[];
+  metrics: Metrics;
 }
 
-export function DashboardView({ user }: DashboardViewProps) {
-  // For now, use mock data. In a real app, this would come from API/context
-  const [jobs] = useState(initialJobRequests);
+export function DashboardView({
+  user,
+  jobs: initialJobs,
+  photographers: initialPhotographers,
+  auditLog: initialAuditLog,
+  metrics: initialMetrics
+}: DashboardViewProps) {
+  const [jobs] = useState(initialJobs);
   const [photographers] = useState(initialPhotographers);
   const [auditLog] = useState(initialAuditLog);
+  const [metrics] = useState(initialMetrics);
 
-  const handleJobCreate = (job: Partial<typeof initialJobRequests[0]>) => {
+  const handleJobCreate = (job: Partial<JobRequest>) => {
     // In a real app, this would create the job via API
     console.log('Job created:', job);
   };
@@ -30,7 +40,7 @@ export function DashboardView({ user }: DashboardViewProps) {
     console.log('Job assigned:', { jobId, photographerId, score });
   };
 
-  const handleJobStatusChange = (jobId: string, newStatus: typeof initialJobRequests[0]['status']) => {
+  const handleJobStatusChange = (jobId: string, newStatus: JobRequest['status']) => {
     // In a real app, this would update the job status via API
     console.log('Job status changed:', { jobId, newStatus });
   };

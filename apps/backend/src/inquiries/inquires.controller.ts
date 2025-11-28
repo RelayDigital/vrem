@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';
+import { CurrentOrg } from '../organizations/current-org.decorator';
 
 @Controller('inquiries')
 export class InquiriesController {
@@ -50,7 +51,7 @@ export class InquiriesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
   @Post(':id/convert')
-  convertToProject(@Param('id') id: string) {
-    return this.inquiriesService.convertToProject(id);
+  convertToProject(@Param('id') id: string, @CurrentOrg() org: { id: string }) {
+    return this.inquiriesService.convertToProject(id, org.id);
   }
 }

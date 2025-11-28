@@ -11,7 +11,7 @@ export default function JobsPage() {
     useEffect(() => {
         if (!isLoading && user) {
             // For agents, redirect to agent jobs route
-            if (user.role === 'agent') {
+            if (user.role === 'AGENT') {
                 router.replace('/agent/jobs');
             } else {
                 // For other roles, keep existing behavior (could be dispatcher jobs view)

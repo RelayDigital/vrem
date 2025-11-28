@@ -2122,7 +2122,7 @@ export function JobTaskView({
         <Sheet open={open} onOpenChange={onOpenChange}>
           <SheetContent
             side="right"
-            className="w-full sm:max-w-[40vw] min-w-[600px] flex flex-col p-0 gap-0"
+            className="w-full sm:max-w-[40vw] md:min-w-[600px] flex flex-col p-0 gap-0"
           >
             <SheetTitle className="sr-only">
               {job.propertyAddress} - {job.clientName}

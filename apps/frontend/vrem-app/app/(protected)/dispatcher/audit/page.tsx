@@ -8,7 +8,7 @@ import { auditLog as initialAuditLog } from '@/lib/mock-data';
 import { AuditLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
 
 export default function DispatcherAuditPage() {
-  const { user, isLoading } = useRequireRole(['dispatcher', 'admin', 'project_manager']);
+  const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
   const [auditLog] = useState(initialAuditLog);
 
   if (isLoading) {

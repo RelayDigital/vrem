@@ -3,16 +3,18 @@
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { DispatcherSidebar } from '@/components/features/dispatcher/DispatcherSidebar';
-import { AppHeader } from '@/components/shared/layout/AppHeader';
+import { AppHeader, MobileMenuDock } from '@/components/shared/layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { JobCreationProvider, useJobCreation } from '@/context/JobCreationContext';
 import { MessagingProvider } from '@/context/MessagingContext';
 import { JobManagementProvider, useJobManagement } from '@/context/JobManagementContext';
 import { DispatcherNavigationProvider } from '@/context/DispatcherNavigationContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { JobRequestForm } from '@/components/shared/jobs';
 import { RankingsDialog } from '@/components/features/dispatcher/dialogs';
 import { photographers as initialPhotographers } from '@/lib/mock-data';
+import { useIsMobile } from '@/components/ui/use-mobile';
 import { ReactNode } from 'react';
 
 export default function DispatcherLayout({
@@ -20,7 +22,7 @@ export default function DispatcherLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading } = useRequireRole(['dispatcher', 'admin', 'project_manager']);
+  const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
 
   if (isLoading) {
     return (
@@ -123,6 +125,16 @@ function DispatcherLayoutContent({
 }) {
   const jobCreation = useJobCreation();
   const jobManagement = useJobManagement();
+  const isMobile = useIsMobile();
+
+  const jobFormContent = (
+    <>
+      <JobRequestForm
+        initialValues={jobCreation.initialValues}
+        onSubmit={jobCreation.handleJobCreate}
+      />
+    </>
+  );
 
   return (
     <SidebarProvider>
@@ -136,27 +148,44 @@ function DispatcherLayoutContent({
       
       {/* Main Content */}
       <SidebarInset
-        className="min-w-0 pt-header-h"
+        className="min-w-0 pt-header-h pb-dock-h md:pb-0!"
       >
         {children}
       </SidebarInset>
 
-      {/* Job Creation Dialog - Shared across all dispatcher pages */}
-      <Dialog open={jobCreation.isOpen} onOpenChange={(open) => {
-        if (!open) {
-          jobCreation.closeJobCreationDialog();
-        }
-      }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create New Job</DialogTitle>
-          </DialogHeader>
-          <JobRequestForm
-            initialValues={jobCreation.initialValues}
-            onSubmit={jobCreation.handleJobCreate}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* Mobile Menu Dock */}
+      <MobileMenuDock />
+
+      {/* Job Creation - Drawer on mobile, Dialog on desktop */}
+      {isMobile ? (
+        <Drawer open={jobCreation.isOpen} onOpenChange={(open) => {
+          if (!open) {
+            jobCreation.closeJobCreationDialog();
+          }
+        }}>
+          <DrawerContent className="">
+            <DrawerHeader className="">
+              <DrawerTitle>Create New Job</DrawerTitle>
+            </DrawerHeader>
+            <div className="overflow-y-auto px-4 pb-4">
+              {jobFormContent}
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={jobCreation.isOpen} onOpenChange={(open) => {
+          if (!open) {
+            jobCreation.closeJobCreationDialog();
+          }
+        }}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create New Job</DialogTitle>
+            </DialogHeader>
+            {jobFormContent}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Rankings Dialog - Shared across all dispatcher pages */}
       <RankingsDialog

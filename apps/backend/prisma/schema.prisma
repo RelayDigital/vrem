@@ -7,186 +7,85 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-//
-// ----------------------
-// Global User Role (optional)
-// ----------------------
-// This can be kept as a default persona, but OrgRole is what actually matters.
-//
-enum Role {
-  ADMIN
-  PROJECT_MANAGER
-  TECHNICIAN
-  EDITOR
-  AGENT
-}
-
-//
-// ----------------------
-// Organization-scoped roles
-// Users can have different roles per organization
-// ----------------------
-//
-enum OrgRole {
-  ADMIN
-  PROJECT_MANAGER
-  TECHNICIAN
-  EDITOR
-  AGENT
-}
-
-//
-// ----------------------
-// User can exist with 0, 1, or many organizations
-// Actual permissions inside an org come from OrganizationMember.role
-// ----------------------
-//
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      Role     @default(AGENT) // Kept for onboarding identity, not for permissions
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // MULTI-ORG: relationship through OrganizationMember
-  organizations OrganizationMember[]
-
-  // Existing relationships (unchanged)
-  agentProjects  Project[] @relation("AgentProjects")
-  techProjects   Project[] @relation("TechProjects")
-  editorProjects Project[] @relation("EditorProjects")
+  id             String               @id @default(uuid())
+  email          String               @unique
+  name           String
+  password       String
+  role           Role                 @default(AGENT)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
   messages       Message[]
+  organizations  OrganizationMember[]
+  agentProjects  Project[]            @relation("AgentProjects")
+  editorProjects Project[]            @relation("EditorProjects")
+  techProjects   Project[]            @relation("TechProjects")
 }
 
-//
-// ----------------------
-// Organization
-// ----------------------
-//
 model Organization {
-  id        String   @id @default(uuid())
-  name      String
-  createdAt DateTime @default(now())
-
+  id          String               @id @default(uuid())
+  name        String
+  createdAt   DateTime             @default(now())
+  invitations Invitation[]
   members     OrganizationMember[]
   projects    Project[]
-  invitations Invitation[]
 }
 
-//
-// ----------------------
-// Organization Membership
-// Each membership assigns the user a role *within that org*
-// ----------------------
-//
 model OrganizationMember {
-  id        String   @id @default(uuid())
-  userId    String
-  orgId     String
-  role      OrgRole
-  createdAt DateTime @default(now())
-
-  user         User         @relation(fields: [userId], references: [id])
+  id           String       @id @default(uuid())
+  userId       String
+  orgId        String
+  role         OrgRole
+  createdAt    DateTime     @default(now())
   organization Organization @relation(fields: [orgId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
 
-  @@unique([userId, orgId]) // user can only have one membership per organization
+  @@unique([userId, orgId])
 }
 
-//
-// ----------------------
-// Media
-// ----------------------
-//
 model Media {
-  id        String  @id @default(cuid())
+  id        String    @id @default(cuid())
   projectId String
-  project   Project @relation(fields: [projectId], references: [id])
-
   key       String
   cdnUrl    String?
   filename  String
   size      Int
   type      MediaType
   createdAt DateTime  @default(now())
+  project   Project   @relation(fields: [projectId], references: [id])
 }
 
-//
-// ----------------------
-// Messaging
-// ----------------------
-//
 model Message {
   id        String   @id @default(uuid())
   projectId String
   userId    String
   content   String
   timestamp DateTime @default(now())
-
-  project Project @relation(fields: [projectId], references: [id])
-  user    User    @relation(fields: [userId], references: [id])
+  project   Project  @relation(fields: [projectId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
 
-//
-// ----------------------
-// Projects are now org-scoped
-// ----------------------
-//
 model Project {
-  id String @id @default(uuid())
-
-  orgId        String
-  organization Organization @relation(fields: [orgId], references: [id])
-
-  agentId String
-  agent   User   @relation("AgentProjects", fields: [agentId], references: [id])
-
+  id            String         @id @default(uuid())
+  agentId       String
   address       String
   notes         String?
   scheduledTime DateTime
-  status        ProjectStatus @default(BOOKED)
-
-  technicianId String?
-  technician   User?   @relation("TechProjects", fields: [technicianId], references: [id])
-
-  editorId String?
-  editor   User?   @relation("EditorProjects", fields: [editorId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  status        ProjectStatus  @default(BOOKED)
+  technicianId  String?
+  editorId      String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  orgId         String
+  calendarEvent CalendarEvent?
   media         Media[]
   messages      Message[]
-  calendarEvent CalendarEvent?
+  agent         User           @relation("AgentProjects", fields: [agentId], references: [id])
+  editor        User?          @relation("EditorProjects", fields: [editorId], references: [id])
+  organization  Organization   @relation(fields: [orgId], references: [id])
+  technician    User?          @relation("TechProjects", fields: [technicianId], references: [id])
 }
 
-//
-// ----------------------
-// Media Types
-// ----------------------
-enum MediaType {
-  PHOTO
-  VIDEO
-  FLOORPLAN
-  DOCUMENT
-}
-
-//
-// ----------------------
-// Project Status
-// ----------------------
-enum ProjectStatus {
-  BOOKED
-  SHOOTING
-  EDITING
-  DELIVERED
-}
-
-//
-// ----------------------
-// Inquiries (not org-scoped unless needed)
-// ----------------------
 model Inquiry {
   id        String        @id @default(uuid())
   name      String
@@ -198,36 +97,60 @@ model Inquiry {
   createdAt DateTime      @default(now())
 }
 
-enum InquiryStatus {
-  PENDING
-  REVIEWED
-  APPROVED
-  REJECTED
-  CONVERTED_TO_PROJECT
-}
-
-//
-// ----------------------
-// Calendar Events
-// ----------------------
 model CalendarEvent {
   id             String   @id @default(uuid())
   projectId      String   @unique
   cronofyEventId String
   calendarId     String
   createdAt      DateTime @default(now())
-
-  project Project @relation(fields: [projectId], references: [id])
+  project        Project  @relation(fields: [projectId], references: [id])
 }
 
 model Invitation {
-  id        String   @id @default(uuid())
-  email     String
-  orgId     String
-  role      OrgRole
-  token     String   @unique
-  accepted  Boolean  @default(false)
-  createdAt DateTime @default(now())
-
+  id           String       @id @default(uuid())
+  email        String
+  orgId        String
+  role         OrgRole
+  token        String       @unique
+  accepted     Boolean      @default(false)
+  createdAt    DateTime     @default(now())
   organization Organization @relation(fields: [orgId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  PROJECT_MANAGER
+  TECHNICIAN
+  EDITOR
+  AGENT
+}
+
+enum OrgRole {
+  ADMIN
+  PROJECT_MANAGER
+  TECHNICIAN
+  EDITOR
+  AGENT
+}
+
+enum MediaType {
+  PHOTO
+  VIDEO
+  FLOORPLAN
+  DOCUMENT
+}
+
+enum ProjectStatus {
+  BOOKED
+  SHOOTING
+  EDITING
+  DELIVERED
+}
+
+enum InquiryStatus {
+  PENDING
+  REVIEWED
+  APPROVED
+  REJECTED
+  CONVERTED_TO_PROJECT
 }

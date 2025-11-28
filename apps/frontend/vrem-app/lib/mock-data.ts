@@ -86,7 +86,7 @@ export const currentUser: User = {
   id: 'user-001',
   name: 'Sarah Chen',
   email: 'sarah@vxmedia.com',
-  role: 'dispatcher',
+  role: 'ADMIN' as any,
   organizationId: 'org-vx-001',
   organizationType: 'media_company',
 };
