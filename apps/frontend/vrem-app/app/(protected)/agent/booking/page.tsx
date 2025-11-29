@@ -6,11 +6,6 @@ import { api } from "@/lib/api";
 import { AgentBookingFlow } from "@/components/features/agent";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { useRouter } from "next/navigation";
-import {
-  technicians as initialTechnicians,
-  organizations as initialOrganizations,
-  preferredVendors as initialPreferredVendors,
-} from "@/lib/mock-data";
 import { JobRequest } from "@/types";
 
 export default function AgentBookingPage() {
@@ -20,9 +15,13 @@ export default function AgentBookingPage() {
     "PROJECT_MANAGER",
   ]);
   const router = useRouter();
-  const [technicians] = useState(initialTechnicians);
-  const [organizations] = useState(initialOrganizations);
-  const [preferredVendors] = useState(initialPreferredVendors);
+  
+  // TODO: wire to backend once we have a users/technicians endpoint
+  const technicians: any[] = [];
+  // TODO: wire to backend once we have an organizations endpoint
+  const organizations: any[] = [];
+  // TODO: wire to backend once we have a preferred vendors endpoint
+  const preferredVendors: string[] = [];
   const createJobRequest = async (job: Partial<JobRequest>) => {
     try {
       const project = await api.projects.create({
@@ -60,7 +59,7 @@ export default function AgentBookingPage() {
     <AgentBookingFlow
       technicians={technicians}
       companies={organizations}
-      preferredVendors={preferredVendors.map((v) => v.vendorId)}
+      preferredVendors={preferredVendors}
       onJobCreate={(job) => {
         createJobRequest(job)
           .then(() => router.push("/agent/jobs"))

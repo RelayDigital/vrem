@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { CalendarView } from '@/components/features/calendar/CalendarView';
 import { Photographer } from '@/types';
+// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented (visual placeholder only)
 import {
   photographers as initialPhotographers,
 } from '@/lib/mock-data';
+import { USE_MOCK_DATA } from '@/lib/utils';
 import { JobTaskView } from '@/components/shared/tasks/JobTaskView';
 import { CalendarLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
 import { useJobManagement } from '@/context/JobManagementContext';
@@ -20,7 +22,7 @@ export default function DispatcherCalendarPage() {
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
   const jobCreation = useJobCreation();
-  const [photographers] = useState(initialPhotographers);
+  const [photographers] = useState(USE_MOCK_DATA ? initialPhotographers : []);
 
   if (isLoading) {
     return <CalendarLoadingSkeleton />;

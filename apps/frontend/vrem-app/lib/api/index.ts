@@ -10,7 +10,7 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || '';
-const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA;
+const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
 
 class ApiClient {
   private baseUrl: string;
@@ -454,17 +454,56 @@ class ApiClient {
     },
   };
 
-  // Dashboard is no longer canonical; we wrap canonical project listing to preserve callers until they migrate.
+  // Dashboard endpoint - fetches dashboard data from backend
   dashboard = {
     get: async () => {
-      const projects = await this.projects.listForCurrentUser();
-      return {
-        projects,
-        jobCards: projects.map((p) => this.mapProjectToJobCard(p)),
-        photographers: USE_MOCK_DATA ? technicians : [],
-        auditLog: USE_MOCK_DATA ? auditLog : [],
-        metrics,
-      };
+      if (USE_MOCK_DATA) {
+        const projects = await this.projects.listForCurrentUser();
+        return {
+          projects,
+          jobCards: projects.map((p) => this.mapProjectToJobCard(p)),
+          photographers: technicians,
+          auditLog: auditLog,
+          metrics: metrics,
+        };
+      }
+      try {
+        const dashboardData = await this.request<any>('/dashboard');
+        const projects = dashboardData.projects || [];
+        return {
+          projects: projects.map((p: any) => this.normalizeProject(p)),
+          jobCards: projects.map((p: any) => this.mapProjectToJobCard(this.normalizeProject(p))),
+          photographers: dashboardData.photographers || [],
+          auditLog: dashboardData.auditLog || [],
+          metrics: dashboardData.metrics || {
+            organizationId: "",
+            period: "week" as const,
+            jobs: { total: 0, pending: 0, assigned: 0, completed: 0, cancelled: 0 },
+            photographers: { active: 0, available: 0, utilization: 0 },
+            technicians: { active: 0, available: 0, utilization: 0 },
+            performance: { averageAssignmentTime: 0, averageDeliveryTime: 0, onTimeRate: 0, clientSatisfaction: 0 },
+            revenue: { total: 0, perJob: 0 },
+          },
+        };
+      } catch (error) {
+        // Fallback to projects-only if dashboard endpoint fails
+        const projects = await this.projects.listForCurrentUser();
+        return {
+          projects,
+          jobCards: projects.map((p) => this.mapProjectToJobCard(p)),
+          photographers: [],
+          auditLog: [],
+          metrics: {
+            organizationId: "",
+            period: "week" as const,
+            jobs: { total: 0, pending: 0, assigned: 0, completed: 0, cancelled: 0 },
+            photographers: { active: 0, available: 0, utilization: 0 },
+            technicians: { active: 0, available: 0, utilization: 0 },
+            performance: { averageAssignmentTime: 0, averageDeliveryTime: 0, onTimeRate: 0, clientSatisfaction: 0 },
+            revenue: { total: 0, perJob: 0 },
+          },
+        };
+      }
     },
   };
 

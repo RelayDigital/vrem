@@ -7,7 +7,9 @@ import { useRequireRole } from "@/hooks/useRequireRole";
 import { JobsView } from "@/components/features/dispatcher/views/JobsView";
 import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
 import { Photographer, ProjectStatus } from "@/types";
+// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented (visual placeholder only)
 import { photographers as initialPhotographers } from "@/lib/mock-data";
+import { USE_MOCK_DATA } from "@/lib/utils";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
 import { JobsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
@@ -32,7 +34,7 @@ export default function ProjectManagementPage() {
   ]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
-  const [photographers] = useState(initialPhotographers);
+  const [photographers] = useState(USE_MOCK_DATA ? initialPhotographers : []);
 
   // Get sidebar state to adjust left offset
   let sidebarState: string | undefined;

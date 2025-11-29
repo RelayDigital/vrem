@@ -2,12 +2,16 @@
 
 import { AgentJobsView } from '@/components/features/agent/AgentJobsView';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { jobRequests, technicians } from '@/lib/mock-data';
+import { useJobManagement } from '@/context/JobManagementContext';
 import { useRouter } from 'next/navigation';
 
 export default function AgentJobsPage() {
   const { user, isLoading } = useRequireRole(['AGENT', 'ADMIN', 'PROJECT_MANAGER']);
   const router = useRouter();
+  const jobManagement = useJobManagement();
+
+  // TODO: wire to backend once we have a users/technicians endpoint
+  const technicians: any[] = [];
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
@@ -19,7 +23,7 @@ export default function AgentJobsPage() {
 
   return (
     <AgentJobsView 
-      jobs={jobRequests} 
+      jobs={jobManagement.jobCards} 
       technicians={technicians} 
       organizationId={user.organizationId} 
       onNewJobClick={() => router.push('/agent/booking')} 

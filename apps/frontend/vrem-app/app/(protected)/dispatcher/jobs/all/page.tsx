@@ -7,9 +7,11 @@ import { useRequireRole } from '@/hooks/useRequireRole';
 import { JobsView } from '@/components/features/dispatcher/views/JobsView';
 import { JobTaskView } from '@/components/shared/tasks/JobTaskView';
 import { Photographer, ProjectStatus } from '@/types';
+// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented
 import {
   photographers as initialPhotographers,
 } from '@/lib/mock-data';
+import { USE_MOCK_DATA } from '@/lib/utils';
 import { useJobManagement } from '@/context/JobManagementContext';
 import { useMessaging } from '@/context/MessagingContext';
 import { JobsLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
@@ -27,7 +29,7 @@ export default function AllJobsPage() {
   const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
-  const [photographers] = useState(initialPhotographers);
+  const [photographers] = useState(USE_MOCK_DATA ? initialPhotographers : []);
 
   // Listen for navigation events to open job task view
   useEffect(() => {

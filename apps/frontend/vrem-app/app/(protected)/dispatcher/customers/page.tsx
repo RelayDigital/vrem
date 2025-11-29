@@ -5,6 +5,7 @@ import { useRequireRole } from '@/hooks/useRequireRole';
 import { CustomersView } from '@/components/features/dispatcher/views/CustomersView';
 import { Customer } from '@/components/shared/tables/CustomersTable';
 import { TeamLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
+import { USE_MOCK_DATA } from '@/lib/utils';
 
 // Mock data - in a real app, this would come from an API
 const mockCustomers: Customer[] = [
@@ -57,7 +58,7 @@ const mockCustomers: Customer[] = [
 
 export default function DispatcherCustomersPage() {
   const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
-  const [customers] = useState(mockCustomers);
+  const [customers] = useState(USE_MOCK_DATA ? mockCustomers : []);
 
   if (isLoading) {
     return <TeamLoadingSkeleton />;

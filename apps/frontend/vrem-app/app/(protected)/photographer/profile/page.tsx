@@ -2,17 +2,27 @@
 
 import { PhotographerDashboard } from '@/components/features/photographer/PhotographerDashboard';
 import { useRequireRole } from '@/hooks/useRequireRole';
-import { jobRequests, photographers, organizations, companyApplications } from '@/lib/mock-data';
+import { useJobManagement } from '@/context/JobManagementContext';
+import { useOrganizations } from '@/hooks/useOrganizations';
+// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented
+import { photographers } from '@/lib/mock-data';
 import { useState } from 'react';
-import { Photographer } from '@/types';
+import { Organization, Photographer } from '@/types';
 import { toast } from 'sonner';
 
 export default function PhotographerProfilePage() {
   const { user, isLoading } = useRequireRole(['TECHNICIAN', 'photographer', 'ADMIN', 'PROJECT_MANAGER']);
-  const [jobs] = useState(jobRequests);
+  const jobManagement = useJobManagement();
+  const { memberships } = useOrganizations();
+  // TODO: replace with real photographer list from backend once users/technicians endpoint is implemented
   const [photographersList] = useState(photographers);
-  const [companies] = useState(organizations);
-  const [applications, setApplications] = useState(companyApplications);
+  // TODO: replace with real company applications from backend once applications endpoint is implemented
+  const [applications, setApplications] = useState<any[]>([]);
+  
+  // Get jobs from JobManagementContext
+  const jobs = jobManagement.jobCards;
+  // Get organizations from useOrganizations hook
+  const companies = memberships.map(m => m.organization).filter(Boolean);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
@@ -84,7 +94,7 @@ export default function PhotographerProfilePage() {
   };
 
   const handleApplyToCompany = (companyId: string, message: string) => {
-    const company = companies.find((o) => o.id === companyId);
+    const company = companies.find((o) => o?.id === companyId);
     if (company) {
       const newApplication = {
         id: `app-${Date.now()}`,
@@ -108,7 +118,7 @@ export default function PhotographerProfilePage() {
       <PhotographerDashboard
         photographer={currentPhotographer}
         jobs={jobs}
-        companies={companies}
+        companies={companies.filter(Boolean) as Organization[]}
         applications={applications}
         onUpdateProfile={handleUpdateProfile}
         onApplyToCompany={handleApplyToCompany}

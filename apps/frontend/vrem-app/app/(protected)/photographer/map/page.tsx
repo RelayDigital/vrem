@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { LiveJobMapView } from "@/components/features/dispatcher/views/LiveJobMapView";
 import { Photographer, JobRequest } from "@/types";
+// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented (visual placeholder only)
 import { photographers as initialPhotographers } from "@/lib/mock-data";
+import { USE_MOCK_DATA } from "@/lib/utils";
 import { MapLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import { useJobManagement } from "@/context/JobManagementContext";
 
@@ -18,7 +20,7 @@ export default function PhotographerMapPage() {
   ]);
   const router = useRouter();
   const jobManagement = useJobManagement();
-  const [photographers] = useState<Photographer[]>(initialPhotographers);
+  const [photographers] = useState<Photographer[]>(USE_MOCK_DATA ? initialPhotographers : []);
 
   if (isLoading) {
     return <MapLoadingSkeleton />;

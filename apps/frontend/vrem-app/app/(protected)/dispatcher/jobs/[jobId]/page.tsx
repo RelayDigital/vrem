@@ -6,7 +6,9 @@ import { useRequireRole } from '@/hooks/useRequireRole';
 import { JobTaskView } from '@/components/shared/tasks/JobTaskView';
 import { useJobManagement } from '@/context/JobManagementContext';
 import { useMessaging } from '@/context/MessagingContext';
+// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented (visual placeholder only)
 import { photographers as initialPhotographers } from '@/lib/mock-data';
+import { USE_MOCK_DATA } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useIsMobile } from '@/components/ui/use-mobile';
@@ -18,7 +20,7 @@ export default function JobTaskPage() {
   const { user, isLoading: authLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
-  const [photographers] = useState(initialPhotographers);
+  const [photographers] = useState(USE_MOCK_DATA ? initialPhotographers : []);
   const jobId = params?.jobId as string;
 
   // Get sidebar state to adjust left offset

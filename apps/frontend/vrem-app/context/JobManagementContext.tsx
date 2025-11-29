@@ -50,16 +50,35 @@ export function JobManagementProvider({
   children,
   defaultUserId,
   defaultOrganizationId,
+  initialProjects,
 }: {
   children: ReactNode;
   defaultUserId?: string;
   defaultOrganizationId?: string;
+  initialProjects?: Project[];
 }) {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const normalizeProjects = useCallback((items: Project[]) => {
+    return items.map((p) => ({
+      ...p,
+      createdAt: new Date(p.createdAt),
+      updatedAt: new Date(p.updatedAt),
+      scheduledTime: new Date(p.scheduledTime),
+    }));
+  }, []);
+
+  const [projects, setProjects] = useState<Project[]>(() =>
+    initialProjects ? normalizeProjects(initialProjects) : []
+  );
   const [selectedJob, setSelectedJob] = useState<JobRequest | null>(null);
   const [showRankings, setShowRankings] = useState(false);
   const [showTaskView, setShowTaskView] = useState(false);
   const [showTaskDialog, setShowTaskDialog] = useState(false);
+
+  useEffect(() => {
+    if (initialProjects) {
+      setProjects(normalizeProjects(initialProjects));
+    }
+  }, [initialProjects, normalizeProjects]);
 
   // Set active org header when provided
   useEffect(() => {
@@ -77,12 +96,7 @@ export function JobManagementProvider({
       try {
         const fetchedProjects = await api.projects.listForCurrentUser();
         // Ensure dates are Date objects
-        const projectsWithDates = fetchedProjects.map((p) => ({
-          ...p,
-          createdAt: new Date(p.createdAt),
-          updatedAt: new Date(p.updatedAt),
-          scheduledTime: new Date(p.scheduledTime),
-        }));
+        const projectsWithDates = normalizeProjects(fetchedProjects);
         setProjects(projectsWithDates);
       } catch (error) {
         console.error('Error fetching jobs:', error);
@@ -91,7 +105,7 @@ export function JobManagementProvider({
     };
 
     fetchJobs();
-  }, [defaultOrganizationId]);
+  }, [defaultOrganizationId, normalizeProjects]);
 
   // Derive jobs view model
   const jobCards = useMemo(() => {

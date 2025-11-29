@@ -1,17 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { AuditView } from '@/components/features/dispatcher/views/AuditView';
 import { AuditLogEntry } from '@/types';
-import { auditLog as initialAuditLog } from '@/lib/mock-data';
 import { AuditLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
+import { api } from '@/lib/api';
 
 export default function DispatcherAuditPage() {
   const { user, isLoading } = useRequireRole(['dispatcher', 'ADMIN' as any, 'PROJECT_MANAGER' as any, 'EDITOR' as any]);
-  const [auditLog] = useState(initialAuditLog);
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
+  const [auditLoading, setAuditLoading] = useState(true);
 
-  if (isLoading) {
+  useEffect(() => {
+    const fetchAuditLog = async () => {
+      try {
+        const dashboardData = await api.dashboard.get();
+        setAuditLog(dashboardData.auditLog || []);
+      } catch (error) {
+        console.error('Failed to fetch audit log:', error);
+        setAuditLog([]);
+      } finally {
+        setAuditLoading(false);
+      }
+    };
+
+    fetchAuditLog();
+  }, []);
+
+  if (isLoading || auditLoading) {
     return <AuditLoadingSkeleton />;
   }
 
@@ -25,4 +42,3 @@ export default function DispatcherAuditPage() {
     </div>
   );
 }
-

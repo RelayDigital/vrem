@@ -13,7 +13,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { JobRequestForm } from '@/components/shared/jobs';
 import { RankingsDialog } from '@/components/features/dispatcher/dialogs';
+// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented; currently a visual placeholder
 import { photographers as initialPhotographers } from '@/lib/mock-data';
+import { USE_MOCK_DATA } from '@/lib/utils';
 import { useIsMobile } from '@/components/ui/use-mobile';
 import { ReactNode } from 'react';
 import { api } from '@/lib/api';
@@ -207,6 +209,7 @@ function DispatcherLayoutContent({
       )}
 
       {/* Rankings Dialog - Shared across all dispatcher pages */}
+      {/* TODO: replace initialPhotographers with real photographer list from backend once users/technicians endpoint is implemented; temporary visual placeholder */}
       <RankingsDialog
         open={jobManagement.showRankings}
         onOpenChange={(open) => {
@@ -215,7 +218,7 @@ function DispatcherLayoutContent({
           }
         }}
         selectedJob={jobManagement.selectedJob}
-        photographers={initialPhotographers}
+        photographers={USE_MOCK_DATA ? initialPhotographers : []}
         onJobAssign={jobManagement.assignJob}
       />
     </SidebarProvider>

@@ -3,10 +3,10 @@
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { AppHeader } from '@/components/shared/layout/AppHeader';
 import { Skeleton } from '@/components/ui/skeleton';
-import { JobCreationProvider, useJobCreation } from '@/context/JobCreationContext';
+import { JobCreationProvider } from '@/context/JobCreationContext';
 import { MessagingProvider } from '@/context/MessagingContext';
 import { JobManagementProvider, useJobManagement } from '@/context/JobManagementContext';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { JobRequest, Project } from '@/types';
 
@@ -16,6 +16,22 @@ export default function AgentLayout({
   children: React.ReactNode;
 }) {
   const { user, isLoading, organizationId } = useRequireRole(['AGENT', 'ADMIN', 'PROJECT_MANAGER']);
+  const [initialProjects, setInitialProjects] = useState<Project[] | null>(null);
+
+  useEffect(() => {
+    const loadInitialProjects = async () => {
+      if (!organizationId) return;
+      api.organizations.setActiveOrganization(organizationId);
+      try {
+        const dashboardData = await api.dashboard.get();
+        setInitialProjects(dashboardData.projects || []);
+      } catch (error) {
+        console.error('Failed to preload agent projects', error);
+      }
+    };
+
+    loadInitialProjects();
+  }, [organizationId]);
 
   if (isLoading) {
     return (
@@ -57,6 +73,7 @@ export default function AgentLayout({
     <JobManagementProvider
       defaultUserId={user?.id}
       defaultOrganizationId={organizationId || undefined}
+      initialProjects={initialProjects || undefined}
     >
       <JobCreationProviderWrapper
         defaultUserId={user?.id}

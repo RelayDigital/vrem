@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { DashboardView } from '@/components/features/dispatcher/views/DashboardView';
 import { JobTaskView } from '@/components/shared/tasks/JobTaskView';
-import { JobRequest } from '@/types';
-import {
-  photographers as initialPhotographers,
-  metrics, // Mock data - stats/metrics are currently using mock data
-} from '@/lib/mock-data';
+import { JobRequest, Metrics } from '@/types';
+import { api } from '@/lib/api';
+// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented (visual placeholder only)
+import { photographers as initialPhotographers } from '@/lib/mock-data';
+import { USE_MOCK_DATA } from '@/lib/utils';
 import { DashboardLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { JobRequestForm } from '@/components/shared/jobs';
@@ -25,14 +25,41 @@ export default function DispatcherDashboardPage() {
   const messaging = useMessaging();
   const jobManagement = useJobManagement();
   const navigation = useDispatcherNavigation();
-  const [photographers] = useState(initialPhotographers);
+  const [photographers] = useState(USE_MOCK_DATA ? initialPhotographers : []);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(true);
 
-  if (isLoading) {
+  // Fetch metrics from backend
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        const dashboardData = await api.dashboard.get();
+        setMetrics(dashboardData.metrics);
+      } catch (error) {
+        console.error('Failed to fetch dashboard metrics:', error);
+        // Fallback to empty metrics on error
+        setMetrics({
+          organizationId: "",
+          period: "week" as const,
+          jobs: { total: 0, pending: 0, assigned: 0, completed: 0, cancelled: 0 },
+          photographers: { active: 0, available: 0, utilization: 0 },
+          technicians: { active: 0, available: 0, utilization: 0 },
+          performance: { averageAssignmentTime: 0, averageDeliveryTime: 0, onTimeRate: 0, clientSatisfaction: 0 },
+          revenue: { total: 0, perJob: 0 },
+        });
+      } finally {
+        setMetricsLoading(false);
+      }
+    };
+    fetchMetrics();
+  }, []);
+
+  if (isLoading || metricsLoading) {
     return <DashboardLoadingSkeleton />;
   }
 
-  if (!user) {
-    return null; // Redirect handled by hook
+  if (!user || !metrics) {
+    return null; // Redirect handled by hook or metrics not loaded
   }
 
   // Use context handlers
@@ -61,7 +88,7 @@ export default function DispatcherDashboardPage() {
       <DashboardView
         jobs={jobManagement.jobs}
         photographers={photographers}
-        metrics={metrics} // Mock data - stats section uses mock metrics
+        metrics={metrics}
         selectedJob={jobManagement.selectedJob}
         onViewRankings={handleViewRankings}
         onSelectJob={handleJobSelect}
