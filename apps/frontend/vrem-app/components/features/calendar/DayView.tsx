@@ -155,62 +155,78 @@ export function DayView({
     return dayEvents.filter((e) => e.technicianId === technicianId);
   };
 
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-5 h-full">
-      {/* Technician Labels */}
-      <div className="col-span-1 border-r bg-muted shrink-0 h-full hidden md:block">
-        <div className="h-12 border-b flex items-center px-4 font-semibold text-sm">
-          Technician
-        </div>
-        {activeTechnicians.map((technician) => {
-          const color = getTechnicianColor(technician.id);
-          const isAvailable = technician.availability.some(
-            (a) => a.date === format(currentDate, "yyyy-MM-dd") && a.available
-          );
+  const hasTechnicians = technicians.length > 0;
 
-          return (
-            <div
-              key={technician.id}
-              className="h-24 border-b p-3 flex items-center gap-3"
-            >
+  return (
+    <div
+      className={
+        hasTechnicians
+          ? "grid grid-cols-1 md:grid-cols-5 h-full"
+          : "grid grid-cols-1 h-full"
+      }
+    >
+      {/* Technician Labels (hidden entirely when no technicians, e.g. photographer view) */}
+      {hasTechnicians && (
+        <div className="col-span-1 border-r bg-muted shrink-0 h-full hidden md:block">
+          <div className="h-12 border-b flex items-center px-4 font-semibold text-sm">
+            Technician
+          </div>
+          {activeTechnicians.map((technician) => {
+            const color = getTechnicianColor(technician.id);
+            const isAvailable = technician.availability.some(
+              (a) => a.date === format(currentDate, "yyyy-MM-dd") && a.available
+            );
+
+            return (
               <div
-                className="w-1 h-full rounded-full shrink-0"
-                style={{ backgroundColor: color || "#6b7280" }}
-              />
-              <Avatar className="h-10 w-10 shrink-0">
-                <AvatarImage src={technician.avatar} />
-                <AvatarFallback>
-                  {technician.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm truncate">
-                  {technician.name}
-                </div>
-                <div className="text-xs text-muted-foreground truncate">
-                  {technician.companyName || "Independent"}
-                </div>
-                <div className="flex items-center gap-1 mt-1">
-                  {isAvailable ? (
-                    <Wifi className="h-3 w-3 text-green-500" />
-                  ) : (
-                    <WifiOff className="h-3 w-3 text-muted-foreground" />
-                  )}
-                  <span className="text-xs text-muted-foreground">
-                    {isAvailable ? "Available" : "Unavailable"}
-                  </span>
+                key={technician.id}
+                className="h-24 border-b p-3 flex items-center gap-3"
+              >
+                <div
+                  className="w-1 h-full rounded-full shrink-0"
+                  style={{ backgroundColor: color || "#6b7280" }}
+                />
+                <Avatar className="h-10 w-10 shrink-0">
+                  <AvatarImage src={technician.avatar} />
+                  <AvatarFallback>
+                    {technician.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">
+                    {technician.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {technician.companyName || "Independent"}
+                  </div>
+                  <div className="flex items-center gap-1 mt-1">
+                    {isAvailable ? (
+                      <Wifi className="h-3 w-3 text-green-500" />
+                    ) : (
+                      <WifiOff className="h-3 w-3 text-muted-foreground" />
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {isAvailable ? "Available" : "Unavailable"}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
       {/* Calendar Timeline */}
-      <ScrollArea className="col-span-4 relative overflow-y-auto">
+      <ScrollArea
+        className={
+          hasTechnicians
+            ? "col-span-4 relative overflow-y-auto"
+            : "col-span-1 relative overflow-y-auto"
+        }
+      >
         <div className=" absolute flex w-full">
           {/* Hour Labels */}
           <div

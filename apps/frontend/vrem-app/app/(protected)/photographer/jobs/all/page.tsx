@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useRequireRole } from "@/hooks/useRequireRole";
@@ -19,53 +19,27 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { useSidebar } from "@/components/ui/sidebar";
-import { useIsMobile } from "@/components/ui/use-mobile";
 
-export default function ProjectManagementPage() {
+export default function PhotographerAllJobsPage() {
   const router = useRouter();
   const { user, isLoading } = useRequireRole([
-    "dispatcher",
-    "ADMIN" as any,
-    "PROJECT_MANAGER" as any,
-    "EDITOR" as any,
+    "TECHNICIAN",
+    "photographer",
+    "ADMIN",
+    "PROJECT_MANAGER",
   ]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
   const [photographers] = useState(initialPhotographers);
-
-  // Get sidebar state to adjust left offset
-  let sidebarState: string | undefined;
-  let sidebarOpen: boolean | undefined;
-  try {
-    const sidebar = useSidebar();
-    sidebarState = sidebar.state;
-    sidebarOpen = sidebar.open;
-  } catch {
-    // Not within SidebarProvider, use defaults
-    sidebarState = "expanded";
-    sidebarOpen = true;
-  }
-
-  // Calculate left offset based on sidebar state
-  // When collapsed to icon: 3rem (48px), when expanded: 16rem (256px)
-  // On mobile, no offset (sidebar doesn't affect layout)
-  const leftOffset = useIsMobile()
-    ? "0"
-    : sidebarState === "collapsed"
-    ? "3rem"
-    : "16rem";
-
-  // Trigger resize when sidebar state changes
-  useEffect(() => {
-    // Small delay to ensure DOM has updated after sidebar transition
-    const timeoutId = setTimeout(() => {
-      // Trigger resize event
-      window.dispatchEvent(new Event("resize"));
-    }, 250); // Match sidebar transition duration (200ms) + buffer
-
-    return () => clearTimeout(timeoutId);
-  }, [sidebarState]);
+  // Filter jobs to only show those assigned to the current photographer
+  const assignedJobs = useMemo(() => {
+    if (!user) return [];
+    return jobManagement.jobs.filter(
+      (job) =>
+        job.assignedPhotographerId === user.id ||
+        job.assignedTechnicianId === user.id
+    );
+  }, [jobManagement.jobs, user]);
 
   // Listen for navigation events to open job task view
   useEffect(() => {
@@ -89,6 +63,13 @@ export default function ProjectManagementPage() {
     };
   }, [jobManagement]);
 
+  // Fetch messages when selected job changes
+  useEffect(() => {
+    if (jobManagement.selectedJob) {
+      messaging.fetchMessages(jobManagement.selectedJob.id);
+    }
+  }, [jobManagement.selectedJob, messaging]);
+
   if (isLoading) {
     return <JobsLoadingSkeleton />;
   }
@@ -98,78 +79,44 @@ export default function ProjectManagementPage() {
   }
 
   // Use context handlers
-  const handleViewRankings = jobManagement.openRankings;
-  const handleJobAssign = jobManagement.assignJob;
   const handleJobClick = jobManagement.openTaskView;
   const handleFullScreen = jobManagement.openTaskDialog;
   const handleTaskDialogClose = jobManagement.handleTaskDialogClose;
   const handleOpenInNewPage = () => {
     if (jobManagement.selectedJob) {
-      router.push(`/dispatcher/jobs/${jobManagement.selectedJob.id}`);
+      router.push(`/photographer/jobs/${jobManagement.selectedJob.id}`);
     }
   };
   const handleTaskViewClose = jobManagement.handleTaskViewClose;
 
-  // Wrapper to convert JobRequest status to ProjectStatus
   const handleJobStatusChangeWrapper = (jobId: string, status: string) => {
     const statusMap: Record<string, ProjectStatus> = {
-      'pending': ProjectStatus.BOOKED,
-      'assigned': ProjectStatus.SHOOTING,
-      'in_progress': ProjectStatus.SHOOTING,
-      'editing': ProjectStatus.EDITING,
-      'delivered': ProjectStatus.DELIVERED,
-      'cancelled': ProjectStatus.BOOKED,
+      pending: ProjectStatus.BOOKED,
+      assigned: ProjectStatus.SHOOTING,
+      in_progress: ProjectStatus.SHOOTING,
+      editing: ProjectStatus.EDITING,
+      delivered: ProjectStatus.DELIVERED,
+      cancelled: ProjectStatus.BOOKED,
     };
-    jobManagement.changeJobStatus(jobId, statusMap[status] || ProjectStatus.BOOKED);
-  };
-
-  // Wrapper for JobTaskView onStatusChange (only receives status, not jobId)
-  const handleTaskViewStatusChange = (status: string) => {
-    if (jobManagement.selectedJob) {
-      handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
-    }
+    jobManagement.changeJobStatus(
+      jobId,
+      statusMap[status] || ProjectStatus.BOOKED
+    );
   };
 
   return (
-    <>
-      <div
-        className="fixed overflow-hidden transition-[left] duration-200 ease-linear flex flex-col"
-        style={{
-          top: "var(--header-h)",
-          left: leftOffset,
-          right: 0,
-          bottom: 0,
-          height: "calc(100vh - var(--header-h))",
-        }}
-      >
-        <div className="container relative mx-auto px-md pt-md shrink-0">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink asChild>
-                  <Link href="/dispatcher/jobs/all">Jobs</Link>
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Project Management</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </div>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          <JobsView
-            jobs={jobManagement.jobs}
-            photographers={photographers}
-            messages={messaging.messages}
-            onViewRankings={handleViewRankings}
-            onChangePhotographer={handleViewRankings}
-            onJobStatusChange={handleJobStatusChangeWrapper}
-            onJobClick={handleJobClick}
-            activeView="kanban"
-          />
-        </div>
-      </div>
+    <div className="w-full overflow-x-hidden h-full">
+      {/* Jobs View (list only, scoped to assigned jobs) */}
+      <JobsView
+        jobs={assignedJobs}
+        photographers={photographers}
+        messages={messaging.messages}
+        onViewRankings={() => {}}
+        onChangePhotographer={undefined}
+        onJobStatusChange={handleJobStatusChangeWrapper}
+        onJobClick={handleJobClick}
+        activeView="all"
+      />
 
       {/* Job Task View - Sheet */}
       <JobTaskView
@@ -204,7 +151,11 @@ export default function ProjectManagementPage() {
           messaging.editMessage(messageId, content)
         }
         onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
-        onStatusChange={handleTaskViewStatusChange}
+        onStatusChange={(status) => {
+          if (jobManagement.selectedJob) {
+            handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
+          }
+        }}
         onAssignPhotographer={jobManagement.handleAssignPhotographer}
         onChangePhotographer={jobManagement.handleChangePhotographer}
         variant="sheet"
@@ -245,11 +196,16 @@ export default function ProjectManagementPage() {
           messaging.editMessage(messageId, content)
         }
         onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
-        onStatusChange={handleTaskViewStatusChange}
+        onStatusChange={(status) => {
+          if (jobManagement.selectedJob) {
+            handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
+          }
+        }}
         onAssignPhotographer={jobManagement.handleAssignPhotographer}
         onChangePhotographer={jobManagement.handleChangePhotographer}
         variant="dialog"
       />
-    </>
+    </div>
   );
 }
+

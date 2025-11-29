@@ -3,15 +3,18 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
-import { PhotographerDashboardView } from "@/components/features/photographer/views/DashboardView";
-import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
+import { CalendarView } from "@/components/features/calendar/CalendarView";
 import { Photographer, ProjectStatus } from "@/types";
 import { photographers as initialPhotographers } from "@/lib/mock-data";
+import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
+import {
+  CalendarLoadingSkeleton,
+  JobsLoadingSkeleton,
+} from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
-import { DashboardLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 
-export default function PhotographerDashboardPage() {
+export default function PhotographerCalendarPage() {
   const router = useRouter();
   const { user, isLoading } = useRequireRole([
     "TECHNICIAN",
@@ -21,7 +24,7 @@ export default function PhotographerDashboardPage() {
   ]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
-  const [photographers] = useState(initialPhotographers);
+  const [photographers] = useState<Photographer[]>(initialPhotographers);
 
   // Filter jobs to only show those assigned to the current photographer
   const assignedJobs = useMemo(() => {
@@ -33,50 +36,6 @@ export default function PhotographerDashboardPage() {
     );
   }, [jobManagement.jobs, user]);
 
-  // Calculate stats from assigned jobs
-  const stats = useMemo(() => {
-    const upcomingJobs = assignedJobs.filter(
-      (job) => job.status === "assigned" || job.status === "pending"
-    );
-    const completedJobs = assignedJobs.filter(
-      (job) => job.status === "delivered"
-    );
-
-    // Find current photographer for rating/on-time rate
-    const currentPhotographer = photographers.find((p) => p.id === user?.id);
-    const rating = currentPhotographer?.rating?.overall || 0;
-    const onTimeRate = currentPhotographer?.reliability?.onTimeRate || 0;
-
-    return {
-      upcoming: upcomingJobs.length,
-      completed: completedJobs.length,
-      rating,
-      onTimeRate: (onTimeRate * 100).toFixed(0),
-    };
-  }, [assignedJobs, photographers, user]);
-
-  // Listen for navigation events to open job task view
-  useEffect(() => {
-    const handleOpenJobTaskView = (event: CustomEvent<{ id: string }>) => {
-      const job = jobManagement.getJobById(event.detail.id);
-      if (job) {
-        jobManagement.selectJob(job);
-        jobManagement.openTaskView(job);
-      }
-    };
-
-    window.addEventListener(
-      "openJobTaskView",
-      handleOpenJobTaskView as EventListener
-    );
-    return () => {
-      window.removeEventListener(
-        "openJobTaskView",
-        handleOpenJobTaskView as EventListener
-      );
-    };
-  }, [jobManagement]);
-
   // Fetch messages when selected job changes
   useEffect(() => {
     if (jobManagement.selectedJob) {
@@ -85,7 +44,7 @@ export default function PhotographerDashboardPage() {
   }, [jobManagement.selectedJob, messaging]);
 
   if (isLoading) {
-    return <DashboardLoadingSkeleton />;
+    return <CalendarLoadingSkeleton />;
   }
 
   if (!user) {
@@ -94,7 +53,6 @@ export default function PhotographerDashboardPage() {
 
   // Use context handlers
   const handleJobClick = jobManagement.openTaskView;
-  const handleJobSelect = jobManagement.toggleJobSelection;
   const handleFullScreen = jobManagement.openTaskDialog;
   const handleTaskDialogClose = jobManagement.handleTaskDialogClose;
   const handleOpenInNewPage = () => {
@@ -104,34 +62,30 @@ export default function PhotographerDashboardPage() {
   };
   const handleTaskViewClose = jobManagement.handleTaskViewClose;
 
-  // Navigation handlers
-  const handleNavigateToJobsView = () => {
-    router.push("/photographer/jobs/all");
-  };
-  const handleNavigateToMapView = () => {
-    router.push("/photographer/map");
-  };
-  const handleNavigateToCalendarView = () => {
-    router.push("/photographer/calendar");
-  };
-  const handleNavigateToJobInProjectManagement = (job: any) => {
-    jobManagement.selectJob(job);
-    router.push(`/photographer/jobs/${job.id}`);
+  const handleJobStatusChangeWrapper = (jobId: string, status: string) => {
+    const statusMap: Record<string, ProjectStatus> = {
+      pending: ProjectStatus.BOOKED,
+      assigned: ProjectStatus.SHOOTING,
+      in_progress: ProjectStatus.SHOOTING,
+      editing: ProjectStatus.EDITING,
+      delivered: ProjectStatus.DELIVERED,
+      cancelled: ProjectStatus.BOOKED,
+    };
+    jobManagement.changeJobStatus(
+      jobId,
+      statusMap[status] || ProjectStatus.BOOKED
+    );
   };
 
   return (
     <div className="w-full overflow-x-hidden h-full">
-      <PhotographerDashboardView
+      <CalendarView
         jobs={assignedJobs}
-        photographers={photographers}
-        selectedJob={jobManagement.selectedJob}
-        stats={stats}
-        onSelectJob={handleJobSelect}
-        onNavigateToJobsView={handleNavigateToJobsView}
-        onNavigateToMapView={handleNavigateToMapView}
-        onNavigateToCalendarView={handleNavigateToCalendarView}
-        onNavigateToJobInProjectManagement={handleNavigateToJobInProjectManagement}
+        // Photographer accounts are single-technician, so we don't show technicians list in the sidebar
+        photographers={[]}
         onJobClick={handleJobClick}
+        // Photographers cannot create jobs directly from the calendar
+        onCreateJob={undefined}
       />
 
       {/* Job Task View - Sheet */}
@@ -168,18 +122,7 @@ export default function PhotographerDashboardPage() {
         onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
         onStatusChange={(status) => {
           if (jobManagement.selectedJob) {
-            const statusMap: Record<string, ProjectStatus> = {
-              pending: ProjectStatus.BOOKED,
-              assigned: ProjectStatus.SHOOTING,
-              in_progress: ProjectStatus.SHOOTING,
-              editing: ProjectStatus.EDITING,
-              delivered: ProjectStatus.DELIVERED,
-              cancelled: ProjectStatus.BOOKED,
-            };
-            jobManagement.changeJobStatus(
-              jobManagement.selectedJob.id,
-              statusMap[status] || ProjectStatus.BOOKED
-            );
+            handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
           }
         }}
         onAssignPhotographer={jobManagement.handleAssignPhotographer}
@@ -223,18 +166,7 @@ export default function PhotographerDashboardPage() {
         onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
         onStatusChange={(status) => {
           if (jobManagement.selectedJob) {
-            const statusMap: Record<string, ProjectStatus> = {
-              pending: ProjectStatus.BOOKED,
-              assigned: ProjectStatus.SHOOTING,
-              in_progress: ProjectStatus.SHOOTING,
-              editing: ProjectStatus.EDITING,
-              delivered: ProjectStatus.DELIVERED,
-              cancelled: ProjectStatus.BOOKED,
-            };
-            jobManagement.changeJobStatus(
-              jobManagement.selectedJob.id,
-              statusMap[status] || ProjectStatus.BOOKED
-            );
+            handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
           }
         }}
         onAssignPhotographer={jobManagement.handleAssignPhotographer}
@@ -244,3 +176,5 @@ export default function PhotographerDashboardPage() {
     </div>
   );
 }
+
+

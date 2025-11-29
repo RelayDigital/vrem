@@ -305,48 +305,50 @@ export function CalendarRightSidebar({
         </>
       )}
 
-      {/* Technician Filters */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <Label className="text-sm font-semibold">Technicians</Label>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleShowAllTechnicians}
-            className="h-6 text-xs"
-          >
-            {showAllTechnicians ? "Hide All" : "Show All"}
-          </Button>
-        </div>
-        <div className="space-y-2">
-          {technicians.map((technician) => {
-            const color = getTechnicianColor(technician.id);
-            const isChecked = filters.technicians.includes(technician.id);
+      {/* Technician Filters - hidden when there are no technicians (e.g. photographer view) */}
+      {technicians.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <Label className="text-sm font-semibold">Technicians</Label>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleShowAllTechnicians}
+              className="h-6 text-xs"
+            >
+              {showAllTechnicians ? "Hide All" : "Show All"}
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {technicians.map((technician) => {
+              const color = getTechnicianColor(technician.id);
+              const isChecked = filters.technicians.includes(technician.id);
 
-            return (
-              <div key={technician.id} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`filter-technician-${technician.id}`}
-                  checked={isChecked}
-                  onCheckedChange={(checked) =>
-                    handleTechnicianChange(technician.id, checked as boolean)
-                  }
-                />
-                <Label
-                  htmlFor={`filter-technician-${technician.id}`}
-                  className="text-sm font-normal cursor-pointer flex items-center gap-2 flex-1"
-                >
-                  <div
-                    className="w-3 h-3 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: color }}
+              return (
+                <div key={technician.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`filter-technician-${technician.id}`}
+                    checked={isChecked}
+                    onCheckedChange={(checked) =>
+                      handleTechnicianChange(technician.id, checked as boolean)
+                    }
                   />
-                  <span className="truncate">{technician.name}</span>
-                </Label>
-              </div>
-            );
-          })}
+                  <Label
+                    htmlFor={`filter-technician-${technician.id}`}
+                    className="text-sm font-normal cursor-pointer flex items-center gap-2 flex-1"
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="truncate">{technician.name}</span>
+                  </Label>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -316,8 +316,8 @@ export function JobRequestForm({
       } else {
         // If geocoding fails, use existing location if available, otherwise default
         if (!location) {
-          toast.error("Could not find location for this address. Using default location.", { id: "geocoding" });
-          location = { lat: 51.0447, lng: -114.0719 };
+        toast.error("Could not find location for this address. Using default location.", { id: "geocoding" });
+        location = { lat: 51.0447, lng: -114.0719 };
         } else {
           toast.dismiss("geocoding");
           // Keep existing location and address as-is if geocoding fails

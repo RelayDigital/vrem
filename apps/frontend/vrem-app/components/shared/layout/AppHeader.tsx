@@ -41,6 +41,7 @@ import { useAuth } from '@/context/auth-context';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ChatMessage } from '@/types/chat';
+import { OrganizationSwitcher } from '@/components/features/dispatcher/OrganizationSwitcher';
 
 interface AppHeaderProps {
   user?: User;
@@ -52,7 +53,6 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
   const { theme, setTheme } = useTheme();
   const { logout } = useAuth();
   const jobCreation = useJobCreation();
-  const isMobile = useIsMobile();
   const [jobs, setJobs] = useState(initialJobRequests);
   const [photographers] = useState(initialPhotographers);
   const [selectedJob, setSelectedJob] = useState<JobRequest | null>(null);
@@ -74,9 +74,13 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
   const isAgentBookingView = pathname === '/agent/booking';
 
   // Determine photographer view based on pathname
-  const isPhotographerJobsView = pathname === '/photographer' || pathname === '/photographer/jobs';
-  const isPhotographerProfileView = pathname === '/photographer/profile';
-  const isPhotographerCompaniesView = pathname === '/photographer/companies';
+  const isPhotographerDashboardView = pathname === '/photographer';
+  const isPhotographerJobsView = pathname.startsWith('/photographer/jobs');
+  const isPhotographerCalendarView = pathname === '/photographer/calendar';
+  const isPhotographerMapView = pathname === '/photographer/map';
+
+  // Determine dispatcher view (only dispatcher uses the sidebar layout)
+  const isDispatcherView = pathname.startsWith('/dispatcher');
 
     // Sync context dialog state with local dialog state
     useEffect(() => {
@@ -126,7 +130,7 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
       router.push('/dispatcher/settings');
     } else if (user.role === 'AGENT' as any) {
       router.push('/agent/settings');
-    } else if (user.role === 'PHOTOGRAPHER' as any || user.role === 'TECHNICIAN' as any) {
+    } else if (user.role === 'PHOTOGRAPHER' as any || user.role === 'photographer' as any || user.role === 'TECHNICIAN' as any) {
       router.push('/photographer/settings');
     } else {
       router.push('/settings');
@@ -140,14 +144,34 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
     logout();
   };
 
+  const handleOrganizationHome = () => {
+    if (user.role === 'ADMIN' || user.role === 'PROJECT_MANAGER' || user.role === 'EDITOR' || (user.role as any) === 'dispatcher') {
+      router.push('/dispatcher/organization');
+    } else if (user.role === 'TECHNICIAN' || (user.role as any) === 'PHOTOGRAPHER' || (user.role as any) === 'photographer') {
+      router.push('/photographer/organization');
+    }
+  };
+
   return (
     <>
-      <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-xl shadow-sm w-full px-4 h-header-h">
-        <div className="w-full max-w-full py-3 overflow-hidden">
+      <header className="sticky top-0 z-50 flex items-center border-b bg-card/80 backdrop-blur-xl shadow-sm w-full pl-2 pr-4 h-header-h">
+        <div className="w-full max-w-full overflow-hidden">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <H2 className="p-0 border-0">VX Media</H2>
-              {!isMobile && (user.role === 'ADMIN' || user.role === 'PROJECT_MANAGER' || user.role === 'EDITOR') && <SidebarTrigger />}
+              {(user.role === 'ADMIN' || user.role === 'PROJECT_MANAGER' || user.role === 'EDITOR' || user.role === 'dispatcher' as any) && (
+                <OrganizationSwitcher variant="header" showJoin={false} onOrgHome={handleOrganizationHome} accountType="dispatcher" />
+              )}
+              {(user.role === 'TECHNICIAN' || user.role === 'PHOTOGRAPHER' as any || user.role === 'photographer' as any) && (
+                <OrganizationSwitcher variant="header" includePersonal showManage={false} onOrgHome={handleOrganizationHome} accountType="photographer" />
+              )}
+              {(user.role !== 'ADMIN' && user.role !== 'PROJECT_MANAGER' && user.role !== 'EDITOR' && user.role !== 'dispatcher' as any && user.role !== 'TECHNICIAN' && user.role !== 'PHOTOGRAPHER' as any && user.role !== 'photographer' as any) && (
+                <H2 className="p-0 border-0">VX Media</H2>
+              )}
+              {!useIsMobile() &&
+                isDispatcherView &&
+                (user.role === 'ADMIN' ||
+                  user.role === 'PROJECT_MANAGER' ||
+                  user.role === 'EDITOR') && <SidebarTrigger />}
             </div>
 
             <div className="flex items-center gap-4">
@@ -172,31 +196,36 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
               )}
 
               {/* Photographer View Switcher */}
-              {(user.role === 'PHOTOGRAPHER' as any || user.role === 'TECHNICIAN' as any) && (
+              {(user.role === 'PHOTOGRAPHER' as any || user.role === 'photographer' as any || user.role === 'TECHNICIAN' as any) && (
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant={isPhotographerDashboardView ? "default" : "muted"}
+                    size="sm"
+                    onClick={() => router.push('/photographer')}
+                  >
+                    Dashboard
+                  </Button>
                   <Button
                     variant={isPhotographerJobsView ? "default" : "muted"}
                     size="sm"
                     onClick={() => router.push('/photographer/jobs')}
                   >
                     <Briefcase className="h-4 w-4 mr-2" />
-                    My Jobs
+                    Jobs
                   </Button>
                   <Button
-                    variant={isPhotographerProfileView ? "default" : "muted"}
+                    variant={isPhotographerCalendarView ? "default" : "muted"}
                     size="sm"
-                    onClick={() => router.push('/photographer/profile')}
+                    onClick={() => router.push('/photographer/calendar')}
                   >
-                    <UserIcon className="h-4 w-4 mr-2" />
-                    Profile & Services
+                    Calendar
                   </Button>
                   <Button
-                    variant={isPhotographerCompaniesView ? "default" : "muted"}
+                    variant={isPhotographerMapView ? "default" : "muted"}
                     size="sm"
-                    onClick={() => router.push('/photographer/companies')}
+                    onClick={() => router.push('/photographer/map')}
                   >
-                    <Building2 className="h-4 w-4 mr-2" />
-                    Companies
+                    Map
                   </Button>
                 </div>
               )}
@@ -244,7 +273,19 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push('/dispatcher/profile')}>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (user.role === 'ADMIN' as any || user.role === 'PROJECT_MANAGER' as any || user.role === 'EDITOR' as any || user.role === 'dispatcher' as any) {
+                        router.push('/dispatcher/profile');
+                      } else if (user.role === 'PHOTOGRAPHER' as any || user.role === 'photographer' as any || user.role === 'TECHNICIAN' as any) {
+                        router.push('/photographer/profile');
+                      } else if (user.role === 'AGENT' as any) {
+                        router.push('/agent/profile');
+                      } else {
+                        router.push('/profile');
+                      }
+                    }}
+                  >
                     <UserIcon className="h-4 w-4 mr-2" />
                     Profile
                   </DropdownMenuItem>
@@ -300,4 +341,3 @@ export function AppHeader({ user = mockUser, showNewJobButton = false, onNewJobC
     </>
   );
 }
-

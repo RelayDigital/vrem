@@ -92,7 +92,6 @@ export function MapWithSidebar({
   initialJobForRankings = null,
   onGoBack,
 }: MapWithSidebarProps) {
-  const isMobile = useIsMobile();
   const [sidebarView, setSidebarView] =
     useState<SidebarView>(initialSidebarView);
   const [jobForRankings, setJobForRankings] = useState<JobRequest | null>(
@@ -357,7 +356,7 @@ export function MapWithSidebar({
         <>
           {/* Pending Assignments Header */}
           <CardHeader
-            className={`py-4 px-4 md:px-0! space-y-3 gap-0! md:relative sticky top-0 z-50 bg-background`}
+            className={`py-4 px-4 md:px-0! space-y-3 gap-0! md:relative sticky top-0 z-10 bg-background`}
           >
             <div className="flex items-center justify-between">
               <div>
@@ -681,7 +680,7 @@ export function MapWithSidebar({
       {/* Map - takes most of the space on desktop, small on mobile */}
       <div
         className={`${
-          isMobile ? "col-span-1" : "md:col-span-3"
+          useIsMobile() ? "col-span-1" : "md:col-span-3"
         } overflow-hidden ${fullScreen ? "" : "rounded-md"}`}
       >
         <MapView
@@ -696,12 +695,12 @@ export function MapWithSidebar({
                 null
               : null
           }
-          disablePopovers={isMobile}
+          disablePopovers={useIsMobile()}
         />
       </div>
 
       {/* Sidebar - Drawer on mobile, Card on desktop */}
-      {isMobile ? (
+      {useIsMobile() ? (
         <>
           {/* Mobile: Drawer Button */}
           <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>

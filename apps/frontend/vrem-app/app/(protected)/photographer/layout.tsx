@@ -123,16 +123,17 @@ function PhotographerLayoutContent({
   user: any;
 }) {
   return (
-    <>
+    <div className="flex min-h-svh w-full">
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50">
         <AppHeader user={user} />
       </div>
       
+      
       {/* Main Content */}
-      <main className="pt-header-h">
+      <main className="pt-header-h w-full flex-1">
         {children}
       </main>
-    </>
+    </div>
   );
 }

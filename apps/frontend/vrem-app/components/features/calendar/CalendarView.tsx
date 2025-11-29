@@ -74,7 +74,6 @@ export function CalendarView({
     technicians: [],
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const isMobile = useIsMobile();
 
   // Generate technician colors
   const technicianColors = useMemo(
@@ -245,7 +244,7 @@ export function CalendarView({
       view={view}
       onDateSelect={(date) => {
         setCurrentDate(date);
-        if (isMobile) {
+        if (useIsMobile()) {
           setSidebarOpen(false);
         }
       }}
@@ -276,7 +275,7 @@ export function CalendarView({
         <div className="col-span-1 md:col-span-4 min-[2560px]:col-span-6! overflow-auto">{renderView()}</div>
 
         {/* Right Sidebar */}
-        {isMobile ? (
+        {useIsMobile() ? (
           <Drawer open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <DrawerTrigger asChild>
               <Button

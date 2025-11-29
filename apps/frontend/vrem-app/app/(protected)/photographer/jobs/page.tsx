@@ -1,120 +1,31 @@
-'use client';
+"use client";
 
-import { PhotographerDashboard } from '@/components/features/photographer/PhotographerDashboard';
-import { useRequireRole } from '@/hooks/useRequireRole';
-import { jobRequests, photographers, organizations, companyApplications } from '@/lib/mock-data';
-import { useState } from 'react';
-import { Photographer } from '@/types';
-import { toast } from 'sonner';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useRequireRole } from "@/hooks/useRequireRole";
+import { JobsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 
 export default function PhotographerJobsPage() {
-  const { user, isLoading } = useRequireRole(['TECHNICIAN', 'photographer', 'ADMIN', 'PROJECT_MANAGER']);
-  const [jobs] = useState(jobRequests);
-  const [photographersList] = useState(photographers);
-  const [companies] = useState(organizations);
-  const [applications, setApplications] = useState(companyApplications);
+  const router = useRouter();
+  const { user, isLoading } = useRequireRole([
+    "TECHNICIAN",
+    "photographer",
+    "ADMIN",
+    "PROJECT_MANAGER",
+  ]);
+
+  useEffect(() => {
+    // Redirect to /photographer/jobs/all by default
+    router.replace("/photographer/jobs/all");
+  }, [router]);
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    return <JobsLoadingSkeleton />;
   }
 
   if (!user) {
-    return null;
+    return null; // Redirect handled by hook
   }
 
-  // Find the photographer matching the current user
-  // Try matching by ID first, then by email as fallback
-  let currentPhotographer = photographersList.find((p) => p.id === user.id) ||
-    photographersList.find((p) => p.email === user.email);
-
-  // If no photographer found, create a minimal profile from user data
-  if (!currentPhotographer) {
-    currentPhotographer = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: '',
-      organizationId: user.organizationId,
-      isIndependent: true,
-      homeLocation: {
-        lat: 51.0447,
-        lng: -114.0719,
-        address: {
-          city: 'Calgary',
-          stateProvince: 'AB',
-          country: 'Canada',
-        },
-      },
-      availability: [],
-      reliability: {
-        totalJobs: 0,
-        noShows: 0,
-        lateDeliveries: 0,
-        onTimeRate: 1.0,
-        averageDeliveryTime: 24,
-      },
-      skills: {
-        residential: 0,
-        commercial: 0,
-        aerial: 0,
-        twilight: 0,
-        video: 0,
-      },
-      rating: {
-        overall: 0,
-        count: 0,
-        recent: [],
-      },
-      preferredClients: [],
-      status: 'active' as const,
-      createdAt: new Date(),
-      services: {
-        photography: true,
-        video: false,
-        aerial: false,
-        twilight: false,
-        editing: false,
-        virtualStaging: false,
-      },
-    };
-  }
-
-  const handleUpdateProfile = (updates: Partial<Photographer>) => {
-    toast.success('Profile updated successfully');
-  };
-
-  const handleApplyToCompany = (companyId: string, message: string) => {
-    const company = companies.find((o) => o.id === companyId);
-    if (company) {
-      const newApplication = {
-        id: `app-${Date.now()}`,
-        photographerId: currentPhotographer.id,
-        photographerName: currentPhotographer.name,
-        technicianId: currentPhotographer.id,
-        technicianName: currentPhotographer.name,
-        companyId: company.id,
-        companyName: company.name,
-        status: 'pending' as const,
-        message,
-        appliedAt: new Date(),
-      };
-      setApplications([...applications, newApplication]);
-      toast.success(`Application sent to ${company.name}`);
-    }
-  };
-
-  return (
-    <div className="w-full overflow-x-hidden h-full">
-      <PhotographerDashboard
-        photographer={currentPhotographer}
-        jobs={jobs}
-        companies={companies}
-        applications={applications}
-        onUpdateProfile={handleUpdateProfile}
-        onApplyToCompany={handleApplyToCompany}
-        activeView="jobs"
-      />
-    </div>
-  );
+  return null; // Will redirect
 }
-

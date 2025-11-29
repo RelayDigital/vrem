@@ -5,7 +5,6 @@ import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
 import {
-  MapPin,
   Clock,
   Calendar,
   Camera,
@@ -17,7 +16,6 @@ import {
   AlertCircle,
   CheckCircle2,
   ExternalLink,
-  Dot,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { ImageWithFallback } from "../../common";
@@ -25,7 +23,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
 import { format } from "date-fns";
 import { cn } from "../../../lib/utils";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { useIsMobile } from "../../ui/use-mobile";
 import { P } from "@/components/ui/typography";
 
 interface JobCardProps {
@@ -145,7 +142,6 @@ export function JobCard({
   // Determine if layout should be horizontal
   // Always horizontal on mobile, or if horizontal prop is true
   const isHorizontal = horizontal;
-  const isMobile = useIsMobile();
 
   // Horizontal layout
   if (isHorizontal) {

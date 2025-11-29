@@ -13,6 +13,12 @@ interface LiveJobMapViewProps {
   onSelectJob: (job: JobRequest) => void;
   onNavigateToJobInProjectManagement?: (job: JobRequest) => void;
   onJobAssign?: (jobId: string, photographerId: string, score: number) => void;
+  /**
+   * When true, the view reserves space for the dispatcher sidebar by offsetting from the left.
+   * For photographer views (which have no sidebar), pass false to make the map full-width.
+   * Defaults to true for dispatcher layouts.
+   */
+  hasSidebar?: boolean;
 }
 
 export function LiveJobMapView({
@@ -22,8 +28,8 @@ export function LiveJobMapView({
   onSelectJob,
   onNavigateToJobInProjectManagement,
   onJobAssign,
+  hasSidebar = true,
 }: LiveJobMapViewProps) {
-  const isMobile = useIsMobile();
 
   // Get sidebar state to adjust left offset
   let sidebarState: string | undefined;
@@ -41,7 +47,13 @@ export function LiveJobMapView({
   // Calculate left offset based on sidebar state
   // When collapsed to icon: 3rem (48px), when expanded: 16rem (256px)
   // On mobile, no offset (sidebar doesn't affect layout)
-  const leftOffset = isMobile ? '0' : (sidebarState === 'collapsed' ? '3rem' : '16rem');
+  const isMobile = useIsMobile();
+  const leftOffset =
+    !hasSidebar || isMobile
+      ? '0'
+      : sidebarState === 'collapsed'
+      ? '3rem'
+      : '16rem';
 
   useEffect(() => {
     // Prevent body scrolling when map view is active

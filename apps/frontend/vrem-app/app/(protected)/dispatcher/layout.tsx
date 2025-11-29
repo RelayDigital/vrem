@@ -145,7 +145,6 @@ function DispatcherLayoutContent({
 }) {
   const jobCreation = useJobCreation();
   const jobManagement = useJobManagement();
-  const isMobile = useIsMobile();
 
   const jobFormContent = (
     <>
@@ -177,7 +176,7 @@ function DispatcherLayoutContent({
       <MobileMenuDock />
 
       {/* Job Creation - Drawer on mobile, Dialog on desktop */}
-      {isMobile ? (
+      {useIsMobile() ? (
         <Drawer open={jobCreation.isOpen} onOpenChange={(open) => {
           if (!open) {
             jobCreation.closeJobCreationDialog();

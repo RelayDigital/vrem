@@ -150,7 +150,7 @@ export function AgentBookingFlow({
       : [];
 
   return (
-    <div className="bg-background">
+    <div className="bg-background size-full flex-1">
       <AnimatePresence mode="wait">
         {/* Step 1: Address Search */}
         {step === 'address' && (

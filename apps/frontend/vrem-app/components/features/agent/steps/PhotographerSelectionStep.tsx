@@ -56,7 +56,7 @@ export function PhotographerSelectionStep({
       initial={{ opacity: 0, x: 100 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -100 }}
-      className="min-h-screen container mx-auto p-6 h-full"
+      className="container mx-auto p-6 h-full"
     >
       <div className="container mx-auto px-6 space-y-6">
         {/* Progress */}

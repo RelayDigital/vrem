@@ -87,6 +87,7 @@ export default function AllJobsPage() {
 
   return (
     <div className="w-full overflow-x-hidden h-full">
+      {/* Breadcrumb */}
       <div className="container relative mx-auto px-md pt-md">
         <Breadcrumb>
           <BreadcrumbList>
@@ -102,6 +103,8 @@ export default function AllJobsPage() {
           </BreadcrumbList>
         </Breadcrumb>
       </div>
+
+      {/* Jobs View */}
       <JobsView
         jobs={jobManagement.jobs}
         photographers={photographers}

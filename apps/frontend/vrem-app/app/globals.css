@@ -124,7 +124,7 @@
 
 :root {
   --radius: 0.5rem;
-  --header-h: 4rem; /* Application-wide header height */
+  --header-h: 3.5rem; /* Application-wide header height */
   --dock-h: 5rem; /* Mobile menu dock height */
   
   /* Uber-inspired Color Scheme */

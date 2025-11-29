@@ -19,7 +19,6 @@ export default function JobTaskPage() {
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
   const [photographers] = useState(initialPhotographers);
-  const isMobile = useIsMobile();
   const jobId = params?.jobId as string;
 
   // Get sidebar state to adjust left offset
@@ -38,7 +37,7 @@ export default function JobTaskPage() {
   // Calculate left offset based on sidebar state
   // When collapsed to icon: 3rem (48px), when expanded: 16rem (256px)
   // On mobile, no offset (sidebar doesn't affect layout)
-  const leftOffset = isMobile ? '0' : (sidebarState === 'collapsed' ? '3rem' : '16rem');
+  const leftOffset = useIsMobile() ? '0' : (sidebarState === 'collapsed' ? '3rem' : '16rem');
 
   // Trigger resize when sidebar state changes
   useEffect(() => {

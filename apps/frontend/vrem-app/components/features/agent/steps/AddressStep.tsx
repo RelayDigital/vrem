@@ -14,7 +14,7 @@ export function AddressStep({ onAddressSelect }: AddressStepProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] container mx-auto px-6 py-12"
+      className="flex flex-col items-center justify-center container mx-auto px-6 py-12 h-full"
     >
       <div className="w-full container mx-auto px-6 space-y-8" style={{ maxWidth: '896px' }}>
         <motion.div

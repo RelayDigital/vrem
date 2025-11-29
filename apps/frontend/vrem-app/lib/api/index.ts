@@ -141,11 +141,14 @@ class ApiClient {
   auth = {
     login: async (credentials: { email: string; password: string }) => {
       if (USE_MOCK_DATA) {
-        // Simulate login delay
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const mockUser = this.mockUserFromEmail(credentials.email);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('mockUser', JSON.stringify(mockUser));
+        }
         return {
           token: 'mock-token',
-          user: currentUser
+          user: mockUser,
         };
       }
       return this.request<{ token: string; user: User }>('/auth/login', {
@@ -173,6 +176,10 @@ class ApiClient {
     },
     me: async () => {
       if (USE_MOCK_DATA) {
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem('mockUser');
+          if (stored) return JSON.parse(stored);
+        }
         return currentUser;
       }
       return this.request<User>('/auth/me');
@@ -613,6 +620,27 @@ class ApiClient {
       throw new Error('Marketplace endpoints are not implemented on the backend.');
     },
   };
+
+  private mockUserFromEmail(email: string): User {
+    const lower = email.toLowerCase();
+    const roleMap: Record<string, User['role']> = {
+      admin: 'ADMIN',
+      pm: 'PROJECT_MANAGER',
+      dispatcher: 'PROJECT_MANAGER',
+      tech: 'TECHNICIAN',
+      photographer: 'TECHNICIAN',
+      editor: 'EDITOR',
+      agent: 'AGENT',
+    };
+    const matchedKey = Object.keys(roleMap).find((key) => lower.includes(key));
+    const role = matchedKey ? roleMap[matchedKey] : currentUser.role;
+    return {
+      ...currentUser,
+      email,
+      role,
+      name: `${role} User`,
+    };
+  }
 }
 
 export const api = new ApiClient(API_URL);

@@ -4,11 +4,10 @@ import { useRequireRole } from "@/hooks/useRequireRole";
 import { H2, Muted } from "@/components/ui/typography";
 import { Card } from "@/components/ui/card";
 
-export default function DispatcherOrganizationHome() {
+export default function PhotographerOrganizationHome() {
   const { user, isLoading } = useRequireRole([
-    "ADMIN",
-    "PROJECT_MANAGER",
-    "dispatcher" as any,
+    "TECHNICIAN",
+    "PHOTOGRAPHER" as any,
   ]);
 
   if (isLoading) {
@@ -25,10 +24,10 @@ export default function DispatcherOrganizationHome() {
             Organization
           </Muted>
           <H2 className="text-2xl">Organization Home</H2>
-          <Muted>Coming soon.</Muted>
+          <Muted>View-only organization hub (coming soon).</Muted>
         </header>
         <Card className="p-6">
-          <Muted>This space will host the organization hub.</Muted>
+          <Muted>Photographers can view org context here. Management is disabled.</Muted>
         </Card>
       </article>
     </main>

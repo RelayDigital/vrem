@@ -1,7 +1,16 @@
-'use client';
+"use client";
 
-import { Building2, Check, ChevronDown, ChevronsUpDown, Plus, Settings } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import {
+  Building2,
+  Check,
+  ChevronDown,
+  ChevronsUpDown,
+  Settings,
+  User,
+  UserPlus,
+  Home,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,82 +19,161 @@ import {
   DropdownMenuSeparator,
   DropdownMenuGroup,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useOrganizations } from '@/hooks/useOrganizations';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
-import { useRouter } from 'next/navigation';
-import { useMemo } from 'react';
-import { useSidebar } from '@/components/ui/sidebar';
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useOrganizations } from "@/hooks/useOrganizations";
+import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
+import { useRouter } from "next/navigation";
+import { useMemo } from "react";
+import { useSidebar } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/components/ui/use-mobile";
+import { toast } from "sonner";
 
-export function OrganizationSwitcher() {
+interface OrganizationSwitcherProps {
+  variant?: "sidebar" | "header";
+  includePersonal?: boolean;
+  showManage?: boolean;
+  showJoin?: boolean;
+  onOrgHome?: () => void;
+  accountType?: "dispatcher" | "photographer";
+}
+
+export function OrganizationSwitcher({
+  variant = "sidebar",
+  includePersonal = false,
+  showManage = true,
+  showJoin = true,
+  onOrgHome,
+  accountType = "dispatcher",
+}: OrganizationSwitcherProps) {
   const { memberships, isLoading, setActiveOrganization } = useOrganizations();
   const { activeOrganizationId } = useCurrentOrganization();
   const router = useRouter();
-  const { state: sidebarState } = useSidebar();
+
+  // Use sidebar hook - must be called unconditionally (React rules)
+  // The header is within SidebarProvider in dispatcher layout, so this is safe
+  // In header mode, we always show text regardless of sidebar state
+  let sidebarState: "expanded" | "collapsed" | undefined = "expanded";
+  try {
+    sidebarState = useSidebar()?.state;
+  } catch {
+    sidebarState = "expanded";
+  }
 
   const activeOrg = useMemo(
-    () => memberships.find((m) => m.orgId === activeOrganizationId)?.organization,
+    () =>
+      memberships.find((m) => m.orgId === activeOrganizationId)?.organization,
     [memberships, activeOrganizationId]
   );
 
-  const selectOrg = (orgId: string) => {
+  const selectOrg = (orgId: string | null) => {
     setActiveOrganization(orgId);
+    // Navigate to organization home page after switching
+    if (orgId !== null) {
+      // Only navigate if switching to an organization (not personal dashboard)
+      if (accountType === "dispatcher") {
+        router.push("/dispatcher/organization");
+      } else if (accountType === "photographer") {
+        router.push("/photographer/organization");
+      }
+    }
   };
 
   const goToManage = () => {
-    router.push('/dispatcher/organization');
+    // New canonical route for organization settings
+    router.push("/dispatcher/organization/settings");
   };
 
+  const handleJoin = () => {
+    toast.info("Join request sent (mock)");
+  };
+
+  const showText = variant === "header" || sidebarState !== "collapsed";
+
   return (
-    <div className="p-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="flat"
-            className="w-full justify-between text-left p-0!"
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          className="h-auto justify-between text-left pl-1.5! pr-2.5! py-0!"
+        >
+          <div
+            className={`flex items-center gap-2 cursor-pointer w-full`}
           >
-            <div className="flex items-center gap-2">
-              <Avatar className="size-7">
-                <AvatarImage src={activeOrg?.avatar} alt={activeOrg?.name} />
+            <Avatar className="size-8">
+              <AvatarImage src={activeOrg?.avatar} alt={activeOrg?.name} />
+              <AvatarFallback>
+                <Building2 className="size-3" />
+              </AvatarFallback>
+            </Avatar>
+            {showText && (
+              <div className="flex flex-col items-start">
+                <span className="text-sm font-medium">
+                  {includePersonal && !activeOrganizationId
+                    ? "Personal dashboard"
+                    : activeOrg?.name || "Select organization"}
+                </span>
+              </div>
+            )}
+
+            {showText && (
+              <ChevronsUpDown className="size-3 text-muted-foreground ml-auto" />
+            )}
+          </div>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        className="w-72 max-h-[400px]"
+        align="start"
+        side="right"
+      >
+        <DropdownMenuLabel>Organizations</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          {isLoading && (
+            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+              Loading...
+            </div>
+          )}
+          {!isLoading && memberships.length === 0 && (
+            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+              No organizations found
+            </div>
+          )}
+          {includePersonal && (
+            <DropdownMenuItem
+              onClick={() => selectOrg(null)}
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <Avatar className="size-8">
                 <AvatarFallback>
-                  <Building2 className="size-3" />
+                  <ChevronsUpDown className="size-4" />
                 </AvatarFallback>
               </Avatar>
-              {sidebarState === 'expanded' && (
-                <div className="flex flex-col items-start">
-                  <span className="text-sm font-medium">{activeOrg?.name || 'Select organization'}</span>
-                  <span className="text-xs text-muted-foreground capitalize">{activeOrg?.type?.replace('_', ' ') || '—'}</span>
-                </div>
+              <div className="flex flex-col flex-1 min-w-0">
+                <span className="text-sm font-medium truncate">
+                  Personal dashboard
+                </span>
+                <span className="text-xs text-muted-foreground capitalize truncate">
+                  Marketplace view
+                </span>
+              </div>
+              {!activeOrganizationId && (
+                <Check className="size-4 text-primary ml-auto shrink-0" />
               )}
-            </div>
-            {sidebarState === 'expanded' && <ChevronsUpDown className="size-3 text-muted-foreground ml-auto" />}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-72 max-h-[400px]" align="start">
-          <DropdownMenuLabel>Organizations</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            {isLoading && (
-              <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                Loading...
-              </div>
-            )}
-            {!isLoading && memberships.length === 0 && (
-              <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                No organizations found
-              </div>
-            )}
-            {!isLoading && memberships.map((m) => (
+            </DropdownMenuItem>
+          )}
+          {!isLoading &&
+            memberships.map((m) => (
               <DropdownMenuItem
                 key={m.orgId}
                 onClick={() => selectOrg(m.orgId)}
                 className="flex items-center gap-2 cursor-pointer"
               >
-                <Avatar className="h-8 w-8">
+                <Avatar className="size-8">
                   <AvatarImage src={m.organization?.avatar} />
                   <AvatarFallback>
-                    <Building2 className="h-4 w-4" />
+                    <Building2 className="size-4" />
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col flex-1 min-w-0">
@@ -93,29 +181,38 @@ export function OrganizationSwitcher() {
                     {m.organization?.name || m.orgId}
                   </span>
                   <span className="text-xs text-muted-foreground capitalize truncate">
-                    {m.organization?.type?.replace('_', ' ') || 'Member'}
+                    {m.organization?.type?.replace("_", " ") || "Member"}
                   </span>
                 </div>
                 {m.orgId === activeOrganizationId && (
-                  <Check className="h-4 w-4 text-primary ml-auto shrink-0" />
+                  <Check className="size-4 text-primary ml-auto shrink-0" />
                 )}
               </DropdownMenuItem>
             ))}
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          {onOrgHome && (
+            <DropdownMenuItem onClick={onOrgHome}>
+              <Home className="size-4 mr-2" />
+              Org home
+            </DropdownMenuItem>
+          )}
+          {showJoin && (
+            <DropdownMenuItem onClick={handleJoin}>
+              <UserPlus className="size-4 mr-2" />
+              Join organization
+              <span className="ml-auto text-xs text-muted-foreground">Mock</span>
+            </DropdownMenuItem>
+          )}
+          {showManage && (
             <DropdownMenuItem onClick={goToManage}>
-              <Settings className="h-4 w-4 mr-2" />
+              <Settings className="size-4 mr-2" />
               Manage organization
             </DropdownMenuItem>
-            <DropdownMenuItem disabled>
-              <Plus className="h-4 w-4 mr-2" />
-              Add organization
-              <span className="ml-auto text-xs text-muted-foreground">Soon</span>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+          )}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

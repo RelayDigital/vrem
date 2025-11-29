@@ -31,7 +31,11 @@ import {
   Beaker,
   Handshake,
 } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../../ui/collapsible";
 import { cn } from "../../ui/utils";
 import { OrganizationSwitcher } from "./OrganizationSwitcher";
 
@@ -49,11 +53,14 @@ export function DispatcherSidebar() {
   };
 
   // Check if jobs submenu should be open (if we're on any jobs route)
-  const isJobsRouteActive = pathname?.startsWith("/dispatcher/jobs") && pathname !== "/dispatcher/jobs";
+  const isJobsRouteActive =
+    pathname?.startsWith("/dispatcher/jobs") && pathname !== "/dispatcher/jobs";
   const [jobsSubmenuOpen, setJobsSubmenuOpen] = useState(false);
 
   // Check if settings submenu should be open (if we're on any settings route)
-  const isSettingsRouteActive = pathname?.startsWith("/dispatcher/settings") && pathname !== "/dispatcher/settings";
+  const isSettingsRouteActive =
+    pathname?.startsWith("/dispatcher/settings") &&
+    pathname !== "/dispatcher/settings";
   const [settingsSubmenuOpen, setSettingsSubmenuOpen] = useState(false);
 
   // Auto-open submenus if on their routes
@@ -156,7 +163,7 @@ export function DispatcherSidebar() {
       className={`**:data-[slot=sidebar-container]:top-(--header-height)! **:data-[slot=sidebar-container]:h-[calc(100vh-var(--header-height))]! **:data-[slot=sidebar-container]:bottom-auto!`}
     >
       <SidebarContent className="pt-header-h">
-        <OrganizationSwitcher />
+        {/* <OrganizationSwitcher /> */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -165,19 +172,22 @@ export function DispatcherSidebar() {
                 const hasSubmenu = item.submenu && item.submenu.length > 0;
                 const isItemActive = isActive(item.path);
                 const defaultPath = (item as any).defaultPath || item.path;
-                
+
                 // For items with submenu, check if any submenu item is active
-                const isSubmenuActive = hasSubmenu && item.submenu?.some(subItem => isActive(subItem.path));
-                const shouldBeOpen = hasSubmenu && (
-                  isSubmenuActive || 
-                  (item.path === "/dispatcher/jobs/all" && jobsSubmenuOpen) ||
-                  (item.path === "/dispatcher/settings" && settingsSubmenuOpen)
-                );
+                const isSubmenuActive =
+                  hasSubmenu &&
+                  item.submenu?.some((subItem) => isActive(subItem.path));
+                const shouldBeOpen =
+                  hasSubmenu &&
+                  (isSubmenuActive ||
+                    (item.path === "/dispatcher/jobs/all" && jobsSubmenuOpen) ||
+                    (item.path === "/dispatcher/settings" &&
+                      settingsSubmenuOpen));
 
                 if (hasSubmenu) {
                   const isJobsItem = item.path === "/dispatcher/jobs/all";
                   const isSettingsItem = item.path === "/dispatcher/settings";
-                  
+
                   return (
                     <Collapsible
                       key={item.path}
@@ -191,54 +201,41 @@ export function DispatcherSidebar() {
                       }}
                     >
                       <SidebarMenuItem>
-                        <div className="flex items-center w-full relative group/menu-item">
-                          <SidebarMenuButton
-                            asChild
-                            isActive={isSubmenuActive || isItemActive}
-                            tooltip={item.tooltip}
-                            className="flex-1 pr-8"
-                          >
-                            <Link href={defaultPath}>
-                              <Icon />
-                              <span>{item.label}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                          {state === "expanded" && (
-                            <CollapsibleTrigger asChild>
-                              <button
-                                type="button"
-                                className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 p-0 flex items-center justify-center rounded-sm transition-transform pointer-events-auto z-10 hover:bg-transparent focus:bg-transparent active:bg-transparent focus:outline-none"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  if (isJobsItem) {
-                                    setJobsSubmenuOpen(!jobsSubmenuOpen);
-                                  } else if (isSettingsItem) {
-                                    setSettingsSubmenuOpen(!settingsSubmenuOpen);
-                                  }
-                                }}
-                                onMouseDown={(e) => {
-                                  // Prevent the menu item click from firing
-                                  e.stopPropagation();
-                                }}
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isSubmenuActive || isItemActive}
+                          tooltip={item.tooltip}
+                        >
+                          <Link href={defaultPath}>
+                            <Icon />
+                            <span>{item.label}</span>
+
+                            {/* CollapsibleTrigger for submenu */}
+                            {state === "expanded" && (
+                              <CollapsibleTrigger
+                                asChild
+                                className="ml-auto z-50"
                               >
-                                <ChevronRight className={cn(
-                                  "h-3.5 w-3.5 transition-transform duration-200",
-                                  // Inherit color from parent menu item state
-                                  "text-sidebar-foreground/50 group-hover/menu-item:text-sidebar-accent-foreground/70",
-                                  (isSubmenuActive || isItemActive) && "text-sidebar-accent-foreground/70",
-                                  shouldBeOpen && "rotate-90"
-                                )} />
-                              </button>
-                            </CollapsibleTrigger>
-                          )}
-                        </div>
+                                <ChevronRight
+                                  className={cn(
+                                    "h-3.5 w-3.5 transition-transform duration-200",
+                                    // Inherit color from parent menu item state
+                                    "text-sidebar-foreground/50 group-hover/menu-item:text-sidebar-accent-foreground/70",
+                                    (isSubmenuActive || isItemActive) &&
+                                      "text-sidebar-accent-foreground/70",
+                                    shouldBeOpen && "rotate-90"
+                                  )}
+                                />
+                              </CollapsibleTrigger>
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
                         <CollapsibleContent>
-                          <SidebarMenuSub>
+                          <SidebarMenuSub className="w-full translate-x-0 mx-0 px-0 border-none">
                             {item.submenu.map((subItem) => {
                               const SubIcon = subItem.icon;
                               return (
-                                <SidebarMenuSubItem key={subItem.path}>
+                                <SidebarMenuSubItem key={subItem.path} className="ml-3">
                                   <SidebarMenuSubButton
                                     asChild
                                     isActive={isActive(subItem.path)}

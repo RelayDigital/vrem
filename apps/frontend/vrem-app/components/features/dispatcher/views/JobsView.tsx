@@ -297,7 +297,7 @@ export function JobsView({
                       job={job}
                       photographer={photographer}
                       onViewRankings={
-                        job.status === "pending"
+                        job.status === "pending" && onViewRankings
                           ? () => onViewRankings(job)
                           : undefined
                       }
@@ -411,7 +411,7 @@ export function JobsView({
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {job.status === "pending" && (
+                          {job.status === "pending" && onViewRankings && (
                             <Button
                               variant="outline"
                               size="sm"
