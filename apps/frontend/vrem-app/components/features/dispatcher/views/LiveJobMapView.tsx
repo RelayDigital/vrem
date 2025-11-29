@@ -19,6 +19,12 @@ interface LiveJobMapViewProps {
    * Defaults to true for dispatcher layouts.
    */
   hasSidebar?: boolean;
+  /**
+   * When true, uses dispatcher-specific language like "Pending Assignments".
+   * When false, uses generic language like "Pending Jobs".
+   * Defaults to true for backwards compatibility.
+   */
+  isDispatcherView?: boolean;
 }
 
 export function LiveJobMapView({
@@ -29,6 +35,7 @@ export function LiveJobMapView({
   onNavigateToJobInProjectManagement,
   onJobAssign,
   hasSidebar = true,
+  isDispatcherView = true,
 }: LiveJobMapViewProps) {
 
   // Get sidebar state to adjust left offset
@@ -98,6 +105,7 @@ export function LiveJobMapView({
         onJobAssign={onJobAssign}
         className="size-full"
         fullScreen={true}
+        isDispatcherView={isDispatcherView}
       />
     </main>
   );

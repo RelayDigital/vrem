@@ -398,7 +398,7 @@ export function PaginatedJobGrid<T>({
         <div className="text-center py-12 text-muted-foreground">
           {emptyIcon && (() => {
             const Icon = emptyIcon;
-            return <Icon className="h-16 w-16 mx-auto mb-4 text-muted-foreground/40" />;
+            return <Icon className="size-16 mx-auto mb-4 text-muted-foreground/40" />;
           })()}
           <H3 className="text-xl text-foreground mb-2">{emptyTitle || emptyMessage}</H3>
           <Muted className="mb-6">{emptyDescription}</Muted>

@@ -17,6 +17,7 @@ import { eventsOverlap, calculateEventLayout } from "@/lib/calendar-utils";
 import { useState, useRef, useEffect } from "react";
 
 interface DayViewProps {
+  canSeeTechnicians: boolean;
   currentDate: Date;
   events: CalendarEvent[];
   technicians: Photographer[];
@@ -33,6 +34,7 @@ interface DayViewProps {
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0:00 to 23:00 (24 hours)
 
 export function DayView({
+  canSeeTechnicians,
   currentDate,
   events,
   technicians,
@@ -155,7 +157,7 @@ export function DayView({
     return dayEvents.filter((e) => e.technicianId === technicianId);
   };
 
-  const hasTechnicians = technicians.length > 0;
+  const hasTechnicians = canSeeTechnicians || technicians.length > 0;
 
   return (
     <div
@@ -186,7 +188,7 @@ export function DayView({
                   className="w-1 h-full rounded-full shrink-0"
                   style={{ backgroundColor: color || "#6b7280" }}
                 />
-                <Avatar className="h-10 w-10 shrink-0">
+                <Avatar className="size-10 shrink-0">
                   <AvatarImage src={technician.avatar} />
                   <AvatarFallback>
                     {technician.name
@@ -274,7 +276,7 @@ export function DayView({
               ))}
 
               {/* Unified Timeline Area */}
-              <div className="relative w-full h-full">
+              <div className="relative size-full">
                 {(() => {
                   const layoutMap = calculateEventLayout(dayEvents);
 

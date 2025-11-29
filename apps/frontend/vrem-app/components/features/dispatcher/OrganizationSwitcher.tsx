@@ -68,20 +68,15 @@ export function OrganizationSwitcher({
 
   const selectOrg = (orgId: string | null) => {
     setActiveOrganization(orgId);
-    // Navigate to organization home page after switching
+    // Navigate to dashboard after switching organization
     if (orgId !== null) {
-      // Only navigate if switching to an organization (not personal dashboard)
-      if (accountType === "dispatcher") {
-        router.push("/dispatcher/organization");
-      } else if (accountType === "photographer") {
-        router.push("/photographer/organization");
-      }
+      router.push("/dashboard");
     }
   };
 
   const goToManage = () => {
-    // New canonical route for organization settings
-    router.push("/dispatcher/organization/settings");
+    // Canonical route for organization settings
+    router.push("/organization/settings");
   };
 
   const handleJoin = () => {
@@ -125,7 +120,7 @@ export function OrganizationSwitcher({
       <DropdownMenuContent
         className="w-72 max-h-[400px]"
         align="start"
-        side="right"
+        side={useIsMobile() ? "bottom" : "right"}
       >
         <DropdownMenuLabel>Organizations</DropdownMenuLabel>
         <DropdownMenuSeparator />

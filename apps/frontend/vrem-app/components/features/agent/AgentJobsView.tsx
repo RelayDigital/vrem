@@ -1,22 +1,31 @@
-'use client';
+"use client";
 
-import { JobRequest, Technician, Photographer } from '../../../types';
-import { JobCard } from '../../shared/jobs';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
-import { PaginatedJobGrid } from '../../shared/jobs';
-import { PageHeader } from '../../shared/layout';
-import { Plus, Briefcase, Clock, CheckCircle2, Camera, Video, Plane, Sunset, MapPin, Calendar, Zap, AlertCircle } from 'lucide-react';
-import { JobsStatsBar } from './views/JobsStatsBar';
-import { TableCell } from '../../ui/table';
-import { Badge } from '../../ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
-import { format } from 'date-fns';
+import { JobRequest, Technician, Photographer } from "../../../types";
+import { JobCard } from "../../shared/jobs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
+import { PaginatedJobGrid } from "../../shared/jobs";
+import { PageHeader } from "../../shared/layout";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '../../ui/tooltip';
-import { P } from '@/components/ui/typography';
+  Plus,
+  Briefcase,
+  Clock,
+  CheckCircle2,
+  Camera,
+  Video,
+  Plane,
+  Sunset,
+  MapPin,
+  Calendar,
+  Zap,
+  AlertCircle,
+} from "lucide-react";
+import { JobsStatsBar } from "./views/JobsStatsBar";
+import { TableCell } from "../../ui/table";
+import { Badge } from "../../ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
+import { format } from "date-fns";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
+import { P } from "@/components/ui/typography";
 
 interface AgentJobsViewProps {
   jobs: JobRequest[];
@@ -26,26 +35,32 @@ interface AgentJobsViewProps {
   onNewJobClick: () => void;
 }
 
-export function AgentJobsView({ jobs, photographers, technicians, organizationId, onNewJobClick }: AgentJobsViewProps) {
+export function AgentJobsView({
+  jobs,
+  photographers,
+  technicians,
+  organizationId,
+  onNewJobClick,
+}: AgentJobsViewProps) {
   // Use technicians if provided, fallback to photographers for backwards compatibility
   const effectiveTechnicians = technicians || photographers || [];
   // Filter jobs for this agent's organization
   const myJobs = jobs.filter((job) => job.organizationId === organizationId);
 
-  const pendingJobs = myJobs.filter((j) => j.status === 'pending');
-  const assignedJobs = myJobs.filter((j) => j.status === 'assigned');
-  const inProgressJobs = myJobs.filter((j) => j.status === 'in_progress');
-  const completedJobs = myJobs.filter((j) => j.status === 'delivered');
+  const pendingJobs = myJobs.filter((j) => j.status === "pending");
+  const assignedJobs = myJobs.filter((j) => j.status === "assigned");
+  const inProgressJobs = myJobs.filter((j) => j.status === "in_progress");
+  const completedJobs = myJobs.filter((j) => j.status === "delivered");
 
   const getMediaIcon = (type: string) => {
     switch (type) {
-      case 'photo':
+      case "photo":
         return Camera;
-      case 'video':
+      case "video":
         return Video;
-      case 'aerial':
+      case "aerial":
         return Plane;
-      case 'twilight':
+      case "twilight":
         return Sunset;
       default:
         return Camera;
@@ -54,22 +69,22 @@ export function AgentJobsView({ jobs, photographers, technicians, organizationId
 
   const getPriorityConfig = (priority: string) => {
     switch (priority) {
-      case 'urgent':
+      case "urgent":
         return {
-          variant: 'destructive' as const,
-          label: 'Urgent',
+          variant: "destructive" as const,
+          label: "Urgent",
           icon: AlertCircle,
         };
-      case 'rush':
+      case "rush":
         return {
-          variant: 'secondary' as const,
-          label: 'Rush',
+          variant: "secondary" as const,
+          label: "Rush",
           icon: Zap,
         };
       default:
         return {
-          variant: 'outline' as const,
-          label: 'Standard',
+          variant: "outline" as const,
+          label: "Standard",
           icon: Clock,
         };
     }
@@ -77,20 +92,20 @@ export function AgentJobsView({ jobs, photographers, technicians, organizationId
 
   const getStatusConfig = (status: string) => {
     switch (status) {
-      case 'pending':
-        return { variant: 'outline' as const, label: 'Pending' };
-      case 'assigned':
-        return { variant: 'secondary' as const, label: 'Assigned' };
-      case 'in_progress':
-        return { variant: 'default' as const, label: 'In Progress' };
-      case 'editing':
-        return { variant: 'secondary' as const, label: 'Editing' };
-      case 'delivered':
-        return { variant: 'default' as const, label: 'Delivered' };
-      case 'cancelled':
-        return { variant: 'destructive' as const, label: 'Cancelled' };
+      case "pending":
+        return { variant: "outline" as const, label: "Pending" };
+      case "assigned":
+        return { variant: "secondary" as const, label: "Assigned" };
+      case "in_progress":
+        return { variant: "default" as const, label: "In Progress" };
+      case "editing":
+        return { variant: "secondary" as const, label: "Editing" };
+      case "delivered":
+        return { variant: "default" as const, label: "Delivered" };
+      case "cancelled":
+        return { variant: "destructive" as const, label: "Cancelled" };
       default:
-        return { variant: 'outline' as const, label: status };
+        return { variant: "outline" as const, label: status };
     }
   };
 
@@ -110,7 +125,9 @@ export function AgentJobsView({ jobs, photographers, technicians, organizationId
             <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="truncate max-w-[180px]">{job.propertyAddress}</span>
+                <span className="truncate max-w-[180px]">
+                  {job.propertyAddress}
+                </span>
               </TooltipTrigger>
               <TooltipContent>
                 <P className="max-w-xs">{job.propertyAddress}</P>
@@ -125,9 +142,13 @@ export function AgentJobsView({ jobs, photographers, technicians, organizationId
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <div className="flex flex-col">
-              <span className="text-sm">{format(new Date(job.scheduledDate), 'MMM d, yyyy')}</span>
+              <span className="text-sm">
+                {format(new Date(job.scheduledDate), "MMM d, yyyy")}
+              </span>
               {job.scheduledTime && (
-                <span className="text-xs text-muted-foreground">{job.scheduledTime}</span>
+                <span className="text-xs text-muted-foreground">
+                  {job.scheduledTime}
+                </span>
               )}
             </div>
           </div>
@@ -166,7 +187,10 @@ export function AgentJobsView({ jobs, photographers, technicians, organizationId
               <Avatar className="h-6 w-6">
                 <AvatarImage src={technician.avatar} alt={technician.name} />
                 <AvatarFallback>
-                  {technician.name.split(' ').map(n => n[0]).join('')}
+                  {technician.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")}
                 </AvatarFallback>
               </Avatar>
               <span className="text-sm">{technician.name}</span>
@@ -190,7 +214,7 @@ export function AgentJobsView({ jobs, photographers, technicians, organizationId
           title="My Jobs"
           description="View and manage all your photo shoot bookings"
           action={{
-            label: 'New Booking',
+            label: "New Booking",
             onClick: onNewJobClick,
             icon: <Plus className="h-4 w-4 mr-2" />,
           }}
@@ -208,29 +232,44 @@ export function AgentJobsView({ jobs, photographers, technicians, organizationId
         <Tabs defaultValue="all" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="all">All ({myJobs.length})</TabsTrigger>
-            <TabsTrigger value="pending">Pending ({pendingJobs.length})</TabsTrigger>
-            <TabsTrigger value="assigned">Assigned ({assignedJobs.length})</TabsTrigger>
-            <TabsTrigger value="in_progress">In Progress ({inProgressJobs.length})</TabsTrigger>
-            <TabsTrigger value="completed">Completed ({completedJobs.length})</TabsTrigger>
+            <TabsTrigger value="pending">
+              Pending ({pendingJobs.length})
+            </TabsTrigger>
+            <TabsTrigger value="assigned">
+              Assigned ({assignedJobs.length})
+            </TabsTrigger>
+            <TabsTrigger value="in_progress">
+              In Progress ({inProgressJobs.length})
+            </TabsTrigger>
+            <TabsTrigger value="completed">
+              Completed ({completedJobs.length})
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="mt-6">
             <PaginatedJobGrid
               items={myJobs}
               searchPlaceholder="Search by address, client, Order #..."
-              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`}
+              searchFields={(job) =>
+                `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
+              }
               filterOptions={[
-                { label: 'Urgent', value: 'urgent' },
-                { label: 'Rush', value: 'rush' },
-                { label: 'Standard', value: 'standard' },
+                { label: "Urgent", value: "urgent" },
+                { label: "Rush", value: "rush" },
+                { label: "Standard", value: "standard" },
               ]}
-              onFilterChange={(value) => myJobs.filter((j) => value === 'all' || j.priority === value)}
+              onFilterChange={(value) =>
+                myJobs.filter((j) => value === "all" || j.priority === value)
+              }
               renderItem={(job) => {
-                const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+                const assignedId =
+                  job.assignedTechnicianId || job.assignedPhotographerId;
                 const technician = assignedId
                   ? effectiveTechnicians.find((t) => t.id === assignedId)
                   : undefined;
-                return <JobCard key={job.id} job={job} photographer={technician} />;
+                return (
+                  <JobCard key={job.id} job={job} photographer={technician} />
+                );
               }}
               renderTableRow={renderTableRow}
               emptyMessage="No jobs yet"
@@ -238,7 +277,7 @@ export function AgentJobsView({ jobs, photographers, technicians, organizationId
               emptyTitle="No jobs yet"
               emptyDescription="Create your first booking to get started"
               emptyAction={{
-                label: 'Create Booking',
+                label: "Create Booking",
                 onClick: onNewJobClick,
               }}
               itemsPerPage={12}
@@ -249,19 +288,28 @@ export function AgentJobsView({ jobs, photographers, technicians, organizationId
             <PaginatedJobGrid
               items={pendingJobs}
               searchPlaceholder="Search by address, client, Order #..."
-              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`}
+              searchFields={(job) =>
+                `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
+              }
               filterOptions={[
-                { label: 'Urgent', value: 'urgent' },
-                { label: 'Rush', value: 'rush' },
-                { label: 'Standard', value: 'standard' },
+                { label: "Urgent", value: "urgent" },
+                { label: "Rush", value: "rush" },
+                { label: "Standard", value: "standard" },
               ]}
-              onFilterChange={(value) => pendingJobs.filter((j) => value === 'all' || j.priority === value)}
+              onFilterChange={(value) =>
+                pendingJobs.filter(
+                  (j) => value === "all" || j.priority === value
+                )
+              }
               renderItem={(job) => {
-                const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+                const assignedId =
+                  job.assignedTechnicianId || job.assignedPhotographerId;
                 const technician = assignedId
                   ? effectiveTechnicians.find((t) => t.id === assignedId)
                   : undefined;
-                return <JobCard key={job.id} job={job} photographer={technician} />;
+                return (
+                  <JobCard key={job.id} job={job} photographer={technician} />
+                );
               }}
               renderTableRow={renderTableRow}
               emptyMessage="No pending jobs"
@@ -276,19 +324,28 @@ export function AgentJobsView({ jobs, photographers, technicians, organizationId
             <PaginatedJobGrid
               items={assignedJobs}
               searchPlaceholder="Search by address, client, Order #..."
-              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`}
+              searchFields={(job) =>
+                `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
+              }
               filterOptions={[
-                { label: 'Urgent', value: 'urgent' },
-                { label: 'Rush', value: 'rush' },
-                { label: 'Standard', value: 'standard' },
+                { label: "Urgent", value: "urgent" },
+                { label: "Rush", value: "rush" },
+                { label: "Standard", value: "standard" },
               ]}
-              onFilterChange={(value) => assignedJobs.filter((j) => value === 'all' || j.priority === value)}
+              onFilterChange={(value) =>
+                assignedJobs.filter(
+                  (j) => value === "all" || j.priority === value
+                )
+              }
               renderItem={(job) => {
-                const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+                const assignedId =
+                  job.assignedTechnicianId || job.assignedPhotographerId;
                 const technician = assignedId
                   ? effectiveTechnicians.find((t) => t.id === assignedId)
                   : undefined;
-                return <JobCard key={job.id} job={job} photographer={technician} />;
+                return (
+                  <JobCard key={job.id} job={job} photographer={technician} />
+                );
               }}
               renderTableRow={renderTableRow}
               emptyMessage="No assigned jobs"
@@ -303,19 +360,28 @@ export function AgentJobsView({ jobs, photographers, technicians, organizationId
             <PaginatedJobGrid
               items={inProgressJobs}
               searchPlaceholder="Search by address, client, Order #..."
-              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`}
+              searchFields={(job) =>
+                `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
+              }
               filterOptions={[
-                { label: 'Urgent', value: 'urgent' },
-                { label: 'Rush', value: 'rush' },
-                { label: 'Standard', value: 'standard' },
+                { label: "Urgent", value: "urgent" },
+                { label: "Rush", value: "rush" },
+                { label: "Standard", value: "standard" },
               ]}
-              onFilterChange={(value) => inProgressJobs.filter((j) => value === 'all' || j.priority === value)}
+              onFilterChange={(value) =>
+                inProgressJobs.filter(
+                  (j) => value === "all" || j.priority === value
+                )
+              }
               renderItem={(job) => {
-                const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+                const assignedId =
+                  job.assignedTechnicianId || job.assignedPhotographerId;
                 const technician = assignedId
                   ? effectiveTechnicians.find((t) => t.id === assignedId)
                   : undefined;
-                return <JobCard key={job.id} job={job} photographer={technician} />;
+                return (
+                  <JobCard key={job.id} job={job} photographer={technician} />
+                );
               }}
               renderTableRow={renderTableRow}
               emptyMessage="No jobs in progress"
@@ -330,19 +396,28 @@ export function AgentJobsView({ jobs, photographers, technicians, organizationId
             <PaginatedJobGrid
               items={completedJobs}
               searchPlaceholder="Search by address, client, Order #..."
-              searchFields={(job) => `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`}
+              searchFields={(job) =>
+                `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
+              }
               filterOptions={[
-                { label: 'Urgent', value: 'urgent' },
-                { label: 'Rush', value: 'rush' },
-                { label: 'Standard', value: 'standard' },
+                { label: "Urgent", value: "urgent" },
+                { label: "Rush", value: "rush" },
+                { label: "Standard", value: "standard" },
               ]}
-              onFilterChange={(value) => completedJobs.filter((j) => value === 'all' || j.priority === value)}
+              onFilterChange={(value) =>
+                completedJobs.filter(
+                  (j) => value === "all" || j.priority === value
+                )
+              }
               renderItem={(job) => {
-                const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+                const assignedId =
+                  job.assignedTechnicianId || job.assignedPhotographerId;
                 const technician = assignedId
                   ? effectiveTechnicians.find((t) => t.id === assignedId)
                   : undefined;
-                return <JobCard key={job.id} job={job} photographer={technician} />;
+                return (
+                  <JobCard key={job.id} job={job} photographer={technician} />
+                );
               }}
               renderTableRow={renderTableRow}
               emptyMessage="No completed jobs"

@@ -44,6 +44,7 @@ export function RankingsDialog({
               initialSidebarView="rankings"
               initialJobForRankings={selectedJob}
               onGoBack={() => onOpenChange(false)}
+              isDispatcherView={true}
             />
           </div>
         )}

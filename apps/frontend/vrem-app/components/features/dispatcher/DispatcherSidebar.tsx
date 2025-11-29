@@ -30,6 +30,9 @@ import {
   Building2,
   Beaker,
   Handshake,
+  Package,
+  Shield,
+  HelpCircle,
 } from "lucide-react";
 import {
   Collapsible,
@@ -45,22 +48,41 @@ export function DispatcherSidebar() {
   const { state } = useSidebar();
 
   // Determine if a route is active
-  const isActive = (path: string) => {
-    if (path === "/dispatcher") {
-      return pathname === "/dispatcher";
+  // For submenu items, use exact matching to avoid highlighting multiple items
+  const isActive = (path: string, isSubmenuItem: boolean = false) => {
+    if (path === "/dashboard") {
+      return pathname === "/dashboard";
     }
+    // For settings submenu items, use startsWith to match any route in that section
+    if (isSubmenuItem && path.startsWith("/settings")) {
+      // Personal section: account, notifications, or profile
+      if (path === "/settings/account") {
+        return pathname?.startsWith("/settings/account") || 
+               pathname?.startsWith("/settings/notifications") ||
+               pathname === "/settings/profile";
+      }
+      // For other settings sections, check if pathname starts with the section path
+      // Extract the section prefix (e.g., "/settings/organization" from "/settings/organization/general")
+      const sectionPath = path.split("/").slice(0, 3).join("/");
+      return pathname?.startsWith(sectionPath);
+    }
+    // For other submenu items, use exact matching
+    if (isSubmenuItem) {
+      return pathname === path;
+    }
+    // For parent menu items, use startsWith to match any child route
     return pathname?.startsWith(path);
   };
 
   // Check if jobs submenu should be open (if we're on any jobs route)
   const isJobsRouteActive =
-    pathname?.startsWith("/dispatcher/jobs") && pathname !== "/dispatcher/jobs";
+    pathname?.startsWith("/jobs") && pathname !== "/jobs";
   const [jobsSubmenuOpen, setJobsSubmenuOpen] = useState(false);
 
   // Check if settings submenu should be open (if we're on any settings route)
   const isSettingsRouteActive =
-    pathname?.startsWith("/dispatcher/settings") &&
-    pathname !== "/dispatcher/settings";
+    pathname?.startsWith("/settings") &&
+    pathname !== "/settings";
   const [settingsSubmenuOpen, setSettingsSubmenuOpen] = useState(false);
 
   // Auto-open submenus if on their routes
@@ -71,81 +93,96 @@ export function DispatcherSidebar() {
 
   const menuItems = [
     {
-      path: "/dispatcher",
+      path: "/dashboard",
       icon: LayoutDashboard,
       label: "Dashboard",
       tooltip: "Dashboard",
     },
     {
-      path: "/dispatcher/jobs/all",
+      path: "/jobs/all-jobs",
       icon: Briefcase,
       label: "Jobs",
       tooltip: "Jobs",
-      defaultPath: "/dispatcher/jobs/all",
+      defaultPath: "/jobs/all-jobs",
       submenu: [
         {
-          path: "/dispatcher/jobs/all",
+          path: "/jobs/all-jobs",
           icon: Briefcase,
           label: "All Jobs",
         },
         {
-          path: "/dispatcher/jobs/project-management",
+          path: "/jobs/job-management",
           icon: Kanban,
-          label: "Project Management",
+          label: "Job Management",
         },
       ],
     },
     {
-      path: "/dispatcher/team",
+      path: "/team",
       icon: Users,
       label: "Team",
       tooltip: "Team",
     },
     {
-      path: "/dispatcher/customers",
+      path: "/customers",
       icon: Handshake,
       label: "Customers",
       tooltip: "Customers",
     },
     {
-      path: "/dispatcher/audit",
+      path: "/audit",
       icon: FileText,
       label: "Audit Log",
       tooltip: "Audit Log",
     },
     {
-      path: "/dispatcher/map",
+      path: "/map",
       icon: MapPin,
       label: "Map",
       tooltip: "Map",
     },
     {
-      path: "/dispatcher/calendar",
+      path: "/calendar",
       icon: Calendar,
       label: "Calendar",
       tooltip: "Calendar",
     },
     {
-      path: "/dispatcher/settings",
+      path: "/settings",
       icon: Settings,
       label: "Settings",
       tooltip: "Settings",
-      defaultPath: "/dispatcher/settings",
+      defaultPath: "/settings/account",
       submenu: [
         {
-          path: "/dispatcher/settings/personal",
+          path: "/settings/account",
           icon: User,
           label: "Personal",
         },
         {
-          path: "/dispatcher/settings/account",
+          path: "/settings/organization/general",
           icon: Building2,
-          label: "Account",
+          label: "Organization",
         },
         {
-          path: "/dispatcher/settings/product",
-          icon: Beaker,
+          path: "/settings/product/features",
+          icon: Package,
           label: "Product",
+        },
+        {
+          path: "/settings/security/password",
+          icon: Shield,
+          label: "Security",
+        },
+        {
+          path: "/settings/preferences/appearance",
+          icon: Settings,
+          label: "Preferences",
+        },
+        {
+          path: "/settings/support/help-center",
+          icon: HelpCircle,
+          label: "Support",
         },
       ],
     },
@@ -176,17 +213,17 @@ export function DispatcherSidebar() {
                 // For items with submenu, check if any submenu item is active
                 const isSubmenuActive =
                   hasSubmenu &&
-                  item.submenu?.some((subItem) => isActive(subItem.path));
+                  item.submenu?.some((subItem) => isActive(subItem.path, true));
                 const shouldBeOpen =
                   hasSubmenu &&
                   (isSubmenuActive ||
-                    (item.path === "/dispatcher/jobs/all" && jobsSubmenuOpen) ||
-                    (item.path === "/dispatcher/settings" &&
+                    (item.path === "/jobs" && jobsSubmenuOpen) ||
+                    (item.path === "/settings" &&
                       settingsSubmenuOpen));
 
                 if (hasSubmenu) {
-                  const isJobsItem = item.path === "/dispatcher/jobs/all";
-                  const isSettingsItem = item.path === "/dispatcher/settings";
+                  const isJobsItem = item.path === "/jobs";
+                  const isSettingsItem = item.path === "/settings";
 
                   return (
                     <Collapsible
@@ -238,7 +275,7 @@ export function DispatcherSidebar() {
                                 <SidebarMenuSubItem key={subItem.path} className="ml-3">
                                   <SidebarMenuSubButton
                                     asChild
-                                    isActive={isActive(subItem.path)}
+                                    isActive={isActive(subItem.path, true)}
                                   >
                                     <Link href={subItem.path}>
                                       <SubIcon />

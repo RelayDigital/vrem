@@ -188,6 +188,7 @@ export function PhotographerDashboardView({
               onNavigateToJobInProjectManagement
             }
             onJobAssign={undefined} // Photographers cannot assign jobs to themselves
+            isDispatcherView={false}
           />
         </div>
         {/* Active Jobs */}

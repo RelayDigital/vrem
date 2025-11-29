@@ -18,7 +18,7 @@ import {
   generateTechnicianColors,
 } from "../../../../types/calendar";
 
-interface DashboardViewProps {
+interface DispatcherDashboardViewProps {
   jobs: JobRequest[];
   photographers: Photographer[];
   metrics: Metrics;
@@ -33,7 +33,7 @@ interface DashboardViewProps {
   onJobClick?: (job: JobRequest) => void;
 }
 
-export function DashboardView({
+export function DispatcherDashboardView({
   jobs,
   photographers,
   metrics,
@@ -46,7 +46,7 @@ export function DashboardView({
   onNavigateToJobInProjectManagement,
   onJobAssign,
   onJobClick,
-}: DashboardViewProps) {
+}: DispatcherDashboardViewProps) {
   const assignedJobs = jobs.filter((j) => j.status === "assigned");
   const [currentDate] = useState(new Date());
 
@@ -180,6 +180,7 @@ export function DashboardView({
               onNavigateToJobInProjectManagement
             }
             onJobAssign={onJobAssign}
+            isDispatcherView={true}
           />
         </div>
         {/* Active Jobs */}

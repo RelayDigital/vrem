@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboard, Briefcase, MapPin, Calendar, Plus } from "lucide-react";
 import { cn } from "@/components/ui/utils";
 import { useJobCreation } from "@/context/JobCreationContext";
+import { useAuth } from "@/context/auth-context";
 
 interface MenuItem {
   path: string;
@@ -13,22 +14,22 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   {
-    path: "/dispatcher",
+    path: "/dashboard",
     icon: LayoutDashboard,
     label: "Dashboard",
   },
   {
-    path: "/dispatcher/jobs/all",
+    path: "/jobs",
     icon: Briefcase,
     label: "Jobs",
   },
   {
-    path: "/dispatcher/map",
+    path: "/map",
     icon: MapPin,
     label: "Map",
   },
   {
-    path: "/dispatcher/calendar",
+    path: "/calendar",
     icon: Calendar,
     label: "Calendar",
   },
@@ -38,16 +39,21 @@ export function MobileMenuDock() {
   const pathname = usePathname();
   const router = useRouter();
   const jobCreation = useJobCreation();
+  const { user } = useAuth();
 
   const isActive = (path: string) => {
-    if (path === "/dispatcher") {
-      return pathname === "/dispatcher";
+    if (path === "/dashboard") {
+      return pathname === "/dashboard";
     }
     return pathname?.startsWith(path);
   };
 
   const handleNewJobClick = () => {
-    jobCreation.openJobCreationDialog();
+    if (user?.role === 'AGENT') {
+      router.push('/booking');
+    } else {
+      jobCreation.openJobCreationDialog();
+    }
   };
 
   return (
@@ -68,7 +74,7 @@ export function MobileMenuDock() {
               key={item.path}
               type="button"
               className={cn(
-                "flex flex-col items-center justify-center gap-1 h-16 w-16 rounded-lg transition-colors relative",
+                "flex flex-col items-center justify-center gap-1 size-16 rounded-lg transition-colors relative",
                 active
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
@@ -85,7 +91,7 @@ export function MobileMenuDock() {
         {/* Center + button */}
         <button
           type="button"
-          className="h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
+          className="size-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
           onClick={handleNewJobClick}
           aria-label="Create new job"
         >
@@ -101,7 +107,7 @@ export function MobileMenuDock() {
               key={item.path}
               type="button"
               className={cn(
-                "flex flex-col items-center justify-center gap-1 h-16 w-16 rounded-lg transition-colors relative",
+                "flex flex-col items-center justify-center gap-1 size-16 rounded-lg transition-colors relative",
                 active
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/50"

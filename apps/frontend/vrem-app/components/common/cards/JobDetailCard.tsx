@@ -57,10 +57,10 @@ export function JobDetailCard({ job, onClick }: JobDetailCardProps) {
             <ImageWithFallback
               src={job.propertyImage}
               alt={job.propertyAddress}
-              className="w-full h-full object-cover"
+              className="size-full object-cover"
             />
           ) : (
-            <div className={getStatusGradient(job.status) + " w-full h-full"} />
+            <div className={getStatusGradient(job.status) + " size-full"} />
           )}
           </div>
         <div className="flex-1 space-y-2">

@@ -1127,9 +1127,9 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
   }
 
   return (
-    <div className="relative w-full h-full md:min-h-[400px]">
+    <div className="relative size-full md:min-h-[400px]">
       {/* Map container - always rendered so map can initialize */}
-      <div ref={mapContainerRef} className="w-full h-full min-h-[400px]" />
+      <div ref={mapContainerRef} className="size-full min-h-[400px]" />
 
       {/* Loading overlay - shown when map is not loaded */}
       {!isLoaded && (

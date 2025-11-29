@@ -774,7 +774,8 @@ export function JobRequestForm({
 
       <Button
         type="submit"
-        className="w-full h-12 bg-primary shadow-lg shadow-indigo-200"
+        variant="default"
+        className="w-full h-12"
       >
         Create Job Request
       </Button>

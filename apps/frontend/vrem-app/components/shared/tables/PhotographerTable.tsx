@@ -187,7 +187,7 @@ export function PhotographerTable({ photographers, technicians, onRowClick }: Ph
           >
             <TableCell>
               <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10 border-2 border-border">
+                <Avatar className="size-10 border-2 border-border">
                   <AvatarImage src={photographer.avatar} />
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                     {photographer.name

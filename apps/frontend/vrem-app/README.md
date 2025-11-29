@@ -59,7 +59,7 @@ vrem-app/
 │       │   ├── jobs/            # Job management
 │       │   │   ├── [jobId]/    # Individual job detail
 │       │   │   ├── all/         # All jobs view
-│       │   │   └── project-management/  # Project management view
+│       │   │   └── project-management/  # Job management view
 │       │   ├── map/             # Live map view
 │       │   ├── settings/        # Settings (account, personal, product)
 │       │   ├── team/            # Team management
@@ -245,7 +245,7 @@ vrem-app/
 - **Team Management**: Manage photographer network and preferred vendor relationships
 - **Kanban Board**: Visual job management with drag-and-drop functionality
 - **Metrics Dashboard**: Track key performance indicators and analytics
-- **Project Management View**: Detailed project management interface
+- **Job Management View**: Detailed job management interface
 - **Settings Management**: Account, personal, and product settings
 
 ### For Photographers/Technicians

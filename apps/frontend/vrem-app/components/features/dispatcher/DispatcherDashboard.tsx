@@ -10,7 +10,7 @@ import {
 } from "../../../types";
 import { ChatMessage } from "../../../types/chat";
 import { JobTaskView } from "../../shared/tasks/JobTaskView";
-import { DashboardView, JobsView, LiveJobMapView, TeamView, AuditView } from "./views";
+import { DispatcherDashboardView, JobsView, LiveJobMapView, TeamView, AuditView } from "./views";
 import { CalendarView } from "../calendar";
 import { SettingsView } from "../../shared/settings";
 import { dispatcherSettingsConfig } from "../../shared/settings/settings-config";
@@ -176,10 +176,10 @@ export function DispatcherDashboard({
   };
 
   return (
-    <div className="w-full overflow-x-hidden h-full">
+    <div className="size-full overflow-x-hidden">
       {/* Views */}
       {activeView === "dashboard" && (
-        <DashboardView
+        <DispatcherDashboardView
           jobs={jobs}
           photographers={photographers}
           metrics={metrics}
@@ -189,7 +189,7 @@ export function DispatcherDashboard({
           onNavigateToJobsView={onNavigateToJobsView}
           onNavigateToMapView={onNavigateToMapView}
           onNavigateToCalendarView={onNavigateToCalendarView}
-          onNavigateToJobInProjectManagement={(job) => {
+          onNavigateToJobInProjectManagement={(job: any) => {
             setSelectedJob(job);
             if (onNavigateToJobsView) {
               onNavigateToJobsView();

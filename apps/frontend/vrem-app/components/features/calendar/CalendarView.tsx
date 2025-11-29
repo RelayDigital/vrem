@@ -39,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Filter } from "lucide-react";
 
 interface CalendarViewProps {
+  canSeeTechnicians?: boolean;
   jobs?: JobRequest[];
   photographers?: Photographer[]; // Deprecated: use technicians
   technicians?: Technician[];
@@ -51,6 +52,7 @@ interface CalendarViewProps {
 }
 
 export function CalendarView({
+  canSeeTechnicians = false,
   jobs = [],
   photographers = [],
   technicians,
@@ -226,7 +228,7 @@ export function CalendarView({
 
     switch (view) {
       case "day":
-        return <DayView {...commonProps} onCreateJob={onCreateJob} />;
+        return <DayView {...commonProps} onCreateJob={onCreateJob} canSeeTechnicians={canSeeTechnicians} />;
       case "week":
         return <WeekView {...commonProps} />;
       case "month":
@@ -240,6 +242,7 @@ export function CalendarView({
 
   const sidebarContent = (
     <CalendarRightSidebar
+      canSeeTechnicians={canSeeTechnicians}
       currentDate={currentDate}
       view={view}
       onDateSelect={(date) => {

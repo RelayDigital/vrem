@@ -21,19 +21,19 @@ export function DispatcherNavigationProvider({
   const router = useRouter();
 
   const navigateToJobsView = useCallback(() => {
-    router.push('/dispatcher/jobs');
+    router.push('/jobs/all-jobs');
   }, [router]);
 
   const navigateToMapView = useCallback(() => {
-    router.push('/dispatcher/map');
+    router.push('/map');
   }, [router]);
 
   const navigateToCalendarView = useCallback(() => {
-    router.push('/dispatcher/calendar');
+    router.push('/calendar');
   }, [router]);
 
   const navigateToJobInProjectManagement = useCallback((job: JobRequest) => {
-    router.push(`/dispatcher/jobs/${job.id}`);
+    router.push(`/jobs/${job.id}`);
   }, [router]);
 
   return (

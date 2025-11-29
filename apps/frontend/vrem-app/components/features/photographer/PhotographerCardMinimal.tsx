@@ -111,7 +111,7 @@ export function PhotographerCardMinimal({
       >
         {/* Avatar */}
         <div className="relative shrink-0">
-          <Avatar className="h-12 w-12 border-2 border-background">
+          <Avatar className="size-12 border-2 border-background">
             <AvatarImage src={photographer.avatar} alt={photographer.name} />
             <AvatarFallback className="bg-primary text-primary-foreground text-sm">
               {photographer.name
@@ -276,7 +276,7 @@ export function PhotographerCardMinimal({
                             <div>
                               <ChartContainer
                                 config={scoreChartConfig}
-                                className="h-16 w-16 cursor-help"
+                                className="size-16 cursor-help"
                               >
                                 <RadialBarChart
                                   data={scoreData}

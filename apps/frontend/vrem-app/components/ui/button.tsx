@@ -21,6 +21,8 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         muted: "text-primary border-none bg-muted hover:bg-primary/20 transition-colors duration-300",
         flat: "text-primary border-none bg-transparent hover:text-primary/60 transition-colors duration-300",
+        activeFlat: "text-primary border-none bg-transparent",
+        mutedFlat: "text-primary/60 border-none bg-transparent hover:text-primary/90 transition-colors duration-300",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",

@@ -54,6 +54,7 @@ interface MapWithSidebarProps {
   initialSidebarView?: SidebarView;
   initialJobForRankings?: JobRequest | null;
   onGoBack?: () => void;
+  isDispatcherView?: boolean; // If true, use "Pending Assignments" language; if false, use generic "Jobs" language
 }
 
 type SidebarView = "pending" | "rankings";
@@ -91,6 +92,7 @@ export function MapWithSidebar({
   initialSidebarView = "pending",
   initialJobForRankings = null,
   onGoBack,
+  isDispatcherView = true, // Default to dispatcher view for backwards compatibility
 }: MapWithSidebarProps) {
   const [sidebarView, setSidebarView] =
     useState<SidebarView>(initialSidebarView);
@@ -356,11 +358,13 @@ export function MapWithSidebar({
         <>
           {/* Pending Assignments Header */}
           <CardHeader
-            className={`py-4 px-4 md:px-0! space-y-3 gap-0! md:relative sticky top-0 z-10 bg-background`}
+            className={`py-4 px-4 md:px-0! space-y-3 gap-0! md:relative sticky top-0 z-50 md:z-10 bg-background`}
           >
             <div className="flex items-center justify-between">
               <div>
-                <H3 className="text-lg border-0">Pending Assignments</H3>
+                <H3 className="text-lg border-0">
+                  {isDispatcherView ? "Pending Assignments" : "Pending Jobs"}
+                </H3>
                 <Muted className="text-xs">
                   {pendingJobs.length}{" "}
                   {pendingJobs.length === 1 ? "job" : "jobs"}
@@ -396,9 +400,11 @@ export function MapWithSidebar({
               <div className="px-4 pb-4 md:px-0! md:pb-0 space-y-3 min-w-0 w-full max-w-full box-border">
                 {filteredPendingJobs.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                    <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
+                    <CheckCircle2 className="size-12 text-muted-foreground mb-4" />
                     <H3 className="text-lg mb-2">All caught up!</H3>
-                    <Muted>No pending assignments</Muted>
+                    <Muted>
+                      {isDispatcherView ? "No pending assignments" : "No pending jobs"}
+                    </Muted>
                   </div>
                 ) : (
                   filteredPendingJobs.map((job) => (
@@ -717,7 +723,7 @@ export function MapWithSidebar({
               {/* <DrawerHeader> */}
               <DrawerTitle className="sr-only">
                 {sidebarView === "pending"
-                  ? "Pending Assignments"
+                  ? (isDispatcherView ? "Pending Assignments" : "Pending Jobs")
                   : "Ranked Photographers"}
               </DrawerTitle>
               {/* </DrawerHeader> */}

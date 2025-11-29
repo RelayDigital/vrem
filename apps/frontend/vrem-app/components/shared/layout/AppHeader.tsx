@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useTheme } from 'next-themes';
-import { useRouter, usePathname } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { H2 } from '@/components/ui/typography';
-import { SidebarTrigger } from '@/components/ui/sidebar';
-import { useIsMobile } from '@/components/ui/use-mobile';
+import { useTheme } from "next-themes";
+import { useRouter, usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { H2 } from "@/components/ui/typography";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/components/ui/use-mobile";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   User as UserIcon,
   Settings,
@@ -27,11 +27,11 @@ import {
   Monitor,
   Briefcase,
   Building2,
-} from 'lucide-react';
-import { User } from '@/types';
-import { useJobCreation } from '@/context/JobCreationContext';
-import { useAuth } from '@/context/auth-context';
-import { OrganizationSwitcher } from '@/components/features/dispatcher/OrganizationSwitcher';
+} from "lucide-react";
+import { User } from "@/types";
+import { useJobCreation } from "@/context/JobCreationContext";
+import { useAuth } from "@/context/auth-context";
+import { OrganizationSwitcher } from "@/components/features/dispatcher/OrganizationSwitcher";
 
 interface AppHeaderProps {
   user: User;
@@ -39,27 +39,50 @@ interface AppHeaderProps {
   onNewJobClick?: () => void;
 }
 
-export function AppHeader({ user, showNewJobButton = false, onNewJobClick }: AppHeaderProps) {
+export function AppHeader({
+  user,
+  showNewJobButton = false,
+  onNewJobClick,
+}: AppHeaderProps) {
   const { theme, setTheme } = useTheme();
   const { logout } = useAuth();
   const jobCreation = useJobCreation();
   const router = useRouter();
   const pathname = usePathname();
 
-  // Determine agent view based on pathname
-  const isAgentJobsView = pathname === '/agent' || pathname === '/agent/jobs';
-  const isAgentBookingView = pathname === '/agent/booking';
+  // Determine agent view based on pathname (using canonical routes)
+  const isAgentJobsView =
+    pathname === "/dashboard" ||
+    pathname === "/jobs" ||
+    pathname === "/jobs/all-jobs";
+  const isAgentBookingView = pathname === "/booking";
+  const isAgentCalendarView = pathname === "/calendar";
+  const isAgentMapView = pathname === "/map";
 
-  // Determine photographer view based on pathname
-  const isPhotographerDashboardView = pathname === '/photographer';
-  const isPhotographerJobsView = pathname.startsWith('/photographer/jobs');
-  const isPhotographerCalendarView = pathname === '/photographer/calendar';
-  const isPhotographerMapView = pathname === '/photographer/map';
+  // Determine photographer view based on pathname (using canonical routes)
+  const isPhotographerDashboardView = pathname === "/dashboard";
+  const isPhotographerJobsView = pathname.startsWith("/jobs/all-jobs");
+  const isPhotographerCalendarView = pathname === "/calendar";
+  const isPhotographerMapView = pathname === "/map";
 
-  // Determine dispatcher view (only dispatcher uses the sidebar layout)
-  const isDispatcherView = pathname.startsWith('/dispatcher');
+  // Determine dispatcher view (check for canonical routes or legacy dispatcher routes)
+  const isDispatcherView =
+    pathname.startsWith("/dispatcher") ||
+    pathname === "/dashboard" ||
+    pathname.startsWith("/jobs/all-jobs") ||
+    pathname.startsWith("/calendar") ||
+    pathname.startsWith("/map") ||
+    pathname.startsWith("/team") ||
+    pathname.startsWith("/customers") ||
+    pathname.startsWith("/settings");
 
   const handleNewJobClick = () => {
+    // For agents, navigate to booking page
+    if (user?.role === "AGENT") {
+      router.push("/booking");
+      return;
+    }
+
     if (onNewJobClick) {
       onNewJobClick();
     } else {
@@ -68,30 +91,20 @@ export function AppHeader({ user, showNewJobButton = false, onNewJobClick }: App
   };
 
   const handleSettingsClick = () => {
-    if (user?.role === 'ADMIN' as any || user?.role === 'PROJECT_MANAGER' as any || user?.role === 'EDITOR' as any) {
-      router.push('/dispatcher/settings');
-    } else if (user?.role === 'AGENT' as any) {
-      router.push('/agent/settings');
-    } else if (user?.role === 'PHOTOGRAPHER' as any || user?.role === 'photographer' as any || user?.role === 'TECHNICIAN' as any) {
-      router.push('/photographer/settings');
-    } else {
-      router.push('/settings');
-    }
+    // All roles use canonical settings route
+    router.push("/settings/profile");
   };
 
   const handleLogout = () => {
     // Clear any additional localStorage items
-    localStorage.removeItem('accountType');
+    localStorage.removeItem("accountType");
     // Use the auth context logout function which handles token removal and navigation
     logout();
   };
 
   const handleOrganizationHome = () => {
-    if (user?.role === 'ADMIN' || user?.role === 'PROJECT_MANAGER' || user?.role === 'EDITOR' || (user?.role as any) === 'dispatcher') {
-      router.push('/dispatcher/organization');
-    } else if (user?.role === 'TECHNICIAN' || (user?.role as any) === 'PHOTOGRAPHER' || (user?.role as any) === 'photographer') {
-      router.push('/photographer/organization');
-    }
+    // Navigate to organization settings (canonical route)
+    router.push("/organization/settings");
   };
 
   return (
@@ -99,38 +112,75 @@ export function AppHeader({ user, showNewJobButton = false, onNewJobClick }: App
       <header className="sticky top-0 z-50 flex items-center border-b bg-card/80 backdrop-blur-xl shadow-sm w-full pl-2 pr-4 h-header-h">
         <div className="w-full max-w-full overflow-hidden">
           <div className="flex items-center justify-between">
+            {/* Organization Switcher */}
             <div className="flex items-center gap-3">
-              {(user?.role === 'ADMIN' || user?.role === 'PROJECT_MANAGER' || user?.role === 'EDITOR' || user?.role === 'dispatcher' as any) && (
-                <OrganizationSwitcher variant="header" showJoin={false} onOrgHome={handleOrganizationHome} accountType="dispatcher" />
+              {(user?.role === "ADMIN" ||
+                user?.role === "PROJECT_MANAGER" ||
+                user?.role === "EDITOR" ||
+                user?.role === ("dispatcher" as any)) && (
+                <OrganizationSwitcher
+                  variant="header"
+                  showJoin={false}
+                  onOrgHome={handleOrganizationHome}
+                  accountType="dispatcher"
+                />
               )}
-              {(user?.role === 'TECHNICIAN' || user?.role === 'PHOTOGRAPHER' as any || user?.role === 'photographer' as any) && (
-                <OrganizationSwitcher variant="header" includePersonal showManage={false} onOrgHome={handleOrganizationHome} accountType="photographer" />
+              {(user?.role === "TECHNICIAN" ||
+                user?.role === ("PHOTOGRAPHER" as any) ||
+                user?.role === ("photographer" as any)) && (
+                <OrganizationSwitcher
+                  variant="header"
+                  includePersonal
+                  showManage={false}
+                  onOrgHome={handleOrganizationHome}
+                  accountType="photographer"
+                />
               )}
-              {(user?.role !== 'ADMIN' && user?.role !== 'PROJECT_MANAGER' && user?.role !== 'EDITOR' && user?.role !== 'dispatcher' as any && user?.role !== 'TECHNICIAN' && user?.role !== 'PHOTOGRAPHER' as any && user?.role !== 'photographer' as any) && (
-                <H2 className="p-0 border-0">VX Media</H2>
-              )}
+              {user?.role !== "ADMIN" &&
+                user?.role !== "PROJECT_MANAGER" &&
+                user?.role !== "EDITOR" &&
+                user?.role !== ("dispatcher" as any) &&
+                user?.role !== "TECHNICIAN" &&
+                user?.role !== ("PHOTOGRAPHER" as any) &&
+                user?.role !== ("photographer" as any) && (
+                  <H2 className="p-0 border-0">VX Media</H2>
+                )}
               {!useIsMobile() &&
                 isDispatcherView &&
-                (user?.role === 'ADMIN' ||
-                  user?.role === 'PROJECT_MANAGER' ||
-                  user?.role === 'EDITOR') && <SidebarTrigger />}
+                (user?.role === "ADMIN" ||
+                  user?.role === "PROJECT_MANAGER" ||
+                  user?.role === "EDITOR") && <SidebarTrigger />}
             </div>
 
             <div className="flex items-center gap-4">
               {/* Agent View Switcher */}
-              {user?.role === 'AGENT' as any && (
+              {!useIsMobile() && user?.role === ("AGENT" as any) && (
                 <div className="flex items-center gap-2">
                   <Button
-                    variant={isAgentJobsView ? "default" : "muted"}
+                    variant={isAgentJobsView ? "activeFlat" : "mutedFlat"}
                     size="sm"
-                    onClick={() => router.push('/agent/jobs')}
+                    onClick={() => router.push("/jobs")}
                   >
                     My Jobs
                   </Button>
                   <Button
-                    variant={isAgentBookingView ? "default" : "muted"}
+                    variant={isAgentCalendarView ? "activeFlat" : "mutedFlat"}
                     size="sm"
-                    onClick={() => router.push('/agent/booking')}
+                    onClick={() => router.push("/calendar")}
+                  >
+                    Calendar
+                  </Button>
+                  <Button
+                    variant={isAgentMapView ? "activeFlat" : "mutedFlat"}
+                    size="sm"
+                    onClick={() => router.push("/map")}
+                  >
+                    Map
+                  </Button>
+                  <Button
+                    variant={isAgentBookingView ? "activeFlat" : "mutedFlat"}
+                    size="sm"
+                    onClick={handleNewJobClick}
                   >
                     New Booking
                   </Button>
@@ -138,34 +188,41 @@ export function AppHeader({ user, showNewJobButton = false, onNewJobClick }: App
               )}
 
               {/* Photographer View Switcher */}
-              {(user?.role === 'PHOTOGRAPHER' as any || user?.role === 'photographer' as any || user?.role === 'TECHNICIAN' as any) && (
+              {!useIsMobile() && (user?.role === ("PHOTOGRAPHER" as any) ||
+                user?.role === ("photographer" as any) ||
+                user?.role === ("TECHNICIAN" as any)) && (
                 <div className="flex items-center gap-2">
                   <Button
-                    variant={isPhotographerDashboardView ? "default" : "muted"}
+                    variant={
+                      isPhotographerDashboardView ? "activeFlat" : "mutedFlat"
+                    }
                     size="sm"
-                    onClick={() => router.push('/photographer')}
+                    onClick={() => router.push("/dashboard")}
                   >
                     Dashboard
                   </Button>
                   <Button
-                    variant={isPhotographerJobsView ? "default" : "muted"}
+                    variant={
+                      isPhotographerJobsView ? "activeFlat" : "mutedFlat"
+                    }
                     size="sm"
-                    onClick={() => router.push('/photographer/jobs')}
+                    onClick={() => router.push("/jobs/all-jobs")}
                   >
-                    <Briefcase className="h-4 w-4 mr-2" />
                     Jobs
                   </Button>
                   <Button
-                    variant={isPhotographerCalendarView ? "default" : "muted"}
+                    variant={
+                      isPhotographerCalendarView ? "activeFlat" : "mutedFlat"
+                    }
                     size="sm"
-                    onClick={() => router.push('/photographer/calendar')}
+                    onClick={() => router.push("/calendar")}
                   >
                     Calendar
                   </Button>
                   <Button
-                    variant={isPhotographerMapView ? "default" : "muted"}
+                    variant={isPhotographerMapView ? "activeFlat" : "mutedFlat"}
                     size="sm"
-                    onClick={() => router.push('/photographer/map')}
+                    onClick={() => router.push("/map")}
                   >
                     Map
                   </Button>
@@ -173,17 +230,20 @@ export function AppHeader({ user, showNewJobButton = false, onNewJobClick }: App
               )}
 
               {/* New Job Button for Dispatcher */}
-              {showNewJobButton && (user?.role === 'ADMIN' as any || user?.role === 'PROJECT_MANAGER' as any || user?.role === 'EDITOR' as any) && (
-                <Button
-                  onClick={handleNewJobClick}
-                  size="sm"
-                  className="gap-2"
-                  variant="muted"
-                >
-                  <Plus className="h-4 w-4" />
-                  New Job
-                </Button>
-              )}
+              {!useIsMobile() && showNewJobButton &&
+                (user?.role === ("ADMIN" as any) ||
+                  user?.role === ("PROJECT_MANAGER" as any) ||
+                  user?.role === ("EDITOR" as any)) && (
+                  <Button
+                    onClick={handleNewJobClick}
+                    size="sm"
+                    className="gap-2"
+                    variant="mutedFlat"
+                  >
+                    <Plus className="h-4 w-4" />
+                    New Job
+                  </Button>
+                )}
 
               {/* Profile Dropdown */}
               <DropdownMenu>
@@ -193,16 +253,14 @@ export function AppHeader({ user, showNewJobButton = false, onNewJobClick }: App
                     className="flex items-center gap-3 h-auto p-0"
                   >
                     <Avatar className="h-9 w-9 border-2 border-border shadow-sm">
-                      <AvatarImage
-                        src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200"
-                      />
+                      <AvatarImage src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200" />
                       <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                         {user?.name
                           ? user.name
-                              .split(' ')
+                              .split(" ")
                               .map((n) => n[0])
-                              .join('')
-                          : 'U'}
+                              .join("")
+                          : "U"}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -210,24 +268,17 @@ export function AppHeader({ user, showNewJobButton = false, onNewJobClick }: App
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>
                     <div>
-                      <div className="text-sm">{user?.name || 'User'}</div>
+                      <div className="text-sm">{user?.name || "User"}</div>
                       <div className="text-xs text-muted-foreground capitalize">
-                        {user?.role || 'user'}
+                        {user?.role || "user"}
                       </div>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => {
-                      if (user?.role === 'ADMIN' as any || user?.role === 'PROJECT_MANAGER' as any || user?.role === 'EDITOR' as any || user?.role === 'dispatcher' as any) {
-                        router.push('/dispatcher/profile');
-                      } else if (user?.role === 'PHOTOGRAPHER' as any || user?.role === 'photographer' as any || user?.role === 'TECHNICIAN' as any) {
-                        router.push('/photographer/profile');
-                      } else if (user?.role === 'AGENT' as any) {
-                        router.push('/agent/profile');
-                      } else {
-                        router.push('/profile');
-                      }
+                      // All roles use canonical profile route
+                      router.push("/settings/profile");
                     }}
                   >
                     <UserIcon className="h-4 w-4 mr-2" />

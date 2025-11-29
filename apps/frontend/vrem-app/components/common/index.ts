@@ -2,3 +2,4 @@
 export { ImageWithFallback } from './figma/ImageWithFallback';
 export { JobDetailCard, EmptyState, CompanyCard, ApplicationCard } from './cards';
 export { ProfileEditor } from './forms';
+export { AccessDenied } from './AccessDenied';

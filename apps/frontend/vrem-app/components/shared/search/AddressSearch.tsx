@@ -243,7 +243,7 @@ export function AddressSearch({ onAddressSelect }: AddressSearchProps) {
               animate={{ opacity: 1, y: 0 }}
               className="absolute top-full mt-2 w-full bg-card rounded-2xl border-2 border-border shadow-2xl overflow-hidden z-50 p-6 text-center"
             >
-              <MapPin className="h-12 w-12 mx-auto mb-2 text-muted-foreground/40" />
+              <MapPin className="size-12 mx-auto mb-2 text-muted-foreground/40" />
               <P className="text-sm text-muted-foreground">No addresses found</P>
               <P className="text-xs text-muted-foreground/80 mt-1">Try a different search term</P>
             </motion.div>

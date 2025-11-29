@@ -242,7 +242,7 @@ export function JobCard({
                   className="flex items-center rounded-full backdrop-blur-md! hover:bg-card/60! bg-card/60! group-hover:bg-card! transition-colors duration-200"
                 >
                   <ExternalLink className="size-2.5" />
-                  <span className="sr-only">View in project management</span>
+                  <span className="sr-only">View in job management</span>
                 </Button>
               </div>
             )}
@@ -449,7 +449,7 @@ export function JobCard({
               </Badge>
             )}
 
-            {/* View in Project Management Button - Top Right */}
+            {/* View in Job Management Button - Top Right */}
             {onViewInProjectManagement && (
               <div className="flex absolute right-0 z-10">
                 <Button
@@ -461,7 +461,7 @@ export function JobCard({
                   }}
                 >
                   <ExternalLink className="size-3.5" />
-                  <span className="sr-only">View in project management</span>
+                  <span className="sr-only">View in job management</span>
                 </Button>
               </div>
             )}

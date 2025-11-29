@@ -51,7 +51,7 @@ export function ProfileEditor({ photographer, onSave }: ProfileEditorProps) {
       <div className="space-y-6">
         {/* Basic Info */}
         <div className="flex items-start gap-6">
-          <Avatar className="h-24 w-24 border-4 border-card shadow-lg">
+          <Avatar className="size-24 border-4 border-card shadow-lg">
             <AvatarImage src={photographer.avatar} />
             <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
               {photographer.name

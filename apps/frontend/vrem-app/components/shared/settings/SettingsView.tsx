@@ -106,7 +106,7 @@ function SettingsCard({
       <CardContent className="p-6">
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
               {icon}
             </div>
             <H3 className="text-base font-semibold text-foreground">{title}</H3>
@@ -255,7 +255,7 @@ export function SettingsView({
                 <BreadcrumbList>
                   <BreadcrumbItem>
                     <BreadcrumbLink asChild>
-                      <Link href="/dispatcher/settings">Settings</Link>
+                      <Link href="/settings/profile">Settings</Link>
                     </BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator />

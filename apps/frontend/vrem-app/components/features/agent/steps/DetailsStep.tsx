@@ -55,7 +55,7 @@ export function DetailsStep({
       className="container mx-auto p-6 h-full"
     >
       <div
-        className="container mx-auto px-6 space-y-6"
+        className="container mx-auto space-y-6"
         style={{ maxWidth: "896px", marginLeft: "auto", marginRight: "auto" }}
       >
         {/* Progress */}

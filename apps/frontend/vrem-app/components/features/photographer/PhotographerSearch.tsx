@@ -103,7 +103,7 @@ export function PhotographerSearch({
                 className="w-full p-4 border-2 border-border rounded-xl hover:border-indigo-300 transition-all text-left"
               >
                 <div className="flex items-start gap-4">
-                  <Avatar className="h-14 w-14 border-2 border-white shadow-md">
+                  <Avatar className="size-14 border-2 border-white shadow-md">
                     <AvatarImage src={photographer.avatar} />
                     <AvatarFallback className="bg-primary text-primary-foreground">
                       {photographer.name
@@ -159,7 +159,7 @@ export function PhotographerSearch({
                 className="p-4 border-2 border-border rounded-xl"
               >
                 <div className="flex items-start gap-4 mb-4">
-                  <Avatar className="h-14 w-14 border-2 border-white shadow-md">
+                  <Avatar className="size-14 border-2 border-white shadow-md">
                     <AvatarImage src={company.avatar} />
                     <AvatarFallback>
                       {company.name
@@ -232,14 +232,14 @@ export function PhotographerSearch({
           ((searchType === 'photographer' && filteredPhotographers.length === 0) ||
             (searchType === 'company' && filteredCompanies.length === 0)) && (
             <div className="text-center py-8 text-muted-foreground/80">
-              <Search className="h-12 w-12 mx-auto mb-2 text-muted-foreground/40" />
+              <Search className="size-12 mx-auto mb-2 text-muted-foreground/40" />
               <P className="text-sm">No results found</P>
             </div>
           )}
 
         {!query && (
           <div className="text-center py-8 text-muted-foreground/80">
-            <Search className="h-12 w-12 mx-auto mb-2 text-muted-foreground/40" />
+            <Search className="size-12 mx-auto mb-2 text-muted-foreground/40" />
             <P className="text-sm">
               {searchType === 'photographer'
                 ? 'Search for a specific photographer'

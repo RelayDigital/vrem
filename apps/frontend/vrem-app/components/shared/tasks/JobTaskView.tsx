@@ -533,7 +533,8 @@ export function JobTaskView({
   const handleCopyLink = () => {
     if (!job) return;
     
-    const jobTaskUrl = `${window.location.origin}/dispatcher/jobs/${job.id}`;
+    // Use canonical route for job detail
+    const jobTaskUrl = `${window.location.origin}/jobs/${job.id}`;
     navigator.clipboard.writeText(jobTaskUrl);
     toast.success('Link copied to clipboard');
   };
@@ -554,15 +555,15 @@ export function JobTaskView({
   const getMediaTypeIcon = (type: "image" | "video" | "floor-plan" | "3d-content" | "file") => {
     switch (type) {
       case "image":
-        return <ImageIcon className="h-10 w-10 text-muted-foreground" />;
+        return <ImageIcon className="size-10 text-muted-foreground" />;
       case "video":
-        return <Video className="h-10 w-10 text-muted-foreground" />;
+        return <Video className="size-10 text-muted-foreground" />;
       case "floor-plan":
-        return <FileText className="h-10 w-10 text-muted-foreground" />;
+        return <FileText className="size-10 text-muted-foreground" />;
       case "3d-content":
-        return <Box className="h-10 w-10 text-muted-foreground" />;
+        return <Box className="size-10 text-muted-foreground" />;
       default:
-        return <File className="h-10 w-10 text-muted-foreground" />;
+        return <File className="size-10 text-muted-foreground" />;
     }
   };
 
@@ -767,7 +768,7 @@ export function JobTaskView({
                     key={item.id || `media-${index}-${item.url}`}
                     className="group relative aspect-square rounded-lg border border-border overflow-hidden bg-muted hover:border-primary transition-colors"
                   >
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-muted p-4">
+                    <div className="size-full flex flex-col items-center justify-center bg-muted p-4">
                       {getMediaTypeIcon(item.type)}
                       <P className="text-xs text-muted-foreground mt-2 text-center line-clamp-2">
                         {item.name}
@@ -892,16 +893,16 @@ export function JobTaskView({
                 <img
                   src={item.url}
                   alt={item.name}
-                  className="w-full h-full object-cover"
+                  className="size-full object-cover"
                 />
               )}
               {item.type === "video" && (
-                <div className="w-full h-full flex items-center justify-center bg-muted">
-                  <Video className="h-12 w-12 text-muted-foreground" />
+                <div className="size-full flex items-center justify-center bg-muted">
+                  <Video className="size-12 text-muted-foreground" />
                 </div>
               )}
               {(item.type === "3d-content" || item.type === "file") && (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-muted p-4">
+                <div className="size-full flex flex-col items-center justify-center bg-muted p-4">
                   {getMediaTypeIcon(item.type)}
                   <P className="text-xs text-muted-foreground mt-2 text-center line-clamp-2">
                     {item.name}
@@ -1818,7 +1819,7 @@ export function JobTaskView({
                       <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
                     )}
                   </Button>
-                  <Button
+                  {/* <Button
                     variant="ghost"
                     size={isMobile ? "icon" : "default"}
                     onClick={() => setActiveTab("attachments")}
@@ -1834,7 +1835,7 @@ export function JobTaskView({
                     {activeTab === "attachments" && (
                       <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
                     )}
-                  </Button>
+                  </Button> */}
                 </div>
 
               </div>
@@ -2096,7 +2097,7 @@ export function JobTaskView({
       </AlertDialog>
 
       {variant === "page" ? (
-        <div className="w-full h-full flex flex-col overflow-hidden">
+        <div className="size-full flex flex-col overflow-hidden h-[calc(100vh-var(--header-h))]">
           <div className="border-b flex-shrink-0">{renderHeader(SheetTitle)}</div>
           <div className="flex-1 overflow-hidden">
             {renderContent()}

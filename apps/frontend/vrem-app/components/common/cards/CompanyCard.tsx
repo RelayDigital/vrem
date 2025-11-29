@@ -32,7 +32,7 @@ export function CompanyCard({ company, onApply, isApplied = false, showApplyButt
   return (
     <Card className="p-6">
       <div className="flex gap-6">
-        <Avatar className="h-20 w-20 border-2 border-border">
+        <Avatar className="size-20 border-2 border-border">
           <AvatarImage src={company.avatar} />
           <AvatarFallback className="bg-primary text-primary-foreground">
             {company.name

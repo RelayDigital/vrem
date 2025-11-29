@@ -1,0 +1,103 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { User } from '@/types';
+import { useAuth } from '@/context/auth-context';
+
+interface UseRoleGuardOptions {
+  /**
+   * If true, automatically redirect to /dashboard when access is denied
+   * If false, return isAllowed: false so the component can render a 403
+   * @default false
+   */
+  redirectOnDeny?: boolean;
+  /**
+   * Custom redirect path when redirectOnDeny is true
+   * @default '/dashboard'
+   */
+  redirectTo?: string;
+}
+
+interface UseRoleGuardReturn {
+  user: User | null;
+  isLoading: boolean;
+  isAllowed: boolean;
+}
+
+// Map backend role names to frontend role names (for normalization)
+// Same mapping as useRequireRole for consistency
+const roleMap: Record<string, User['role']> = {
+  'ADMIN': 'ADMIN',
+  'PROJECT_MANAGER': 'PROJECT_MANAGER',
+  'TECHNICIAN': 'TECHNICIAN',
+  'EDITOR': 'EDITOR',
+  'AGENT': 'AGENT',
+  // Legacy lowercase mappings (for backwards compatibility)
+  'dispatcher': 'ADMIN',
+  'photographer': 'TECHNICIAN',
+  'agent': 'AGENT',
+  'admin': 'ADMIN',
+  'project_manager': 'PROJECT_MANAGER',
+  'editor': 'EDITOR',
+};
+
+/**
+ * Hook to guard routes based on user roles
+ * Returns whether the user is allowed access, without automatically redirecting
+ * (unless redirectOnDeny is true)
+ */
+export function useRoleGuard(
+  requiredRoles: (User['role'] | string)[],
+  options: UseRoleGuardOptions = {}
+): UseRoleGuardReturn {
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
+  const { redirectOnDeny = false, redirectTo = '/dashboard' } = options;
+
+  useEffect(() => {
+    // Don't redirect while loading
+    if (isLoading) return;
+
+    // If no user, redirect to login (handled by parent layout)
+    if (!user) {
+      if (redirectOnDeny) {
+        router.replace('/');
+      }
+      return;
+    }
+
+    // Normalize role names (handle both backend and frontend role formats)
+    const normalizedRequiredRoles = requiredRoles.map(role =>
+      roleMap[role] || (role as User['role'])
+    );
+    const normalizedUserRole = roleMap[user.role] || user.role;
+
+    // Check if user has one of the required roles
+    const hasRequiredRole = normalizedRequiredRoles.includes(normalizedUserRole);
+
+    // Redirect if access is denied and redirectOnDeny is true
+    if (!hasRequiredRole && redirectOnDeny) {
+      router.replace(redirectTo);
+    }
+  }, [user, isLoading, requiredRoles, router, redirectOnDeny, redirectTo]);
+
+  // Calculate isAllowed
+  const isAllowed = (() => {
+    if (isLoading || !user) {
+      return false;
+    }
+    const normalizedRequiredRoles = requiredRoles.map(role =>
+      roleMap[role] || (role as User['role'])
+    );
+    const normalizedUserRole = roleMap[user.role] || user.role;
+    return normalizedRequiredRoles.includes(normalizedUserRole);
+  })();
+
+  return {
+    user,
+    isLoading,
+    isAllowed,
+  };
+}
+

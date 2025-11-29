@@ -175,7 +175,7 @@ export function PhotographerCard({
                         <div>
                           <ChartContainer
                             config={scoreChartConfig}
-                            className="h-16 w-16 cursor-help"
+                            className="size-16 cursor-help"
                           >
                             <RadialBarChart
                               data={scoreData}

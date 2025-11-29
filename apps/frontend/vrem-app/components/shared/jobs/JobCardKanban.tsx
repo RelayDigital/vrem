@@ -390,7 +390,7 @@ export function JobCardKanban({
                         <div className="p-4 space-y-3">
                           {/* Header */}
                           <div className="flex items-center gap-3">
-                            <Avatar className="h-12 w-12 border-2 border-background">
+                            <Avatar className="size-12 border-2 border-background">
                               <AvatarImage
                                 src={assignee.avatar}
                                 alt={assignee.name}

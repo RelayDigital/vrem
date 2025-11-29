@@ -27,7 +27,7 @@ export function PhotographerDashboard({
   const upcomingJobs = myJobs.filter((j) => j.status === 'assigned');
 
   return (
-    <div className="w-full overflow-x-hidden h-full">
+    <div className="size-full overflow-x-hidden">
       {/* Views */}
       {activeView === 'jobs' && (
         <JobsView

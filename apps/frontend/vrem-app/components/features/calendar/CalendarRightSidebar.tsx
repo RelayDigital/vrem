@@ -26,6 +26,7 @@ import { getWeekRange, getMonthRange } from "@/lib/calendar-utils";
 import { H3 } from "@/components/ui/typography";
 
 interface CalendarRightSidebarProps {
+  canSeeTechnicians: boolean;
   currentDate: Date;
   view: ViewType;
   onDateSelect: (date: Date) => void;
@@ -39,6 +40,7 @@ interface CalendarRightSidebarProps {
 }
 
 export function CalendarRightSidebar({
+  canSeeTechnicians,
   currentDate,
   view,
   onDateSelect,
@@ -306,7 +308,7 @@ export function CalendarRightSidebar({
       )}
 
       {/* Technician Filters - hidden when there are no technicians (e.g. photographer view) */}
-      {technicians.length > 0 && (
+      {canSeeTechnicians && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <Label className="text-sm font-semibold">Technicians</Label>

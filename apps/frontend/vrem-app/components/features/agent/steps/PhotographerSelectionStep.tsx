@@ -58,7 +58,7 @@ export function PhotographerSelectionStep({
       exit={{ opacity: 0, x: -100 }}
       className="container mx-auto p-6 h-full"
     >
-      <div className="container mx-auto px-6 space-y-6">
+      <div className="container mx-auto space-y-6">
         {/* Progress */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <CheckCircle2 className="h-5 w-5 text-green-500" />
