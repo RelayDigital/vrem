@@ -68,11 +68,11 @@ export function useRequireRole(
         // Get the user's role dashboard path
         const getUserDashboardPath = (role: User['role']): string => {
           if (role === 'ADMIN' || role === 'PROJECT_MANAGER' || role === 'EDITOR') {
-            return '/dispatcher';
+            return '/dashboard';
           } else if (role === 'AGENT') {
-            return '/agent';
+            return '/dashboard';
           } else if (role === 'TECHNICIAN') {
-            return '/photographer';
+            return '/dashboard';
           }
           // Fallback to root if role is unknown
           return '/';
