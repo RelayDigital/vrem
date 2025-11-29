@@ -269,8 +269,8 @@ export function AppHeader({
                   <DropdownMenuLabel>
                     <div>
                       <div className="text-sm">{user?.name || "User"}</div>
-                      <div className="text-xs text-muted-foreground capitalize">
-                        {user?.role || "user"}
+                      <div className="text-xs text-muted-foreground">
+                        {user?.email || "email@example.com"}
                       </div>
                     </div>
                   </DropdownMenuLabel>
