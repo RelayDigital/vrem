@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { TeamView } from '@/components/features/dispatcher/views/TeamView';
 import { Photographer } from '@/types';
-// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented
+// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented (visual placeholder only)
 import { photographers as initialPhotographers } from '@/lib/mock-data';
 import { USE_MOCK_DATA } from '@/lib/utils';
 import { TeamLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';

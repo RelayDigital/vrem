@@ -7,7 +7,7 @@ import { useRequireRole } from '@/hooks/useRequireRole';
 import { JobsView } from '@/components/features/dispatcher/views/JobsView';
 import { JobTaskView } from '@/components/shared/tasks/JobTaskView';
 import { Photographer, ProjectStatus } from '@/types';
-// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented
+// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented (visual placeholder only)
 import {
   photographers as initialPhotographers,
 } from '@/lib/mock-data';

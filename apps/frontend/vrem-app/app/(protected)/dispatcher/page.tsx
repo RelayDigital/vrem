@@ -8,8 +8,9 @@ import { JobTaskView } from '@/components/shared/tasks/JobTaskView';
 import { JobRequest, Metrics } from '@/types';
 import { api } from '@/lib/api';
 // TODO: replace with real photographer list from backend once users/technicians endpoint is implemented (visual placeholder only)
-import { photographers as initialPhotographers } from '@/lib/mock-data';
-import { USE_MOCK_DATA } from '@/lib/utils';
+import {
+  photographers as initialPhotographers,
+} from '@/lib/mock-data';
 import { DashboardLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { JobRequestForm } from '@/components/shared/jobs';
@@ -17,6 +18,7 @@ import { useJobCreation } from '@/context/JobCreationContext';
 import { useMessaging } from '@/context/MessagingContext';
 import { useJobManagement } from '@/context/JobManagementContext';
 import { useDispatcherNavigation } from '@/context/DispatcherNavigationContext';
+import { USE_MOCK_DATA } from '@/lib/utils';
 
 export default function DispatcherDashboardPage() {
   const router = useRouter();
@@ -25,9 +27,10 @@ export default function DispatcherDashboardPage() {
   const messaging = useMessaging();
   const jobManagement = useJobManagement();
   const navigation = useDispatcherNavigation();
-  const [photographers] = useState(USE_MOCK_DATA ? initialPhotographers : []);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(true);
+  // TODO: replace with real photographer list from backend once users/technicians endpoint is implemented (visual placeholder only)
+  const [photographers] = useState(USE_MOCK_DATA ? initialPhotographers : []);
 
   // Fetch metrics from backend
   useEffect(() => {
@@ -150,4 +153,3 @@ export default function DispatcherDashboardPage() {
     </div>
   );
 }
-

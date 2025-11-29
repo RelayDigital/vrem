@@ -4,7 +4,7 @@ import { PhotographerDashboard } from '@/components/features/photographer/Photog
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { useJobManagement } from '@/context/JobManagementContext';
 import { useOrganizations } from '@/hooks/useOrganizations';
-// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented
+// TODO: replace with real photographer list from backend once users/technicians endpoint is implemented (visual placeholder only)
 import { photographers } from '@/lib/mock-data';
 import { useState } from 'react';
 import { Organization, Photographer } from '@/types';
@@ -14,7 +14,7 @@ export default function PhotographerProfilePage() {
   const { user, isLoading } = useRequireRole(['TECHNICIAN', 'photographer', 'ADMIN', 'PROJECT_MANAGER']);
   const jobManagement = useJobManagement();
   const { memberships } = useOrganizations();
-  // TODO: replace with real photographer list from backend once users/technicians endpoint is implemented
+  // TODO: replace with real photographer list from backend once users/technicians endpoint is implemented (visual placeholder only)
   const [photographersList] = useState(photographers);
   // TODO: replace with real company applications from backend once applications endpoint is implemented
   const [applications, setApplications] = useState<any[]>([]);
