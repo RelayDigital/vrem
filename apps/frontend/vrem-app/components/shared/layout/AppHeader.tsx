@@ -103,8 +103,8 @@ export function AppHeader({
   };
 
   const handleOrganizationHome = () => {
-    // Navigate to organization settings (canonical route)
-    router.push("/organization/settings");
+    // Navigate to organization home page
+    router.push("/organization");
   };
 
   return (

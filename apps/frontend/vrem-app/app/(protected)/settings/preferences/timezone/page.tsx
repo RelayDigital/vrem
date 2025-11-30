@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { useRequireRole } from "@/hooks/useRequireRole";
-import { H2, Muted } from "@/components/ui/typography";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -12,9 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import { SettingsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import { toast } from "sonner";
+import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
 
 export default function PreferencesTimezonePage() {
   const { user, isLoading } = useRequireRole([
@@ -41,21 +39,10 @@ export default function PreferencesTimezonePage() {
   };
 
   return (
-    <div className="w-full">
-      <div className="mb-md">
-        <H2 className="text-2xl mb-2">Timezone</H2>
-        <Muted className="text-sm">
-          Set your timezone for accurate time displays.
-        </Muted>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Timezone Preferences</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="timezone">Timezone</Label>
+    <SettingsRightContentSection id="timezone" title="Timezone" description="Set your timezone for accurate time displays." onSave={handleSave}>
+      <div className="space-y-4">
+        <Label>Timezone</Label>
+        <div className="space-y-3">
             <Select value={timezone} onValueChange={setTimezone}>
               <SelectTrigger id="timezone">
                 <SelectValue />
@@ -84,14 +71,9 @@ export default function PreferencesTimezonePage() {
                 </SelectItem>
               </SelectContent>
             </Select>
-          </div>
-
-          <div className="pt-2">
-            <Button onClick={handleSave}>Save Changes</Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </SettingsRightContentSection>
   );
 }
 

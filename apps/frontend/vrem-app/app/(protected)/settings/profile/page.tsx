@@ -146,14 +146,13 @@ export default function ProfilePage() {
     };
 
     return (
-      <div className="w-full">
-        <div className="mb-md">
-          <H2 className="text-2xl mb-2">Profile</H2>
-          <Muted className="text-sm">
-            Manage your personal information and profile details.
-          </Muted>
+      <section id="profile" className="mb-md border-b pb-md">
+        {/* Heading */}
+        <div className="mb-md flex items-baseline justify-between">
+          <H2 className="text-lg border-0">Profile</H2>
+          <Muted>Manage your personal information and profile details.</Muted>
         </div>
-
+        
               <Card>
                 <CardHeader>
                   <CardTitle>Personal Information</CardTitle>
@@ -196,7 +195,7 @@ export default function ProfilePage() {
                   </div>
                 </CardContent>
               </Card>
-      </div>
+      </section>
     );
   }
 
@@ -206,14 +205,13 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="w-full">
-      <div className="mb-md">
-        <H2 className="text-2xl mb-2">Profile</H2>
-        <Muted className="text-sm">
-          Manage your personal information and profile details.
-        </Muted>
+    <section id="profile" className="mb-md border-b pb-md">
+      {/* Heading */}
+      <div className="mb-md flex items-baseline justify-between">
+        <H2 className="text-lg border-0">Profile</H2>
+        <Muted>Manage your personal information and profile details.</Muted>
       </div>
-
+      
       <Card>
         <CardHeader>
           <CardTitle>Personal Information</CardTitle>
@@ -245,7 +243,7 @@ export default function ProfilePage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </section>
   );
 }
 

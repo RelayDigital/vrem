@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useRequireRole } from "@/hooks/useRequireRole";
-import { useOrganizations } from "@/hooks/useOrganizations";
+import { useOrganizationSettings } from "@/hooks/useOrganizationSettings";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +31,9 @@ import {
   Search,
   TrendingUp,
   DollarSign,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { H2, Muted } from "@/components/ui/typography";
 import { toast } from "sonner";
@@ -65,26 +67,29 @@ interface ServiceArea {
 }
 
 export default function OrganizationSettingsPage() {
-  const { user, isLoading, isAllowed } = useRoleGuard([
-    "dispatcher",
-    "ADMIN",
-    "PROJECT_MANAGER",
-  ]);
-  const { memberships, activeOrganizationId } = useOrganizations();
-  const activeMembership = useMemo(
-    () => memberships.find((m) => m.orgId === activeOrganizationId),
-    [memberships, activeOrganizationId]
-  );
-  const org = activeMembership?.organization;
+  const {
+    user,
+    isLoading: roleLoading,
+    isAllowed,
+  } = useRoleGuard(["dispatcher", "ADMIN", "PROJECT_MANAGER"]);
+  const {
+    organization,
+    isLoading: orgLoading,
+    isSaving,
+    error: orgError,
+    save,
+    reload,
+  } = useOrganizationSettings();
 
   const [hasChanges, setHasChanges] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
 
   // Form state - initialize from org data
-  const [companyName, setCompanyName] = useState(org?.name || "");
-  const [companyType, setCompanyType] = useState(org?.type || "");
-  const [description, setDescription] = useState(org?.description || "");
-  const [logo, setLogo] = useState<string | null>(org?.avatar || null);
+  const [companyName, setCompanyName] = useState("");
+  const [companyType, setCompanyType] = useState("");
+  const [description, setDescription] = useState("");
+  const [logo, setLogo] = useState<string | null>(null);
   const [brandColor, setBrandColor] = useState("#3B82F6");
   const [streetAddress, setStreetAddress] = useState("");
   const [city, setCity] = useState("");
@@ -106,13 +111,25 @@ export default function OrganizationSettingsPage() {
 
   // Initialize form from org data when it loads
   useEffect(() => {
-    if (org) {
-      setCompanyName(org.name || "");
-      setCompanyType(org.type || "");
-      setDescription(org.description || "");
-      setLogo(org.avatar || null);
+    if (organization) {
+      setCompanyName(organization.name || "");
+      setCompanyType((organization as any).type || "");
+      setDescription((organization as any).description || "");
+      setLogo(
+        (organization as any).avatar || (organization as any).logoUrl || null
+      );
+      // Address fields
+      setStreetAddress((organization as any).addressLine1 || "");
+      setCity((organization as any).city || "");
+      setStateProvince((organization as any).region || "");
+      setPostalCode((organization as any).postalCode || "");
+      setCountry((organization as any).countryCode || "");
+      setTimezone((organization as any).timezone || "America/Edmonton");
+      // Contact fields
+      setPrimaryEmail((organization as any).primaryEmail || "");
+      setPhoneNumber((organization as any).phone || "");
     }
-  }, [org]);
+  }, [organization]);
 
   const sectionRefs = {
     companyDetails: useRef<HTMLDivElement>(null),
@@ -130,11 +147,11 @@ export default function OrganizationSettingsPage() {
 
     // Get header height - try CSS variable first, then measure actual header
     const headerHeightVar = getComputedStyle(document.documentElement)
-      .getPropertyValue('--header-h')
+      .getPropertyValue("--header-h")
       .trim();
-    
+
     let headerHeight = 64; // fallback to 4rem (64px)
-    
+
     if (headerHeightVar) {
       // Convert rem to pixels (assuming 16px base font size)
       const remValue = parseFloat(headerHeightVar);
@@ -142,15 +159,16 @@ export default function OrganizationSettingsPage() {
         headerHeight = remValue * 16;
       }
     }
-    
+
     // Try to measure actual header as fallback
-    const headerElement = document.querySelector('header');
+    const headerElement = document.querySelector("header");
     if (headerElement) {
       headerHeight = headerElement.offsetHeight;
     }
 
     const elementPosition = element.getBoundingClientRect().top;
-    const offsetPosition = elementPosition + window.pageYOffset - headerHeight - 32;
+    const offsetPosition =
+      elementPosition + window.pageYOffset - headerHeight - 32;
 
     window.scrollTo({
       top: offsetPosition,
@@ -158,25 +176,60 @@ export default function OrganizationSettingsPage() {
     });
   };
 
-  const handleSave = () => {
-    // TODO: Implement save logic with API
-    toast.success("Organization settings saved successfully");
-    setHasChanges(false);
+  const handleSave = async () => {
+    try {
+      await save({
+        name: companyName,
+        legalName: (organization as any)?.legalName || undefined,
+        websiteUrl: (organization as any)?.websiteUrl || undefined,
+        primaryEmail: primaryEmail || undefined,
+        phone: phoneNumber || undefined,
+        addressLine1: streetAddress || undefined,
+        addressLine2: (organization as any)?.addressLine2 || undefined,
+        city: city || undefined,
+        region: stateProvince || undefined,
+        postalCode: postalCode || undefined,
+        countryCode: country || undefined,
+        timezone: timezone || undefined,
+        // Keep existing fields that aren't in the basic profile
+        type: companyType || (organization as any)?.type || undefined,
+        description: description || undefined,
+        avatar: logo || (organization as any)?.logoUrl || undefined,
+      } as any);
+      toast.success("Organization settings saved successfully");
+      setHasChanges(false);
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to save organization settings"
+      );
+    }
   };
 
   const handleCancel = () => {
     // Revert to original org data
-    if (org) {
-      setCompanyName(org.name || "");
-      setCompanyType(org.type || "");
-      setDescription(org.description || "");
-      setLogo(org.avatar || null);
+    if (organization) {
+      setCompanyName(organization.name || "");
+      setCompanyType((organization as any).type || "");
+      setDescription((organization as any).description || "");
+      setLogo(
+        (organization as any).avatar || (organization as any).logoUrl || null
+      );
+      setStreetAddress((organization as any).addressLine1 || "");
+      setCity((organization as any).city || "");
+      setStateProvince((organization as any).region || "");
+      setPostalCode((organization as any).postalCode || "");
+      setCountry((organization as any).countryCode || "");
+      setTimezone((organization as any).timezone || "America/Edmonton");
+      setPrimaryEmail((organization as any).primaryEmail || "");
+      setPhoneNumber((organization as any).phone || "");
     }
     toast.info("Changes discarded");
     setHasChanges(false);
   };
 
-  if (isLoading) {
+  if (roleLoading || orgLoading) {
     return <TeamLoadingSkeleton />;
   }
 
@@ -190,6 +243,23 @@ export default function OrganizationSettingsPage() {
         title="Access Denied"
         description="You do not have permission to view organization settings. Please contact your administrator."
       />
+    );
+  }
+
+  if (orgError && !organization) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-destructive mb-4">
+                {orgError.message || "Failed to load organization settings"}
+              </p>
+              <Button onClick={() => reload()}>Retry</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -210,12 +280,85 @@ export default function OrganizationSettingsPage() {
       )
     : sections;
 
+  // Mobile navigation handlers
+  const handleSectionChange = (sectionId: string) => {
+    const index = sections.findIndex((s) => s.id === sectionId);
+    if (index >= 0) {
+      setCurrentSectionIndex(index);
+      scrollToSection(sectionId as keyof typeof sectionRefs);
+    }
+  };
+
+  const handlePreviousSection = () => {
+    if (currentSectionIndex > 0) {
+      const newIndex = currentSectionIndex - 1;
+      setCurrentSectionIndex(newIndex);
+      scrollToSection(sections[newIndex].id as keyof typeof sectionRefs);
+    }
+  };
+
+  const handleNextSection = () => {
+    if (currentSectionIndex < sections.length - 1) {
+      const newIndex = currentSectionIndex + 1;
+      setCurrentSectionIndex(newIndex);
+      scrollToSection(sections[newIndex].id as keyof typeof sectionRefs);
+    }
+  };
+
+  const currentSection = sections[currentSectionIndex] || sections[0];
+
   return (
     <main className="container relative mx-auto">
       <article className="flex flex-col gap-2xl md:gap-3xl px-md">
-        <div className="@container flex flex-col md:flex-row gap-2xl md:gap-3xl w-full mt-md">
-          {/* Left Column - Navigation */}
-          <aside className="w-64 shrink-0 md:sticky top-[calc(var(--header-h)+2rem)] h-fit">
+        {/* Mobile Navigation - Only visible on mobile */}
+        <div className="md:hidden w-full mt-md">
+          <div className="space-y-4">
+            <div>
+              <H2 className="text-2xl mb-2">Organization Settings</H2>
+              <Muted className="text-sm">
+                Manage your company profile, service areas, and operational
+                preferences.
+              </Muted>
+            </div>
+
+            {/* Search Field */}
+            <div className="@container w-full">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search settings…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            {/* Section Selector */}
+            {/* <Select
+              value={currentSection.id}
+              onValueChange={handleSectionChange}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue>
+                  <span>{currentSection.label}</span>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {sections.map((section) => (
+                  <SelectItem key={section.id} value={section.id}>
+                    {section.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select> */}
+          </div>
+        </div>
+
+        <div className="@container flex flex-col md:flex-row gap-2xl md:gap-3xl w-full md:mt-md mb-md">
+          {/* Left Column - Navigation (Desktop only) */}
+          <aside className="hidden md:block w-64 shrink-0 md:sticky top-[calc(var(--header-h)+2rem)] h-fit">
             <div className="space-y-2">
               <div className="mb-6">
                 <H2 className="text-2xl mb-2">Organization Settings</H2>
@@ -225,12 +368,13 @@ export default function OrganizationSettingsPage() {
                 </Muted>
               </div>
               <nav className="space-y-1">
-                {sections.map((section) => (
+                {sections.map((section, index) => (
                   <button
                     key={section.id}
-                    onClick={() =>
-                      scrollToSection(section.id as keyof typeof sectionRefs)
-                    }
+                    onClick={() => {
+                      setCurrentSectionIndex(index);
+                      scrollToSection(section.id as keyof typeof sectionRefs);
+                    }}
                     className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                   >
                     {section.label}
@@ -243,7 +387,7 @@ export default function OrganizationSettingsPage() {
           {/* Right Column - Content */}
           <div className="@container w-full">
             {/* Search Field */}
-            <div className="@container w-full mb-md">
+            <div className="@container w-full mb-md hidden md:block">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -272,6 +416,7 @@ export default function OrganizationSettingsPage() {
                 <div className="grid grid-cols-1 gap-lg">
                   {/* Company Details */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
+                    {/* Company Name */}
                     <div className="space-y-2">
                       <Label htmlFor="company-name">Company Name</Label>
                       <Input
@@ -287,6 +432,7 @@ export default function OrganizationSettingsPage() {
                         Your organization's legal or display name
                       </Muted>
                     </div>
+                    {/* Company Type */}
                     <div className="space-y-2">
                       <Label htmlFor="company-type">Company Type</Label>
                       <Select
@@ -310,6 +456,7 @@ export default function OrganizationSettingsPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {/* Company Description */}
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="description">Company Description</Label>
                       <Textarea
@@ -329,7 +476,13 @@ export default function OrganizationSettingsPage() {
                   </div>
                   {/* Save Button */}
                   <div className="flex justify-end">
-                    <Button onClick={handleSave} disabled={!hasChanges}>
+                    <Button
+                      onClick={handleSave}
+                      disabled={!hasChanges || isSaving}
+                    >
+                      {isSaving && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
                       Save Details
                     </Button>
                   </div>
@@ -453,7 +606,7 @@ export default function OrganizationSettingsPage() {
                 <div className="grid grid-cols-1 gap-lg">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
                     <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="street-address">Street Address</Label>
+                      <Label htmlFor="street-address">Address Line 1</Label>
                       <Input
                         id="street-address"
                         value={streetAddress}
@@ -676,6 +829,7 @@ export default function OrganizationSettingsPage() {
                 {/* Content */}
                 <div className="grid grid-cols-1 gap-lg">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
+                    {/* Primary Email */}
                     <div className="space-y-2">
                       <Label htmlFor="primary-email">Primary Email</Label>
                       <Input
@@ -692,6 +846,7 @@ export default function OrganizationSettingsPage() {
                         Main contact email for business operations
                       </Muted>
                     </div>
+                    {/* Support Email */}
                     <div className="space-y-2">
                       <Label htmlFor="support-email">Support Email</Label>
                       <Input
@@ -708,6 +863,7 @@ export default function OrganizationSettingsPage() {
                         Customer support and inquiries
                       </Muted>
                     </div>
+                    {/* Phone Number */}
                     <div className="space-y-2">
                       <Label htmlFor="phone">Phone Number</Label>
                       <Input
@@ -721,6 +877,7 @@ export default function OrganizationSettingsPage() {
                         placeholder="+1 (555) 123-4567"
                       />
                     </div>
+                    {/* SMS Contact Number (Optional) */}
                     <div className="space-y-2">
                       <Label htmlFor="sms">SMS Contact Number (Optional)</Label>
                       <Input
@@ -735,41 +892,58 @@ export default function OrganizationSettingsPage() {
                       />
                     </div>
                   </div>
+                  {/* Notification Preferences */}
                   <div className="space-y-4">
                     <Label>Notification Preferences</Label>
                     <div className="space-y-3">
+                      {/* Email Notifications */}
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium">
+                          <Label htmlFor="email-notifications">
                             Email Notifications
-                          </p>
-                          <p className="text-xs text-muted-foreground">
+                          </Label>
+                          <Muted className="text-xs block">
                             Receive updates via email
-                          </p>
+                          </Muted>
                         </div>
-                        <Switch defaultChecked />
+                        <Switch
+                          id="email-notifications"
+                          // checked={emailNotifications}
+                          // onCheckedChange={setEmailNotifications}
+                        />
                       </div>
+                      {/* SMS Notifications */}
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium">
+                          <Label htmlFor="sms-notifications">
                             SMS Notifications
-                          </p>
-                          <p className="text-xs text-muted-foreground">
+                          </Label>
+                          <Muted className="text-xs block">
                             Receive urgent updates via SMS
-                          </p>
+                          </Muted>
                         </div>
-                        <Switch />
+                        <Switch
+                          id="sms-notifications"
+                          // checked={smsNotifications}
+                          // onCheckedChange={setSmsNotifications}
+                        />
                       </div>
+                      {/* Job Assignment Alerts */}
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-medium">
+                          <Label htmlFor="job-assignment-alerts">
                             Job Assignment Alerts
-                          </p>
-                          <p className="text-xs text-muted-foreground">
+                          </Label>
+
+                          <Muted className="text-xs block">
                             Notify when jobs are assigned
-                          </p>
+                          </Muted>
                         </div>
-                        <Switch defaultChecked />
+                        <Switch
+                          id="job-assignment-alerts"
+                          // checked={jobAssignmentAlerts}
+                          // onCheckedChange={setJobAssignmentAlerts}
+                        />
                       </div>
                     </div>
                   </div>
@@ -951,7 +1125,7 @@ export default function OrganizationSettingsPage() {
 
         {/* Bottom Action Bar */}
         {hasChanges && (
-          <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 z-50">
+          <div className="fixed bottom-dock-h md:bottom-0! left-0 right-0 border-t bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 z-50">
             <div className="container mx-auto px-md py-4">
               <div className="flex items-center justify-between max-w-5xl mx-auto">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -959,10 +1133,19 @@ export default function OrganizationSettingsPage() {
                   <span>You have unsaved changes</span>
                 </div>
                 <div className="flex gap-3">
-                  <Button variant="ghost" onClick={handleCancel}>
+                  <Button
+                    variant="ghost"
+                    onClick={handleCancel}
+                    disabled={isSaving}
+                  >
                     Cancel
                   </Button>
-                  <Button onClick={handleSave}>Save Changes</Button>
+                  <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Save Changes
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1122,7 +1305,12 @@ function AnalyticsContent() {
                 formatter={(value: number) => value.toLocaleString()}
               />
               <Bar dataKey="count" fill="var(--color-count)" radius={4}>
-                <LabelList position="top" offset={12} fill="var(--color-count)" fontSize={12} />
+                <LabelList
+                  position="top"
+                  offset={12}
+                  fill="var(--color-count)"
+                  fontSize={12}
+                />
               </Bar>
             </BarChart>
           }
@@ -1131,4 +1319,3 @@ function AnalyticsContent() {
     </div>
   );
 }
-

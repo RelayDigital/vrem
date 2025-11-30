@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import { useRequireRole } from "@/hooks/useRequireRole";
-import { H2, Muted } from "@/components/ui/typography";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { SettingsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import { toast } from "sonner";
+import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
 
 export default function SecurityPasswordPage() {
   const { user, isLoading } = useRequireRole([
@@ -44,19 +43,16 @@ export default function SecurityPasswordPage() {
   };
 
   return (
-    <div className="w-full">
-      <div className="mb-md">
-        <H2 className="text-2xl mb-2">Password</H2>
-        <Muted className="text-sm">
-          Change your account password.
-        </Muted>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Change Password</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <SettingsRightContentSection
+      id="password"
+      title="Password"
+      description="Change your account password."
+      onSave={handleSave}
+      saveButtonText="Update Password"
+    >
+      <div className="space-y-4">
+        <Label>Change Password</Label>
+        <div className="space-y-3">
           <div className="space-y-2">
             <Label htmlFor="current-password">Current Password</Label>
             <Input
@@ -86,13 +82,8 @@ export default function SecurityPasswordPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
             />
           </div>
-
-          <div className="pt-2">
-            <Button onClick={handleSave}>Update Password</Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </SettingsRightContentSection>
   );
 }
-

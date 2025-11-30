@@ -1,11 +1,13 @@
 "use client";
 
 import { useRequireRole } from "@/hooks/useRequireRole";
-import { H2, Muted } from "@/components/ui/typography";
+import { Muted } from "@/components/ui/typography";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SettingsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
+import { Label } from "@/components/ui/label";
 
 export default function SupportChangelogPage() {
   const { user, isLoading } = useRequireRole([
@@ -49,15 +51,14 @@ export default function SupportChangelogPage() {
   ];
 
   return (
-    <div className="w-full">
-      <div className="mb-md">
-        <H2 className="text-2xl mb-2">Changelog</H2>
-        <Muted className="text-sm">
-          View recent updates and improvements to the platform.
-        </Muted>
-      </div>
-
+    <SettingsRightContentSection
+      id="changelog"
+      title="Changelog"
+      description="View recent updates and improvements to the platform."
+    >
+      {/* Heading */}
       <div className="space-y-4">
+        <Label>Changelog</Label>
         {changelog.map((entry, index) => (
           <Card key={index}>
             <CardHeader>
@@ -65,9 +66,7 @@ export default function SupportChangelogPage() {
                 <CardTitle className="flex items-center gap-2">
                   Version {entry.version}
                   <Badge
-                    variant={
-                      entry.type === "major" ? "default" : "secondary"
-                    }
+                    variant={entry.type === "major" ? "default" : "secondary"}
                   >
                     {entry.type}
                   </Badge>
@@ -89,7 +88,6 @@ export default function SupportChangelogPage() {
           </Card>
         ))}
       </div>
-    </div>
+    </SettingsRightContentSection>
   );
 }
-

@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SettingsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import { useRoleGuard } from "@/hooks/useRoleGuard";
 import { AccessDenied } from "@/components/common/AccessDenied";
+import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
+import { Label } from "@/components/ui/label";
 
 export default function ProductPlansPage() {
   const { user, isLoading } = useRequireRole([
@@ -37,25 +39,16 @@ export default function ProductPlansPage() {
   }
 
   return (
-    <div className="w-full">
-      <div className="mb-md">
-        <H2 className="text-2xl mb-2">Plans</H2>
-        <Muted className="text-sm">
-          View and manage your subscription plans.
-        </Muted>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Subscription Plans</CardTitle>
-        </CardHeader>
-        <CardContent>
+    <SettingsRightContentSection id="plans" title="Plans" description="View and manage your subscription plans.">
+      <div className="space-y-4">
+        <Label>Subscription Plans</Label>
+        <div className="space-y-3">
           <Muted className="text-sm">
             Plan management will be available here.
           </Muted>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </SettingsRightContentSection>
   );
 }
 

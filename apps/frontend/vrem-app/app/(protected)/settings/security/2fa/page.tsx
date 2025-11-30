@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { SettingsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import { toast } from "sonner";
+import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
 
 export default function Security2FAPage() {
   const { user, isLoading } = useRequireRole([
@@ -40,19 +41,10 @@ export default function Security2FAPage() {
   };
 
   return (
-    <div className="w-full">
-      <div className="mb-md">
-        <H2 className="text-2xl mb-2">Two-Factor Authentication</H2>
-        <Muted className="text-sm">
-          Add an extra layer of security to your account.
-        </Muted>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>2FA Settings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <SettingsRightContentSection id="2fa" title="Two-Factor Authentication" description="Add an extra layer of security to your account.">
+      <div className="space-y-4">
+        <Label>2FA Settings</Label>
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <Label htmlFor="2fa">Enable Two-Factor Authentication</Label>
@@ -74,9 +66,9 @@ export default function Security2FAPage() {
               </Muted>
             </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </SettingsRightContentSection>
   );
 }
 

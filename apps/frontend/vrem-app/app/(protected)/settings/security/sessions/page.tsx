@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { SettingsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
+import { Label } from "@/components/ui/label";
 
 export default function SecuritySessionsPage() {
   const { user, isLoading } = useRequireRole([
@@ -50,19 +52,11 @@ export default function SecuritySessionsPage() {
   };
 
   return (
-    <div className="w-full">
-      <div className="mb-md">
-        <H2 className="text-2xl mb-2">Sessions</H2>
-        <Muted className="text-sm">
-          Manage your active sessions and devices.
-        </Muted>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Active Sessions</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <SettingsRightContentSection id="sessions" title="Sessions" description="Manage your active sessions and devices.">
+      {/* Heading */}
+      <div className="space-y-4">
+        <Label>Active Sessions</Label>
+        <div className="space-y-3">
           {sessions.map((session) => (
             <div
               key={session.id}
@@ -91,9 +85,9 @@ export default function SecuritySessionsPage() {
               )}
             </div>
           ))}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </SettingsRightContentSection>
   );
 }
 

@@ -200,7 +200,6 @@ export function DispatcherSidebar() {
       className={`**:data-[slot=sidebar-container]:top-(--header-height)! **:data-[slot=sidebar-container]:h-[calc(100vh-var(--header-height))]! **:data-[slot=sidebar-container]:bottom-auto!`}
     >
       <SidebarContent className="pt-header-h">
-        {/* <OrganizationSwitcher /> */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>

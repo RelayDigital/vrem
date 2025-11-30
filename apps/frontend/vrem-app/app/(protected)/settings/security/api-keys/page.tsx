@@ -9,6 +9,8 @@ import { useRoleGuard } from "@/hooks/useRoleGuard";
 import { AccessDenied } from "@/components/common/AccessDenied";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
+import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
+import { Label } from "@/components/ui/label";
 
 export default function SecurityApiKeysPage() {
   const { user, isLoading } = useRequireRole([
@@ -45,31 +47,17 @@ export default function SecurityApiKeysPage() {
   };
 
   return (
-    <div className="w-full">
-      <div className="mb-md flex items-center justify-between">
-        <div>
-          <H2 className="text-2xl mb-2">API Keys</H2>
-          <Muted className="text-sm">
-            Manage your API keys for programmatic access.
-          </Muted>
-        </div>
-        <Button onClick={handleCreateApiKey}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create API Key
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>API Keys</CardTitle>
-        </CardHeader>
-        <CardContent>
+    <SettingsRightContentSection id="api-keys" title="API Keys" description="Manage your API keys for programmatic access.">
+      {/* Heading */}
+      <div className="space-y-4">
+        <Label>API Keys</Label>
+        <div className="space-y-3">
           <Muted className="text-sm">
             No API keys created yet. Create one to get started.
           </Muted>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+    </SettingsRightContentSection>
   );
 }
 

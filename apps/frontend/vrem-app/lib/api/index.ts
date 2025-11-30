@@ -209,6 +209,35 @@ class ApiClient {
         return [];
       }
     },
+    getById: async (orgId: string): Promise<Organization> => {
+      if (USE_MOCK_DATA) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const org = organizations.find(o => o.id === orgId);
+        if (!org) throw new Error('Organization not found');
+        return org;
+      }
+      const org = await this.request<Organization>(`/organizations/${orgId}`);
+      return {
+        ...org,
+        createdAt: new Date(org.createdAt),
+      };
+    },
+    updateSettings: async (orgId: string, payload: Partial<Organization>): Promise<Organization> => {
+      if (USE_MOCK_DATA) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const org = organizations.find(o => o.id === orgId);
+        if (!org) throw new Error('Organization not found');
+        return { ...org, ...payload };
+      }
+      const org = await this.request<Organization>(`/organizations/${orgId}/settings`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      return {
+        ...org,
+        createdAt: new Date(org.createdAt),
+      };
+    },
     setActiveOrganization: (orgId: string | null) => {
       if (typeof window === 'undefined') return;
       if (orgId) {
