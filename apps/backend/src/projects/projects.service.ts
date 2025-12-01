@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectStatus, Role } from '@prisma/client';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -8,6 +8,8 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { CronofyService } from '../cronofy/cronofy.service';
 @Injectable()
 export class ProjectsService {
+  private readonly logger = new Logger(ProjectsService.name);
+
   constructor(
     private prisma: PrismaService,
     private cronofy: CronofyService
@@ -25,6 +27,18 @@ export class ProjectsService {
   return project;
 }
 
+  private async ensureCustomerInOrg(customerId: string, orgId: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, orgId },
+    });
+
+    if (!customer) {
+      throw new ForbiddenException('Customer does not belong to your organization');
+    }
+
+    return customer;
+  }
+
 
   // Get all projects (PM + Admin)
   findAll() {
@@ -41,49 +55,114 @@ export class ProjectsService {
   }
 
   // Get projects for logged-in user
-  async findForUser(userId: string, role: Role, orgId: string) {
+  async findForUser(userId: string, role: Role, orgId: string | null) {
+    this.logger.log(`findForUser called with userId: ${userId}, role: ${role}, orgId: ${orgId || 'null'}`);
+
+    try {
   if (role === Role.AGENT) {
-    return this.prisma.project.findMany({
-      where: { agentId: userId, orgId },
-      include: { media: true, messages: true },
-    });
+        // Agents can query by agentId only (they may not be org members)
+        const whereClause: any = { agentId: userId };
+        if (orgId) {
+          whereClause.orgId = orgId;
+        }
+        
+        this.logger.log(`Querying projects for AGENT: agentId=${userId}, orgId=${orgId || 'any'}`);
+        const result = await this.prisma.project.findMany({
+          where: whereClause,
+          include: { 
+            media: true, 
+            customer: true,
+            messages: {
+              include: { user: true },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+        this.logger.log(`Found ${result.length} projects for AGENT`);
+        return result;
   }
 
   if (role === Role.TECHNICIAN) {
-    return this.prisma.project.findMany({
+        if (!orgId) {
+          throw new ForbiddenException('Organization ID required for technicians');
+        }
+        this.logger.log(`Querying projects for TECHNICIAN: technicianId=${userId}, orgId=${orgId}`);
+        const result = await this.prisma.project.findMany({
       where: { technicianId: userId, orgId },
-      include: { media: true, messages: true },
-    });
+          include: { 
+            media: true, 
+            customer: true,
+            messages: {
+              include: { user: true },
+            },
+          },
+        });
+        this.logger.log(`Found ${result.length} projects for TECHNICIAN`);
+        return result;
   }
 
   if (role === Role.EDITOR) {
-    return this.prisma.project.findMany({
+        if (!orgId) {
+          throw new ForbiddenException('Organization ID required for editors');
+        }
+        this.logger.log(`Querying projects for EDITOR: editorId=${userId}, orgId=${orgId}`);
+        const result = await this.prisma.project.findMany({
       where: { editorId: userId, orgId },
-      include: { media: true, messages: true },
-    });
+          include: { 
+            media: true, 
+            customer: true,
+            messages: {
+              include: { user: true },
+            },
+          },
+        });
+        this.logger.log(`Found ${result.length} projects for EDITOR`);
+        return result;
   }
 
   // PM / Admin → still scoped to org
-  return this.prisma.project.findMany({
+      if (!orgId) {
+        throw new ForbiddenException('Organization ID required for project managers and admins');
+      }
+      this.logger.log(`Querying projects for PM/Admin: orgId=${orgId}`);
+      const result = await this.prisma.project.findMany({
     where: { orgId },
     include: {
       agent: true,
       technician: true,
       editor: true,
       media: true,
-      messages: true,
+      customer: true,
+          messages: {
+            include: { user: true },
+          },
     },
     orderBy: { createdAt: 'desc' },
   });
+      this.logger.log(`Found ${result.length} projects for PM/Admin`);
+      return result;
+    } catch (error: any) {
+      this.logger.error(`Error in findForUser: ${error.message}`, error.stack);
+      this.logger.error(`Error meta: ${JSON.stringify(error.meta || {})}`);
+      throw new HttpException(
+        `Failed to fetch projects: ${error.message}`,
+        error.code === 'P2002' ? HttpStatus.CONFLICT : HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
 }
 
 
   // Create project (PM or Agent booking)
   async create(dto: CreateProjectDto, orgId: string) {
+    if (dto.customerId) {
+      await this.ensureCustomerInOrg(dto.customerId, orgId);
+    }
+
     return this.prisma.project.create({
       data: {
         orgId,
         agentId: dto.agentId,
+        customerId: dto.customerId,
         address: dto.address,
         notes: dto.notes,
         scheduledTime: new Date(dto.scheduledTime),
@@ -226,20 +305,25 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
         technician: true,
         editor: true,
         media: true,
+        customer: true,
         messages: true,
       },
     });
   }
 
   async findOneForUser(id: string, userId: string, role: Role, orgId: string) {
-    const project = await this.prisma.project.findUnique({
+    // Use findFirst instead of findUnique since orgId is not unique
+    const project = await this.prisma.project.findFirst({
       where: { id, orgId },
       include: {
         agent: true,
         technician: true,
         editor: true,
         media: true,
-        messages: true,
+        customer: true,
+        messages: {
+          include: { user: true },
+        },
       }
     });
 
@@ -268,7 +352,7 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
 async findForOrg(orgId: string) {
   return this.prisma.project.findMany({
     where: { orgId },
-    include: { agent: true, technician: true, editor: true },
+    include: { agent: true, technician: true, editor: true, customer: true },
     orderBy: { createdAt: 'desc' },
   });
 }

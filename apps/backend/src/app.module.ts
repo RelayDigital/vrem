@@ -8,8 +8,10 @@ import { MediaModule } from './media/media.module';
 import { MessagesModule } from './messages/messages.module';
 import { InquiriesModule } from './inquiries/inquires.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 import { ActiveOrgMiddleware } from './organizations/active-org.middleware';
 import { PrismaService } from './prisma/prisma.service';
+import { CustomersModule } from './customers/customers.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { PrismaService } from './prisma/prisma.service';
     MessagesModule,
     InquiriesModule,
     DashboardModule,
+    OrganizationsModule,
+    CustomersModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, ActiveOrgMiddleware],

@@ -13,7 +13,7 @@ export class InquiriesService {
 
   async getAllInquiries() {
     return this.prisma.inquiry.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
   }
 

@@ -7,7 +7,8 @@ import {
   Patch,
   Req,
   Post,
-  Delete
+  Delete,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -40,7 +41,10 @@ export class ProjectsController {
   @Get('mine')
   @UseGuards(OrgMemberGuard)
   findMine(@CurrentUser() user, @CurrentOrg() org) {
-    return this.projectsService.findForUser(user.id, user.role, org.id);
+    // For agents, org might be null if they're not org members
+    // They can still access their projects by agentId
+    const orgId = org?.id || null;
+    return this.projectsService.findForUser(user.id, user.role, orgId);
   }
 
   // GET messages for a project
@@ -71,14 +75,27 @@ export class ProjectsController {
   // CREATE project
   @Post('create')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.AGENT, Role.PROJECT_MANAGER)
+  @Roles(Role.AGENT, Role.PROJECT_MANAGER, Role.ADMIN)
   createProject(
     @CurrentUser() user,
     @CurrentOrg() org,
     @Body() dto: CreateProjectDto,
   ) {
+    dto.agentId = dto.agentId || user.id;
+
     if (user.role === Role.AGENT) {
       dto.agentId = user.id;
+      // For agents, orgId might come from the request body if they're not org members
+      // But we still need an orgId to create the project
+      const orgId = org?.id || dto.orgId;
+      if (!orgId) {
+        throw new ForbiddenException('Organization ID is required to create a project');
+      }
+      return this.projectsService.create(dto, orgId);
+    }
+    // PM/Admin must be org members, so org.id should always exist
+    if (!org?.id) {
+      throw new ForbiddenException('Organization ID is required');
     }
     return this.projectsService.create(dto, org.id);
   }

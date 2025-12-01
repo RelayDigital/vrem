@@ -1,4 +1,11 @@
-import { Body, Controller, Get, Post, Req, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Role } from '@prisma/client';
 import { Public } from './public.decorator';
@@ -10,7 +17,7 @@ export class AuthController {
   @Public()
   @Post('register')
   async register(
-    @Body() body: { email: string; name: string; password: string; role: Role }
+    @Body() body: { email: string; name: string; password: string; role: Role },
   ) {
     return this.authService.register(
       body.email,
@@ -19,7 +26,6 @@ export class AuthController {
       body.role,
     );
   }
-
 
   @Public()
   @Post('login')

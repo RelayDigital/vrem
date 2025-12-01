@@ -7,6 +7,6 @@ import { CronofyModule } from '../cronofy/cronofy.module';
 @Module({
   imports: [CronofyModule],
   providers: [ProjectsService, PrismaService],
-  controllers: [ProjectsController]
+  controllers: [ProjectsController],
 })
 export class ProjectsModule {}

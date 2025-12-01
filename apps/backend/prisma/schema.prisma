@@ -20,15 +20,32 @@ model User {
   agentProjects  Project[]            @relation("AgentProjects")
   editorProjects Project[]            @relation("EditorProjects")
   techProjects   Project[]            @relation("TechProjects")
+  customers      Customer[]
 }
 
 model Organization {
-  id          String               @id @default(uuid())
-  name        String
-  createdAt   DateTime             @default(now())
-  invitations Invitation[]
-  members     OrganizationMember[]
-  projects    Project[]
+  id           String               @id
+  name         String
+  createdAt    DateTime             @default(now())
+  type         OrgType              @default(COMPANY)
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  countryCode  String?
+  legalName    String?
+  logoUrl      String?
+  phone        String?
+  postalCode   String?
+  primaryEmail String?
+  region       String?
+  serviceArea  Json?
+  slug         String?
+  timezone     String?
+  websiteUrl   String?
+  invitations  Invitation[]
+  members      OrganizationMember[]
+  projects     Project[]
+  customers    Customer[]
 }
 
 model OrganizationMember {
@@ -67,7 +84,7 @@ model Message {
 
 model Project {
   id            String         @id @default(uuid())
-  agentId       String
+  agentId       String?
   address       String
   notes         String?
   scheduledTime DateTime
@@ -77,13 +94,31 @@ model Project {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   orgId         String
+  customerId    String?
   calendarEvent CalendarEvent?
   media         Media[]
   messages      Message[]
-  agent         User           @relation("AgentProjects", fields: [agentId], references: [id])
+  agent         User?          @relation("AgentProjects", fields: [agentId], references: [id])
   editor        User?          @relation("EditorProjects", fields: [editorId], references: [id])
   organization  Organization   @relation(fields: [orgId], references: [id])
   technician    User?          @relation("TechProjects", fields: [technicianId], references: [id])
+  customer      Customer?      @relation(fields: [customerId], references: [id])
+}
+
+model Customer {
+  id        String        @id @default(uuid())
+  orgId     String
+  name      String
+  email     String?
+  phone     String?
+  notes     String?
+  agentId   String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id])
+  agent        User?        @relation(fields: [agentId], references: [id])
+  projects     Project[]
 }
 
 model Inquiry {
@@ -118,19 +153,23 @@ model Invitation {
 }
 
 enum Role {
-  ADMIN
-  PROJECT_MANAGER
+  DISPATCHER
   TECHNICIAN
-  EDITOR
   AGENT
 }
 
 enum OrgRole {
+  OWNER
   ADMIN
-  PROJECT_MANAGER
+  DISPATCHER
   TECHNICIAN
   EDITOR
-  AGENT
+  PROJECT_MANAGER
+}
+
+enum OrgType {
+  COMPANY
+  PERSONAL
 }
 
 enum MediaType {

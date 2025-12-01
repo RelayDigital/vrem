@@ -13,10 +13,7 @@ async function bootstrap() {
   });
 
   const reflector = app.get(Reflector);
-  app.useGlobalGuards(
-    new JwtAuthGuard(reflector),
-    new RolesGuard(reflector),
-  );
+  app.useGlobalGuards(new JwtAuthGuard(reflector), new RolesGuard(reflector));
 
   await app.listen(process.env.PORT ?? 3001);
 }

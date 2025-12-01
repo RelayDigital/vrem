@@ -15,13 +15,15 @@ import { JwtService } from '@nestjs/jwt';
   namespace: '/chat',
   cors: { origin: '*' },
 })
-export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class MessagesGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
   constructor(
     private readonly messagesService: MessagesService,
-    private readonly jwtService: JwtService,   // ← INJECT JWT SERVICE
+    private readonly jwtService: JwtService, // ← INJECT JWT SERVICE
   ) {}
 
   async handleConnection(client: Socket) {
@@ -71,7 +73,6 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     return { joined: room };
   }
 
-
   @SubscribeMessage('sendMessage')
   async handleSendMessage(
     @MessageBody() data: { projectId: string; content: string },
@@ -99,6 +100,4 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     return message;
   }
-
-
 }

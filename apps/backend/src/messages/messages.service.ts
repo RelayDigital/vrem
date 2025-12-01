@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { Role } from '@prisma/client';
@@ -8,29 +12,28 @@ export class MessagesService {
   constructor(private prisma: PrismaService) {}
 
   async userHasAccessToProject(userId: string, role: Role, projectId: string) {
-  // PMs and Admins get full access
-  if (role === Role.ADMIN || role === Role.PROJECT_MANAGER) {
-    return true;
+    // PMs and Admins get full access
+    if (role === Role.ADMIN || role === Role.PROJECT_MANAGER) {
+      return true;
+    }
+
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        agentId: true,
+        technicianId: true,
+        editorId: true,
+      },
+    });
+
+    if (!project) return false;
+
+    return (
+      project.agentId === userId ||
+      project.technicianId === userId ||
+      project.editorId === userId
+    );
   }
-
-  const project = await this.prisma.project.findUnique({
-    where: { id: projectId },
-    select: {
-      agentId: true,
-      technicianId: true,
-      editorId: true,
-    },
-  });
-
-  if (!project) return false;
-
-  return (
-    project.agentId === userId ||
-    project.technicianId === userId ||
-    project.editorId === userId
-  );
-}
-
 
   async sendMessage(userId: string, dto: SendMessageDto) {
     // Ensure project exists (optional but nice)

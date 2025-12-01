@@ -11,9 +11,9 @@ export class OnboardingService {
       where: { id: userId },
       include: {
         organizations: {
-          include: { organization: true }
-        }
-      }
+          include: { organization: true },
+        },
+      },
     });
 
     if (!user) {
@@ -68,7 +68,6 @@ export class OnboardingService {
         message: 'You are not part of any organization yet.',
       };
     }
-
 
     // Exactly one organization → go straight to dashboard
     if (membershipCount === 1) {
