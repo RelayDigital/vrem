@@ -1,11 +1,11 @@
-// Photographer-specific settings sub-view components
+// Technician-specific settings sub-view components
 // Import and export your settings components here
 // Example:
 // import PersonalDetails from './PersonalDetails';
 // import Billing from './Billing';
 // import Integrations from './Integrations';
 // 
-// export const photographerSettingsComponents = {
+// export const technicianSettingsComponents = {
 //   'personal-details': PersonalDetails,
 //   'billing': Billing,
 //   'integrations': Integrations,
@@ -15,5 +15,5 @@
 import type { SettingsSubViewComponents } from '@/components/shared/settings';
 
 // Export an empty registry by default - components will be added as they're created
-export const photographerSettingsComponents: SettingsSubViewComponents = {};
+export const technicianSettingsComponents: SettingsSubViewComponents = {};
 

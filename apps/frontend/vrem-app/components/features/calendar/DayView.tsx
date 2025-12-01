@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { CalendarEvent } from "@/types/calendar";
-import { Photographer } from "@/types";
+import { Technician } from "@/types";
 import { TechnicianColor } from "@/types/calendar";
 import { CalendarEventCard } from "./CalendarEventCard";
 import { CalendarEventPopover } from "./CalendarEventPopover";
@@ -20,7 +20,7 @@ interface DayViewProps {
   canSeeTechnicians: boolean;
   currentDate: Date;
   events: CalendarEvent[];
-  technicians: Photographer[];
+  technicians: Technician[];
   technicianColors: TechnicianColor[];
   onEventClick: (event: CalendarEvent) => void;
   onEventDrag?: (eventId: string, newDate: Date, newTime?: string) => void;
@@ -167,7 +167,7 @@ export function DayView({
           : "grid grid-cols-1 h-full"
       }
     >
-      {/* Technician Labels (hidden entirely when no technicians, e.g. photographer view) */}
+      {/* Technician Labels (hidden entirely when no technicians, e.g. technician view) */}
       {hasTechnicians && (
         <div className="col-span-1 border-r bg-muted shrink-0 h-full hidden md:block">
           <div className="h-12 border-b flex items-center px-4 font-semibold text-sm">

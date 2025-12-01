@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { JobRequest, Technician, Photographer } from "@/types";
+import { JobRequest, Technician } from "@/types";
 import { USE_MOCK_DATA } from "@/lib/utils";
 import {
   CalendarEvent,
@@ -41,7 +41,6 @@ import { Filter } from "lucide-react";
 interface CalendarViewProps {
   canSeeTechnicians?: boolean;
   jobs?: JobRequest[];
-  photographers?: Photographer[]; // Deprecated: use technicians
   technicians?: Technician[];
   onJobClick?: (job: JobRequest) => void;
   onCreateJob?: (initialValues?: {
@@ -54,14 +53,12 @@ interface CalendarViewProps {
 export function CalendarView({
   canSeeTechnicians = false,
   jobs = [],
-  photographers = [],
-  technicians,
+  technicians = [],
   onJobClick,
   onCreateJob,
 }: CalendarViewProps) {
-  // Use technicians if provided, fallback to photographers for backwards compatibility
   // Use empty array when mock data is disabled
-  const baseTechnicians = technicians || photographers || [];
+  const baseTechnicians = technicians || technicians || [];
   const effectiveTechnicians = USE_MOCK_DATA ? baseTechnicians : [];
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>("week");
@@ -124,7 +121,7 @@ export function CalendarView({
     });
   }, [allEvents, filters]);
 
-  // Detect conflicts (overlapping events for the same technician/photographer)
+  // Detect conflicts (overlapping events for the same technician/technician)
   // This includes: scheduled jobs overlapping with each other, or external events overlapping with scheduled jobs
   const eventsWithConflicts = useMemo(() => {
     return filteredEvents.map((event) => {

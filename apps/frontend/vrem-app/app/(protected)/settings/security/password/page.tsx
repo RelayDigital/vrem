@@ -15,7 +15,7 @@ export default function SecurityPasswordPage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const [currentPassword, setCurrentPassword] = useState("");

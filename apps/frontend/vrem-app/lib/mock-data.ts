@@ -2,7 +2,6 @@ import {
   Organization,
   User,
   Technician,
-  Photographer,
   JobRequest,
   AuditLogEntry,
   Metrics,
@@ -14,12 +13,11 @@ export const organizations: Organization[] = [
   {
     id: 'org-vx-001',
     name: 'VX Media',
-    type: 'media_company',
+    type: 'COMPANY',
     createdAt: new Date('2024-01-15'),
     avatar: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=400',
     description: 'Premier real estate media company serving Calgary and surrounding areas',
     services: ['Photography', 'Video', 'Aerial/Drone', 'Twilight', '3D Tours', 'Virtual Staging'],
-    photographerCount: 12,
     technicianCount: 12,
     rating: 4.8,
     reviewCount: 342,
@@ -28,12 +26,11 @@ export const organizations: Organization[] = [
   {
     id: 'org-media-002',
     name: 'Luxe Shots Pro',
-    type: 'media_company',
+    type: 'COMPANY',
     createdAt: new Date('2024-02-10'),
     avatar: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=400',
     description: 'Boutique media company specializing in luxury properties',
     services: ['Photography', 'Video', 'Aerial/Drone', 'Twilight'],
-    photographerCount: 5,
     technicianCount: 5,
     rating: 4.9,
     reviewCount: 128,
@@ -42,7 +39,7 @@ export const organizations: Organization[] = [
   {
     id: 'org-client-001',
     name: 'Luxury Realty Group',
-    type: 'real_estate_team',
+    type: 'COMPANY',
     createdAt: new Date('2024-03-22'),
     avatar: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400',
     description: 'High-end real estate brokerage',
@@ -50,7 +47,7 @@ export const organizations: Organization[] = [
   {
     id: 'org-client-002',
     name: 'Metro Properties',
-    type: 'real_estate_team',
+    type: 'COMPANY',
     createdAt: new Date('2024-05-10'),
     avatar: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400',
     description: 'Commercial and residential real estate team',
@@ -70,9 +67,7 @@ export const preferredVendors: PreferredVendor[] = [
 export const companyApplications: CompanyApplication[] = [
   {
     id: 'app-001',
-    photographerId: 'photo-005', // Deprecated
-    technicianId: 'photo-005',
-    photographerName: 'Ryan OConnor', // Deprecated
+    technicianId: 'photo-005', // Deprecated
     technicianName: 'Ryan OConnor',
     companyId: 'org-vx-001',
     companyName: 'VX Media',
@@ -88,7 +83,6 @@ export const currentUser: User = {
   email: 'sarah@vxmedia.com',
   role: 'ADMIN' as any,
   organizationId: 'org-vx-001',
-  organizationType: 'media_company',
 };
 
 export const technicians: Technician[] = [
@@ -205,7 +199,7 @@ export const technicians: Technician[] = [
     status: 'active',
     createdAt: new Date('2024-01-18'),
     avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400',
-    bio: 'Award-winning photographer specializing in high-end residential and commercial properties.',
+    bio: 'Award-winning technician specializing in high-end residential and commercial properties.',
     services: {
       photography: true,
       video: true,
@@ -267,7 +261,7 @@ export const technicians: Technician[] = [
     status: 'active',
     createdAt: new Date('2024-02-15'),
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-    bio: 'Independent videographer and photographer focused on cinematic storytelling.',
+    bio: 'Independent videographer and technician focused on cinematic storytelling.',
     services: {
       photography: true,
       video: true,
@@ -389,7 +383,7 @@ export const technicians: Technician[] = [
     status: 'active',
     createdAt: new Date('2024-06-10'),
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
-    bio: 'Growing photographer looking to expand my real estate photography business.',
+    bio: 'Growing technician looking to expand my real estate photography business.',
     services: {
       photography: true,
       video: true,
@@ -402,9 +396,6 @@ export const technicians: Technician[] = [
     certifications: [],
   },
 ];
-
-// Backwards compatibility: photographers is now technicians
-export const photographers: Photographer[] = technicians;
 
 export const jobRequests: JobRequest[] = [
   {
@@ -464,7 +455,6 @@ export const jobRequests: JobRequest[] = [
     mediaType: ['photo', 'aerial'],
     priority: 'standard',
     status: 'assigned',
-    assignedPhotographerId: 'photo-002',
     assignedTechnicianId: 'photo-002',
     estimatedDuration: 150,
     requirements: 'Estate property with tennis court and guest house. Standard aerial package.',
@@ -488,7 +478,6 @@ export const jobRequests: JobRequest[] = [
     mediaType: ['photo'],
     priority: 'standard',
     status: 'assigned',
-    assignedPhotographerId: 'photo-003',
     assignedTechnicianId: 'photo-003',
     estimatedDuration: 90,
     requirements: 'Beach-adjacent condo. Focus on ocean views and outdoor spaces.',
@@ -512,7 +501,6 @@ export const jobRequests: JobRequest[] = [
     mediaType: ['photo', 'video', 'aerial', 'twilight'],
     priority: 'standard',
     status: 'delivered',
-    assignedPhotographerId: 'photo-001',
     assignedTechnicianId: 'photo-001',
     estimatedDuration: 240,
     requirements: 'Ultra-luxury modern estate. Full media package with cinematic video.',
@@ -600,7 +588,6 @@ export const jobRequests: JobRequest[] = [
     mediaType: ['photo'],
     priority: 'standard',
     status: 'assigned',
-    assignedPhotographerId: 'photo-001',
     assignedTechnicianId: 'photo-001',
     estimatedDuration: 90,
     requirements: 'Modern Venice bungalow. Focus on architectural details.',
@@ -624,7 +611,6 @@ export const jobRequests: JobRequest[] = [
     mediaType: ['photo', 'video', 'aerial'],
     priority: 'rush',
     status: 'in_progress',
-    assignedPhotographerId: 'photo-002',
     assignedTechnicianId: 'photo-002',
     estimatedDuration: 200,
     requirements: 'Luxury penthouse. Full media package with aerial city views.',
@@ -669,7 +655,6 @@ export const jobRequests: JobRequest[] = [
     mediaType: ['photo', 'video'],
     priority: 'standard',
     status: 'assigned',
-    assignedPhotographerId: 'photo-003',
     assignedTechnicianId: 'photo-003',
     estimatedDuration: 150,
     requirements: 'Elegant estate. Video tour with cinematic transitions.',
@@ -714,7 +699,6 @@ export const jobRequests: JobRequest[] = [
     mediaType: ['photo', 'video', 'aerial'],
     priority: 'standard',
     status: 'in_progress',
-    assignedPhotographerId: 'photo-001',
     assignedTechnicianId: 'photo-001',
     estimatedDuration: 180,
     requirements: 'Bel Air mansion. Aerial shots of property and surrounding hills.',
@@ -759,7 +743,6 @@ export const jobRequests: JobRequest[] = [
     mediaType: ['photo', 'twilight'],
     priority: 'rush',
     status: 'assigned',
-    assignedPhotographerId: 'photo-002',
     assignedTechnicianId: 'photo-002',
     estimatedDuration: 120,
     requirements: 'Hillside property. Twilight shoot with city lights.',
@@ -804,7 +787,6 @@ export const jobRequests: JobRequest[] = [
     mediaType: ['photo', 'aerial'],
     priority: 'standard',
     status: 'delivered',
-    assignedPhotographerId: 'photo-003',
     assignedTechnicianId: 'photo-003',
     estimatedDuration: 150,
     requirements: 'Canyon estate. Aerial photography of property grounds.',
@@ -829,7 +811,6 @@ export const jobRequests: JobRequest[] = [
     mediaType: ['photo', 'video'],
     priority: 'standard',
     status: 'delivered',
-    assignedPhotographerId: 'photo-001',
     assignedTechnicianId: 'photo-001',
     estimatedDuration: 120,
     requirements: 'Modern West Hollywood condo. Video walkthrough.',
@@ -903,8 +884,6 @@ export const auditLog: AuditLogEntry[] = [
     resourceType: 'job',
     resourceId: 'job-003',
     details: {
-      photographerId: 'photo-002',
-      photographerName: 'Jennifer Kim',
       technicianId: 'photo-002',
       technicianName: 'Jennifer Kim',
       rankingScore: 87.5,
@@ -920,8 +899,6 @@ export const auditLog: AuditLogEntry[] = [
     resourceType: 'job',
     resourceId: 'job-004',
     details: {
-      photographerId: 'photo-003',
-      photographerName: 'David Thompson',
       technicianId: 'photo-003',
       technicianName: 'David Thompson',
       rankingScore: 92.3,
@@ -951,8 +928,6 @@ export const auditLog: AuditLogEntry[] = [
     resourceType: 'job',
     resourceId: 'job-005',
     details: {
-      photographerId: 'photo-001',
-      photographerName: 'Marcus Rodriguez',
       technicianId: 'photo-001',
       technicianName: 'Marcus Rodriguez',
       rankingScore: 89.2,
@@ -969,11 +944,6 @@ export const metrics: Metrics = {
     assigned: 8,
     completed: 23,
     cancelled: 1,
-  },
-  photographers: {
-    active: 5,
-    available: 4,
-    utilization: 0.78,
   },
   technicians: {
     active: 5,

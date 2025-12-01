@@ -17,7 +17,7 @@ export function HeroSection({ onAddressSelect }: HeroSectionProps) {
           <div className="text-center space-y-4">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-full text-sm mb-2">
               <Sparkles className="h-4 w-4" />
-              <span>AI-Powered Photographer Matching</span>
+              <span>AI-Powered Technician Matching</span>
             </div>
             
             <H1 className="text-5xl md:text-7xl font-bold text-foreground leading-tight">

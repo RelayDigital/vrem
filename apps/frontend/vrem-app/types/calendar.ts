@@ -1,4 +1,4 @@
-import { JobRequest, Photographer } from './index';
+import { JobRequest, Technician } from './index';
 
 export type CalendarView = 'day' | 'week' | 'month' | 'list';
 
@@ -38,7 +38,7 @@ export interface TechnicianColor {
 }
 
 // Helper function to generate colors for technicians
-export function generateTechnicianColors(technicians: Photographer[]): TechnicianColor[] {
+export function generateTechnicianColors(technicians: Technician[]): TechnicianColor[] {
   const colors = [
     '#3b82f6', // blue
     '#10b981', // green

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { CalendarEvent } from "@/types/calendar";
-import { Photographer } from "@/types";
+import { Technician } from "@/types";
 import { TechnicianColor } from "@/types/calendar";
 import { CalendarEventPill } from "./CalendarEventPill";
 import { CalendarEventPopover } from "./CalendarEventPopover";
@@ -23,7 +23,7 @@ import { cn } from "@/components/ui/utils";
 interface MonthViewProps {
   currentDate: Date;
   events: CalendarEvent[];
-  technicians: Photographer[];
+  technicians: Technician[];
   technicianColors: TechnicianColor[];
   onEventClick: (event: CalendarEvent) => void;
   onDayClick: (date: Date) => void;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { JobRequest, Photographer } from "../../../types";
+import { JobRequest, Technician } from "../../../types";
 import { ChatMessage } from "../../../types/chat";
 import { JobCardKanban } from "../jobs/JobCardKanban";
 import { Badge } from "../../ui/badge";
@@ -16,10 +16,10 @@ import {
 
 interface JobKanbanBoardProps {
   jobs: JobRequest[];
-  photographers: Photographer[];
+  technicians: Technician[];
   messages?: ChatMessage[];
   onViewRankings?: (job: JobRequest) => void;
-  onChangePhotographer?: (job: JobRequest) => void; // For reassigning photographer
+  onChangeTechnician?: (job: JobRequest) => void; // For reassigning technician
   onJobStatusChange?: (jobId: string, newStatus: JobRequest["status"]) => void;
   onJobClick?: (job: JobRequest) => void;
   disableContextMenu?: boolean; // Disable context menu when sheet is open
@@ -80,10 +80,10 @@ interface JobKanbanItem extends Record<string, unknown> {
 
 export function JobKanbanBoard({
   jobs,
-  photographers,
+  technicians,
   messages = [],
   onViewRankings,
-  onChangePhotographer,
+  onChangeTechnician,
   onJobStatusChange,
   onJobClick,
   disableContextMenu = false,
@@ -174,9 +174,9 @@ export function JobKanbanBoard({
                   <KanbanCards id={column.id} className="h-full">
                   {(item) => {
                     const jobItem = item as JobKanbanItem;
-                    const photographer = jobItem.job.assignedPhotographerId
-                      ? photographers.find(
-                          (p) => p.id === jobItem.job.assignedPhotographerId
+                    const technician = jobItem.job.assignedTechnicianId
+                      ? technicians.find(
+                          (p) => p.id === jobItem.job.assignedTechnicianId
                         )
                       : undefined;
 
@@ -190,7 +190,7 @@ export function JobKanbanBoard({
                         >
                           <JobCardKanban
                             job={jobItem.job}
-                            photographer={photographer}
+                            technician={technician}
                             messages={messages}
                             onViewRankings={
                               (jobItem.job.status === "pending" ||
@@ -199,9 +199,9 @@ export function JobKanbanBoard({
                                 ? () => onViewRankings(jobItem.job)
                                 : undefined
                             }
-                            onChangePhotographer={
-                              onChangePhotographer
-                                ? () => onChangePhotographer(jobItem.job)
+                            onChangeTechnician={
+                              onChangeTechnician
+                                ? () => onChangeTechnician(jobItem.job)
                                 : undefined
                             }
                             onJobClick={

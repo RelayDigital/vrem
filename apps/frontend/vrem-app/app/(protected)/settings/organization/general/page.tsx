@@ -34,7 +34,7 @@ export default function OrganizationGeneralPage() {
     user,
     isLoading: roleLoading,
     isAllowed,
-  } = useRoleGuard(["dispatcher", "ADMIN", "PROJECT_MANAGER"]);
+  } = useRoleGuard(["dispatcher", "DISPATCHER", "PROJECT_MANAGER"]);
   const { organization, isLoading, isSaving, error, save, reload } =
     useOrganizationSettings();
 

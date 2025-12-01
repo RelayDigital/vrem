@@ -244,12 +244,12 @@ export default function OrganizationSettingsPage() {
   );
 
   const isPersonalOrg =
-    orgMembership?.organization?.orgType === "PERSONAL" ||
+    orgMembership?.organization?.type === "PERSONAL" ||
     (orgMembership?.organization as any)?.type === "PERSONAL";
   const membershipRole = orgMembership?.role;
   const isAllowed =
-    user?.role === "ADMIN" ||
-    membershipRole === "ADMIN" ||
+    user?.role === "DISPATCHER" ||
+    membershipRole === "DISPATCHER" ||
     membershipRole === "PROJECT_MANAGER" ||
     isPersonalOrg;
 
@@ -271,6 +271,16 @@ export default function OrganizationSettingsPage() {
   }
 
   if (orgError && !organization) {
+    const forbidden = /forbidden|permission/i.test(orgError.message || "");
+    if (forbidden) {
+      return (
+        <AccessDenied
+          title="Access Denied"
+          description="Only organization owners or admins can edit settings."
+        />
+      );
+    }
+
     return (
       <div className="container mx-auto px-4 py-8">
         <Card>
@@ -457,7 +467,7 @@ export default function OrganizationSettingsPage() {
                       </Muted>
                     </div>
                     {/* Company Type */}
-                    <div className="space-y-2">
+                    {/* <div className="space-y-2">
                       <Label htmlFor="company-type">Company Type</Label>
                       <Select
                         value={companyType}
@@ -479,7 +489,7 @@ export default function OrganizationSettingsPage() {
                           <SelectItem value="agent">Agent</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
+                    </div> */}
                     {/* Company Description */}
                     <div className="space-y-2 md:col-span-2">
                       <Label htmlFor="description">Company Description</Label>

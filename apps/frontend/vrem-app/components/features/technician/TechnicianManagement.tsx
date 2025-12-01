@@ -1,29 +1,29 @@
-import { Photographer } from "../../../types";
+import { Technician } from "../../../types";
 import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
-import { PhotographerTable } from "../../shared/tables";
+import { TechnicianTable } from "../../shared/tables";
 import { Users, Star, TrendingUp } from "lucide-react";
 import { StatsCard } from "../../shared/dashboard";
 import { H2 } from "@/components/ui/typography";
 
-interface PhotographerManagementProps {
-  photographers: Photographer[];
+interface TechnicianManagementProps {
+  technicians: Technician[];
 }
 
-export function PhotographerManagement({
-  photographers,
-}: PhotographerManagementProps) {
-  const activePhotographers = photographers.filter(
+export function TechnicianManagement({
+  technicians,
+}: TechnicianManagementProps) {
+  const activeTechnicians = technicians.filter(
     (p) => p.status === "active"
   );
   const avgRating =
-    photographers.length > 0
-      ? photographers.reduce((sum, p) => sum + p.rating.overall, 0) /
-        photographers.length
+    technicians.length > 0
+      ? technicians.reduce((sum, p) => sum + p.rating.overall, 0) /
+        technicians.length
       : 0;
   const avgOnTimeRate =
-    photographers.length > 0
-      ? photographers.reduce((sum, p) => sum + p.reliability.onTimeRate, 0) /
-        photographers.length
+    technicians.length > 0
+      ? technicians.reduce((sum, p) => sum + p.reliability.onTimeRate, 0) /
+        technicians.length
       : 0;
 
   return (
@@ -31,8 +31,8 @@ export function PhotographerManagement({
       {/* Stats */}
       <StatsCard
         icon={Users}
-        value={activePhotographers.length}
-        label="Active Photographers"
+        value={activeTechnicians.length}
+        label="Active Technicians"
         iconBgColor="bg-accent"
         iconColor="text-primary"
       />
@@ -58,7 +58,7 @@ export function PhotographerManagement({
           <H2 className="text-lg border-0">Team Members</H2>
         </div>
         <div className="">
-          <PhotographerTable photographers={photographers} />
+          <TechnicianTable technicians={technicians} />
         </div>
       </div>
     </div>

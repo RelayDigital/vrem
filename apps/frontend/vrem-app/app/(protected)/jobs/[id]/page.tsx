@@ -20,7 +20,7 @@ export default function JobDetailPage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const jobManagement = useJobManagement();
@@ -60,7 +60,10 @@ export default function JobDetailPage() {
   // Fetch messages when job is loaded
   useEffect(() => {
     if (jobManagement.selectedJob && jobManagement.selectedJob.id === jobId) {
-      messaging.fetchMessages(jobId);
+      messaging.fetchMessages(
+        jobId,
+        (jobManagement.selectedJob as any)?.organizationId
+      );
     }
   }, [jobManagement.selectedJob, jobId, messaging]);
 
@@ -78,12 +81,12 @@ export default function JobDetailPage() {
 
   const userRole = user.role;
   const hasAccess =
-    ["dispatcher", "ADMIN", "PROJECT_MANAGER", "EDITOR"].includes(userRole) ||
-    selectedJob?.assignedPhotographerId === user.id ||
+    ["dispatcher", "DISPATCHER", "PROJECT_MANAGER", "EDITOR"].includes(userRole) ||
+    selectedJob?.assignedTechnicianId === user.id ||
     selectedJob?.assignedTechnicianId === user.id ||
     selectedJob?.createdBy === user.id;
 
-  const handleStatusChange = (status: string) => {
+  const handleStatusChange = (status: string, jobId: string) => {
     const statusMap: Record<string, ProjectStatus> = {
       pending: ProjectStatus.BOOKED,
       assigned: ProjectStatus.SHOOTING,
@@ -93,13 +96,13 @@ export default function JobDetailPage() {
       cancelled: ProjectStatus.BOOKED,
     };
     jobManagement.changeJobStatus(
-      selectedJob.id,
+      jobId,
       statusMap[status] || ProjectStatus.BOOKED
     );
   };
 
-  // Empty photographers array - backend will provide when endpoint is ready
-  const photographers: any[] = [];
+  // Empty technicians array - backend will provide when endpoint is ready
+  const technicians: any[] = [];
 
   return (
     <div className="size-full overflow-x-hidden p-6 space-y-4">
@@ -139,13 +142,13 @@ export default function JobDetailPage() {
       {!isJobLoading && hasSelectedJob && hasAccess && selectedJob && (
         <JobTaskView
           job={selectedJob}
-          photographer={
-            selectedJob?.assignedPhotographerId
-              ? photographers.find(
-                  (p) => p.id === selectedJob?.assignedPhotographerId
-                )
-              : undefined
-          }
+          // technician={
+          //   selectedJob?.assignedTechnicianId
+          //     ? technicians.find(
+          //         (p) => p.id === selectedJob?.assignedTechnicianId
+          //       )
+          //     : undefined
+          // }
           messages={messaging.getMessagesForJob(selectedJob.id)}
           currentUserId={user?.id || "current-user-id"}
           currentUserName={user?.name || "Current User"}
@@ -163,9 +166,9 @@ export default function JobDetailPage() {
             messaging.editMessage(messageId, content)
           }
           onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
-          onStatusChange={handleStatusChange}
-          onAssignPhotographer={jobManagement.handleAssignPhotographer}
-          onChangePhotographer={jobManagement.handleChangePhotographer}
+          onStatusChange={(status) => handleStatusChange(status, selectedJob.id)}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
           variant="page"
         />
       )}

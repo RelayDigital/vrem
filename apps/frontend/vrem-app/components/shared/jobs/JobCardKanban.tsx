@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { JobRequest, Photographer } from "../../../types";
+import { JobRequest, Technician } from "../../../types";
 import { ChatMessage } from "../../../types/chat";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
 import { Badge } from "../../ui/badge";
@@ -40,12 +40,12 @@ import { H3, P } from "@/components/ui/typography";
 
 interface JobCardKanbanProps {
   job: JobRequest;
-  photographer?: Photographer;
+  technician?: Technician;
   messages?: ChatMessage[];
   onClick?: () => void;
   onViewRankings?: () => void;
   onJobClick?: () => void;
-  onChangePhotographer?: () => void; // For reassigning photographer
+  onChangeTechnician?: () => void; // For reassigning technician
   disableContextMenu?: boolean; // Disable context menu when sheet is open
 }
 
@@ -135,12 +135,12 @@ const getPriorityConfig = (priority: string) => {
 
 export function JobCardKanban({
   job,
-  photographer,
+  technician,
   messages = [],
   onClick,
   onViewRankings,
   onJobClick,
-  onChangePhotographer,
+  onChangeTechnician,
   disableContextMenu = false,
 }: JobCardKanbanProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -162,8 +162,8 @@ export function JobCardKanban({
     }
   })();
 
-  // Get assignees (photographer if assigned)
-  const assignees = photographer ? [photographer] : [];
+  // Get assignees (technician if assigned)
+  const assignees = technician ? [technician] : [];
 
   // Calculate actual comment count from messages
   const commentsCount = messages.filter((msg) => msg.jobId === job.id).length;
@@ -318,7 +318,7 @@ export function JobCardKanban({
                 )}
                 {onViewRankings &&
                   (job.status === "pending" || job.status === "assigned") &&
-                  !job.assignedPhotographerId && (
+                  !job.assignedTechnicianId && (
                     <DropdownMenuItem
                       onSelect={(e) => {
                         e.preventDefault();
@@ -326,20 +326,20 @@ export function JobCardKanban({
                         onViewRankings();
                       }}
                     >
-                      Find Photographer
+                      Find Technician
                     </DropdownMenuItem>
                   )}
-                {onChangePhotographer &&
-                  job.assignedPhotographerId &&
+                {onChangeTechnician &&
+                  job.assignedTechnicianId &&
                   (job.status === "assigned" || job.status === "in_progress") && (
                     <DropdownMenuItem
                       onSelect={(e) => {
                         e.preventDefault();
                         setDropdownOpen(false);
-                        onChangePhotographer();
+                        onChangeTechnician();
                       }}
                     >
-                      Change Photographer
+                      Change Technician
                     </DropdownMenuItem>
                   )}
               </DropdownMenuContent>
@@ -537,7 +537,7 @@ export function JobCardKanban({
         )}
         {onViewRankings &&
           (job.status === "pending" || job.status === "assigned") &&
-          !job.assignedPhotographerId && (
+          !job.assignedTechnicianId && (
             <ContextMenuItem
               className="cursor-pointer"
               onSelect={(e) => {
@@ -550,11 +550,11 @@ export function JobCardKanban({
                 }, 0);
               }}
             >
-              Find Photographer
+              Find Technician
             </ContextMenuItem>
           )}
-        {onChangePhotographer &&
-          job.assignedPhotographerId &&
+        {onChangeTechnician &&
+          job.assignedTechnicianId &&
           (job.status === "assigned" || job.status === "in_progress") && (
             <ContextMenuItem
               className="cursor-pointer"
@@ -564,11 +564,11 @@ export function JobCardKanban({
                 setContextMenuOpen(false);
                 // Use setTimeout to ensure the menu closes after the callback
                 setTimeout(() => {
-                  onChangePhotographer();
+                  onChangeTechnician();
                 }, 0);
               }}
             >
-              Change Photographer
+              Change Technician
             </ContextMenuItem>
           )}
       </ContextMenuContent>

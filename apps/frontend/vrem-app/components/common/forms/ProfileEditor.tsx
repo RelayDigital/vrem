@@ -9,19 +9,19 @@ import { Textarea } from '../../ui/textarea';
 import { Label } from '../../ui/label';
 import { Checkbox } from '../../ui/checkbox';
 import { H2, H3, Small, Muted, Large } from '../../ui/typography';
-import { Photographer } from '../../../types';
+import { Technician } from '../../../types';
 import { CheckCircle2, XCircle, Settings } from 'lucide-react';
 
 interface ProfileEditorProps {
-  photographer: Photographer;
-  onSave: (updates: Partial<Photographer>) => void;
+  technician: Technician;
+  onSave: (updates: Partial<Technician>) => void;
 }
 
-export function ProfileEditor({ photographer, onSave }: ProfileEditorProps) {
+export function ProfileEditor({ technician, onSave }: ProfileEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
-    bio: photographer.bio || '',
-    services: photographer.services,
+    bio: technician.bio || '',
+    services: technician.services,
   });
 
   const handleSave = () => {
@@ -52,24 +52,24 @@ export function ProfileEditor({ photographer, onSave }: ProfileEditorProps) {
         {/* Basic Info */}
         <div className="flex items-start gap-6">
           <Avatar className="size-24 border-4 border-card shadow-lg">
-            <AvatarImage src={photographer.avatar} />
+            <AvatarImage src={technician.avatar} />
             <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-              {photographer.name
+              {technician.name
                 .split(' ')
                 .map((n) => n[0])
                 .join('')}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1">
-            <H3 className="text-xl mb-1">{photographer.name}</H3>
-            <Small className="text-muted-foreground mb-2">{photographer.email}</Small>
-            {photographer.isIndependent ? (
+            <H3 className="text-xl mb-1">{technician.name}</H3>
+            <Small className="text-muted-foreground mb-2">{technician.email}</Small>
+            {technician.isIndependent ? (
               <Badge variant="outline" className="border-primary text-foreground/90">
-                Independent Photographer
+                Independent Technician
               </Badge>
             ) : (
               <Badge className="bg-primary text-primary-foreground">
-                {photographer.companyName}
+                {technician.companyName}
               </Badge>
             )}
           </div>
@@ -89,7 +89,7 @@ export function ProfileEditor({ photographer, onSave }: ProfileEditorProps) {
             />
           ) : (
             <Small className="text-muted-foreground">
-              {photographer.bio || 'No bio added yet'}
+              {technician.bio || 'No bio added yet'}
             </Small>
           )}
         </div>
@@ -138,16 +138,16 @@ export function ProfileEditor({ photographer, onSave }: ProfileEditorProps) {
         {/* Performance Stats */}
         <div className="grid grid-cols-3 gap-4 pt-6 border-t">
           <div className="text-center">
-            <Large className="mb-1">{photographer.reliability.totalJobs}</Large>
+            <Large className="mb-1">{technician.reliability.totalJobs}</Large>
             <Small className="text-muted-foreground">Total Jobs</Small>
           </div>
           <div className="text-center">
-            <Large className="mb-1">{photographer.rating.overall}</Large>
+            <Large className="mb-1">{technician.rating.overall}</Large>
             <Small className="text-muted-foreground">Rating</Small>
           </div>
           <div className="text-center">
             <Large className="mb-1">
-              {(photographer.reliability.onTimeRate * 100).toFixed(0)}%
+              {(technician.reliability.onTimeRate * 100).toFixed(0)}%
             </Large>
             <Small className="text-muted-foreground">On-Time</Small>
           </div>

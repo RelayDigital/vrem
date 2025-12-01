@@ -1,4 +1,4 @@
-import { JobRequest, Photographer } from '../types';
+import { JobRequest, Technician } from '../types';
 import { CalendarEvent } from '../types/calendar';
 import { format, parseISO, startOfDay, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay, isWithinInterval } from 'date-fns';
 
@@ -39,7 +39,7 @@ export function jobToCalendarEvent(job: JobRequest): CalendarEvent {
       end: formatLocalToISO(dayEnd),
       jobId: job.id,
       orderNumber: job.orderNumber,
-      technicianId: job.assignedPhotographerId,
+      technicianId: job.assignedTechnicianId,
       type: 'Unscheduled',
       allDay: true,
       description: `${job.clientName} - ${job.propertyAddress}`,
@@ -59,7 +59,7 @@ export function jobToCalendarEvent(job: JobRequest): CalendarEvent {
     end: formatLocalToISO(endDateTime),
     jobId: job.id,
     orderNumber: job.orderNumber,
-    technicianId: job.assignedPhotographerId,
+    technicianId: job.assignedTechnicianId,
     type: 'Scheduled',
     allDay: false,
     description: `${job.clientName} - ${job.propertyAddress}`,

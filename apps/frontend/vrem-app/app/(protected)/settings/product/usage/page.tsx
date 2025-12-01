@@ -11,12 +11,12 @@ import { Label } from "@/components/ui/label";
 export default function ProductUsagePage() {
   const { user, isLoading } = useRequireRole([
     "dispatcher",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const { isAllowed } = useRoleGuard([
     "dispatcher",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
 

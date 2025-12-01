@@ -1,17 +1,29 @@
 export interface Organization {
   id: string;
   name: string;
-  type: 'media_company' | 'real_estate_team' | 'agent';
+  type: "COMPANY" | "PERSONAL";
   createdAt: Date;
-  orgType?: 'COMPANY' | 'PERSONAL';
   avatar?: string;
   description?: string;
   services?: string[];
   technicianCount?: number;
-  photographerCount?: number; // Deprecated: use technicianCount
   rating?: number;
   reviewCount?: number;
   coverageArea?: string[];
+  legalName?: string;
+  slug?: string;
+  logoUrl?: string;
+  websiteUrl?: string;
+  phone?: string;
+  primaryEmail?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  region?: string;
+  postalCode?: string;
+  countryCode?: string;
+  timezone?: string;
+  serviceArea?: any;
 }
 
 export interface PreferredVendor {
@@ -24,13 +36,11 @@ export interface PreferredVendor {
 
 export interface CompanyApplication {
   id: string;
-  photographerId: string; // Deprecated: use technicianId
   technicianId: string;
-  photographerName: string; // Deprecated: use technicianName
   technicianName: string;
   companyId: string;
   companyName: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: "pending" | "approved" | "rejected";
   message?: string;
   appliedAt: Date;
   reviewedAt?: Date;
@@ -40,9 +50,10 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'PROJECT_MANAGER' | 'TECHNICIAN' | 'EDITOR' | 'AGENT';
+  avatarUrl?: string;
+  role: "DISPATCHER" | "TECHNICIAN" | "AGENT";
   organizationId: string;
-  organizationType?: 'media_company' | 'real_estate_team' | 'agent';
+  organizationType?: "COMPANY" | "PERSONAL";
 }
 
 export interface Customer {
@@ -101,7 +112,7 @@ export interface Technician {
     recent: number[]; // last 10 ratings
   };
   preferredClients: string[]; // client organization IDs
-  status: 'active' | 'inactive' | 'suspended';
+  status: "active" | "inactive" | "suspended";
   createdAt: Date;
   avatar?: string;
   bio?: string;
@@ -117,28 +128,31 @@ export interface Technician {
   certifications?: string[];
 }
 
-// Backwards compatibility: Photographer is now Technician
-export type Photographer = Technician;
-
 export enum ProjectStatus {
-  BOOKED = 'BOOKED',
-  SHOOTING = 'SHOOTING',
-  EDITING = 'EDITING',
-  DELIVERED = 'DELIVERED',
+  BOOKED = "BOOKED",
+  SHOOTING = "SHOOTING",
+  EDITING = "EDITING",
+  DELIVERED = "DELIVERED",
 }
 
 export enum MediaType {
-  PHOTO = 'PHOTO',
-  VIDEO = 'VIDEO',
-  FLOORPLAN = 'FLOORPLAN',
-  DOCUMENT = 'DOCUMENT',
+  PHOTO = "PHOTO",
+  VIDEO = "VIDEO",
+  FLOORPLAN = "FLOORPLAN",
+  DOCUMENT = "DOCUMENT",
 }
 
 export interface OrganizationMember {
   id: string;
   userId: string;
   orgId: string;
-  role: User['role'];
+  role:
+    | "OWNER"
+    | "ADMIN"
+    | "DISPATCHER"
+    | "TECHNICIAN"
+    | "EDITOR"
+    | "PROJECT_MANAGER";
   createdAt: Date;
   organization?: Organization;
   user?: User;
@@ -219,11 +233,16 @@ export interface JobRequest {
   };
   scheduledDate: string;
   scheduledTime: string;
-  mediaType: ('photo' | 'video' | 'aerial' | 'twilight')[];
-  priority: 'standard' | 'rush' | 'urgent';
-  status: 'pending' | 'assigned' | 'in_progress' | 'editing' | 'delivered' | 'cancelled';
-  assignedPhotographerId?: string; // Deprecated: use assignedTechnicianId
-  assignedTechnicianId?: string;
+  mediaType: ("photo" | "video" | "aerial" | "twilight")[];
+  priority: "standard" | "rush" | "urgent";
+  status:
+    | "pending"
+    | "assigned"
+    | "in_progress"
+    | "editing"
+    | "delivered"
+    | "cancelled";
+  assignedTechnicianId?: string; // Deprecated: use assignedTechnicianId
   estimatedDuration: number; // minutes
   requirements: string;
   createdBy: string;
@@ -238,7 +257,7 @@ export interface JobDetails {
   scheduledDate: string;
   scheduledTime: string;
   mediaTypes: string[];
-  priority: 'standard' | 'rush' | 'urgent';
+  priority: "standard" | "rush" | "urgent";
   estimatedDuration: number;
   requirements: string;
 }
@@ -257,9 +276,9 @@ export interface TechnicianRanking {
   recommended: boolean;
 }
 
-// Backwards compatibility: PhotographerRanking is now TechnicianRanking
-export interface PhotographerRanking {
-  photographer: Photographer;
+// Backwards compatibility: TechnicianRanking is now TechnicianRanking
+export interface TechnicianRanking {
+  technician: Technician;
   score: number;
   factors: {
     availability: number;
@@ -279,7 +298,7 @@ export interface AuditLogEntry {
   userName: string;
   organizationId: string;
   action: string;
-  resourceType: 'job' | 'photographer' | 'technician' | 'organization' | 'user';
+  resourceType: "job" | "technician" | "technician" | "organization" | "user";
   resourceId: string;
   details: Record<string, any>;
   ipAddress?: string;
@@ -287,7 +306,7 @@ export interface AuditLogEntry {
 
 export interface Metrics {
   organizationId: string;
-  period: 'today' | 'week' | 'month';
+  period: "today" | "week" | "month";
   jobs: {
     total: number;
     pending: number;
@@ -295,11 +314,6 @@ export interface Metrics {
     completed: number;
     cancelled: number;
   };
-  photographers: {
-    active: number;
-    available: number;
-    utilization: number;
-  }; // Deprecated: use technicians
   technicians: {
     active: number;
     available: number;
@@ -319,11 +333,11 @@ export interface Metrics {
 
 // Analytics
 export interface AnalyticsSummary {
-  period: 'today' | 'week' | 'month';
-  jobs: Metrics['jobs'];
-  technicians: Metrics['technicians'];
-  revenue: Metrics['revenue'];
-  performance: Metrics['performance'];
+  period: "today" | "week" | "month";
+  jobs: Metrics["jobs"];
+  technicians: Metrics["technicians"];
+  revenue: Metrics["revenue"];
+  performance: Metrics["performance"];
 }
 
 // Marketplace
@@ -334,7 +348,7 @@ export interface MarketplaceJob {
   location?: string;
   compensation: number;
   currency: string;
-  status: 'open' | 'assigned' | 'closed';
+  status: "open" | "assigned" | "closed";
   orgId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -345,7 +359,7 @@ export interface JobApplication {
   jobId: string;
   applicantId: string;
   coverLetter?: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: "pending" | "accepted" | "rejected";
   createdAt: Date;
 }
 
@@ -355,7 +369,7 @@ export interface Transaction {
   orgId: string;
   amount: number;
   currency: string;
-  type: 'payout' | 'charge';
-  status: 'pending' | 'completed' | 'failed';
+  type: "payout" | "charge";
+  status: "pending" | "completed" | "failed";
   createdAt: Date;
 }

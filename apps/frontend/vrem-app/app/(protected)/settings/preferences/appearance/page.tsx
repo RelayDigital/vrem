@@ -21,7 +21,7 @@ export default function PreferencesAppearancePage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const { theme, setTheme } = useTheme();

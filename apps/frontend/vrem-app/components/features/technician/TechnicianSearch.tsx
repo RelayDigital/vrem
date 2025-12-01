@@ -4,29 +4,29 @@ import { useState } from 'react';
 import { Input } from '../../ui/input';
 import { Badge } from '../../ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
-import { Photographer, Organization } from '../../../types';
+import { Technician, Organization } from '../../../types';
 import { Search, Star, Building2, User as UserIcon, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { P } from '@/components/ui/typography';
-interface PhotographerSearchProps {
-  photographers: Photographer[];
+interface TechnicianSearchProps {
+  technicians: Technician[];
   companies: Organization[];
-  onSelect: (photographerId: string) => void;
+  onSelect: (technicianId: string) => void;
   preferredVendors?: string[];
 }
 
-export function PhotographerSearch({
-  photographers,
+export function TechnicianSearch({
+  technicians,
   companies,
   onSelect,
   preferredVendors = [],
-}: PhotographerSearchProps) {
+}: TechnicianSearchProps) {
   const [query, setQuery] = useState('');
-  const [searchType, setSearchType] = useState<'photographer' | 'company'>('photographer');
+  const [searchType, setSearchType] = useState<'technician' | 'company'>('technician');
 
-  const filteredPhotographers =
-    searchType === 'photographer'
-      ? photographers.filter((p) =>
+  const filteredTechnicians =
+    searchType === 'technician'
+      ? technicians.filter((p) =>
           p.name.toLowerCase().includes(query.toLowerCase())
         )
       : [];
@@ -35,7 +35,7 @@ export function PhotographerSearch({
     searchType === 'company'
       ? companies.filter(
           (c) =>
-            c.type === 'media_company' &&
+            c.type === 'COMPANY' &&
             c.name.toLowerCase().includes(query.toLowerCase())
         )
       : [];
@@ -45,16 +45,16 @@ export function PhotographerSearch({
       {/* Search Type Tabs */}
       <div className="flex gap-2 p-1 bg-muted rounded-lg">
         <button
-          onClick={() => setSearchType('photographer')}
+          onClick={() => setSearchType('technician')}
           className={`flex-1 px-4 py-2 rounded-lg text-sm transition-all ${
-            searchType === 'photographer'
+            searchType === 'technician'
               ? 'bg-card shadow-sm text-foreground'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <div className="flex items-center justify-center gap-2">
             <UserIcon className="h-4 w-4" />
-            <span>Search Photographers</span>
+            <span>Search Technicians</span>
           </div>
         </button>
         <button
@@ -79,8 +79,8 @@ export function PhotographerSearch({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={
-            searchType === 'photographer'
-              ? 'Search photographers by name...'
+            searchType === 'technician'
+              ? 'Search technicians by name...'
               : 'Search media companies...'
           }
           className="pl-12 h-12"
@@ -89,24 +89,24 @@ export function PhotographerSearch({
 
       {/* Results */}
       <div className="space-y-3 max-h-96 overflow-y-auto">
-        {searchType === 'photographer' &&
-          filteredPhotographers.map((photographer) => {
+        {searchType === 'technician' &&
+          filteredTechnicians.map((technician) => {
             const isPreferred = preferredVendors.includes(
-              photographer.companyId || photographer.id
+              technician.companyId || technician.id
             );
             return (
               <motion.button
-                key={photographer.id}
+                key={technician.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                onClick={() => onSelect(photographer.id)}
+                onClick={() => onSelect(technician.id)}
                 className="w-full p-4 border-2 border-border rounded-xl hover:border-indigo-300 transition-all text-left"
               >
                 <div className="flex items-start gap-4">
                   <Avatar className="size-14 border-2 border-white shadow-md">
-                    <AvatarImage src={photographer.avatar} />
+                    <AvatarImage src={technician.avatar} />
                     <AvatarFallback className="bg-primary text-primary-foreground">
-                      {photographer.name
+                      {technician.name
                         .split(' ')
                         .map((n) => n[0])
                         .join('')}
@@ -114,29 +114,29 @@ export function PhotographerSearch({
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h4 className="text-sm truncate">{photographer.name}</h4>
+                      <h4 className="text-sm truncate">{technician.name}</h4>
                       {isPreferred && (
                         <Heart className="h-4 w-4 fill-red-500 text-red-500 flex-shrink-0" />
                       )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                       <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                      <span>{photographer.rating.overall}</span>
+                      <span>{technician.rating.overall}</span>
                       <span className="text-muted-foreground/60">•</span>
-                      {photographer.isIndependent ? (
+                      {technician.isIndependent ? (
                         <Badge variant="outline" className="text-xs h-5">
                           Independent
                         </Badge>
                       ) : (
                         <div className="flex items-center gap-1">
                           <Building2 className="h-3 w-3" />
-                          <span>{photographer.companyName}</span>
+                          <span>{technician.companyName}</span>
                         </div>
                       )}
                     </div>
-                    {photographer.bio && (
+                    {technician.bio && (
                       <P className="text-xs text-muted-foreground/80 line-clamp-2">
-                        {photographer.bio}
+                        {technician.bio}
                       </P>
                     )}
                   </div>
@@ -148,7 +148,7 @@ export function PhotographerSearch({
         {searchType === 'company' &&
           filteredCompanies.map((company) => {
             const isPreferred = preferredVendors.includes(company.id);
-            const companyPhotographers = photographers.filter(
+            const companyTechnicians = technicians.filter(
               (p) => p.companyId === company.id
             );
             return (
@@ -186,27 +186,27 @@ export function PhotographerSearch({
                           <span className="text-muted-foreground/60">•</span>
                         </>
                       )}
-                      <span>{company.photographerCount} photographers</span>
+                      <span>{company.technicianCount} technicians</span>
                     </div>
                     <P className="text-xs text-muted-foreground/80">{company.description}</P>
                   </div>
                 </div>
 
-                {/* Company Photographers */}
+                {/* Company Technicians */}
                 <div className="space-y-2 pl-4 border-l-2 border-border">
                   <div className="text-xs text-muted-foreground/80 mb-2">
-                    Available photographers:
+                    Available technicians:
                   </div>
-                  {companyPhotographers.slice(0, 3).map((photographer) => (
+                  {companyTechnicians.slice(0, 3).map((technician) => (
                     <button
-                      key={photographer.id}
-                      onClick={() => onSelect(photographer.id)}
+                      key={technician.id}
+                      onClick={() => onSelect(technician.id)}
                       className="w-full flex items-center gap-3 p-2 hover:bg-accent rounded-lg transition-colors text-left"
                     >
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src={photographer.avatar} />
+                        <AvatarImage src={technician.avatar} />
                         <AvatarFallback className="text-xs">
-                          {photographer.name
+                          {technician.name
                             .split(' ')
                             .map((n) => n[0])
                             .join('')}
@@ -214,11 +214,11 @@ export function PhotographerSearch({
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs text-foreground truncate">
-                          {photographer.name}
+                          {technician.name}
                         </div>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground/80">
                           <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                          <span>{photographer.rating.overall}</span>
+                          <span>{technician.rating.overall}</span>
                         </div>
                       </div>
                     </button>
@@ -229,7 +229,7 @@ export function PhotographerSearch({
           })}
 
         {query &&
-          ((searchType === 'photographer' && filteredPhotographers.length === 0) ||
+          ((searchType === 'technician' && filteredTechnicians.length === 0) ||
             (searchType === 'company' && filteredCompanies.length === 0)) && (
             <div className="text-center py-8 text-muted-foreground/80">
               <Search className="size-12 mx-auto mb-2 text-muted-foreground/40" />
@@ -241,8 +241,8 @@ export function PhotographerSearch({
           <div className="text-center py-8 text-muted-foreground/80">
             <Search className="size-12 mx-auto mb-2 text-muted-foreground/40" />
             <P className="text-sm">
-              {searchType === 'photographer'
-                ? 'Search for a specific photographer'
+              {searchType === 'technician'
+                ? 'Search for a specific technician'
                 : 'Search for a media company'}
             </P>
           </div>

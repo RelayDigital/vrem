@@ -15,7 +15,7 @@ export default function NotificationsPage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const [emailNotifications, setEmailNotifications] = useState(true);

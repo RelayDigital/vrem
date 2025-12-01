@@ -16,7 +16,7 @@ export default function SecuritySessionsPage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
 

@@ -214,7 +214,7 @@ export const agentSettingsConfig: SettingsConfig = createSettingsConfig([
   "security",
 ]);
 
-export const photographerSettingsConfig: SettingsConfig = createSettingsConfig([
+export const technicianSettingsConfig: SettingsConfig = createSettingsConfig([
   "personal-details",
   "communication-preferences",
   "billing",

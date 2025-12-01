@@ -1,6 +1,6 @@
 "use client";
 
-import { JobRequest, Technician, Photographer } from "../../../types";
+import { JobRequest, Technician } from "../../../types";
 import { JobCard } from "../../shared/jobs";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
 import { PaginatedJobGrid } from "../../shared/jobs";
@@ -30,7 +30,6 @@ import { Button } from "@/components/ui/button";
 
 interface AgentJobsViewProps {
   jobs: JobRequest[];
-  photographers?: Photographer[]; // Deprecated: use technicians
   technicians: Technician[];
   organizationId: string;
   onNewJobClick: () => void;
@@ -38,13 +37,12 @@ interface AgentJobsViewProps {
 
 export function AgentJobsView({
   jobs,
-  photographers,
   technicians,
   organizationId,
   onNewJobClick,
 }: AgentJobsViewProps) {
-  // Use technicians if provided, fallback to photographers for backwards compatibility
-  const effectiveTechnicians = technicians || photographers || [];
+  // Use technicians if provided, fallback to technicians for backwards compatibility
+  const effectiveTechnicians = technicians || technicians || [];
   // Filter jobs for this agent's organization
   const myJobs = jobs.filter((job) => job.organizationId === organizationId);
 
@@ -111,7 +109,7 @@ export function AgentJobsView({
   };
 
   const renderTableRow = (job: JobRequest) => {
-    const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
+    const assignedId = job.assignedTechnicianId || job.assignedTechnicianId;
     const technician = assignedId
       ? effectiveTechnicians.find((t) => t.id === assignedId)
       : undefined;
@@ -266,7 +264,7 @@ export function AgentJobsView({
                   }
                   renderItem={(job) => {
                     const assignedId =
-                      job.assignedTechnicianId || job.assignedPhotographerId;
+                      job.assignedTechnicianId || job.assignedTechnicianId;
                     const technician = assignedId
                       ? effectiveTechnicians.find((t) => t.id === assignedId)
                       : undefined;
@@ -274,7 +272,7 @@ export function AgentJobsView({
                       <JobCard
                         key={job.id}
                         job={job}
-                        photographer={technician}
+                        technician={technician}
                       />
                     );
                   }}
@@ -310,7 +308,7 @@ export function AgentJobsView({
                   }
                   renderItem={(job) => {
                     const assignedId =
-                      job.assignedTechnicianId || job.assignedPhotographerId;
+                      job.assignedTechnicianId || job.assignedTechnicianId;
                     const technician = assignedId
                       ? effectiveTechnicians.find((t) => t.id === assignedId)
                       : undefined;
@@ -318,7 +316,7 @@ export function AgentJobsView({
                       <JobCard
                         key={job.id}
                         job={job}
-                        photographer={technician}
+                        technician={technician}
                       />
                     );
                   }}
@@ -350,7 +348,7 @@ export function AgentJobsView({
                   }
                   renderItem={(job) => {
                     const assignedId =
-                      job.assignedTechnicianId || job.assignedPhotographerId;
+                      job.assignedTechnicianId || job.assignedTechnicianId;
                     const technician = assignedId
                       ? effectiveTechnicians.find((t) => t.id === assignedId)
                       : undefined;
@@ -358,7 +356,7 @@ export function AgentJobsView({
                       <JobCard
                         key={job.id}
                         job={job}
-                        photographer={technician}
+                        technician={technician}
                       />
                     );
                   }}
@@ -390,7 +388,7 @@ export function AgentJobsView({
                   }
                   renderItem={(job) => {
                     const assignedId =
-                      job.assignedTechnicianId || job.assignedPhotographerId;
+                      job.assignedTechnicianId || job.assignedTechnicianId;
                     const technician = assignedId
                       ? effectiveTechnicians.find((t) => t.id === assignedId)
                       : undefined;
@@ -398,7 +396,7 @@ export function AgentJobsView({
                       <JobCard
                         key={job.id}
                         job={job}
-                        photographer={technician}
+                        technician={technician}
                       />
                     );
                   }}
@@ -430,7 +428,7 @@ export function AgentJobsView({
                   }
                   renderItem={(job) => {
                     const assignedId =
-                      job.assignedTechnicianId || job.assignedPhotographerId;
+                      job.assignedTechnicianId || job.assignedTechnicianId;
                     const technician = assignedId
                       ? effectiveTechnicians.find((t) => t.id === assignedId)
                       : undefined;
@@ -438,7 +436,7 @@ export function AgentJobsView({
                       <JobCard
                         key={job.id}
                         job={job}
-                        photographer={technician}
+                        technician={technician}
                       />
                     );
                   }}

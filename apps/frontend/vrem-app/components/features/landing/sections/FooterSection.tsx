@@ -32,7 +32,7 @@ export function FooterSection() {
               </ListItem>
               <ListItem className="list-none">
                 <a href="#" className="hover:text-primary-foreground transition-colors">
-                  For Photographers
+                  For Technicians
                 </a>
               </ListItem>
               <ListItem className="list-none">

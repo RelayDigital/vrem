@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { JobRequest, Photographer } from "@/types";
-import { USE_MOCK_DATA } from "@/lib/utils";
+import { JobRequest, Technician } from "@/types";
 import { JobCard } from "@/components/shared/jobs";
 import { MapWithSidebar } from "@/components/shared/dashboard/MapWithSidebar";
 import { MonthView } from "@/components/features/calendar/MonthView";
@@ -19,9 +18,9 @@ import {
 import { StatsGrid } from "@/components/shared/dashboard";
 import { CheckCircle2, Star, TrendingUp } from "lucide-react";
 
-interface PhotographerDashboardViewProps {
+interface TechnicianDashboardViewProps {
   jobs: JobRequest[]; // Already filtered to assigned jobs
-  photographers: Photographer[];
+  technicians: Technician[];
   selectedJob: JobRequest | null;
   stats: {
     upcoming: number;
@@ -37,9 +36,9 @@ interface PhotographerDashboardViewProps {
   onJobClick?: (job: JobRequest) => void;
 }
 
-export function PhotographerDashboardView({
+export function TechnicianDashboardView({
   jobs,
-  photographers,
+  technicians,
   selectedJob,
   stats,
   onSelectJob,
@@ -48,7 +47,7 @@ export function PhotographerDashboardView({
   onNavigateToCalendarView,
   onNavigateToJobInProjectManagement,
   onJobClick,
-}: PhotographerDashboardViewProps) {
+}: TechnicianDashboardViewProps) {
   const assignedJobs = jobs.filter((j) => j.status === "assigned");
   const [currentDate] = useState(new Date());
 
@@ -63,23 +62,28 @@ export function PhotographerDashboardView({
   }, [jobs]);
 
   // Use empty array when mock data is disabled
-  const displayPhotographers = USE_MOCK_DATA ? photographers : [];
+  const displayTechnicians = technicians ?? [];
 
-  // For the photographer dashboard, only show the current photographer on the map.
-  // Derive the photographer IDs that appear on this user's jobs and filter to those.
-  const mapPhotographers = useMemo(() => {
+  // For the technician dashboard, only show the current technician on the map.
+  // Derive the technician IDs that appear on this user's jobs and filter to those.
+  const mapTechnicians = useMemo(() => {
     const ids = new Set(
       jobs
-        .map((job) => job.assignedPhotographerId || job.assignedTechnicianId)
+        .map((job) => job.assignedTechnicianId || job.assignedTechnicianId)
         .filter((id): id is string => Boolean(id))
     );
-    return displayPhotographers.filter((p) => ids.has(p.id));
-  }, [jobs, displayPhotographers]);
+    const filtered = displayTechnicians.filter((p) => ids.has(p.id));
+    if (filtered.length > 0) return filtered;
+    // Fallback: show at least the first technician so the user can see themselves on the map
+    return displayTechnicians.length > 0
+      ? [displayTechnicians[0]]
+      : [];
+  }, [jobs, displayTechnicians]);
 
-  // Generate technician colors for the (possibly single) photographer shown on the map
+  // Generate technician colors for the (possibly single) technician shown on the map
   const technicianColors = useMemo(
-    () => generateTechnicianColors(mapPhotographers),
-    [mapPhotographers]
+    () => generateTechnicianColors(mapTechnicians),
+    [mapTechnicians]
   );
 
   // Handle event click
@@ -156,7 +160,7 @@ export function PhotographerDashboardView({
             <MonthView
               currentDate={currentDate}
               events={calendarEvents}
-              technicians={displayPhotographers}
+              technicians={displayTechnicians}
               technicianColors={technicianColors}
               onEventClick={handleEventClick}
               onDayClick={handleDayClick}
@@ -181,13 +185,13 @@ export function PhotographerDashboardView({
           {/* Content */}
           <MapWithSidebar
             jobs={jobs}
-            photographers={mapPhotographers}
+            technicians={mapTechnicians}
             selectedJob={selectedJob}
             onSelectJob={onSelectJob}
             onNavigateToJobInProjectManagement={
               onNavigateToJobInProjectManagement
             }
-            onJobAssign={undefined} // Photographers cannot assign jobs to themselves
+            onJobAssign={undefined} // Technicians cannot assign jobs to themselves
             isDispatcherView={false}
           />
         </div>
@@ -216,14 +220,14 @@ export function PhotographerDashboardView({
             >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {jobsToDisplay.map((job) => {
-                  const photographer = photographers.find(
-                    (p) => p.id === job.assignedPhotographerId
+                  const technician = technicians.find(
+                    (p) => p.id === job.assignedTechnicianId
                   );
                   return (
                     <JobCard
                       key={job.id}
                       job={job}
-                      photographer={photographer}
+                      technician={technician}
                       onClick={onJobClick ? () => onJobClick(job) : undefined}
                     />
                   );

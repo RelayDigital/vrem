@@ -949,7 +949,7 @@ export function JobRequestForm({
           onChange={(e) =>
             setFormData({ ...formData, requirements: e.target.value })
           }
-          placeholder="Any special instructions, access codes, or details the photographer should know..."
+          placeholder="Any special instructions, access codes, or details the technician should know..."
           rows={4}
           className="resize-none"
         />

@@ -29,7 +29,7 @@ export default function JobsPage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const jobManagement = useJobManagement();
@@ -38,7 +38,7 @@ export default function JobsPage() {
     if (!user) return [];
     return jobManagement.jobs.filter(
       (job) =>
-        job.assignedPhotographerId === user.id ||
+        job.assignedTechnicianId === user.id ||
         job.assignedTechnicianId === user.id
     );
   }, [jobManagement.jobs, user]);
@@ -68,7 +68,10 @@ export default function JobsPage() {
   // Fetch messages when selected job changes
   useEffect(() => {
     if (jobManagement.selectedJob) {
-      messaging.fetchMessages(jobManagement.selectedJob.id);
+      messaging.fetchMessages(
+        jobManagement.selectedJob.id,
+        (jobManagement.selectedJob as any)?.organizationId
+      );
     }
   }, [jobManagement.selectedJob, messaging]);
 
@@ -111,9 +114,9 @@ export default function JobsPage() {
   };
 
   // Dispatcher/Admin/Project Manager/Editor: Use JobsView
-  if (["dispatcher", "ADMIN", "PROJECT_MANAGER", "EDITOR"].includes(userRole)) {
-    // Empty photographers array - backend will provide when endpoint is ready
-    const photographers: any[] = [];
+  if (["dispatcher", "DISPATCHER", "PROJECT_MANAGER", "EDITOR"].includes(userRole)) {
+    // Empty technicians array - backend will provide when endpoint is ready
+    const technicians: any[] = [];
 
     return (
       <div className="size-full overflow-x-hidden">
@@ -137,10 +140,10 @@ export default function JobsPage() {
         <JobDataBoundary fallback={<JobsGridSkeleton />}>
           <JobsView
             jobs={jobManagement.jobs}
-            photographers={photographers}
+            technicians={technicians}
             messages={messaging.messages}
             onViewRankings={handleViewRankings}
-            onChangePhotographer={handleViewRankings}
+            onChangeTechnician={handleViewRankings}
             onJobStatusChange={handleJobStatusChangeWrapper}
             onJobClick={handleJobClick}
             activeView="all"
@@ -150,7 +153,7 @@ export default function JobsPage() {
         {/* Job Task View - Sheet */}
         <JobTaskView
           job={jobManagement.selectedJob}
-          photographer={undefined}
+          // technician={undefined}
           messages={
             jobManagement.selectedJob
               ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
@@ -181,8 +184,8 @@ export default function JobsPage() {
               );
             }
           }}
-          onAssignPhotographer={jobManagement.handleAssignPhotographer}
-          onChangePhotographer={jobManagement.handleChangePhotographer}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
           variant="sheet"
           onFullScreen={handleFullScreen}
           onOpenInNewPage={handleOpenInNewPage}
@@ -191,7 +194,7 @@ export default function JobsPage() {
         {/* Job Task View - Dialog (Full Screen) */}
         <JobTaskView
           job={jobManagement.selectedJob}
-          photographer={undefined}
+          // technician={undefined}
           messages={
             jobManagement.selectedJob
               ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
@@ -222,28 +225,28 @@ export default function JobsPage() {
               );
             }
           }}
-          onAssignPhotographer={jobManagement.handleAssignPhotographer}
-          onChangePhotographer={jobManagement.handleChangePhotographer}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
           variant="dialog"
         />
       </div>
     );
   }
 
-  // Technician/Photographer: Filter to assigned jobs only
+  // Technician/Technician: Filter to assigned jobs only
   if (["TECHNICIAN"].includes(userRole)) {
-    // Empty photographers array - backend will provide when endpoint is ready
-    const photographers: any[] = [];
+    // Empty technicians array - backend will provide when endpoint is ready
+    const technicians: any[] = [];
 
     return (
       <div className="size-full overflow-x-hidden space-y-6">
         <JobDataBoundary fallback={<JobsGridSkeleton />}>
           <JobsView
             jobs={assignedJobs}
-            photographers={photographers}
+            technicians={technicians}
             messages={messaging.messages}
             onViewRankings={() => {}}
-            onChangePhotographer={undefined}
+            onChangeTechnician={undefined}
             onJobStatusChange={handleJobStatusChangeWrapper}
             onJobClick={handleJobClick}
             activeView="all"
@@ -253,7 +256,7 @@ export default function JobsPage() {
         {/* Job Task View - Sheet */}
         <JobTaskView
           job={jobManagement.selectedJob}
-          photographer={undefined}
+          // technician={undefined}
           messages={
             jobManagement.selectedJob
               ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
@@ -284,8 +287,8 @@ export default function JobsPage() {
               );
             }
           }}
-          onAssignPhotographer={jobManagement.handleAssignPhotographer}
-          onChangePhotographer={jobManagement.handleChangePhotographer}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
           variant="sheet"
           onFullScreen={handleFullScreen}
           onOpenInNewPage={handleOpenInNewPage}
@@ -294,7 +297,7 @@ export default function JobsPage() {
         {/* Job Task View - Dialog (Full Screen) */}
         <JobTaskView
           job={jobManagement.selectedJob}
-          photographer={undefined}
+          // technician={undefined}
           messages={
             jobManagement.selectedJob
               ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
@@ -325,8 +328,8 @@ export default function JobsPage() {
               );
             }
           }}
-          onAssignPhotographer={jobManagement.handleAssignPhotographer}
-          onChangePhotographer={jobManagement.handleChangePhotographer}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
           variant="dialog"
         />
       </div>

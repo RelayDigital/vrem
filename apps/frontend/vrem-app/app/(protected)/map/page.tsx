@@ -1,14 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { LiveJobMapView } from "@/components/features/dispatcher/views/LiveJobMapView";
-import { JobRequest } from "@/types";
+import { JobRequest, Technician } from "@/types";
 import { MapLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { JobDataBoundary } from "@/components/shared/jobs";
-import { PageHeader } from "@/components/shared/layout";
+import { fetchOrganizationTechnicians } from "@/lib/technicians";
 
 export default function MapPage() {
   const { user, isLoading } = useRequireRole([
@@ -16,11 +16,48 @@ export default function MapPage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const router = useRouter();
   const jobManagement = useJobManagement();
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [loadingTechnicians, setLoadingTechnicians] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTechnicians = async () => {
+      setLoadingTechnicians(true);
+      try {
+        const techniciansFromMembers = await fetchOrganizationTechnicians();
+
+        if (!cancelled) {
+          setTechnicians(techniciansFromMembers);
+        }
+      } catch (error) {
+        console.error("Failed to load technicians for map:", error);
+        if (!cancelled) {
+          setTechnicians([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingTechnicians(false);
+        }
+      }
+    };
+
+    if (user) {
+      loadTechnicians();
+    } else {
+      setTechnicians([]);
+      setLoadingTechnicians(false);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // Filter jobs based on role
   const displayJobs = useMemo(() => {
@@ -28,11 +65,11 @@ export default function MapPage() {
 
     const userRole = user.role;
 
-    // Technician/Photographer: Only show assigned jobs
+    // Technician/Technician: Only show assigned jobs
     if (["TECHNICIAN"].includes(userRole)) {
       return jobManagement.jobs.filter(
         (job) =>
-          job.assignedPhotographerId === user.id ||
+          job.assignedTechnicianId === user.id ||
           job.assignedTechnicianId === user.id
       );
     }
@@ -41,30 +78,35 @@ export default function MapPage() {
     return jobManagement.jobs;
   }, [jobManagement.jobs, user]);
 
-  // Filter photographers based on role
-  const displayPhotographers = useMemo(() => {
-    // Empty array - backend will provide when endpoint is ready
-    const photographers: any[] = [];
-
-    if (!user) return photographers;
+  // Filter technicians based on role
+  const displayTechnicians = useMemo(() => {
+    if (!user) return [];
 
     const userRole = user.role;
 
-    // Technician/Photographer: Only include photographers that appear in their jobs
+    // Technician/Technician: Only include technicians that appear in their jobs
     if (["TECHNICIAN"].includes(userRole)) {
       const ids = new Set(
         displayJobs
-          .map((job) => job.assignedPhotographerId || job.assignedTechnicianId)
+          .map((job) => job.assignedTechnicianId || job.assignedTechnicianId)
           .filter((id): id is string => Boolean(id))
       );
-      return photographers.filter((p) => ids.has(p.id));
+      const filtered = technicians.filter(
+        (p) => ids.has(p.id) || p.id === user.id
+      );
+      // Ensure the current technician sees themselves even if not on a job yet
+      if (!filtered.find((p) => p.id === user.id)) {
+        const self = technicians.find((p) => p.id === user.id);
+        return self ? [self] : filtered;
+      }
+      return filtered;
     }
 
-    // Dispatcher/Admin/Project Manager/Editor/Agent: Show all photographers
-    return photographers;
-  }, [displayJobs, user]);
+    // Dispatcher/Admin/Project Manager/Editor/Agent: Show all technicians
+    return technicians;
+  }, [displayJobs, user, technicians]);
 
-  if (isLoading) {
+  if (isLoading || loadingTechnicians) {
     return <MapLoadingSkeleton />;
   }
 
@@ -75,7 +117,7 @@ export default function MapPage() {
   const userRole = user.role;
   const canAssignJobs = [
     "dispatcher",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
     "EDITOR",
   ].includes(userRole);
@@ -100,12 +142,11 @@ export default function MapPage() {
     <JobDataBoundary fallback={<MapLoadingSkeleton />}>
       <LiveJobMapView
         jobs={displayJobs}
-        photographers={displayPhotographers}
+        technicians={displayTechnicians}
         selectedJob={jobManagement.selectedJob}
         onSelectJob={handleJobSelect}
-        onNavigateToJobInProjectManagement={
-          handleNavigateToJobInProjectManagement
-        }
+        onNavigateToJobInProjectManagement=
+          {handleNavigateToJobInProjectManagement}
         onJobAssign={handleJobAssign}
         hasSidebar={canAssignJobs}
         isDispatcherView={isDispatcherView}

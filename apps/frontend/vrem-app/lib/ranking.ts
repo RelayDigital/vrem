@@ -1,4 +1,4 @@
-import { Photographer, JobRequest, PhotographerRanking } from '../types';
+import { Technician, JobRequest, TechnicianRanking } from '../types';
 
 /**
  * Calculate distance between two coordinates using Haversine formula
@@ -28,10 +28,10 @@ export function calculateDistance(
  * 0 = not available
  */
 function scoreAvailability(
-  photographer: Photographer,
+  technician: Technician,
   requestedDate: string
 ): number {
-  const availability = photographer.availability.find(
+  const availability = technician.availability.find(
     (a) => a.date === requestedDate
   );
   return availability?.available ? 100 : 0;
@@ -57,10 +57,10 @@ function scoreDistance(distanceKm: number): number {
  * Score reliability (0-100)
  * Based on on-time rate and no-show history
  */
-function scoreReliability(photographer: Photographer): number {
-  const { onTimeRate, noShows, totalJobs } = photographer.reliability;
+function scoreReliability(technician: Technician): number {
+  const { onTimeRate, noShows, totalJobs } = technician.reliability;
   
-  if (totalJobs === 0) return 50; // neutral for new photographers
+  if (totalJobs === 0) return 50; // neutral for new technicians
   
   const noShowPenalty = (noShows / totalJobs) * 100;
   const reliabilityScore = onTimeRate * 100 - noShowPenalty;
@@ -70,13 +70,13 @@ function scoreReliability(photographer: Photographer): number {
 
 /**
  * Score skill match (0-100)
- * Based on photographer's skill ratings for required media types
+ * Based on technician's skill ratings for required media types
  */
 function scoreSkillMatch(
-  photographer: Photographer,
+  technician: Technician,
   job: JobRequest
 ): number {
-  const skillMap: Record<string, keyof Photographer['skills']> = {
+  const skillMap: Record<string, keyof Technician['skills']> = {
     photo: 'residential',
     video: 'video',
     aerial: 'aerial',
@@ -88,8 +88,8 @@ function scoreSkillMatch(
   
   for (const mediaType of job.mediaType) {
     const skillKey = skillMap[mediaType];
-    if (skillKey && photographer.skills[skillKey] !== undefined) {
-      totalScore += photographer.skills[skillKey];
+    if (skillKey && technician.skills[skillKey] !== undefined) {
+      totalScore += technician.skills[skillKey];
       count++;
     }
   }
@@ -99,20 +99,20 @@ function scoreSkillMatch(
 
 /**
  * Score preferred relationship (0-100)
- * 100 = preferred client relationship exists OR photographer's company is a preferred vendor
+ * 100 = preferred client relationship exists OR technician's company is a preferred vendor
  * 0 = no relationship
  */
 function scorePreferredRelationship(
-  photographer: Photographer,
+  technician: Technician,
   job: JobRequest,
   preferredVendorIds: string[] = []
 ): number {
-  // Check if photographer's company is a preferred vendor
-  if (photographer.companyId && preferredVendorIds.includes(photographer.companyId)) {
+  // Check if technician's company is a preferred vendor
+  if (technician.companyId && preferredVendorIds.includes(technician.companyId)) {
     return 100;
   }
-  // Check if photographer has direct relationship with client
-  if (photographer.preferredClients.includes(job.organizationId)) {
+  // Check if technician has direct relationship with client
+  if (technician.preferredClients.includes(job.organizationId)) {
     return 100;
   }
   return 0;
@@ -127,11 +127,11 @@ function scorePreferredRelationship(
  * - Distance: 15%
  * - Skill: 10%
  */
-export function rankPhotographers(
-  photographers: Photographer[],
+export function rankTechnicians(
+  technicians: Technician[],
   job: JobRequest,
   preferredVendorIds: string[] = []
-): PhotographerRanking[] {
+): TechnicianRanking[] {
   const weights = {
     availability: 0.3,
     preferredRelationship: 0.25, // Increased weight for preferred vendors
@@ -140,23 +140,23 @@ export function rankPhotographers(
     skill: 0.1,
   };
   
-  const rankings: PhotographerRanking[] = photographers
+  const rankings: TechnicianRanking[] = technicians
     .filter((p) => p.status === 'active')
-    .map((photographer) => {
+    .map((technician) => {
       const distanceKm = calculateDistance(
-        photographer.homeLocation.lat,
-        photographer.homeLocation.lng,
+        technician.homeLocation.lat,
+        technician.homeLocation.lng,
         job.location.lat,
         job.location.lng
       );
       
       const factors = {
-        availability: scoreAvailability(photographer, job.scheduledDate),
+        availability: scoreAvailability(technician, job.scheduledDate),
         distance: scoreDistance(distanceKm),
         distanceKm,
-        reliability: scoreReliability(photographer),
-        skillMatch: scoreSkillMatch(photographer, job),
-        preferredRelationship: scorePreferredRelationship(photographer, job, preferredVendorIds),
+        reliability: scoreReliability(technician),
+        skillMatch: scoreSkillMatch(technician, job),
+        preferredRelationship: scorePreferredRelationship(technician, job, preferredVendorIds),
       };
       
       const score =
@@ -167,7 +167,7 @@ export function rankPhotographers(
         factors.skillMatch * weights.skill;
       
       return {
-        photographer,
+        technician,
         score,
         factors,
         recommended: score >= 60 && factors.availability === 100,

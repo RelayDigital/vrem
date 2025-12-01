@@ -15,7 +15,7 @@ components/
 │   │   ├── steps/               [Booking wizard steps]
 │   │   │   ├── AddressStep.tsx (51 lines)
 │   │   │   ├── DetailsStep.tsx (222 lines)
-│   │   │   ├── PhotographerSelectionStep.tsx (93 lines)
+│   │   │   ├── TechnicianSelectionStep.tsx (93 lines)
 │   │   │   ├── LoginDialog.tsx (60 lines)
 │   │   │   └── index.ts
 │   │   ├── views/               [Dashboard views]
@@ -32,11 +32,11 @@ components/
 │   │   │   └── index.ts
 │   │   └── index.ts
 │   │
-│   ├── photographer/
-│   │   ├── PhotographerDashboard.tsx (78 lines) - Main orchestrator
-│   │   ├── PhotographerManagement.tsx (61 lines)
-│   │   ├── PhotographerCard.tsx (251 lines)
-│   │   ├── PhotographerSearch.tsx (150 lines)
+│   ├── technician/
+│   │   ├── TechnicianDashboard.tsx (78 lines) - Main orchestrator
+│   │   ├── TechnicianManagement.tsx (61 lines)
+│   │   ├── TechnicianCard.tsx (251 lines)
+│   │   ├── TechnicianSearch.tsx (150 lines)
 │   │   ├── views/               [Dashboard views]
 │   │   │   ├── JobsView.tsx (140 lines)
 │   │   │   ├── ProfileView.tsx (165 lines)
@@ -51,7 +51,7 @@ components/
 │       │   ├── FeaturesSection.tsx (91 lines)
 │       │   ├── HowItWorksSection.tsx (74 lines)
 │       │   ├── StatsSection.tsx (34 lines)
-│       │   ├── ForPhotographersSection.tsx (93 lines)
+│       │   ├── ForTechniciansSection.tsx (93 lines)
 │       │   ├── ForCompaniesSection.tsx (87 lines)
 │       │   ├── CTASection.tsx (30 lines)
 │       │   ├── FooterSection.tsx (102 lines)
@@ -69,7 +69,7 @@ components/
 │   │   └── index.ts
 │   │
 │   ├── tables/                  [Reusable tables] [NEW!]
-│   │   ├── PhotographerTable.tsx (88 lines)
+│   │   ├── TechnicianTable.tsx (88 lines)
 │   │   └── index.ts
 │   │
 │   ├── jobs/
@@ -99,7 +99,7 @@ components/
 ## 🎯 Organization Principles
 
 ### 1. **Features** - Role-based, used once
-Components specific to a user role (agent, dispatcher, photographer) or feature (landing).
+Components specific to a user role (agent, dispatcher, technician) or feature (landing).
 
 ### 2. **Shared** - Cross-feature, reusable
 Components used by multiple features:
@@ -158,7 +158,7 @@ import { HeroSection, FeaturesSection } from './sections';
 ```typescript
 import { StatsCard, ProgressIndicator } from '@/components/shared/dashboard';
 import { RankingFactors } from '@/components/shared/ranking';
-import { PhotographerTable } from '@/components/shared/tables';
+import { TechnicianTable } from '@/components/shared/tables';
 ```
 
 ### Importing UI:
@@ -194,16 +194,16 @@ Multi-step progress tracker:
 ```
 
 ### RankingFactors
-Display photographer AI ranking scores:
+Display technician AI ranking scores:
 ```typescript
 <RankingFactors factors={ranking.factors} />
 ```
 
-### PhotographerTable
-Consistent photographer data table:
+### TechnicianTable
+Consistent technician data table:
 ```typescript
-<PhotographerTable
-  photographers={photographers}
+<TechnicianTable
+  technicians={technicians}
   onRowClick={(p) => console.log(p)}
 />
 ```

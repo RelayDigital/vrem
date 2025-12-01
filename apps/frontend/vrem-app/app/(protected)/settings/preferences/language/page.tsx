@@ -21,7 +21,7 @@ export default function PreferencesLanguagePage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const [language, setLanguage] = useState("en");

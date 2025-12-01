@@ -18,7 +18,7 @@ export function useOrganizations() {
         setMemberships(data);
         if (!activeOrganizationId && data.length > 0) {
           const personal = data.find(
-            (m) => m.organization?.orgType === 'PERSONAL' || m.organization?.type === 'PERSONAL'
+            (m) => m.organization?.type === 'PERSONAL'
           );
           const fallbackOrgId = personal?.orgId || data[0]?.orgId || null;
           if (fallbackOrgId) {

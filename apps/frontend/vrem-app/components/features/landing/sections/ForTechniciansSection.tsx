@@ -9,7 +9,7 @@ import {
   Star,
 } from 'lucide-react';
 
-interface ForPhotographersSectionProps {
+interface ForTechniciansSectionProps {
   onGetStarted: () => void;
   onBookShoot: () => void;
 }
@@ -22,14 +22,14 @@ const benefits = [
   'Manage your schedule and availability easily',
 ];
 
-export function ForPhotographersSection({ onGetStarted, onBookShoot }: ForPhotographersSectionProps) {
+export function ForTechniciansSection({ onGetStarted, onBookShoot }: ForTechniciansSectionProps) {
   return (
     <section className="py-12 md:py-24 bg-card">
       <div className="container mx-auto px-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <Badge className="bg-accent text-foreground border-border">
-              For Photographers
+              For Technicians
             </Badge>
             <H2 className="text-4xl text-foreground border-0">
               Grow your photography business
@@ -59,7 +59,7 @@ export function ForPhotographersSection({ onGetStarted, onBookShoot }: ForPhotog
                 variant="outline"
                 className="border-2 border-border hover:border-ring"
               >
-                Join as Photographer
+                Join as Technician
               </Button>
             </div>
           </div>
@@ -67,7 +67,7 @@ export function ForPhotographersSection({ onGetStarted, onBookShoot }: ForPhotog
             <div className="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-card">
               <ImageWithFallback
                 src="https://images.unsplash.com/photo-1643968612613-fd411aecd1fd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBwaG90b2dyYXBoZXIlMjBjYW1lcmF8ZW58MXx8fHwxNzYyOTQ1MjE1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-                alt="Professional photographer"
+                alt="Professional technician"
                 className="w-full h-[500px] object-cover"
               />
             </div>

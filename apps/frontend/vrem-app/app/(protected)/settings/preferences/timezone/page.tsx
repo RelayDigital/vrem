@@ -20,7 +20,7 @@ export default function PreferencesTimezonePage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const [timezone, setTimezone] = useState("America/Edmonton");

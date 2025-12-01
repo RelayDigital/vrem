@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { JobRequest, Photographer, Metrics } from "../../../../types";
+import { JobRequest, Technician, Metrics } from "../../../../types";
 import { MetricsDashboard } from "../../../shared/metrics";
 import { USE_MOCK_DATA } from "../../../../lib/utils";
 import { JobCard } from "../../../shared/jobs";
@@ -20,7 +20,7 @@ import {
 
 interface DispatcherDashboardViewProps {
   jobs: JobRequest[];
-  photographers: Photographer[];
+  technicians: Technician[];
   metrics: Metrics;
   selectedJob: JobRequest | null;
   onViewRankings: (job: JobRequest) => void;
@@ -29,13 +29,13 @@ interface DispatcherDashboardViewProps {
   onNavigateToMapView?: () => void;
   onNavigateToCalendarView?: () => void;
   onNavigateToJobInProjectManagement?: (job: JobRequest) => void;
-  onJobAssign?: (jobId: string, photographerId: string, score: number) => void;
+  onJobAssign?: (jobId: string, technicianId: string, score: number) => void;
   onJobClick?: (job: JobRequest) => void;
 }
 
 export function DispatcherDashboardView({
   jobs,
-  photographers,
+  technicians,
   metrics,
   selectedJob,
   onViewRankings,
@@ -60,13 +60,12 @@ export function DispatcherDashboardView({
     return jobs.map((job) => jobToCalendarEvent(job));
   }, [jobs]);
 
-  // Use empty array when mock data is disabled
-  const displayPhotographers = USE_MOCK_DATA ? photographers : [];
+  const displayTechnicians = technicians ?? [];
 
   // Generate technician colors
   const technicianColors = useMemo(
-    () => generateTechnicianColors(displayPhotographers),
-    [displayPhotographers]
+    () => generateTechnicianColors(displayTechnicians),
+    [displayTechnicians]
   );
 
   // Handle event click
@@ -98,11 +97,6 @@ export function DispatcherDashboardView({
           assigned: 0,
           completed: 0,
           cancelled: 0,
-        },
-        photographers: {
-          active: 0,
-          available: 0,
-          utilization: 0,
         },
         technicians: {
           active: 0,
@@ -147,7 +141,7 @@ export function DispatcherDashboardView({
             <MonthView
               currentDate={currentDate}
               events={calendarEvents}
-              technicians={displayPhotographers}
+              technicians={displayTechnicians}
               technicianColors={technicianColors}
               onEventClick={handleEventClick}
               onDayClick={handleDayClick}
@@ -173,7 +167,7 @@ export function DispatcherDashboardView({
           {/* Content */}
           <MapWithSidebar
             jobs={jobs}
-            photographers={displayPhotographers}
+            technicians={displayTechnicians}
             selectedJob={selectedJob}
             onSelectJob={onSelectJob}
             onNavigateToJobInProjectManagement={
@@ -208,14 +202,14 @@ export function DispatcherDashboardView({
             >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {jobsToDisplay.map((job) => {
-                  const photographer = photographers.find(
-                    (p) => p.id === job.assignedPhotographerId
+                  const technician = technicians.find(
+                    (p) => p.id === job.assignedTechnicianId
                   );
                   return (
                     <JobCard
                       key={job.id}
                       job={job}
-                      photographer={photographer}
+                      technician={technician}
                       onViewRankings={
                         job.status === "pending"
                           ? () => onViewRankings(job)
@@ -231,7 +225,7 @@ export function DispatcherDashboardView({
             <EmptyState
               icon={Briefcase}
               title="No Active Jobs"
-              description="There are currently no active jobs assigned to photographers."
+              description="There are currently no active jobs assigned to technicians."
               action={
                 onNavigateToJobsView
                   ? {

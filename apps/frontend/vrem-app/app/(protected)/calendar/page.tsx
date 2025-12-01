@@ -20,7 +20,7 @@ export default function CalendarPage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const jobManagement = useJobManagement();
@@ -33,11 +33,11 @@ export default function CalendarPage() {
 
     const userRole = user.role;
 
-    // Technician/Photographer: Only show assigned jobs
+    // Technician/Technician: Only show assigned jobs
     if (["TECHNICIAN"].includes(userRole)) {
       return jobManagement.jobs.filter(
         (job) =>
-          job.assignedPhotographerId === user.id ||
+          job.assignedTechnicianId === user.id ||
           job.assignedTechnicianId === user.id
       );
     }
@@ -49,7 +49,10 @@ export default function CalendarPage() {
   // Fetch messages when selected job changes
   useEffect(() => {
     if (jobManagement.selectedJob) {
-      messaging.fetchMessages(jobManagement.selectedJob.id);
+      messaging.fetchMessages(
+        jobManagement.selectedJob.id,
+        (jobManagement.selectedJob as any)?.organizationId
+      );
     }
   }, [jobManagement.selectedJob, messaging]);
 
@@ -64,13 +67,13 @@ export default function CalendarPage() {
   const userRole = user.role;
   const canCreateJobs = [
     "dispatcher",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
     "EDITOR",
   ].includes(userRole);
   const canSeeTechnicians = [
     "dispatcher",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
     "EDITOR",
   ].includes(userRole);
@@ -111,8 +114,8 @@ export default function CalendarPage() {
     );
   };
 
-  // Empty photographers array - backend will provide when endpoint is ready
-  const photographers: any[] = [];
+  // Empty technicians array - backend will provide when endpoint is ready
+  const technicians: any[] = [];
 
   return (
     <div className="size-full overflow-x-hidden space-y-6">
@@ -120,7 +123,7 @@ export default function CalendarPage() {
         <CalendarView
           canSeeTechnicians={canSeeTechnicians}
           jobs={displayJobs}
-          photographers={photographers}
+          technicians={technicians}
           onJobClick={handleJobClick}
           onCreateJob={canCreateJobs ? handleCreateJob : undefined}
         />
@@ -129,7 +132,7 @@ export default function CalendarPage() {
       {/* Job Task View - Sheet */}
       <JobTaskView
         job={jobManagement.selectedJob}
-        photographer={undefined}
+        // technician={undefined}
         messages={
           jobManagement.selectedJob
             ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
@@ -157,8 +160,8 @@ export default function CalendarPage() {
             handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
           }
         }}
-        onAssignPhotographer={jobManagement.handleAssignPhotographer}
-        onChangePhotographer={jobManagement.handleChangePhotographer}
+        onAssignTechnician={jobManagement.handleAssignTechnician}
+        onChangeTechnician={jobManagement.handleChangeTechnician}
         variant="sheet"
         onFullScreen={handleFullScreen}
         onOpenInNewPage={handleOpenInNewPage}
@@ -167,7 +170,7 @@ export default function CalendarPage() {
       {/* Job Task View - Dialog (Full Screen) */}
       <JobTaskView
         job={jobManagement.selectedJob}
-        photographer={undefined}
+        // technician={undefined}
         messages={
           jobManagement.selectedJob
             ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
@@ -195,8 +198,8 @@ export default function CalendarPage() {
             handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
           }
         }}
-        onAssignPhotographer={jobManagement.handleAssignPhotographer}
-        onChangePhotographer={jobManagement.handleChangePhotographer}
+        onAssignTechnician={jobManagement.handleAssignTechnician}
+        onChangeTechnician={jobManagement.handleChangeTechnician}
         variant="dialog"
       />
     </div>

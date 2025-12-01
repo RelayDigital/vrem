@@ -17,7 +17,7 @@ export default function Security2FAPage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);

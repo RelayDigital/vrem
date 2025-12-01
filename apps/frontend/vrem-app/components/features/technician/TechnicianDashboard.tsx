@@ -1,29 +1,29 @@
 'use client';
 
-import { JobRequest, Photographer, Organization, CompanyApplication } from '../../../types';
+import { JobRequest, Technician, Organization, CompanyApplication } from '../../../types';
 import { JobsView, ProfileView, CompaniesView } from './views';
 
-interface PhotographerDashboardProps {
-  photographer: Photographer;
+interface TechnicianDashboardProps {
+  technician: Technician;
   jobs: JobRequest[];
   companies: Organization[];
   applications: CompanyApplication[];
-  onUpdateProfile: (updates: Partial<Photographer>) => void;
+  onUpdateProfile: (updates: Partial<Technician>) => void;
   onApplyToCompany: (companyId: string, message: string) => void;
   activeView?: 'jobs' | 'profile' | 'companies';
 }
 
-export function PhotographerDashboard({
-  photographer,
+export function TechnicianDashboard({
+  technician,
   jobs,
   companies,
   applications,
   onUpdateProfile,
   onApplyToCompany,
   activeView = 'jobs',
-}: PhotographerDashboardProps) {
+}: TechnicianDashboardProps) {
 
-  const myJobs = jobs.filter((j) => j.assignedPhotographerId === photographer.id);
+  const myJobs = jobs.filter((j) => j.assignedTechnicianId === technician.id);
   const upcomingJobs = myJobs.filter((j) => j.status === 'assigned');
 
   return (
@@ -32,22 +32,22 @@ export function PhotographerDashboard({
       {activeView === 'jobs' && (
         <JobsView
           upcomingJobs={upcomingJobs}
-          totalJobs={photographer.reliability.totalJobs}
-          rating={photographer.rating.overall}
-          onTimeRate={(photographer.reliability.onTimeRate * 100)}
+          totalJobs={technician.reliability.totalJobs}
+          rating={technician.rating.overall}
+          onTimeRate={(technician.reliability.onTimeRate * 100)}
         />
       )}
 
       {activeView === 'profile' && (
         <ProfileView
-          photographer={photographer}
+          technician={technician}
           onUpdateProfile={onUpdateProfile}
         />
       )}
 
       {activeView === 'companies' && (
         <CompaniesView
-          photographer={photographer}
+          technician={technician}
           companies={companies}
           applications={applications}
           onApplyToCompany={onApplyToCompany}

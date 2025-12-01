@@ -10,7 +10,7 @@ interface MessagingContextType {
   // Message state
   messages: ChatMessage[];
   getMessagesForJob: (jobId: string) => ChatMessage[];
-  fetchMessages: (jobId: string) => Promise<void>;
+  fetchMessages: (jobId: string, orgId?: string) => Promise<void>;
 
   // Message handlers
   sendMessage: (
@@ -75,8 +75,11 @@ export function MessagingProvider({
     return messages.filter((msg) => msg.jobId === jobId);
   }, [messages]);
 
-  const fetchMessages = useCallback(async (jobId: string) => {
+  const fetchMessages = useCallback(async (jobId: string, orgId?: string) => {
     try {
+      if (orgId) {
+        api.organizations.setActiveOrganization(orgId);
+      }
       const fetchedMessages = await api.chat.getMessages(jobId);
       // Convert date strings to Date objects if needed
       const processedMessages = fetchedMessages.map((msg: any) => ({

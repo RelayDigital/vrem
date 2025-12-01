@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarEvent } from "@/types/calendar";
-import { Photographer } from "@/types";
+import { Technician } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { formatTimeRange } from "@/lib/calendar-utils";
 import { cn } from "@/components/ui/utils";
@@ -9,7 +9,7 @@ import { Clock, MapPin } from "lucide-react";
 
 interface CalendarEventCardProps {
   event: CalendarEvent;
-  technician?: Photographer;
+  technician?: Technician;
   technicianColor?: string;
   onClick?: () => void;
   className?: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { JobRequest, Photographer } from "../../../types";
+import { JobRequest, Technician } from "../../../types";
 import { Calendar } from "../../ui/calendar";
 import { Card, CardContent, CardHeader } from "../../ui/card";
 import { Button } from "../../ui/button";
@@ -16,7 +16,7 @@ import { DayButton } from "react-day-picker";
 
 interface MiniCalendarViewProps {
   jobs: JobRequest[];
-  photographers?: Photographer[];
+  technicians?: Technician[];
   onDateClick?: (date: Date) => void;
   onJobClick?: (job: JobRequest) => void;
   onViewFullCalendar?: () => void;
@@ -24,7 +24,7 @@ interface MiniCalendarViewProps {
 
 export function MiniCalendarView({
   jobs,
-  photographers = [],
+  technicians = [],
   onDateClick,
   onJobClick,
   onViewFullCalendar,
@@ -126,8 +126,8 @@ export function MiniCalendarView({
               {upcomingEvents.map((event) => {
                 const eventDate = parseISO(event.start);
                 const job = jobs.find((j) => j.id === event.jobId);
-                const photographer = event.technicianId
-                  ? photographers.find((p) => p.id === event.technicianId)
+                const technician = event.technicianId
+                  ? technicians.find((p) => p.id === event.technicianId)
                   : undefined;
 
                 return (
@@ -164,9 +164,9 @@ export function MiniCalendarView({
                         {format(eventDate, "h:mm a")}
                       </P>
                     )}
-                    {photographer && (
+                    {technician && (
                       <P className="text-xs text-muted-foreground mt-1">
-                        {photographer.name}
+                        {technician.name}
                       </P>
                     )}
                   </div>

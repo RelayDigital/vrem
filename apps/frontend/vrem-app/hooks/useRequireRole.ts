@@ -19,18 +19,19 @@ interface UseRequireRoleReturn {
 
 // Map backend role names to frontend role names (for normalization)
 const roleMap: Record<string, User['role']> = {
-  'ADMIN': 'ADMIN',
-  'PROJECT_MANAGER': 'PROJECT_MANAGER',
-  'TECHNICIAN': 'TECHNICIAN',
-  'EDITOR': 'EDITOR',
-  'AGENT': 'AGENT',
-  // Legacy lowercase mappings (for backwards compatibility)
-  'dispatcher': 'ADMIN',
-  'photographer': 'TECHNICIAN',
-  'agent': 'AGENT',
-  'admin': 'ADMIN',
-  'project_manager': 'PROJECT_MANAGER',
-  'editor': 'EDITOR',
+  DISPATCHER: 'DISPATCHER',
+  TECHNICIAN: 'TECHNICIAN',
+  AGENT: 'AGENT',
+  // Legacy/old mappings to new roles
+  ADMIN: 'DISPATCHER',
+  PROJECT_MANAGER: 'DISPATCHER',
+  EDITOR: 'DISPATCHER',
+  dispatcher: 'DISPATCHER',
+  technician: 'TECHNICIAN',
+  agent: 'AGENT',
+  admin: 'DISPATCHER',
+  project_manager: 'DISPATCHER',
+  editor: 'DISPATCHER',
 };
 
 /**
@@ -67,14 +68,9 @@ export function useRequireRole(
       } else {
         // Get the user's role dashboard path
         const getUserDashboardPath = (role: User['role']): string => {
-          if (role === 'ADMIN' || role === 'PROJECT_MANAGER' || role === 'EDITOR') {
-            return '/dashboard';
-          } else if (role === 'AGENT') {
-            return '/dashboard';
-          } else if (role === 'TECHNICIAN') {
-            return '/dashboard';
-          }
-          // Fallback to root if role is unknown
+          if (role === 'DISPATCHER') return '/dashboard';
+          if (role === 'AGENT') return '/dashboard';
+          if (role === 'TECHNICIAN') return '/dashboard';
           return '/';
         };
         

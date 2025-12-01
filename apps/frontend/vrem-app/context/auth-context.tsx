@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const storedOrg = api.organizations.getActiveOrganization();
           const personal = orgs.find(
             (m) =>
-              m.organization?.orgType === "PERSONAL" ||
+              m.organization?.type === "PERSONAL" ||
               (m.organization as any)?.type === "PERSONAL"
           );
           const resolvedOrgId =
@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMemberships(orgs);
       const personal = orgs.find(
         (m) =>
-          m.organization?.orgType === "PERSONAL" ||
+          m.organization?.type === "PERSONAL" ||
           (m.organization as any)?.type === "PERSONAL"
       );
       const resolvedOrgId =
@@ -120,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMemberships(orgs);
       const personal = orgs.find(
         (m) =>
-          m.organization?.orgType === "PERSONAL" ||
+          m.organization?.type === "PERSONAL" ||
           (m.organization as any)?.type === "PERSONAL"
       );
       const resolvedOrgId =
@@ -157,6 +157,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const switchOrganization = (orgId: string | null) => {
     setActiveOrganizationId(orgId);
     api.organizations.setActiveOrganization(orgId);
+    // Notify listeners (job context, etc.) that org changed
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("organizationChanged", { detail: { orgId } })
+      );
+    }
   };
 
   return (

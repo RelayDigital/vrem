@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Photographer } from '../../../types';
+import { Technician } from '../../../types';
 
-// Generate additional fake photographers for availability display
-function generateFakePhotographers(baseLocation: { lat: number; lng: number }): Photographer[] {
+// Generate additional fake technicians for availability display
+function generateFakeTechnicians(baseLocation: { lat: number; lng: number }): Technician[] {
   const fakeNames = [
     'Alex Chen', 'Jordan Smith', 'Taylor Williams', 'Morgan Brown', 'Casey Davis',
     'Riley Johnson', 'Quinn Miller', 'Sage Wilson', 'River Anderson', 'Phoenix Martinez',
@@ -77,7 +77,7 @@ function generateFakePhotographers(baseLocation: { lat: number; lng: number }): 
       status: 'active' as const,
       createdAt: new Date('2024-01-01'),
       avatar: `https://images.unsplash.com/photo-${1500000000000 + index}?w=400`,
-      bio: 'Professional photographer specializing in real estate media.',
+      bio: 'Professional technician specializing in real estate media.',
       services: {
         photography: true,
         video: Math.random() > 0.5,
@@ -156,7 +156,7 @@ export function LoginMapView() {
     };
   }, [userLocation]);
 
-  // Add photographer markers
+  // Add technician markers
   useEffect(() => {
     if (!mapRef.current || !isLoaded || !userLocation) return;
 
@@ -166,15 +166,15 @@ export function LoginMapView() {
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
 
-    // Only show fake photographers distributed around user's location
-    // This simulates the final version where only photographers near the user are shown (for confidentiality)
-    const allPhotographers = generateFakePhotographers(userLocation);
+    // Only show fake technicians distributed around user's location
+    // This simulates the final version where only technicians near the user are shown (for confidentiality)
+    const allTechnicians = generateFakeTechnicians(userLocation);
 
-    // Add markers for each photographer
-    allPhotographers.forEach((photographer) => {
-      if (!photographer.homeLocation) return;
+    // Add markers for each technician
+    allTechnicians.forEach((technician) => {
+      if (!technician.homeLocation) return;
 
-      const { lat, lng } = photographer.homeLocation;
+      const { lat, lng } = technician.homeLocation;
 
       // Create marker element - non-interactive
       const el = document.createElement('div');
@@ -220,12 +220,12 @@ export function LoginMapView() {
       markersRef.current.push(marker);
     });
 
-    // Fit map to show all photographers
-    if (allPhotographers.length > 0) {
+    // Fit map to show all technicians
+    if (allTechnicians.length > 0) {
       const bounds = new mapboxgl.LngLatBounds();
-      allPhotographers.forEach((photographer) => {
-        if (photographer.homeLocation) {
-          bounds.extend([photographer.homeLocation.lng, photographer.homeLocation.lat]);
+      allTechnicians.forEach((technician) => {
+        if (technician.homeLocation) {
+          bounds.extend([technician.homeLocation.lng, technician.homeLocation.lat]);
         }
       });
       // Also include user location

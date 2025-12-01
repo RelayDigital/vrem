@@ -1,21 +1,21 @@
 'use client';
 
 import { useEffect } from 'react';
-import { JobRequest, Photographer } from '../../../../types';
+import { JobRequest, Technician } from '../../../../types';
 import { MapWithSidebar } from '../../../shared/dashboard/MapWithSidebar';
 import { useSidebar } from '../../../ui/sidebar';
 import { useIsMobile } from '../../../ui/use-mobile';
 
 interface LiveJobMapViewProps {
   jobs: JobRequest[];
-  photographers: Photographer[];
+  technicians: Technician[];
   selectedJob: JobRequest | null;
   onSelectJob: (job: JobRequest) => void;
   onNavigateToJobInProjectManagement?: (job: JobRequest) => void;
-  onJobAssign?: (jobId: string, photographerId: string, score: number) => void;
+  onJobAssign?: (jobId: string, technicianId: string, score: number) => void;
   /**
    * When true, the view reserves space for the dispatcher sidebar by offsetting from the left.
-   * For photographer views (which have no sidebar), pass false to make the map full-width.
+   * For technician views (which have no sidebar), pass false to make the map full-width.
    * Defaults to true for dispatcher layouts.
    */
   hasSidebar?: boolean;
@@ -29,7 +29,7 @@ interface LiveJobMapViewProps {
 
 export function LiveJobMapView({
   jobs,
-  photographers,
+  technicians,
   selectedJob,
   onSelectJob,
   onNavigateToJobInProjectManagement,
@@ -98,7 +98,7 @@ export function LiveJobMapView({
     >
       <MapWithSidebar
         jobs={jobs}
-        photographers={photographers}
+        technicians={technicians}
         selectedJob={selectedJob}
         onSelectJob={onSelectJob}
         onNavigateToJobInProjectManagement={onNavigateToJobInProjectManagement}

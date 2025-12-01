@@ -58,7 +58,7 @@ export function CompanyCard({ company, onApply, isApplied = false, showApplyButt
             )}
             <div className="flex items-center gap-1">
               <User className="h-4 w-4 text-muted-foreground/60" />
-              <Small>{company.photographerCount} photographers</Small>
+              <Small>{company.technicianCount} technicians</Small>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">

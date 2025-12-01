@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { CalendarEvent } from "@/types/calendar";
-import { Photographer } from "@/types";
+import { Technician } from "@/types";
 import { TechnicianColor } from "@/types/calendar";
 import { CalendarEventPopover } from "./CalendarEventPopover";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ import { P } from "@/components/ui/typography";
 interface ListViewProps {
   currentDate: Date;
   events: CalendarEvent[];
-  technicians: Photographer[];
+  technicians: Technician[];
   technicianColors: TechnicianColor[];
   onEventClick: (event: CalendarEvent) => void;
 }

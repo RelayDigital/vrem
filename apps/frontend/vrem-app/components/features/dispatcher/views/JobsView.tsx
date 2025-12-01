@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { JobRequest, Photographer } from "../../../../types";
+import { JobRequest, Technician } from "../../../../types";
 import { ChatMessage } from "../../../../types/chat";
 import { JobCard, PaginatedJobGrid } from "../../../shared/jobs";
 import { JobKanbanBoard } from "../../../shared/kanban";
@@ -40,10 +40,10 @@ import { cn } from "../../../ui/utils";
 
 interface JobsViewProps {
   jobs: JobRequest[];
-  photographers: Photographer[];
+  technicians: Technician[];
   messages?: ChatMessage[];
   onViewRankings: (job: JobRequest) => void;
-  onChangePhotographer?: (job: JobRequest) => void; // For reassigning photographer
+  onChangeTechnician?: (job: JobRequest) => void; // For reassigning technician
   onJobStatusChange?: (jobId: string, newStatus: JobRequest["status"]) => void;
   onJobClick?: (job: JobRequest) => void;
   disableContextMenu?: boolean;
@@ -52,10 +52,10 @@ interface JobsViewProps {
 
 export function JobsView({
   jobs,
-  photographers,
+  technicians,
   messages = [],
   onViewRankings,
-  onChangePhotographer,
+  onChangeTechnician,
   onJobStatusChange,
   onJobClick,
   disableContextMenu = false,
@@ -286,16 +286,16 @@ export function JobsView({
                   return jobs.filter((j) => j.status === value);
                 }}
                 renderItem={(job, index, viewMode) => {
-                  const photographer = job.assignedPhotographerId
-                    ? photographers.find(
-                        (p) => p.id === job.assignedPhotographerId
+                  const technician = job.assignedTechnicianId
+                    ? technicians.find(
+                        (p) => p.id === job.assignedTechnicianId
                       )
                     : undefined;
                   return (
                     <JobCard
                       key={job.id}
                       job={job}
-                      photographer={photographer}
+                      technician={technician}
                       onViewRankings={
                         job.status === "pending" && onViewRankings
                           ? () => onViewRankings(job)
@@ -306,9 +306,9 @@ export function JobsView({
                   );
                 }}
                 renderTableRow={(job) => {
-                  const photographer = job.assignedPhotographerId
-                    ? photographers.find(
-                        (p) => p.id === job.assignedPhotographerId
+                  const technician = job.assignedTechnicianId
+                    ? technicians.find(
+                        (p) => p.id === job.assignedTechnicianId
                       )
                     : undefined;
                   const priorityConfig = getPriorityConfig(job.priority);
@@ -387,21 +387,21 @@ export function JobsView({
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {photographer ? (
+                        {technician ? (
                           <div className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
                               <AvatarImage
-                                src={photographer.avatar}
-                                alt={photographer.name}
+                                src={technician.avatar}
+                                alt={technician.name}
                               />
                               <AvatarFallback>
-                                {photographer.name
+                                {technician.name
                                   .split(" ")
                                   .map((n) => n[0])
                                   .join("")}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="text-sm">{photographer.name}</span>
+                            <span className="text-sm">{technician.name}</span>
                           </div>
                         ) : (
                           <span className="text-sm text-muted-foreground">
@@ -417,7 +417,7 @@ export function JobsView({
                               size="sm"
                               onClick={() => onViewRankings(job)}
                             >
-                              Find Photographer
+                              Find Technician
                             </Button>
                           )}
                           {onJobClick && (
@@ -513,10 +513,10 @@ export function JobsView({
                 <div className="flex-1 min-h-0">
                   <JobKanbanBoard
                     jobs={filteredAndSortedJobs}
-                    photographers={photographers}
+                    technicians={technicians}
                     messages={messages}
                     onViewRankings={onViewRankings}
-                    onChangePhotographer={onChangePhotographer}
+                    onChangeTechnician={onChangeTechnician}
                     onJobStatusChange={onJobStatusChange}
                     onJobClick={onJobClick}
                     disableContextMenu={disableContextMenu}

@@ -2,20 +2,20 @@
 
 import { useState } from 'react';
 import { AgentBookingFlow } from '../agent';
-import { Photographer, Organization, JobRequest } from '../../../types';
+import { Technician, Organization, JobRequest } from '../../../types';
 import {
   HeroSection,
   FeaturesSection,
   HowItWorksSection,
   StatsSection,
-  ForPhotographersSection,
+  ForTechniciansSection,
   ForCompaniesSection,
   CTASection,
   FooterSection,
 } from './sections';
 
 interface LandingPageProps {
-  photographers: Photographer[];
+  technicians: Technician[];
   companies: Organization[];
   preferredVendors: string[];
   onJobCreate: (job: Partial<JobRequest>) => void;
@@ -25,7 +25,7 @@ interface LandingPageProps {
 }
 
 export function LandingPage({
-  photographers,
+  technicians,
   companies,
   preferredVendors,
   onJobCreate,
@@ -42,7 +42,7 @@ export function LandingPage({
   if (bookingData) {
     return (
       <AgentBookingFlow
-        technicians={photographers}
+        technicians={technicians}
         companies={companies}
         preferredVendors={preferredVendors}
         onJobCreate={(job) => {
@@ -72,7 +72,7 @@ export function LandingPage({
       <FeaturesSection />
       <HowItWorksSection />
       <StatsSection />
-      <ForPhotographersSection 
+      <ForTechniciansSection 
         onGetStarted={onGetStarted}
         onBookShoot={handleBookShoot}
       />

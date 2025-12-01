@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Card,
@@ -21,24 +21,35 @@ import {
   Briefcase,
   ArrowRight,
 } from "lucide-react";
-import { H2, Muted } from "@/components/ui/typography";
+import { H2, H3, Muted } from "@/components/ui/typography";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrganizationSettings } from "@/hooks/useOrganizationSettings";
 import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
+import { useJobManagement } from "@/context/JobManagementContext";
+import { api } from "@/lib/api";
 
 export default function OrganizationByIdPage() {
   const params = useParams();
   const orgId = params?.orgId as string | undefined;
-  const { setActiveOrganization, activeOrganizationId } = useCurrentOrganization();
+  const { setActiveOrganization, activeOrganizationId } =
+    useCurrentOrganization();
   const { organization, isLoading, error } = useOrganizationSettings(orgId);
   const router = useRouter();
+  const jobManagement = useJobManagement();
 
   // keep active org in sync
-  if (orgId && orgId !== activeOrganizationId) {
-    setActiveOrganization(orgId);
-  }
+  useEffect(() => {
+    const syncOrg = async () => {
+      if (!orgId) return;
+      // Always push the route orgId into auth/api storage so requests include it
+      setActiveOrganization(orgId);
+      api.organizations.setActiveOrganization(orgId);
+      await jobManagement.refreshJobs();
+    };
+    void syncOrg();
+  }, [orgId, setActiveOrganization, jobManagement]);
 
   const isLoadingOrg = isLoading || (!organization && !error);
   const orgType = useMemo(
@@ -131,8 +142,91 @@ export default function OrganizationByIdPage() {
           )}
         </div>
 
-        {/* Quick Actions */}
+        {/* Organization Info Card */}
         <div className="@container w-full">
+          {/* Heading and button */}
+          <div className="mb-md flex items-baseline justify-between">
+            <H2 className="text-lg border-0">Organization Information</H2>
+            <Button
+              variant="flat"
+              className="px-0"
+              onClick={() => router.push(`/organization/${orgId}/settings`)}
+            >
+              Edit Organization Settings
+            </Button>
+          </div>
+
+          {/* Organization Info Grid */}
+          {isLoadingOrg ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={`org-info-skeleton-${index}`} className="space-y-2">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-5 w-32" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <div className="text-sm font-medium text-muted-foreground mb-1">
+                  Organization Name
+                </div>
+                <div className="text-base">{organization?.name}</div>
+              </div>
+              {orgType && (
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">
+                    Type
+                  </div>
+                  <div className="text-base capitalize">
+                    {orgType.replace("_", " ")}
+                  </div>
+                </div>
+              )}
+              {(city || region || postalCode) && (
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">
+                    Location
+                  </div>
+                  <div className="text-base">{address}</div>
+                </div>
+              )}
+              {(organization as any)?.timezone && (
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">
+                    Timezone
+                  </div>
+                  <div className="text-base">
+                    {(organization as any).timezone}
+                  </div>
+                </div>
+              )}
+              {(organization as any)?.primaryEmail && (
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">
+                    Primary Email
+                  </div>
+                  <div className="text-base">
+                    {(organization as any).primaryEmail}
+                  </div>
+                </div>
+              )}
+              {(organization as any)?.phone && (
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">
+                    Phone
+                  </div>
+                  <div className="text-base">{(organization as any).phone}</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="@container w-full mb-md">
+          {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-lg border-0">Quick Actions</H2>
           </div>
@@ -151,146 +245,71 @@ export default function OrganizationByIdPage() {
               <>
                 <Card className="hover:border-primary/50 transition-colors cursor-pointer group">
                   <Link href={`/organization/${orgId}/settings`}>
-                    <CardHeader>
+                    <CardHeader className="pb-6">
                       <div className="flex items-center justify-between">
-                        <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
-                          <Settings className="size-5 text-primary" />
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                            <Settings className="size-5 text-primary" />
+                          </div>
+                          <H3 className="text-lg">Organization Settings</H3>
                         </div>
                         <ArrowRight className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
                       </div>
-                      <CardTitle className="text-lg">
-                        Organization Settings
-                      </CardTitle>
-                      <CardDescription>
-                        Manage your organization's details, branding, and preferences
-                      </CardDescription>
                     </CardHeader>
+                    <CardContent>
+                      <CardDescription>
+                        Manage your organization's details, branding, and
+                        preferences
+                      </CardDescription>
+                    </CardContent>
                   </Link>
                 </Card>
 
                 <Card className="hover:border-primary/50 transition-colors cursor-pointer group">
                   <Link href="/dashboard">
-                    <CardHeader>
+                    <CardHeader className="pb-6">
                       <div className="flex items-center justify-between">
-                        <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
-                          <Briefcase className="size-5 text-primary" />
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                            <Briefcase className="size-5 text-primary" />
+                          </div>
+                          <H3 className="text-lg">Dashboard</H3>
                         </div>
                         <ArrowRight className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
                       </div>
-                      <CardTitle className="text-lg">Dashboard</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                       <CardDescription>
                         View jobs, metrics, and manage your workflow
                       </CardDescription>
-                    </CardHeader>
+                    </CardContent>
                   </Link>
                 </Card>
 
-                <Card className="hover:border-primary/50 transition-colors cursor-pointer group">
-                  <Link href="/team">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
-                          <Users className="size-5 text-primary" />
+                {organization?.type === "COMPANY" && (
+                  <Card className="hover:border-primary/50 transition-colors cursor-pointer group">
+                    <Link href="/team">
+                      <CardHeader className="pb-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                              <Users className="size-5 text-primary" />
+                            </div>
+                            <H3 className="text-lg">Team Members</H3>
+                          </div>
+                          <ArrowRight className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
                         </div>
-                        <ArrowRight className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                      </div>
-                      <CardTitle className="text-lg">Team Members</CardTitle>
-                      <CardDescription>
-                        View and manage your organization's team
-                      </CardDescription>
-                    </CardHeader>
-                  </Link>
-                </Card>
+                      </CardHeader>
+                      <CardContent>
+                        <CardDescription>
+                          View and manage your organization's team
+                        </CardDescription>
+                      </CardContent>
+                    </Link>
+                  </Card>
+                )}
               </>
             )}
-          </div>
-        </div>
-
-        {/* Organization Info Card */}
-        <div className="@container w-full mb-md">
-          <div className="mb-md flex items-baseline justify-between">
-            <H2 className="text-lg border-0">Organization Information</H2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardContent>
-                {isLoadingOrg ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {Array.from({ length: 6 }).map((_, index) => (
-                      <div key={`org-info-skeleton-${index}`} className="space-y-2">
-                        <Skeleton className="h-3 w-24" />
-                        <Skeleton className="h-5 w-32" />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <div className="text-sm font-medium text-muted-foreground mb-1">
-                        Organization Name
-                      </div>
-                      <div className="text-base">{organization?.name}</div>
-                    </div>
-                    {orgType && (
-                      <div>
-                        <div className="text-sm font-medium text-muted-foreground mb-1">
-                          Type
-                        </div>
-                        <div className="text-base capitalize">
-                          {orgType.replace("_", " ")}
-                        </div>
-                      </div>
-                    )}
-                    {(city || region || postalCode) && (
-                      <div>
-                        <div className="text-sm font-medium text-muted-foreground mb-1">
-                          Location
-                        </div>
-                        <div className="text-base">{address}</div>
-                      </div>
-                    )}
-                    {(organization as any)?.timezone && (
-                      <div>
-                        <div className="text-sm font-medium text-muted-foreground mb-1">
-                          Timezone
-                        </div>
-                        <div className="text-base">
-                          {(organization as any).timezone}
-                        </div>
-                      </div>
-                    )}
-                    {(organization as any)?.primaryEmail && (
-                      <div>
-                        <div className="text-sm font-medium text-muted-foreground mb-1">
-                          Primary Email
-                        </div>
-                        <div className="text-base">
-                          {(organization as any).primaryEmail}
-                        </div>
-                      </div>
-                    )}
-                    {(organization as any)?.phone && (
-                      <div>
-                        <div className="text-sm font-medium text-muted-foreground mb-1">
-                          Phone
-                        </div>
-                        <div className="text-base">
-                          {(organization as any).phone}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className="mt-6 pt-6 border-t">
-                  <Button asChild variant="outline" disabled={isLoadingOrg}>
-                    <Link href={`/organization/${orgId}/settings`}>
-                      <Settings className="size-4 mr-2" />
-                      Edit Organization Settings
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       </article>

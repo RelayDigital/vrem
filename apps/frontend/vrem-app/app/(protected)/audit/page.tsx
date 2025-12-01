@@ -10,7 +10,7 @@ import { TeamLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadi
 export default function AuditPage() {
   const { user, isLoading } = useRequireRole([
     "dispatcher",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
     "EDITOR",
   ]);

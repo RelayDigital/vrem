@@ -7,7 +7,7 @@ import {
 
 const stats = [
   { value: '10,000+', label: 'Shoots Completed', icon: Camera },
-  { value: '500+', label: 'Professional Photographers', icon: Users },
+  { value: '500+', label: 'Professional Technicians', icon: Users },
   { value: '98%', label: 'Client Satisfaction', icon: Star },
   { value: '24/7', label: 'Platform Availability', icon: Clock },
 ];

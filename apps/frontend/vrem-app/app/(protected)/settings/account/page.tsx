@@ -15,7 +15,7 @@ export default function AccountPage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const [email, setEmail] = useState(user?.email || "");

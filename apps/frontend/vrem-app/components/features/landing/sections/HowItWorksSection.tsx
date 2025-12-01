@@ -23,9 +23,9 @@ const steps = [
   },
   {
     step: '03',
-    title: 'Choose Your Photographer',
+    title: 'Choose Your Technician',
     description:
-      'Review AI-matched photographers or search for specific ones you prefer.',
+      'Review AI-matched technicians or search for specific ones you prefer.',
     icon: CheckCircle2,
   },
 ];

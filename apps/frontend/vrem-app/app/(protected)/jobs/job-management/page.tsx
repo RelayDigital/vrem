@@ -25,7 +25,7 @@ export default function JobManagementPage() {
   const router = useRouter();
   const { user, isLoading } = useRequireRole([
     "dispatcher",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
     "EDITOR",
   ]);
@@ -57,7 +57,10 @@ export default function JobManagementPage() {
   // Fetch messages when selected job changes
   useEffect(() => {
     if (jobManagement.selectedJob) {
-      messaging.fetchMessages(jobManagement.selectedJob.id);
+      messaging.fetchMessages(
+        jobManagement.selectedJob.id,
+        (jobManagement.selectedJob as any)?.organizationId
+      );
     }
   }, [jobManagement.selectedJob, messaging]);
 
@@ -90,8 +93,8 @@ export default function JobManagementPage() {
     );
   };
 
-  // Empty photographers array - backend will provide when endpoint is ready
-  const photographers: any[] = [];
+  // Empty technicians array - backend will provide when endpoint is ready
+  const technicians: any[] = [];
 
   return (
     <div className="size-full overflow-x-hidden flex flex-col h-[calc(100vh-var(--header-h))]">
@@ -117,10 +120,10 @@ export default function JobManagementPage() {
       <JobDataBoundary fallback={<JobsGridSkeleton />}>
         <JobsView
           jobs={jobManagement.jobs}
-          photographers={photographers}
+          technicians={technicians}
           messages={messaging.messages}
           onViewRankings={handleViewRankings}
-          onChangePhotographer={handleViewRankings}
+          onChangeTechnician={handleViewRankings}
           onJobStatusChange={handleJobStatusChangeWrapper}
           onJobClick={handleJobClick}
           activeView="kanban"
@@ -130,7 +133,7 @@ export default function JobManagementPage() {
       {/* Job Task View - Sheet */}
       <JobTaskView
         job={jobManagement.selectedJob}
-        photographer={undefined}
+        // technician={undefined}
         messages={
           jobManagement.selectedJob
             ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
@@ -158,8 +161,8 @@ export default function JobManagementPage() {
             handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
           }
         }}
-        onAssignPhotographer={jobManagement.handleAssignPhotographer}
-        onChangePhotographer={jobManagement.handleChangePhotographer}
+        onAssignTechnician={jobManagement.handleAssignTechnician}
+        onChangeTechnician={jobManagement.handleChangeTechnician}
       />
     </div>
   );

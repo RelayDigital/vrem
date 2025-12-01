@@ -35,7 +35,7 @@ interface OrganizationSwitcherProps {
   showManage?: boolean;
   showJoin?: boolean;
   onOrgHome?: () => void;
-  accountType?: "dispatcher" | "photographer";
+  accountType?: "dispatcher" | "technician";
 }
 
 export function OrganizationSwitcher({
@@ -53,7 +53,7 @@ export function OrganizationSwitcher({
     () =>
       memberships.find(
         (m) =>
-          m.organization?.orgType === "PERSONAL" ||
+          m.organization?.type === "PERSONAL" ||
           (m.organization as any)?.type === "PERSONAL"
       ),
     [memberships]
@@ -65,7 +65,7 @@ export function OrganizationSwitcher({
         (m) =>
           !(
             includePersonal &&
-            (m.organization?.orgType === "PERSONAL" ||
+            (m.organization?.type === "PERSONAL" ||
               (m.organization as any)?.type === "PERSONAL")
           )
       ),
@@ -177,9 +177,9 @@ export function OrganizationSwitcher({
                 <span className="text-sm font-medium truncate">
                   Personal dashboard
                 </span>
-                <span className="text-xs text-muted-foreground capitalize truncate">
+                {/* <span className="text-xs text-muted-foreground capitalize truncate">
                   Marketplace view
-                </span>
+                </span> */}
               </div>
               {activeOrganizationId === personalOrg?.orgId && (
                 <Check className="size-4 text-primary ml-auto shrink-0" />

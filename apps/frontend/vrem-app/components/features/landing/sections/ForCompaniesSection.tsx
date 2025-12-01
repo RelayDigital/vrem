@@ -15,7 +15,7 @@ interface ForCompaniesSectionProps {
 
 const benefits = [
   'AI-powered job assignment and routing',
-  'Real-time tracking and photographer availability',
+  'Real-time tracking and technician availability',
   'Performance metrics and reliability scores',
   'Multi-tenant architecture for enterprise teams',
   'Complete audit trail and accountability',
@@ -52,7 +52,7 @@ export function ForCompaniesSection({ onGetStarted, onBookShoot }: ForCompaniesS
               Streamline your operations
             </H2>
             <P className="text-lg text-muted-foreground">
-              Manage your photographer network, dispatch jobs intelligently, and track
+              Manage your technician network, dispatch jobs intelligently, and track
               performance with powerful analytics.
             </P>
             <div className="space-y-4">

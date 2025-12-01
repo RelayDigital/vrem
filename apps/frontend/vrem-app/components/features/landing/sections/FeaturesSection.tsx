@@ -15,7 +15,7 @@ const features = [
     icon: Sparkles,
     title: 'AI-Powered Matching',
     description:
-      'Advanced algorithms rank photographers by availability, location, reliability, and your preferred vendors.',
+      'Advanced algorithms rank technicians by availability, location, reliability, and your preferred vendors.',
     color: '',
   },
   {
@@ -29,21 +29,21 @@ const features = [
     icon: Shield,
     title: 'Quality Guaranteed',
     description:
-      'Every photographer is vetted, rated, and tracked. See reliability scores before you book.',
+      'Every technician is vetted, rated, and tracked. See reliability scores before you book.',
     color: '',
   },
   {
     icon: MapPin,
     title: 'Location-Optimized',
     description:
-      'Get photographers who are closest to your property for faster service and lower costs.',
+      'Get technicians who are closest to your property for faster service and lower costs.',
     color: '',
   },
   {
     icon: TrendingUp,
     title: 'Fair Pricing',
     description:
-      'No race-to-the-bottom bidding. Professional rates that respect photographer expertise.',
+      'No race-to-the-bottom bidding. Professional rates that respect technician expertise.',
     color: '',
   },
   {
@@ -67,7 +67,7 @@ export function FeaturesSection() {
             The smartest way to book photography
           </H2>
           <P className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Our AI-powered platform matches you with the perfect photographer based on
+            Our AI-powered platform matches you with the perfect technician based on
             availability, proximity, reliability, and your preferences.
           </P>
         </div>

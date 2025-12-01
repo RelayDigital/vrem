@@ -319,7 +319,7 @@ export function PaginatedJobGrid<T>({
                   <TableHead>Media Types</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Photographer</TableHead>
+                  <TableHead>Technician</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>

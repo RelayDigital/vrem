@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { JobRequest, Technician, Photographer } from '../../../types';
+import { JobRequest, Technician } from '../../../types';
 import { AlertCircle, User, Home } from 'lucide-react';
 import { Small, Muted } from '../../ui/typography';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,23 +14,20 @@ import { useTheme } from 'next-themes';
 
 interface MapViewProps {
   jobs: JobRequest[];
-  photographers?: Photographer[]; // Deprecated: use technicians
   technicians?: Technician[];
   selectedJob?: JobRequest | null;
-  selectedPhotographer?: Photographer | null; // Deprecated: use selectedTechnician
-  selectedTechnician?: Technician | null;
+  selectedTechnician?: Technician | null; // Deprecated: use selectedTechnician
   disablePopovers?: boolean;
 }
 
-export function MapView({ jobs, photographers, technicians, selectedJob, selectedPhotographer, selectedTechnician, disablePopovers = false }: MapViewProps) {
-  // Use technicians if provided, fallback to photographers for backwards compatibility
-  const effectiveTechnicians = technicians || photographers || [];
-  const effectiveSelectedTechnician = selectedTechnician || selectedPhotographer || null;
+export function MapView({ jobs, technicians, selectedJob, selectedTechnician, disablePopovers = false }: MapViewProps) {
+  const effectiveTechnicians = technicians || [];
+  const effectiveSelectedTechnician = selectedTechnician || null;
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const popupsRef = useRef<mapboxgl.Popup[]>([]);
-  const photographerPopupsRef = useRef<Map<string, mapboxgl.Popup>>(new Map());
+  const technicianPopupsRef = useRef<Map<string, mapboxgl.Popup>>(new Map());
   const jobMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const jobPopupsRef = useRef<Map<string, mapboxgl.Popup>>(new Map());
   const animationIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -417,7 +414,7 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
     popupsRef.current.forEach((popup) => popup.remove());
     markersRef.current = [];
     popupsRef.current = [];
-    photographerPopupsRef.current.clear();
+    technicianPopupsRef.current.clear();
     jobMarkersRef.current.clear();
     jobPopupsRef.current.clear();
 
@@ -437,7 +434,7 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
       };
       const priorityBg = priorityBgMap[job.priority] || getMutedBackgroundColor();
 
-      // Only show images for delivered jobs (when photographer has completed the job)
+      // Only show images for delivered jobs (when technician has completed the job)
       const hasImage = !!(job.propertyImage && job.propertyImage.trim() !== '' && job.status === 'delivered');
 
       return `
@@ -548,8 +545,8 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
         }, 2000);
       }
 
-      const assignedId = job.assignedTechnicianId || job.assignedPhotographerId;
-      const assignedPhotographer = assignedId ? effectiveTechnicians.find((p) => p.id === assignedId) : undefined;
+      const assignedId = job.assignedTechnicianId || job.assignedTechnicianId;
+      const assignedTechnician = assignedId ? effectiveTechnicians.find((p) => p.id === assignedId) : undefined;
       const statusLabel = job.status === 'in_progress' ? 'In Progress' : 'Assigned';
 
       const statusKey = job.status === 'assigned' ? 'assigned' : 'in-progress';
@@ -558,11 +555,11 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
       // Use the status color itself for text (not foreground) to ensure good contrast on light background
       const assignedText = assignedColor || getTextColor();
       const popupContent = createJobPopupContent(job, statusLabel, assignedBg, assignedText);
-      const popupContentWithPhotographer = assignedPhotographer
+      const popupContentWithTechnician = assignedTechnician
         ? popupContent.replace(
           `<div style="font-size: 13px; color: ${getMutedTextColor()}; margin-bottom: 8px;">`,
           `<div style="font-size: 13px; color: ${getMutedTextColor()}; margin-bottom: 8px;">
-              <strong>Photographer:</strong> ${assignedPhotographer.name}
+              <strong>Technician:</strong> ${assignedTechnician.name}
             </div>
             <div style="font-size: 13px; color: ${getMutedTextColor()}; margin-bottom: 8px;">`
         )
@@ -574,7 +571,7 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
 
       const popup = new mapboxgl.Popup({ offset: 25, closeButton: false, closeOnClick: true })
         .setLngLat(lngLat)
-        .setHTML(popupContentWithPhotographer)
+        .setHTML(popupContentWithTechnician)
         .setMaxWidth('280px');
 
       if (!disablePopovers) {
@@ -651,18 +648,18 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
       jobPopupsRef.current.set(job.id, popup);
     });
 
-    // Create markers for photographers
-    effectiveTechnicians.forEach((photographer) => {
-      const lngLat = [photographer.homeLocation.lng, photographer.homeLocation.lat] as [number, number];
+    // Create markers for technicians
+    effectiveTechnicians.forEach((technician) => {
+      const lngLat = [technician.homeLocation.lng, technician.homeLocation.lat] as [number, number];
       bounds.extend(lngLat);
 
       const today = new Date().toISOString().split('T')[0];
       const isAvailable =
-        photographer.availability.find((a) => a.date === today)?.available || false;
+        technician.availability.find((a) => a.date === today)?.available || false;
 
-      // Use neutral color for photographer markers
-      const photographerColor = getCSSVar('--muted-foreground') || '#6b7280';
-      const el = createIconElement(User, photographerColor, 32);
+      // Use neutral color for technician markers
+      const technicianColor = getCSSVar('--muted-foreground') || '#6b7280';
+      const el = createIconElement(User, technicianColor, 32);
 
       // Keep availableColor for popup styling (availability badges, etc.)
       const availableColor = isAvailable ? getStatusColor('delivered') : getStatusColor('cancelled');
@@ -684,20 +681,20 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
       const popupContent = `
           <div style="display: flex; align-items: stretch; min-width: 280px; max-width: 340px; border-radius: 8px; overflow: hidden;">
             <div style="width: 64px; min-width: 64px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 12px; background: ${getMutedBackgroundColor()};">
-              ${photographer.avatar ? `
-                <img src="${photographer.avatar}" alt="${photographer.name}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid ${availableColor};" />
+              ${technician.avatar ? `
+                <img src="${technician.avatar}" alt="${technician.name}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid ${availableColor};" />
               ` : `
                 <div style="width: 40px; height: 40px; border-radius: 50%; background: ${isAvailable ? deliveredBg : cancelledBg}; display: flex; align-items: center; justify-content: center; border: 2px solid ${availableColor}; color: ${isAvailable ? deliveredText : cancelledText}; font-weight: 600; font-size: 16px;">
-                  ${photographer.name.split(' ').map(n => n[0]).join('')}
+                  ${technician.name.split(' ').map(n => n[0]).join('')}
                 </div>
               `}
               <div style="margin-top: 6px; display: flex; flex-direction: column; align-items: center; gap: 3px;">
                 <span style="padding: 1px 5px; background: ${isAvailable ? deliveredBg : cancelledBg}; color: ${isAvailable ? deliveredText : cancelledText}; border-radius: 3px; font-size: 8px; font-weight: 500;">
                   ${isAvailable ? 'Available' : 'Unavailable'}
                 </span>
-                ${photographer.rating.overall ? `
+                ${technician.rating.overall ? `
                   <span style="padding: 1px 5px; background: ${rushBg}; color: ${rushText}; border-radius: 3px; font-size: 8px; font-weight: 500;">
-                    ⭐ ${photographer.rating.overall}
+                    ⭐ ${technician.rating.overall}
                   </span>
                 ` : ''}
               </div>
@@ -705,18 +702,18 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
             
             <div style="padding: 10px; flex: 1; display: flex; flex-direction: column; justify-content: center;">
               <div style="font-size: 13px; font-weight: 600; color: ${getTextColor()}; margin-bottom: 3px; line-height: 1.2;">
-                ${photographer.name}
+                ${technician.name}
               </div>
               
               <div style="font-size: 10px; color: ${getMutedTextColor()}; margin-bottom: 3px;">
-                <span style="font-weight: 500;">Location:</span> ${getLocationDisplay(photographer.homeLocation.address, true)}
+                <span style="font-weight: 500;">Location:</span> ${getLocationDisplay(technician.homeLocation.address, true)}
               </div>
               
-              ${photographer.companyName ? `
+              ${technician.companyName ? `
                 <div style="font-size: 10px; color: ${getMutedTextColor()}; margin-bottom: 3px;">
-                  <span style="font-weight: 500;">Company:</span> ${photographer.companyName}
+                  <span style="font-weight: 500;">Company:</span> ${technician.companyName}
                 </div>
-              ` : photographer.isIndependent ? `
+              ` : technician.isIndependent ? `
                 <div style="font-size: 10px; color: ${getMutedTextColor()}; margin-bottom: 3px;">
                   <span style="font-weight: 500;">Status:</span> Independent
                 </div>
@@ -724,22 +721,22 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
               
               <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-top: 6px; padding-top: 6px; border-top: 1px solid ${getCSSVar('--border') || '#e5e7eb'};">
                 <div style="text-align: center;">
-                  <div style="font-size: 12px; font-weight: 600; color: ${getTextColor()};">${photographer.reliability.totalJobs}</div>
+                  <div style="font-size: 12px; font-weight: 600; color: ${getTextColor()};">${technician.reliability.totalJobs}</div>
                   <div style="font-size: 8px; color: ${getMutedTextColor()};">Jobs</div>
                 </div>
                 <div style="text-align: center;">
-                  <div style="font-size: 12px; font-weight: 600; color: ${getTextColor()};">${(photographer.reliability.onTimeRate * 100).toFixed(0)}%</div>
+                  <div style="font-size: 12px; font-weight: 600; color: ${getTextColor()};">${(technician.reliability.onTimeRate * 100).toFixed(0)}%</div>
                   <div style="font-size: 8px; color: ${getMutedTextColor()};">On-Time</div>
                 </div>
                 <div style="text-align: center;">
-                  <div style="font-size: 12px; font-weight: 600; color: ${getTextColor()};">${photographer.rating.overall}</div>
+                  <div style="font-size: 12px; font-weight: 600; color: ${getTextColor()};">${technician.rating.overall}</div>
                   <div style="font-size: 8px; color: ${getMutedTextColor()};">Rating</div>
                 </div>
               </div>
               
-              ${photographer.bio ? `
+              ${technician.bio ? `
                 <div style="font-size: 9px; color: ${getMutedTextColor()}; margin-top: 6px; padding-top: 6px; border-top: 1px solid ${getCSSVar('--border') || '#e5e7eb'}; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                  ${photographer.bio}
+                  ${technician.bio}
                 </div>
               ` : ''}
             </div>
@@ -778,7 +775,7 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
 
       markersRef.current.push(marker);
       popupsRef.current.push(popup);
-      photographerPopupsRef.current.set(photographer.id, popup);
+      technicianPopupsRef.current.set(technician.id, popup);
     });
 
     // Fit bounds to show all markers
@@ -794,7 +791,7 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
         map.setZoom(15);
       }
     }
-  }, [mapRef.current, isLoaded, jobs, photographers, selectedJob]);
+  }, [mapRef.current, isLoaded, jobs, technicians, selectedJob]);
 
   // Handle job selection: highlight marker and open popup
   useEffect(() => {
@@ -863,7 +860,7 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
     }
   }, [mapRef.current, isLoaded, selectedJob?.id]);
 
-  // Draw polyline from selected photographer to job location
+  // Draw polyline from selected technician to job location
   useEffect(() => {
     if (!mapRef.current || !isLoaded || !effectiveSelectedTechnician || !selectedJob) {
       if (animationIntervalRef.current) {
@@ -892,14 +889,14 @@ export function MapView({ jobs, photographers, technicians, selectedJob, selecte
     }
 
     const map = mapRef.current;
-    const photographerLngLat: [number, number] = [
+    const technicianLngLat: [number, number] = [
       effectiveSelectedTechnician.homeLocation.lng,
       effectiveSelectedTechnician.homeLocation.lat,
     ];
     const jobLngLat: [number, number] = [selectedJob.location.lng, selectedJob.location.lat];
 
     // Use Mapbox Directions API
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${photographerLngLat[0]},${photographerLngLat[1]};${jobLngLat[0]},${jobLngLat[1]}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
+    const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${technicianLngLat[0]},${technicianLngLat[1]};${jobLngLat[0]},${jobLngLat[1]}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
 
     let isCancelled = false;
 

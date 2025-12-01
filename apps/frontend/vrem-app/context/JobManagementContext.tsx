@@ -18,7 +18,7 @@ interface JobManagementContextType {
   updateJob: (jobId: string, updates: Partial<Project>) => void;
 
   // Job handlers
-  assignJob: (jobId: string, photographerId: string, score: number) => void;
+  assignJob: (jobId: string, technicianId: string, score: number) => void;
   changeJobStatus: (jobId: string, newStatus: ProjectStatus) => void;
   createJob: (job: Partial<Project>) => Promise<Project>;
 
@@ -42,9 +42,9 @@ interface JobManagementContextType {
   handleTaskViewClose: (open: boolean) => void;
   handleTaskDialogClose: (open: boolean) => void;
 
-  // Photographer assignment handlers
-  handleAssignPhotographer: () => void;
-  handleChangePhotographer: () => void;
+  // Technician assignment handlers
+  handleAssignTechnician: () => void;
+  handleChangeTechnician: () => void;
 }
 
 const JobManagementContext = createContext<JobManagementContextType | undefined>(undefined);
@@ -54,11 +54,15 @@ export function JobManagementProvider({
   defaultUserId,
   defaultOrganizationId,
   initialProjects,
+  userRole,
+  memberRole,
 }: {
   children: ReactNode;
   defaultUserId?: string;
   defaultOrganizationId?: string;
   initialProjects?: Project[];
+  userRole?: string;
+  memberRole?: string | null;
 }) {
   const normalizeProjects = useCallback((items: Project[]) => {
     return items.map((p) => ({
@@ -97,12 +101,21 @@ export function JobManagementProvider({
     setIsLoadingJobs(true);
     setJobsError(null);
 
-    if (defaultOrganizationId) {
+    const activeOrgId = api.organizations.getActiveOrganization();
+    if (!activeOrgId && defaultOrganizationId) {
       api.organizations.setActiveOrganization(defaultOrganizationId);
     }
 
     try {
-      const fetchedProjects = await api.projects.listForCurrentUser();
+    const userRoleUpper = (userRole || '').toUpperCase();
+    const memberRoleUpper = (memberRole || '').toUpperCase();
+    const isOrgManager = ['OWNER', 'ADMIN', 'DISPATCHER', 'PROJECT_MANAGER'].includes(
+      memberRoleUpper || userRoleUpper
+    );
+
+    const fetchedProjects = isOrgManager
+      ? await api.projects.listForOrg()
+      : await api.projects.listForCurrentUser();
       // Ensure dates are Date objects
       const projectsWithDates = normalizeProjects(fetchedProjects);
       setProjects(projectsWithDates);
@@ -117,6 +130,21 @@ export function JobManagementProvider({
 
   useEffect(() => {
     fetchJobs();
+  }, [fetchJobs]);
+
+  // Reload jobs when organization changes (event fired by auth context)
+  useEffect(() => {
+    const handleOrgChange = () => {
+      fetchJobs();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('organizationChanged', handleOrgChange as EventListener);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('organizationChanged', handleOrgChange as EventListener);
+      }
+    };
   }, [fetchJobs]);
 
   const upsertProject = useCallback((project: Project) => {
@@ -168,18 +196,18 @@ export function JobManagementProvider({
 
   const assignJob = useCallback((
     jobId: string,
-    photographerId: string,
+    technicianId: string,
     score: number
   ) => {
     (async () => {
       try {
-        const updatedProject = await api.projects.assignTechnician(jobId, photographerId);
+        const updatedProject = await api.projects.assignTechnician(jobId, technicianId);
         updateJob(jobId, updatedProject);
         setShowRankings(false);
         setSelectedJob(null);
         toast.success('Technician assigned successfully');
         window.dispatchEvent(new CustomEvent('jobAssigned', {
-          detail: { jobId, photographerId, score }
+          detail: { jobId, technicianId, score }
         }));
       } catch (error) {
         console.error('Failed to assign technician', error);
@@ -288,7 +316,7 @@ export function JobManagementProvider({
     }
   }, [closeTaskDialog]);
 
-  const handleAssignPhotographer = useCallback(() => {
+  const handleAssignTechnician = useCallback(() => {
     if (selectedJob) {
       // Store the job before closing task view
       const jobToRank = selectedJob;
@@ -300,7 +328,7 @@ export function JobManagementProvider({
     }
   }, [selectedJob]);
 
-  const handleChangePhotographer = useCallback(() => {
+  const handleChangeTechnician = useCallback(() => {
     if (selectedJob) {
       // Store the job before closing task views
       const jobToRank = selectedJob;
@@ -346,8 +374,8 @@ export function JobManagementProvider({
         closeTaskDialog,
         handleTaskViewClose,
         handleTaskDialogClose,
-        handleAssignPhotographer,
-        handleChangePhotographer,
+        handleAssignTechnician,
+        handleChangeTechnician,
       }}
     >
       {children}

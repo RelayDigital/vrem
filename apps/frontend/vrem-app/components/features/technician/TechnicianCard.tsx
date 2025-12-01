@@ -1,4 +1,4 @@
-import { Photographer, PhotographerRanking } from "../../../types";
+import { Technician, TechnicianRanking } from "../../../types";
 import {
   Card,
   CardHeader,
@@ -28,9 +28,9 @@ import { Separator } from "@/components/ui/separator";
 import { getLocationDisplay } from "../../../lib/utils";
 import { P } from '../../ui/typography';
 
-interface PhotographerCardProps {
-  photographer: Photographer;
-  ranking?: PhotographerRanking["factors"];
+interface TechnicianCardProps {
+  technician: Technician;
+  ranking?: TechnicianRanking["factors"];
   score?: number;
   recommended?: boolean;
   onAssign?: () => void;
@@ -44,15 +44,15 @@ const scoreChartConfig = {
   },
 } satisfies ChartConfig;
 
-export function PhotographerCard({
-  photographer,
+export function TechnicianCard({
+  technician,
   ranking,
   score,
   recommended,
   onAssign,
   onClick,
   showFullAddress = false, // Default to false (only show city/state/country)
-}: PhotographerCardProps) {
+}: TechnicianCardProps) {
   const getScoreColor = (s: number) => {
     if (s >= 80) return "hsl(142, 76%, 36%)"; // emerald-600
     if (s >= 60) return "hsl(38, 92%, 50%)"; // amber-500
@@ -61,7 +61,7 @@ export function PhotographerCard({
 
   const isAvailable = ranking ? ranking.availability === 100 : true;
 
-  const displayAddress = getLocationDisplay(photographer.homeLocation.address, showFullAddress);
+  const displayAddress = getLocationDisplay(technician.homeLocation.address, showFullAddress);
 
   const scoreData = score !== undefined ? [
     {
@@ -92,11 +92,11 @@ export function PhotographerCard({
             <div className="relative">
               <Avatar className="size-16">
                 <AvatarImage
-                  src={photographer.avatar}
-                  alt={photographer.name}
+                  src={technician.avatar}
+                  alt={technician.name}
                 />
                 <AvatarFallback className="bg-primary text-primary-foreground">
-                  {photographer.name
+                  {technician.name
                     .split(" ")
                     .map((n) => n[0])
                     .join("")}
@@ -115,21 +115,21 @@ export function PhotographerCard({
               <div className="flex items-start justify-between gap-2 min-w-0">
                 <div className="relative flex flex-col min-w-0 flex-1 overflow-hidden">
                   <CardTitle className="flex items-center gap-2 mb-1 min-w-0">
-                    <span className="truncate min-w-0">{photographer.name}</span>
+                    <span className="truncate min-w-0">{technician.name}</span>
                     {recommended && (
                       <Award className="h-4 w-4 text-emerald-600 shrink-0" />
                     )}
                   </CardTitle>
                   {/* Company Affiliation */}
-                  {!photographer.isIndependent && photographer.companyName && (
+                  {!technician.isIndependent && technician.companyName && (
                     <div className="flex items-center gap-1 mt-1.5">
                       <Building2 className="h-3 w-3 text-primary" />
                       <span className="text-xs text-primary">
-                        {photographer.companyName}
+                        {technician.companyName}
                       </span>
                     </div>
                   )}
-                  {photographer.isIndependent && (
+                  {technician.isIndependent && (
                     <Badge
                       variant="outline"
                       className="text-xs mt-1.5 h-5 w-fit"
@@ -157,7 +157,7 @@ export function PhotographerCard({
                           </span>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-xs">
-                          <P className="wrap-break-word">{getLocationDisplay(photographer.homeLocation.address, true)}</P>
+                          <P className="wrap-break-word">{getLocationDisplay(technician.homeLocation.address, true)}</P>
                         </TooltipContent>
                       </Tooltip>
                     ) : (
@@ -253,7 +253,7 @@ export function PhotographerCard({
                 <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
                   <span className="text-muted-foreground">Reliability</span>
                   <span className="text-foreground">
-                    {(photographer.reliability.onTimeRate * 100).toFixed(0)}%
+                    {(technician.reliability.onTimeRate * 100).toFixed(0)}%
                   </span>
                 </div>
               </div>
@@ -269,7 +269,7 @@ export function PhotographerCard({
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
                         <P className="text-xs">
-                          Calculated by averaging the photographer's skill ratings (1-5 scale) for each media type required by the job. 
+                          Calculated by averaging the technician's skill ratings (1-5 scale) for each media type required by the job. 
                           The average is converted to a percentage (multiplied by 20).
                         </P>
                       </TooltipContent>
@@ -290,7 +290,7 @@ export function PhotographerCard({
               <div className="flex items-center justify-center gap-1">
                 <Star className="h-3.5 w-3.5 fill-muted-foreground/60 text-muted-foreground/60" />
                 <span className="text-sm font-semibold text-foreground">
-                  {photographer.rating.overall}
+                  {technician.rating.overall}
                 </span>
               </div>
               <div className="text-xs text-muted-foreground/80 mt-0.5">
@@ -302,7 +302,7 @@ export function PhotographerCard({
               <div className="flex items-center justify-center gap-1">
                 <Briefcase className="h-3.5 w-3.5 fill-muted-foreground/60 text-muted-foreground/60" />
                 <span className="text-sm font-semibold text-foreground">
-                  {photographer.reliability.totalJobs}
+                  {technician.reliability.totalJobs}
                 </span>
               </div>
               <div className="text-xs text-muted-foreground/80 mt-0.5">
@@ -314,7 +314,7 @@ export function PhotographerCard({
               <div className="flex items-center justify-center gap-1">
                 <TrendingUp className="h-3.5 w-3.5 fill-muted-foreground/60 text-muted-foreground/60" />
                 <span className="text-sm font-semibold text-foreground">
-                  {photographer.reliability.averageDeliveryTime}h
+                  {technician.reliability.averageDeliveryTime}h
                 </span>
               </div>
               <div className="text-xs text-muted-foreground/80 mt-0.5">
@@ -341,13 +341,13 @@ export function PhotographerCard({
                     } shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {recommended && <Award className="h-4 w-4 mr-2" />}
-                    {recommended ? "Assign (Recommended)" : "Assign Photographer"}
+                    {recommended ? "Assign (Recommended)" : "Assign Technician"}
                   </Button>
                 </span>
               </TooltipTrigger>
               {!isAvailable && (
                 <TooltipContent>
-                  <P>This photographer is not available for assignment</P>
+                  <P>This technician is not available for assignment</P>
                 </TooltipContent>
               )}
             </Tooltip>

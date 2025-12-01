@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { JobRequest, Photographer, PhotographerRanking } from '../../../types';
+import { JobRequest, Technician, TechnicianRanking } from '../../../types';
 import { MapView } from '../map/MapView';
-import { PhotographerCard } from '../../features/photographer/PhotographerCard';
+import { TechnicianCard } from '../../features/technician/TechnicianCard';
 import { Skeleton } from '../../ui/skeleton';
 import { ScrollArea } from '../../ui/scroll-area';
 import { Spinner } from '../../ui/spinner';
@@ -44,43 +44,43 @@ function calculateDistanceLocal(
 
 type PriorityFactor = 'availability' | 'distance' | 'score';
 
-interface FindPhotographerViewProps {
+interface FindTechnicianViewProps {
   job: JobRequest;
-  photographers: Photographer[];
-  onAssign: (photographerId: string, score: number) => void;
+  technicians: Technician[];
+  onAssign: (technicianId: string, score: number) => void;
   preferredVendors?: string[];
   isLoading?: boolean;
 }
 
-export function FindPhotographerView({
+export function FindTechnicianView({
   job,
-  photographers,
+  technicians,
   onAssign,
   preferredVendors = [],
   isLoading = false,
-}: FindPhotographerViewProps) {
+}: FindTechnicianViewProps) {
   const [priorityOrder, setPriorityOrder] = useState<PriorityFactor[]>([
     'availability',
     'distance',
     'score',
   ]);
   const [assigningId, setAssigningId] = useState<string | null>(null);
-  const [selectedPhotographerId, setSelectedPhotographerId] = useState<string | null>(null);
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState<string | null>(null);
 
-  // Calculate individual scores for each photographer
-  const photographerScores = useMemo(() => {
-    return photographers
+  // Calculate individual scores for each technician
+  const technicianScores = useMemo(() => {
+    return technicians
       .filter((p) => p.status === 'active')
-      .map((photographer) => {
+      .map((technician) => {
         const distanceKm = calculateDistanceLocal(
-          photographer.homeLocation.lat,
-          photographer.homeLocation.lng,
+          technician.homeLocation.lat,
+          technician.homeLocation.lng,
           job.location.lat,
           job.location.lng
         );
 
         // Check availability
-        const availability = photographer.availability.find(
+        const availability = technician.availability.find(
           (a) => a.date === job.scheduledDate
         );
         const isAvailable = availability?.available || false;
@@ -93,7 +93,7 @@ export function FindPhotographerView({
         else if (distanceKm <= 50) distanceScore = 25;
 
         // Calculate reliability score
-        const { onTimeRate, noShows, totalJobs } = photographer.reliability;
+        const { onTimeRate, noShows, totalJobs } = technician.reliability;
         let reliabilityScore = 50;
         if (totalJobs > 0) {
           const noShowPenalty = (noShows / totalJobs) * 100;
@@ -101,7 +101,7 @@ export function FindPhotographerView({
         }
 
         // Calculate skill match score
-        const skillMap: Record<string, keyof Photographer['skills']> = {
+        const skillMap: Record<string, keyof Technician['skills']> = {
           photo: 'residential',
           video: 'video',
           aerial: 'aerial',
@@ -111,8 +111,8 @@ export function FindPhotographerView({
         let skillCount = 0;
         for (const mediaType of job.mediaType) {
           const skillKey = skillMap[mediaType];
-          if (skillKey && photographer.skills[skillKey] !== undefined) {
-            totalSkillScore += photographer.skills[skillKey];
+          if (skillKey && technician.skills[skillKey] !== undefined) {
+            totalSkillScore += technician.skills[skillKey];
             skillCount++;
           }
         }
@@ -120,9 +120,9 @@ export function FindPhotographerView({
 
         // Calculate preferred relationship score
         let preferredScore = 0;
-        if (photographer.companyId && preferredVendors.includes(photographer.companyId)) {
+        if (technician.companyId && preferredVendors.includes(technician.companyId)) {
           preferredScore = 100;
-        } else if (photographer.preferredClients.includes(job.organizationId)) {
+        } else if (technician.preferredClients.includes(job.organizationId)) {
           preferredScore = 100;
         }
 
@@ -135,7 +135,7 @@ export function FindPhotographerView({
           skillScore * 0.1;
 
         return {
-          photographer,
+          technician,
           isAvailable,
           distanceKm,
           distanceScore,
@@ -145,19 +145,19 @@ export function FindPhotographerView({
           overallScore,
         };
       });
-  }, [photographers, job, preferredVendors]);
+  }, [technicians, job, preferredVendors]);
 
-  // Sort photographers based on priority order
-  const rankedPhotographers = useMemo(() => {
-    const sorted = [...photographerScores].sort((a, b) => {
+  // Sort technicians based on priority order
+  const rankedTechnicians = useMemo(() => {
+    const sorted = [...technicianScores].sort((a, b) => {
       for (const priority of priorityOrder) {
         let comparison = 0;
         
         if (priority === 'availability') {
-          // Available photographers first
+          // Available technicians first
           comparison = (b.isAvailable ? 1 : 0) - (a.isAvailable ? 1 : 0);
         } else if (priority === 'distance') {
-          // Closer photographers first
+          // Closer technicians first
           comparison = a.distanceKm - b.distanceKm;
         } else if (priority === 'score') {
           // Higher scores first
@@ -170,7 +170,7 @@ export function FindPhotographerView({
     });
 
     return sorted.map((item, index) => ({
-      photographer: item.photographer,
+      technician: item.technician,
       score: item.overallScore,
       factors: {
         availability: item.isAvailable ? 100 : 0,
@@ -182,17 +182,17 @@ export function FindPhotographerView({
       },
       recommended: index === 0 && item.isAvailable && item.overallScore >= 60,
       rank: index + 1,
-    })) as (PhotographerRanking & { rank: number })[];
-  }, [photographerScores, priorityOrder]);
+    })) as (TechnicianRanking & { rank: number })[];
+  }, [technicianScores, priorityOrder]);
 
-  const handleAssign = async (photographerId: string, score: number) => {
-    setAssigningId(photographerId);
+  const handleAssign = async (technicianId: string, score: number) => {
+    setAssigningId(technicianId);
     try {
       // Simulate API call delay
       await new Promise((resolve) => setTimeout(resolve, 500));
-      onAssign(photographerId, score);
+      onAssign(technicianId, score);
     } catch (error) {
-      console.error('Failed to assign photographer:', error);
+      console.error('Failed to assign technician:', error);
     } finally {
       setAssigningId(null);
     }
@@ -251,13 +251,13 @@ export function FindPhotographerView({
           <div className="absolute inset-0">
           <MapView
             jobs={[job]}
-            photographers={rankedPhotographers.map((r) => r.photographer)}
+            technicians={rankedTechnicians.map((r) => r.technician)}
             selectedJob={job}
-            selectedPhotographer={
-              selectedPhotographerId
-                ? rankedPhotographers.find(
-                    (r) => r.photographer.id === selectedPhotographerId
-                  )?.photographer || null
+            selectedTechnician={
+              selectedTechnicianId
+                ? rankedTechnicians.find(
+                    (r) => r.technician.id === selectedTechnicianId
+                  )?.technician || null
                 : null
             }
           />
@@ -270,9 +270,9 @@ export function FindPhotographerView({
         {/* Header */}
         <div className="p-4 border-b space-y-3">
           <div>
-            <H3 className="text-lg border-0">Ranked Photographers</H3>
+            <H3 className="text-lg border-0">Ranked Technicians</H3>
             <Muted className="text-xs">
-              {rankedPhotographers.length} available
+              {rankedTechnicians.length} available
             </Muted>
           </div>
 
@@ -345,7 +345,7 @@ export function FindPhotographerView({
           </div>
         </div>
 
-        {/* Photographer List */}
+        {/* Technician List */}
         <ScrollArea className="flex-1 size-full overflow-y-auto">
           <div className="p-4 space-y-3">
             {isLoading ? (
@@ -366,33 +366,33 @@ export function FindPhotographerView({
                   <Skeleton className="h-9 w-full" />
                 </div>
               ))
-            ) : rankedPhotographers.length === 0 ? (
+            ) : rankedTechnicians.length === 0 ? (
               <div className="text-center py-8">
-                <Muted>No photographers available</Muted>
+                <Muted>No technicians available</Muted>
               </div>
             ) : (
-              rankedPhotographers.map((ranking) => {
-                const isAssigning = assigningId === ranking.photographer.id;
-                const isSelected = selectedPhotographerId === ranking.photographer.id;
+              rankedTechnicians.map((ranking) => {
+                const isAssigning = assigningId === ranking.technician.id;
+                const isSelected = selectedTechnicianId === ranking.technician.id;
 
                 return (
                   <div
-                    key={ranking.photographer.id}
+                    key={ranking.technician.id}
                     className={`relative border rounded-lg transition-all ${
                       isSelected ? 'ring-2 ring-primary' : ''
                     } ${isAssigning ? 'opacity-50 pointer-events-none' : ''}`}
                   >
-                    <PhotographerCard
-                      photographer={ranking.photographer}
+                    <TechnicianCard
+                      technician={ranking.technician}
                       ranking={ranking.factors}
                       score={ranking.score}
                       recommended={ranking.recommended}
                       showFullAddress={true}
                       onAssign={() => {
-                        setSelectedPhotographerId(ranking.photographer.id);
-                        handleAssign(ranking.photographer.id, ranking.score);
+                        setSelectedTechnicianId(ranking.technician.id);
+                        handleAssign(ranking.technician.id, ranking.score);
                       }}
-                      onClick={() => setSelectedPhotographerId(ranking.photographer.id)}
+                      onClick={() => setSelectedTechnicianId(ranking.technician.id)}
                     />
                     {isAssigning && (
                       <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg z-10">

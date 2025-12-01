@@ -10,29 +10,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../../ui/dialog';
-import { Organization, CompanyApplication, Photographer } from '../../../../types';
+import { Organization, CompanyApplication, Technician } from '../../../../types';
 import { CompanyCard, ApplicationCard } from '../../../common';
 import { H2, H3, Small } from '../../../ui/typography';
 import { Building2, Search } from 'lucide-react';
 
 interface CompaniesViewProps {
-  photographer: Photographer;
+  technician: Technician;
   companies: Organization[];
   applications: CompanyApplication[];
   onApplyToCompany: (companyId: string, message: string) => void;
 }
 
 export function CompaniesView({
-  photographer,
+  technician,
   companies,
   applications,
   onApplyToCompany,
 }: CompaniesViewProps) {
   const [showCompanySearch, setShowCompanySearch] = useState(false);
 
-  const mediaCompanies = companies.filter((c) => c.type === 'media_company');
+  const mediaCompanies = companies.filter((c) => c.type === 'COMPANY');
   const pendingApplications = applications.filter(
-    (a) => a.photographerId === photographer.id && a.status === 'pending'
+    (a) => a.technicianId === technician.id && a.status === 'pending'
   );
 
   return (
@@ -40,7 +40,7 @@ export function CompaniesView({
       <div className="container mx-auto px-6">
         <div className="flex items-center justify-between">
           <H2 className="text-2xl border-0">Media Companies</H2>
-          {photographer.isIndependent && (
+          {technician.isIndependent && (
             <Button onClick={() => setShowCompanySearch(true)}>
               <Search className="h-4 w-4 mr-2" />
               Browse Companies
@@ -61,14 +61,14 @@ export function CompaniesView({
         )}
 
         {/* Current Company */}
-        {!photographer.isIndependent && photographer.companyId && (
+        {!technician.isIndependent && technician.companyId && (
           <Card className="p-6">
             <div className="flex items-center gap-4">
               <div className="p-4 bg-primary rounded-xl">
                 <Building2 className="h-8 w-8 text-primary-foreground" />
               </div>
               <div>
-                <H3 className="text-lg">{photographer.companyName}</H3>
+                <H3 className="text-lg">{technician.companyName}</H3>
                 <Small className="text-muted-foreground">Your current company</Small>
               </div>
             </div>
@@ -87,7 +87,7 @@ export function CompaniesView({
               {mediaCompanies.map((company) => {
                 const alreadyApplied = applications.some(
                   (a) =>
-                    a.photographerId === photographer.id &&
+                    a.technicianId === technician.id &&
                     a.companyId === company.id &&
                     a.status === 'pending'
                 );

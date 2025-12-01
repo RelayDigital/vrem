@@ -3,11 +3,10 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "../../ui/use-mobile";
-import { JobRequest, Photographer, PhotographerRanking } from "../../../types";
-import { USE_MOCK_DATA } from "../../../lib/utils";
+import { JobRequest, Technician, TechnicianRanking } from "../../../types";
 import { MapView } from "../map";
-import { PhotographerCard } from "../../features/photographer/PhotographerCard";
-import { PhotographerCardMinimal } from "../../features/photographer/PhotographerCardMinimal";
+import { TechnicianCard } from "../../features/technician/TechnicianCard";
+import { TechnicianCardMinimal } from "../../features/technician/TechnicianCardMinimal";
 import { JobCard } from "../jobs/JobCard";
 import { Button } from "../../ui/button";
 import { ScrollArea } from "../../ui/scroll-area";
@@ -44,11 +43,11 @@ import { Card, CardContent, CardHeader } from "../../ui/card";
 
 interface MapWithSidebarProps {
   jobs: JobRequest[];
-  photographers: Photographer[];
+  technicians: Technician[];
   selectedJob: JobRequest | null;
   onSelectJob: (job: JobRequest) => void;
   onNavigateToJobInProjectManagement?: (job: JobRequest) => void;
-  onJobAssign?: (jobId: string, photographerId: string, score: number) => void;
+  onJobAssign?: (jobId: string, technicianId: string, score: number) => void;
   className?: string;
   fullScreen?: boolean;
   initialSidebarView?: SidebarView;
@@ -82,7 +81,7 @@ function calculateDistanceLocal(
 
 export function MapWithSidebar({
   jobs,
-  photographers,
+  technicians,
   selectedJob,
   onSelectJob,
   onNavigateToJobInProjectManagement,
@@ -107,7 +106,7 @@ export function MapWithSidebar({
     "score",
   ]);
   const [assigningId, setAssigningId] = useState<string | null>(null);
-  const [selectedPhotographerId, setSelectedPhotographerId] = useState<
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState<
     string | null
   >(null);
 
@@ -124,8 +123,8 @@ export function MapWithSidebar({
     );
   });
 
-  const handleFindPhotographer = (job: JobRequest) => {
-    setSelectedPhotographerId(null); // Clear selected photographer
+  const handleFindTechnician = (job: JobRequest) => {
+    setSelectedTechnicianId(null); // Clear selected technician
     setJobForRankings(job);
     setSidebarView("rankings");
     // Keep drawer open on mobile when navigating to rankings
@@ -135,32 +134,31 @@ export function MapWithSidebar({
     if (onGoBack) {
       onGoBack();
     } else {
-      setSelectedPhotographerId(null); // Clear selected photographer
+      setSelectedTechnicianId(null); // Clear selected technician
       setSidebarView("pending");
       setJobForRankings(null);
       // Drawer stays open on mobile when going back to pending
     }
   };
 
-  // Use empty array when mock data is disabled
-  const displayPhotographers = USE_MOCK_DATA ? photographers : [];
+  const displayTechnicians = technicians ?? [];
 
-  // Calculate ranked photographers when in rankings view
-  const rankedPhotographers = useMemo(() => {
+  // Calculate ranked technicians when in rankings view
+  const rankedTechnicians = useMemo(() => {
     if (!jobForRankings) return [];
 
-    const photographerScores = displayPhotographers
+    const technicianScores = displayTechnicians
       .filter((p) => p.status === "active")
-      .map((photographer) => {
+      .map((technician) => {
         const distanceKm = calculateDistanceLocal(
-          photographer.homeLocation.lat,
-          photographer.homeLocation.lng,
+          technician.homeLocation.lat,
+          technician.homeLocation.lng,
           jobForRankings.location.lat,
           jobForRankings.location.lng
         );
 
         // Check availability
-        const availability = photographer.availability.find(
+        const availability = technician.availability.find(
           (a) => a.date === jobForRankings.scheduledDate
         );
         const isAvailable = availability?.available || false;
@@ -173,7 +171,7 @@ export function MapWithSidebar({
         else if (distanceKm <= 50) distanceScore = 25;
 
         // Calculate reliability score
-        const { onTimeRate, noShows, totalJobs } = photographer.reliability;
+        const { onTimeRate, noShows, totalJobs } = technician.reliability;
         let reliabilityScore = 50;
         if (totalJobs > 0) {
           const noShowPenalty = (noShows / totalJobs) * 100;
@@ -184,7 +182,7 @@ export function MapWithSidebar({
         }
 
         // Calculate skill match score
-        const skillMap: Record<string, keyof Photographer["skills"]> = {
+        const skillMap: Record<string, keyof Technician["skills"]> = {
           photo: "residential",
           video: "video",
           aerial: "aerial",
@@ -194,8 +192,8 @@ export function MapWithSidebar({
         let skillCount = 0;
         for (const mediaType of jobForRankings.mediaType) {
           const skillKey = skillMap[mediaType];
-          if (skillKey && photographer.skills[skillKey] !== undefined) {
-            totalSkillScore += photographer.skills[skillKey];
+          if (skillKey && technician.skills[skillKey] !== undefined) {
+            totalSkillScore += technician.skills[skillKey];
             skillCount++;
           }
         }
@@ -205,7 +203,7 @@ export function MapWithSidebar({
         // Calculate preferred relationship score
         let preferredScore = 0;
         if (
-          photographer.preferredClients.includes(jobForRankings.organizationId)
+          technician.preferredClients.includes(jobForRankings.organizationId)
         ) {
           preferredScore = 100;
         }
@@ -219,7 +217,7 @@ export function MapWithSidebar({
           skillScore * 0.1;
 
         return {
-          photographer,
+          technician,
           isAvailable,
           distanceKm,
           distanceScore,
@@ -231,7 +229,7 @@ export function MapWithSidebar({
       });
 
     // Sort based on priority order
-    const sorted = [...photographerScores].sort((a, b) => {
+    const sorted = [...technicianScores].sort((a, b) => {
       for (const priority of priorityOrder) {
         let comparison = 0;
 
@@ -255,7 +253,7 @@ export function MapWithSidebar({
     });
 
     return sorted.map((item, index) => ({
-      photographer: item.photographer,
+      technician: item.technician,
       score: item.overallScore,
       factors: {
         availability: item.isAvailable ? 100 : 0,
@@ -267,19 +265,19 @@ export function MapWithSidebar({
       },
       recommended: index === 0 && item.isAvailable && item.overallScore >= 60,
       rank: index + 1,
-    })) as (PhotographerRanking & { rank: number })[];
-  }, [jobForRankings, displayPhotographers, priorityOrder]);
+    })) as (TechnicianRanking & { rank: number })[];
+  }, [jobForRankings, displayTechnicians, priorityOrder]);
 
-  const handleAssign = async (photographerId: string, score: number) => {
-    setAssigningId(photographerId);
+  const handleAssign = async (technicianId: string, score: number) => {
+    setAssigningId(technicianId);
     try {
       await new Promise((resolve) => setTimeout(resolve, 500));
       if (jobForRankings && onJobAssign) {
-        onJobAssign(jobForRankings.id, photographerId, score);
+        onJobAssign(jobForRankings.id, technicianId, score);
         handleGoBack();
       }
     } catch (error) {
-      console.error("Failed to assign photographer:", error);
+      console.error("Failed to assign technician:", error);
     } finally {
       setAssigningId(null);
     }
@@ -325,31 +323,31 @@ export function MapWithSidebar({
   // Determine what to show on map based on sidebar view
   const mapJobs =
     sidebarView === "rankings" && jobForRankings ? [jobForRankings] : jobs;
-  const mapPhotographers =
+  const mapTechnicians =
     sidebarView === "rankings" && jobForRankings
-      ? rankedPhotographers.map((r) => r.photographer)
-      : displayPhotographers;
+      ? rankedTechnicians.map((r) => r.technician)
+      : displayTechnicians;
 
-  // Create a Map of photographer rankings for MapView
-  const photographerRankingsMap = useMemo(() => {
+  // Create a Map of technician rankings for MapView
+  const technicianRankingsMap = useMemo(() => {
     if (sidebarView !== "rankings" || !jobForRankings) return undefined;
     const map = new Map<
       string,
       {
-        ranking: PhotographerRanking["factors"];
+        ranking: TechnicianRanking["factors"];
         score: number;
         recommended: boolean;
       }
     >();
-    rankedPhotographers.forEach((r) => {
-      map.set(r.photographer.id, {
+    rankedTechnicians.forEach((r) => {
+      map.set(r.technician.id, {
         ranking: r.factors,
         score: r.score,
         recommended: r.recommended,
       });
     });
     return map;
-  }, [sidebarView, jobForRankings, rankedPhotographers]);
+  }, [sidebarView, jobForRankings, rankedTechnicians]);
 
   // Pending Assignments Content (reusable for both Card and Drawer)
   const pendingAssignmentsContent = (
@@ -416,7 +414,7 @@ export function MapWithSidebar({
                         job={job}
                         horizontal={true}
                         hideRequirements={true}
-                        onClick={() => handleFindPhotographer(job)}
+                        onClick={() => handleFindTechnician(job)}
                         onViewInProjectManagement={
                           onNavigateToJobInProjectManagement
                             ? () => onNavigateToJobInProjectManagement(job)
@@ -433,7 +431,7 @@ export function MapWithSidebar({
         </>
       ) : (
         <>
-          {/* Ranked Photographers Header */}
+          {/* Ranked Technicians Header */}
           <CardHeader
             className={`py-4 px-4 md:px-0! space-y-3 gap-0! md:relative sticky top-0 z-50 bg-background`}
           >
@@ -446,7 +444,7 @@ export function MapWithSidebar({
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <H3 className="text-lg border-0">Ranked Photographers</H3>
+              <H3 className="text-lg border-0">Ranked Technicians</H3>
             </div>
             {jobForRankings && (
               <Muted className="text-xs mb-2">
@@ -455,7 +453,7 @@ export function MapWithSidebar({
             )}
             <div>
               <Muted className="text-xs">
-                {rankedPhotographers.length} available
+                {rankedTechnicians.length} available
               </Muted>
             </div>
             {/* Priority Controls */}
@@ -532,7 +530,7 @@ export function MapWithSidebar({
             </div>
           </CardHeader>
 
-          {/* Ranked Photographers Content */}
+          {/* Ranked Technicians Content */}
           <CardContent
             className={`relative flex-1 p-0! min-h-0 overflow-hidden flex flex-col ${
               fullScreen ? "py-4 px-4 md:px-0!" : ""
@@ -541,7 +539,7 @@ export function MapWithSidebar({
             {jobForRankings && (
               <div className="flex-1 min-h-0">
                 <ScrollArea
-                  key={`photographer-list-${jobForRankings?.id || "none"}`}
+                  key={`technician-list-${jobForRankings?.id || "none"}`}
                   className="h-full"
                 >
                   <div className="space-y-0">
@@ -624,45 +622,45 @@ export function MapWithSidebar({
                       </div>
                     </div>
 
-                    {/* Photographer List */}
+                    {/* Technician List */}
                     <div className="py-4 px-4 md:px-0! space-y-3">
-                      {rankedPhotographers.length === 0 ? (
+                      {rankedTechnicians.length === 0 ? (
                         <div className="text-center py-8">
-                          <Muted>No photographers available</Muted>
+                          <Muted>No technicians available</Muted>
                         </div>
                       ) : (
-                        rankedPhotographers.map((ranking) => {
+                        rankedTechnicians.map((ranking) => {
                           const isSelected =
-                            selectedPhotographerId === ranking.photographer.id;
+                            selectedTechnicianId === ranking.technician.id;
                           const isAssigning =
-                            assigningId === ranking.photographer.id;
+                            assigningId === ranking.technician.id;
 
                           return (
-                            <PhotographerCardMinimal
-                              key={ranking.photographer.id}
-                              photographer={ranking.photographer}
+                            <TechnicianCardMinimal
+                              key={ranking.technician.id}
+                              technician={ranking.technician}
                               ranking={ranking.factors}
                               score={ranking.score}
                               recommended={ranking.recommended}
                               selected={isSelected}
                               isAssigning={isAssigning}
                               onClick={() =>
-                                setSelectedPhotographerId(
-                                  ranking.photographer.id
+                                setSelectedTechnicianId(
+                                  ranking.technician.id
                                 )
                               }
                               onCollapse={() => {
-                                // Only reset if this photographer was selected
+                                // Only reset if this technician was selected
                                 if (
-                                  selectedPhotographerId ===
-                                  ranking.photographer.id
+                                  selectedTechnicianId ===
+                                  ranking.technician.id
                                 ) {
-                                  setSelectedPhotographerId(null);
+                                  setSelectedTechnicianId(null);
                                 }
                               }}
                               onAssign={() =>
                                 handleAssign(
-                                  ranking.photographer.id,
+                                  ranking.technician.id,
                                   ranking.score
                                 )
                               }
@@ -691,13 +689,13 @@ export function MapWithSidebar({
       >
         <MapView
           jobs={mapJobs}
-          photographers={mapPhotographers}
+          technicians={mapTechnicians}
           selectedJob={
             sidebarView === "rankings" ? jobForRankings : selectedJob
           }
-          selectedPhotographer={
-            sidebarView === "rankings" && selectedPhotographerId
-              ? mapPhotographers.find((p) => p.id === selectedPhotographerId) ||
+          selectedTechnician={
+            sidebarView === "rankings" && selectedTechnicianId
+              ? mapTechnicians.find((p) => p.id === selectedTechnicianId) ||
                 null
               : null
           }
@@ -724,7 +722,7 @@ export function MapWithSidebar({
               <DrawerTitle className="sr-only">
                 {sidebarView === "pending"
                   ? (isDispatcherView ? "Pending Assignments" : "Pending Jobs")
-                  : "Ranked Photographers"}
+                  : "Ranked Technicians"}
               </DrawerTitle>
               {/* </DrawerHeader> */}
               <div className="overflow-y-auto size-full">

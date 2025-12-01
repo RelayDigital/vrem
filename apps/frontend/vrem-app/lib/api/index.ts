@@ -286,7 +286,7 @@ class ApiClient {
           id: `${org.id}-member`,
           userId: currentUser.id,
           orgId: org.id,
-          role: currentUser.role,
+          role: currentUser.role as OrganizationMember['role'],
           createdAt: org.createdAt,
           organization: org,
         }));
@@ -374,7 +374,6 @@ class ApiClient {
         ...c,
         createdAt: new Date(c.createdAt),
         updatedAt: new Date(c.updatedAt),
-        lastJob: c.lastJob ? new Date(c.lastJob as any) : null,
       }));
     },
     create: async (payload: Partial<Customer>): Promise<Customer> => {
@@ -507,6 +506,17 @@ class ApiClient {
       const project = await this.request<Project>(`/projects/${id}/assign-technician`, {
         method: 'PATCH',
         body: JSON.stringify({ technicianId }),
+      });
+      return this.normalizeProject(project);
+    },
+    assignCustomer: async (id: string, customerId: string): Promise<Project> => {
+      if (USE_MOCK_DATA) {
+        const project = await this.projects.getById(id);
+        return { ...project, customerId, updatedAt: new Date() };
+      }
+      const project = await this.request<Project>(`/projects/${id}/assign-customer`, {
+        method: 'PATCH',
+        body: JSON.stringify({ customerId }),
       });
       return this.normalizeProject(project);
     },
@@ -649,7 +659,7 @@ class ApiClient {
         return {
           projects,
           jobCards: projects.map((p) => this.mapProjectToJobCard(p)),
-          photographers: technicians,
+          technicians: technicians,
           auditLog: auditLog,
           metrics: metrics,
         };
@@ -660,13 +670,12 @@ class ApiClient {
         return {
           projects: projects.map((p: any) => this.normalizeProject(p)),
           jobCards: projects.map((p: any) => this.mapProjectToJobCard(this.normalizeProject(p))),
-          photographers: dashboardData.photographers || [],
+          technicians: dashboardData.technicians || [],
           auditLog: dashboardData.auditLog || [],
           metrics: dashboardData.metrics || {
             organizationId: "",
             period: "week" as const,
             jobs: { total: 0, pending: 0, assigned: 0, completed: 0, cancelled: 0 },
-            photographers: { active: 0, available: 0, utilization: 0 },
             technicians: { active: 0, available: 0, utilization: 0 },
             performance: { averageAssignmentTime: 0, averageDeliveryTime: 0, onTimeRate: 0, clientSatisfaction: 0 },
             revenue: { total: 0, perJob: 0 },
@@ -678,13 +687,12 @@ class ApiClient {
         return {
           projects,
           jobCards: projects.map((p) => this.mapProjectToJobCard(p)),
-          photographers: [],
+          technicians: [],
           auditLog: [],
           metrics: {
             organizationId: "",
             period: "week" as const,
             jobs: { total: 0, pending: 0, assigned: 0, completed: 0, cancelled: 0 },
-            photographers: { active: 0, available: 0, utilization: 0 },
             technicians: { active: 0, available: 0, utilization: 0 },
             performance: { averageAssignmentTime: 0, averageDeliveryTime: 0, onTimeRate: 0, clientSatisfaction: 0 },
             revenue: { total: 0, perJob: 0 },
@@ -851,12 +859,8 @@ class ApiClient {
   private mockUserFromEmail(email: string): User {
     const lower = email.toLowerCase();
     const roleMap: Record<string, User['role']> = {
-      admin: 'ADMIN',
-      pm: 'PROJECT_MANAGER',
-      dispatcher: 'PROJECT_MANAGER',
-      tech: 'TECHNICIAN',
-      photographer: 'TECHNICIAN',
-      editor: 'EDITOR',
+      dispatcher: 'DISPATCHER',
+      technician: 'TECHNICIAN',
       agent: 'AGENT',
     };
     const matchedKey = Object.keys(roleMap).find((key) => lower.includes(key));

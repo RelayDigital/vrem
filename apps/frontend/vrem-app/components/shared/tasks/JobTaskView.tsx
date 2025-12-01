@@ -6,7 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import UnderlineExtension from "@tiptap/extension-underline";
 import LinkExtension from "@tiptap/extension-link";
-import { JobRequest, Photographer } from "../../../types";
+import { JobRequest, OrganizationMember, Technician } from "../../../types";
 import { ChatMessage } from "../../../types/chat";
 import {
   Sheet,
@@ -88,11 +88,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../../ui/alert-dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../../ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
 import { ScrollArea } from "../../ui/scroll-area";
 import { useIsMobile } from "../../ui/use-mobile";
 import { cn } from "../../ui/utils";
@@ -131,7 +127,9 @@ import { DiOnedrive } from "react-icons/di";
 
 interface JobTaskViewProps {
   job: JobRequest | null;
-  photographer?: Photographer;
+  photographer?: OrganizationMember["user"] & { role: "TECHNICIAN" };
+  projectManager?: OrganizationMember["user"] & { role: "PROJECT_MANAGER" };
+  editor?: OrganizationMember["user"] & { role: "EDITOR" };
   messages: ChatMessage[];
   currentUserId: string;
   currentUserName: string;
@@ -147,8 +145,8 @@ interface JobTaskViewProps {
   onEditMessage?: (messageId: string, content: string) => void;
   onDeleteMessage?: (messageId: string) => void;
   onStatusChange?: (status: JobRequest["status"]) => void;
-  onAssignPhotographer?: () => void;
-  onChangePhotographer?: () => void; // For reassigning photographer
+  onAssignTechnician?: () => void;
+  onChangeTechnician?: () => void; // For reassigning technician
   variant?: "sheet" | "dialog" | "page";
   onFullScreen?: () => void; // Opens larger dialog
   onOpenInNewPage?: () => void; // Navigates to full page view
@@ -157,6 +155,8 @@ interface JobTaskViewProps {
 export function JobTaskView({
   job,
   photographer,
+  projectManager,
+  editor,
   messages,
   currentUserId,
   currentUserName,
@@ -168,8 +168,8 @@ export function JobTaskView({
   onEditMessage,
   onDeleteMessage,
   onStatusChange,
-  onAssignPhotographer,
-  onChangePhotographer,
+  onAssignTechnician,
+  onChangeTechnician,
   variant = "sheet",
   onFullScreen,
   onOpenInNewPage,
@@ -180,25 +180,31 @@ export function JobTaskView({
   const [activeChatTab, setActiveChatTab] = useState<"client" | "team">("team");
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
+    null
+  );
   const [hasEditorContent, setHasEditorContent] = useState(false);
   const [hasEditEditorContent, setHasEditEditorContent] = useState(false);
-  const [uploadedMedia, setUploadedMedia] = useState<Array<{
-    id: string;
-    name: string;
-    type: "image" | "video" | "floor-plan" | "3d-content" | "file";
-    url: string;
-    thumbnail?: string;
-    size: number;
-    uploadedAt: Date;
-  }>>([]);
+  const [uploadedMedia, setUploadedMedia] = useState<
+    Array<{
+      id: string;
+      name: string;
+      type: "image" | "video" | "floor-plan" | "3d-content" | "file";
+      url: string;
+      thumbnail?: string;
+      size: number;
+      uploadedAt: Date;
+    }>
+  >([]);
   const [draggingCategory, setDraggingCategory] = useState<string | null>(null);
   const [threeDUrl, setThreeDUrl] = useState<string>("");
   const [cloudStorageDialog, setCloudStorageDialog] = useState<{
     open: boolean;
     service: string;
   }>({ open: false, service: "" });
-  const [connectingService, setConnectingService] = useState<string | null>(null);
+  const [connectingService, setConnectingService] = useState<string | null>(
+    null
+  );
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const floorPlanInputRef = useRef<HTMLInputElement>(null);
@@ -206,7 +212,7 @@ export function JobTaskView({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
-  const editor = useEditor({
+  const messageEditor = useEditor({
     extensions: [
       StarterKit.configure({
         heading: false,
@@ -235,7 +241,7 @@ export function JobTaskView({
   });
 
   // Editor for editing messages
-  const editEditor = useEditor({
+  const editMessageEditor = useEditor({
     extensions: [
       StarterKit.configure({
         heading: false,
@@ -262,75 +268,75 @@ export function JobTaskView({
 
   // Update placeholder when chat tab changes
   useEffect(() => {
-    if (editor) {
+    if (messageEditor) {
       const placeholderText =
         activeChatTab === "client"
           ? "Type a message for the client..."
           : "Type a message for the team...";
-      const placeholderExt = editor.extensionManager.extensions.find(
+      const placeholderExt = messageEditor.extensionManager.extensions.find(
         (ext) => ext.name === "placeholder"
       );
       if (placeholderExt && placeholderExt.options) {
         placeholderExt.options.placeholder = placeholderText;
-        editor.view.dispatch(editor.state.tr);
+        messageEditor.view.dispatch(messageEditor.state.tr);
       }
     }
-  }, [editor, activeChatTab]);
+  }, [messageEditor, activeChatTab]);
 
   useEffect(() => {
-    if (editor) {
-      editor.setEditable(!(isClient && activeChatTab === "team"));
+    if (messageEditor) {
+      messageEditor.setEditable(!(isClient && activeChatTab === "team"));
     }
-  }, [editor, isClient, activeChatTab]);
+  }, [messageEditor, isClient, activeChatTab]);
 
   useEffect(() => {
-    if (!open && editor) {
-      editor.commands.clearContent();
+    if (!open && messageEditor) {
+      messageEditor.commands.clearContent();
       setReplyingTo(null);
       setActiveTab("discussion");
       setHasEditorContent(false);
       setEditingMessageId(null);
-      if (editEditor) {
-        editEditor.commands.clearContent();
+      if (editMessageEditor) {
+        editMessageEditor.commands.clearContent();
       }
     }
-  }, [open, editor, editEditor]);
+  }, [open, messageEditor, editMessageEditor]);
 
   // Track editor content changes
   useEffect(() => {
-    if (!editor) return;
+    if (!messageEditor) return;
 
     const updateContent = () => {
-      const text = editor.getText().trim();
+      const text = messageEditor.getText().trim();
       setHasEditorContent(text.length > 0);
     };
 
-    editor.on("update", updateContent);
-    editor.on("selectionUpdate", updateContent);
+    messageEditor.on("update", updateContent);
+    messageEditor.on("selectionUpdate", updateContent);
 
     // Initial check
     updateContent();
 
     return () => {
-      editor.off("update", updateContent);
-      editor.off("selectionUpdate", updateContent);
+      messageEditor.off("update", updateContent);
+      messageEditor.off("selectionUpdate", updateContent);
     };
-  }, [editor]);
+  }, [messageEditor]);
 
   const handleSend = useCallback(() => {
-    if (!editor || !onSendMessage) return;
+    if (!messageEditor || !onSendMessage) return;
 
-    const htmlContent = editor.getHTML();
-    const textContent = editor.getText().trim();
+    const htmlContent = messageEditor.getHTML();
+    const textContent = messageEditor.getText().trim();
 
     if (!textContent) return;
 
     onSendMessage(htmlContent, activeChatTab, replyingTo?.id);
-    editor.commands.clearContent();
+    messageEditor.commands.clearContent();
     setReplyingTo(null);
     setHasEditorContent(false);
-    editor.commands.focus();
-  }, [editor, onSendMessage, activeChatTab, replyingTo]);
+    messageEditor.commands.focus();
+  }, [messageEditor, onSendMessage, activeChatTab, replyingTo]);
 
   const handleEdit = useCallback((message: ChatMessage) => {
     setEditingMessageId(message.id);
@@ -338,52 +344,54 @@ export function JobTaskView({
 
   // Update edit editor content when editing message changes
   useEffect(() => {
-    if (editingMessageId && editEditor) {
+    if (editingMessageId && editMessageEditor) {
       const message = messages.find((m) => m.id === editingMessageId);
       if (message) {
         // Ensure editor is editable
-        editEditor.setEditable(true);
+        editMessageEditor.setEditable(true);
         // Use setTimeout to ensure editor is ready
         setTimeout(() => {
-          editEditor.commands.setContent(message.content);
-          editEditor.commands.focus('end');
+          editMessageEditor.commands.setContent(message.content);
+          editMessageEditor.commands.focus("end");
           // Set initial content state
-          setHasEditEditorContent(editEditor.getText().trim().length > 0);
+          setHasEditEditorContent(
+            editMessageEditor.getText().trim().length > 0
+          );
         }, 50);
       }
-    } else if (!editingMessageId && editEditor) {
+    } else if (!editingMessageId && editMessageEditor) {
       // Clear editor when not editing
-      editEditor.commands.clearContent();
+      editMessageEditor.commands.clearContent();
       setHasEditEditorContent(false);
     }
-  }, [editingMessageId, editEditor, messages]);
+  }, [editingMessageId, editMessageEditor, messages]);
 
   // Track edit editor content changes
   useEffect(() => {
-    if (!editEditor) return;
+    if (!editMessageEditor) return;
 
     const updateContent = () => {
-      const text = editEditor.getText().trim();
+      const text = editMessageEditor.getText().trim();
       setHasEditEditorContent(text.length > 0);
     };
 
-    editEditor.on("update", updateContent);
-    editEditor.on("selectionUpdate", updateContent);
+    editMessageEditor.on("update", updateContent);
+    editMessageEditor.on("selectionUpdate", updateContent);
 
     // Initial check
     updateContent();
 
     return () => {
-      editEditor.off("update", updateContent);
-      editEditor.off("selectionUpdate", updateContent);
+      editMessageEditor.off("update", updateContent);
+      editMessageEditor.off("selectionUpdate", updateContent);
     };
-  }, [editEditor]);
+  }, [editMessageEditor]);
 
   const handleSaveEdit = useCallback(() => {
-    if (!editEditor || !editingMessageId || !onEditMessage) return;
+    if (!editMessageEditor || !editingMessageId || !onEditMessage) return;
 
-    const htmlContent = editEditor.getHTML();
-    const textContent = editEditor.getText().trim();
+    const htmlContent = editMessageEditor.getHTML();
+    const textContent = editMessageEditor.getText().trim();
 
     if (!textContent) {
       setEditingMessageId(null);
@@ -392,15 +400,15 @@ export function JobTaskView({
 
     onEditMessage(editingMessageId, htmlContent);
     setEditingMessageId(null);
-    editEditor.commands.clearContent();
-  }, [editEditor, editingMessageId, onEditMessage]);
+    editMessageEditor.commands.clearContent();
+  }, [editMessageEditor, editingMessageId, onEditMessage]);
 
   const handleCancelEdit = useCallback(() => {
     setEditingMessageId(null);
-    if (editEditor) {
-      editEditor.commands.clearContent();
+    if (editMessageEditor) {
+      editMessageEditor.commands.clearContent();
     }
-  }, [editEditor]);
+  }, [editMessageEditor]);
 
   const handleDeleteClick = useCallback((messageId: string) => {
     setDeletingMessageId(messageId);
@@ -418,7 +426,7 @@ export function JobTaskView({
   }, []);
 
   useEffect(() => {
-    if (!editor) return;
+    if (!messageEditor) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Enter" && !event.shiftKey) {
@@ -427,13 +435,13 @@ export function JobTaskView({
       }
     };
 
-    const editorElement = editor.view.dom;
-    editorElement.addEventListener("keydown", handleKeyDown);
+    const messageEditorElement = messageEditor.view.dom;
+    messageEditorElement.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      editorElement.removeEventListener("keydown", handleKeyDown);
+      messageEditorElement.removeEventListener("keydown", handleKeyDown);
     };
-  }, [editor, handleSend]);
+  }, [messageEditor, handleSend]);
 
   // Early return must be after all hooks
   if (!job) return null;
@@ -532,11 +540,11 @@ export function JobTaskView({
 
   const handleCopyLink = () => {
     if (!job) return;
-    
+
     // Use canonical route for job detail
     const jobTaskUrl = `${window.location.origin}/jobs/${job.id}`;
     navigator.clipboard.writeText(jobTaskUrl);
-    toast.success('Link copied to clipboard');
+    toast.success("Link copied to clipboard");
   };
 
   const handleFullScreen = () => {
@@ -552,7 +560,9 @@ export function JobTaskView({
   };
 
   // Media management functions
-  const getMediaTypeIcon = (type: "image" | "video" | "floor-plan" | "3d-content" | "file") => {
+  const getMediaTypeIcon = (
+    type: "image" | "video" | "floor-plan" | "3d-content" | "file"
+  ) => {
     switch (type) {
       case "image":
         return <ImageIcon className="size-10 text-muted-foreground" />;
@@ -567,12 +577,17 @@ export function JobTaskView({
     }
   };
 
-  const handleUploadcareSuccess = (info: any, category: "image" | "video" | "floor-plan" | "file") => {
+  const handleUploadcareSuccess = (
+    info: any,
+    category: "image" | "video" | "floor-plan" | "file"
+  ) => {
     // info.allEntries is an array of OutputFileEntry
     if (!info || !info.allEntries || info.allEntries.length === 0) return;
 
     const newMediaItems = info.allEntries.map((entry: any, index: number) => ({
-      id: entry.uuid || `${Date.now()}-${index}-${Math.random().toString(36).substring(2, 11)}`,
+      id:
+        entry.uuid ||
+        `${Date.now()}-${index}-${Math.random().toString(36).substring(2, 11)}`,
       name: entry.name,
       type: category,
       url: entry.cdnUrl,
@@ -583,12 +598,15 @@ export function JobTaskView({
     setUploadedMedia((prev: any[]) => [...prev, ...newMediaItems]);
   };
 
-
-  const getMediaByCategory = (category: "image" | "video" | "floor-plan" | "3d-content" | "file") => {
+  const getMediaByCategory = (
+    category: "image" | "video" | "floor-plan" | "3d-content" | "file"
+  ) => {
     return uploadedMedia.filter((item) => item.type === category);
   };
 
-  const getUploadcareAcceptTypes = (category: "image" | "video" | "floor-plan" | "file") => {
+  const getUploadcareAcceptTypes = (
+    category: "image" | "video" | "floor-plan" | "file"
+  ) => {
     switch (category) {
       case "image":
         return "image/*";
@@ -654,7 +672,10 @@ export function JobTaskView({
     setThreeDUrl("");
   };
 
-  const handleCloudStorage = (service: "google-drive" | "dropbox" | "onedrive", category: "image" | "video" | "floor-plan" | "file") => {
+  const handleCloudStorage = (
+    service: "google-drive" | "dropbox" | "onedrive",
+    category: "image" | "video" | "floor-plan" | "file"
+  ) => {
     // This would integrate with the respective cloud storage APIs
     // For now, we'll show a placeholder implementation
     console.log(`Opening ${service} file picker for ${category}`);
@@ -683,7 +704,9 @@ export function JobTaskView({
     // }
 
     // Show alert dialog instead of browser alert
-    const serviceName = service.replace("-", " ").replace(/\b\w/g, l => l.toUpperCase());
+    const serviceName = service
+      .replace("-", " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase());
     setConnectingService(service);
     // Simulate a delay to show the spinner
     setTimeout(() => {
@@ -697,7 +720,12 @@ export function JobTaskView({
   ) => {
     const categoryMedia = getMediaByCategory(category);
     const isDragging = draggingCategory === category;
-    const categoryName = category === "floor-plan" ? "Floor Plans" : category === "3d-content" ? "3D Content" : category.charAt(0).toUpperCase() + category.slice(1) + "s";
+    const categoryName =
+      category === "floor-plan"
+        ? "Floor Plans"
+        : category === "3d-content"
+        ? "3D Content"
+        : category.charAt(0).toUpperCase() + category.slice(1) + "s";
 
     // Special handling for 3D Content (URL input)
     if (category === "3d-content") {
@@ -736,7 +764,8 @@ export function JobTaskView({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <P className="text-sm font-medium text-foreground">
-                  {categoryMedia.length} {categoryMedia.length === 1 ? "item" : "items"}
+                  {categoryMedia.length}{" "}
+                  {categoryMedia.length === 1 ? "item" : "items"}
                 </P>
                 <div className="flex items-center gap-2">
                   <Input
@@ -810,11 +839,17 @@ export function JobTaskView({
       // Show upload area when empty
       return (
         <div className="py-4 space-y-4">
-          {(category === "image" || category === "video" || category === "floor-plan" || category === "file") && (
+          {(category === "image" ||
+            category === "video" ||
+            category === "floor-plan" ||
+            category === "file") && (
             <div className="flex flex-col items-center gap-2">
               <div onClick={(e) => e.stopPropagation()}>
                 <FileUploaderRegular
-                  pubkey={process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY || "dbf470d49c954f9f6143"}
+                  pubkey={
+                    process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY ||
+                    "dbf470d49c954f9f6143"
+                  }
                   classNameUploader="uc-light uc-custom"
                   sourceList="local, camera, gdrive, facebook"
                   userAgentIntegration="llm-nextjs"
@@ -834,13 +869,20 @@ export function JobTaskView({
       <div className="py-4 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <P className="text-sm font-medium text-foreground">
-            {categoryMedia.length} {categoryMedia.length === 1 ? "item" : "items"}
+            {categoryMedia.length}{" "}
+            {categoryMedia.length === 1 ? "item" : "items"}
           </P>
           <div className="flex items-center gap-2 flex-wrap">
-            {(category === "image" || category === "video" || category === "floor-plan" || category === "file") && (
+            {(category === "image" ||
+              category === "video" ||
+              category === "floor-plan" ||
+              category === "file") && (
               <div onClick={(e) => e.stopPropagation()}>
                 <FileUploaderRegular
-                  pubkey={process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY || "dbf470d49c954f9f6143"}
+                  pubkey={
+                    process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY ||
+                    "dbf470d49c954f9f6143"
+                  }
                   classNameUploader="uc-light uc-custom"
                   sourceList="local, camera, gdrive, facebook"
                   userAgentIntegration="llm-nextjs"
@@ -850,7 +892,10 @@ export function JobTaskView({
                 />
               </div>
             )}
-            {(category === "image" || category === "video" || category === "floor-plan" || category === "file") && (
+            {(category === "image" ||
+              category === "video" ||
+              category === "floor-plan" ||
+              category === "file") && (
               <ButtonGroup orientation="horizontal">
                 <Button
                   variant="outline"
@@ -969,7 +1014,8 @@ export function JobTaskView({
 
     // Sort messages by date
     const sortedRootMessages = [...rootMessages].sort(
-      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     );
 
     return { sortedRootMessages, threadMap };
@@ -978,7 +1024,11 @@ export function JobTaskView({
   const clientProcessed = processMessages(clientMessages);
   const teamProcessed = processMessages(teamMessages);
 
-  const renderMessage = (message: ChatMessage, isThread = false, threadMap?: Map<string, ChatMessage[]>) => {
+  const renderMessage = (
+    message: ChatMessage,
+    isThread = false,
+    threadMap?: Map<string, ChatMessage[]>
+  ) => {
     const threadMessages = threadMap?.get(message.id) || [];
     const isOwnMessage = message.userId === currentUserId;
     const isEditing = editingMessageId === message.id;
@@ -990,7 +1040,10 @@ export function JobTaskView({
       >
         {/* Thread line indicator for replies */}
         {isThread && (
-          <div className="absolute left-[-20px] top-0 w-px bg-border" style={{ height: '100%' }} />
+          <div
+            className="absolute left-[-20px] top-0 w-px bg-border"
+            style={{ height: "100%" }}
+          />
         )}
         <Avatar className="h-7 w-7 shrink-0">
           <AvatarImage src={message.userAvatar} alt={message.userName} />
@@ -1017,7 +1070,7 @@ export function JobTaskView({
               <div className="mb-1.5">
                 <div className="bg-muted/50 border border-border rounded-2xl overflow-hidden flex flex-col">
                   <EditorContent
-                    editor={editEditor}
+                    editor={editMessageEditor}
                     className="[&_.ProseMirror]:min-h-[64px] [&_.ProseMirror]:max-h-[120px] [&_.ProseMirror]:overflow-y-auto [&_.ProseMirror]:px-3.5 [&_.ProseMirror]:py-3 [&_.ProseMirror]:text-sm [&_.ProseMirror]:text-foreground [&_.ProseMirror]:focus:outline-none [&_.ProseMirror]:prose [&_.ProseMirror]:prose-sm [&_.ProseMirror]:max-w-none [&_.ProseMirror_strong]:font-semibold [&_.ProseMirror_em]:italic [&_.ProseMirror_u]:underline"
                   />
                   <div className="flex items-center justify-end gap-2 px-3.5 py-2 border-t border-border/40">
@@ -1033,7 +1086,7 @@ export function JobTaskView({
                       size="sm"
                       className="h-7 px-3 text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={handleSaveEdit}
-                      disabled={!editEditor || !hasEditEditorContent}
+                      disabled={!editMessageEditor || !hasEditEditorContent}
                     >
                       Save
                     </Button>
@@ -1085,7 +1138,10 @@ export function JobTaskView({
           {threadMessages.length > 0 && (
             <div className="mt-2 space-y-2 relative pl-2">
               {/* Vertical line connecting replies to parent */}
-              <div className="absolute left-0 top-0 w-px bg-border" style={{ height: '100%' }} />
+              <div
+                className="absolute left-0 top-0 w-px bg-border"
+                style={{ height: "100%" }}
+              />
               {threadMessages
                 .sort(
                   (a, b) =>
@@ -1220,382 +1276,542 @@ export function JobTaskView({
   ) => {
     const footerContent = (
       <>
-      {/* Chat Type Tabs - Only show when Discussion tab is active */}
-      {activeTab === "discussion" && (
-        <div className="flex items-center gap-6 pt-2 mb-4">
-          <Button
-            variant="ghost"
-            onClick={() => setActiveChatTab("client")}
-            className={cn(
-              "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
-              activeChatTab === "client"
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <MessageSquare className="h-3.5 w-3.5" />
-            Client Chat
-            {activeChatTab === "client" && (
-              <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => setActiveChatTab("team")}
-            className={cn(
-              "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
-              activeChatTab === "team"
-                ? "text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <User className="h-3.5 w-3.5" />
-            Team Chat
-            {!isClient && (
-              <Badge variant="secondary" className="ml-1 text-xs h-4 px-1.5">
-                Private
-              </Badge>
-            )}
-            {activeChatTab === "team" && (
-              <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
-            )}
-          </Button>
-        </div>
-      )}
-      {replyingTo && (
-        <div className="flex items-center justify-between bg-muted p-3 rounded-lg text-sm">
-          <span className="text-muted-foreground">
-            Replying to {replyingTo.userName}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setReplyingTo(null)}
-            className="h-6 text-xs"
-          >
-            Cancel
-          </Button>
-        </div>
-      )}
-      <div className="flex flex-col gap-0">
-        {/* Editor with Avatar */}
-        <div className="flex items-start gap-3">
-          <Avatar className="h-8 w-8 shrink-0">
-            <AvatarImage src={currentUserAvatar} alt={currentUserName} />
-            <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-              {currentUserName
-                .split(" ")
-                .map((n) => n[0])
-                .join("")}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 relative bg-muted/50 border border-border rounded-2xl overflow-hidden flex flex-col">
-            <EditorContent
-              editor={editor}
-              className="[&_.ProseMirror]:min-h-[64px] [&_.ProseMirror]:max-h-[200px] [&_.ProseMirror]:overflow-y-auto [&_.ProseMirror]:px-3.5 [&_.ProseMirror]:py-3 [&_.ProseMirror]:text-sm [&_.ProseMirror]:text-foreground [&_.ProseMirror]:focus:outline-none [&_.ProseMirror]:prose [&_.ProseMirror]:prose-sm [&_.ProseMirror]:max-w-none [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none [&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0 [&_.ProseMirror_strong]:font-semibold [&_.ProseMirror_em]:italic [&_.ProseMirror_u]:underline"
-            />
+        {/* Chat Type Tabs - Only show when Discussion tab is active */}
+        {activeTab === "discussion" && (
+          <div className="flex items-center gap-6 pt-2 mb-4">
+            <Button
+              variant="ghost"
+              onClick={() => setActiveChatTab("client")}
+              className={cn(
+                "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
+                activeChatTab === "client"
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Client Chat
+              {activeChatTab === "client" && (
+                <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setActiveChatTab("team")}
+              className={cn(
+                "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
+                activeChatTab === "team"
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <User className="h-3.5 w-3.5" />
+              Team Chat
+              {!isClient && (
+                <Badge variant="secondary" className="ml-1 text-xs h-4 px-1.5">
+                  Private
+                </Badge>
+              )}
+              {activeChatTab === "team" && (
+                <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
+              )}
+            </Button>
+          </div>
+        )}
+        {replyingTo && (
+          <div className="flex items-center justify-between bg-muted p-3 rounded-lg text-sm">
+            <span className="text-muted-foreground">
+              Replying to {replyingTo.userName}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setReplyingTo(null)}
+              className="h-6 text-xs"
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
+        <div className="flex flex-col gap-0">
+          {/* Editor with Avatar */}
+          <div className="flex items-start gap-3">
+            <Avatar className="h-8 w-8 shrink-0">
+              <AvatarImage src={currentUserAvatar} alt={currentUserName} />
+              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                {currentUserName
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 relative bg-muted/50 border border-border rounded-2xl overflow-hidden flex flex-col">
+              <EditorContent
+                editor={messageEditor}
+                className="[&_.ProseMirror]:min-h-[64px] [&_.ProseMirror]:max-h-[200px] [&_.ProseMirror]:overflow-y-auto [&_.ProseMirror]:px-3.5 [&_.ProseMirror]:py-3 [&_.ProseMirror]:text-sm [&_.ProseMirror]:text-foreground [&_.ProseMirror]:focus:outline-none [&_.ProseMirror]:prose [&_.ProseMirror]:prose-sm [&_.ProseMirror]:max-w-none [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground [&_.ProseMirror_p.is-editor-empty:first-child::before]:float-left [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none [&_.ProseMirror_p.is-editor-empty:first-child::before]:h-0 [&_.ProseMirror_strong]:font-semibold [&_.ProseMirror_em]:italic [&_.ProseMirror_u]:underline"
+              />
 
-            {/* Formatting Toolbar and Comment Button inside editor */}
-            <div className="flex items-center justify-between px-3.5 py-2 border-t border-border/40">
-              {/* Formatting Buttons */}
-              {isMobile ? (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 hover:bg-muted"
-                      disabled={!editor || (isClient && activeChatTab === "team")}
-                    >
-                      <MoreHorizontal className="h-3.5 w-3.5 text-foreground" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-2" align="start">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-7 w-7 p-0 hover:bg-muted",
-                          editor?.isActive("bold") && "bg-muted border border-primary"
-                        )}
-                        onClick={() => editor?.chain().focus().toggleBold().run()}
-                        disabled={!editor || (isClient && activeChatTab === "team")}
-                      >
-                        <Bold className="h-3.5 w-3.5 text-foreground" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-7 w-7 p-0 hover:bg-muted",
-                          editor?.isActive("italic") && "bg-muted border border-primary"
-                        )}
-                        onClick={() => editor?.chain().focus().toggleItalic().run()}
-                        disabled={!editor || (isClient && activeChatTab === "team")}
-                      >
-                        <Italic className="h-3.5 w-3.5 text-foreground" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-7 w-7 p-0 hover:bg-muted",
-                          editor?.isActive("underline") && "bg-muted border border-primary"
-                        )}
-                        onClick={() => editor?.chain().focus().toggleUnderline().run()}
-                        disabled={!editor || (isClient && activeChatTab === "team")}
-                      >
-                        <Underline className="h-3.5 w-3.5 text-foreground" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-7 w-7 p-0 hover:bg-muted",
-                          editor?.isActive("strike") && "bg-muted border border-primary"
-                        )}
-                        onClick={() => editor?.chain().focus().toggleStrike().run()}
-                        disabled={!editor || (isClient && activeChatTab === "team")}
-                      >
-                        <Strikethrough className="h-3.5 w-3.5 text-foreground" />
-                      </Button>
-                      <div className="h-4 w-px bg-border mx-0.5" />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-7 w-7 p-0 hover:bg-muted",
-                          editor?.isActive("bulletList") && "bg-muted border border-primary"
-                        )}
-                        onClick={() => editor?.chain().focus().toggleBulletList().run()}
-                        disabled={!editor || (isClient && activeChatTab === "team")}
-                      >
-                        <List className="h-3.5 w-3.5 text-foreground" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-7 w-7 p-0 hover:bg-muted",
-                          editor?.isActive("orderedList") && "bg-muted border border-primary"
-                        )}
-                        onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-                        disabled={!editor || (isClient && activeChatTab === "team")}
-                      >
-                        <ListOrdered className="h-3.5 w-3.5 text-foreground" />
-                      </Button>
+              {/* Formatting Toolbar and Comment Button inside editor */}
+              <div className="flex items-center justify-between px-3.5 py-2 border-t border-border/40">
+                {/* Formatting Buttons */}
+                {isMobile ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-7 w-7 p-0 hover:bg-muted"
-                        onClick={() => editor?.chain().focus().liftListItem("listItem").run()}
-                        disabled={!editor || (isClient && activeChatTab === "team")}
+                        disabled={
+                          !messageEditor ||
+                          (isClient && activeChatTab === "team")
+                        }
                       >
-                        <Indent className="h-3.5 w-3.5 text-foreground" />
+                        <MoreHorizontal className="h-3.5 w-3.5 text-foreground" />
                       </Button>
-                      <div className="h-4 w-px bg-border mx-0.5" />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-7 w-7 p-0 hover:bg-muted",
-                          editor?.isActive("codeBlock") && "bg-muted border border-primary"
-                        )}
-                        onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
-                        disabled={!editor || (isClient && activeChatTab === "team")}
-                      >
-                        <Code className="h-3.5 w-3.5 text-foreground" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-7 w-7 p-0 hover:bg-muted",
-                          editor?.isActive("blockquote") && "bg-muted border border-primary"
-                        )}
-                        onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-                        disabled={!editor || (isClient && activeChatTab === "team")}
-                      >
-                        <Quote className="h-3.5 w-3.5 text-foreground" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          "h-7 w-7 p-0 hover:bg-muted",
-                          editor?.isActive("link") && "bg-muted border border-primary"
-                        )}
-                        onClick={() => {
-                          const previousUrl = editor?.getAttributes("link").href;
-                          const url = window.prompt("Enter URL:", previousUrl);
-                          if (url === null) {
-                            return;
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-2" align="start">
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-7 w-7 p-0 hover:bg-muted",
+                            messageEditor?.isActive("bold") &&
+                              "bg-muted border border-primary"
+                          )}
+                          onClick={() =>
+                            messageEditor?.chain().focus().toggleBold().run()
                           }
-                          if (url === "") {
-                            editor?.chain().focus().extendMarkRange("link").unsetLink().run();
-                            return;
+                          disabled={
+                            !messageEditor ||
+                            (isClient && activeChatTab === "team")
                           }
-                          editor?.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
-                        }}
-                        disabled={!editor || (isClient && activeChatTab === "team")}
-                      >
-                        <LinkIcon className="h-3.5 w-3.5 text-foreground" />
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              ) : (
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0 hover:bg-muted",
-                      editor?.isActive("bold") && "bg-muted border border-primary"
-                    )}
-                    onClick={() => editor?.chain().focus().toggleBold().run()}
-                    disabled={!editor || (isClient && activeChatTab === "team")}
-                  >
-                    <Bold className="h-3.5 w-3.5 text-foreground" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0 hover:bg-muted",
-                      editor?.isActive("italic") && "bg-muted border border-primary"
-                    )}
-                    onClick={() => editor?.chain().focus().toggleItalic().run()}
-                    disabled={!editor || (isClient && activeChatTab === "team")}
-                  >
-                    <Italic className="h-3.5 w-3.5 text-foreground" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0 hover:bg-muted",
-                      editor?.isActive("underline") && "bg-muted border border-primary"
-                    )}
-                    onClick={() => editor?.chain().focus().toggleUnderline().run()}
-                    disabled={!editor || (isClient && activeChatTab === "team")}
-                  >
-                    <Underline className="h-3.5 w-3.5 text-foreground" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0 hover:bg-muted",
-                      editor?.isActive("strike") && "bg-muted border border-primary"
-                    )}
-                    onClick={() => editor?.chain().focus().toggleStrike().run()}
-                    disabled={!editor || (isClient && activeChatTab === "team")}
-                  >
-                    <Strikethrough className="h-3.5 w-3.5 text-foreground" />
-                  </Button>
-                  <div className="h-4 w-px bg-border mx-0.5" />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0 hover:bg-muted",
-                      editor?.isActive("bulletList") && "bg-muted border border-primary"
-                    )}
-                    onClick={() => editor?.chain().focus().toggleBulletList().run()}
-                    disabled={!editor || (isClient && activeChatTab === "team")}
-                  >
-                    <List className="h-3.5 w-3.5 text-foreground" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0 hover:bg-muted",
-                      editor?.isActive("orderedList") && "bg-muted border border-primary"
-                    )}
-                    onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-                    disabled={!editor || (isClient && activeChatTab === "team")}
-                  >
-                    <ListOrdered className="h-3.5 w-3.5 text-foreground" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 hover:bg-muted"
-                    onClick={() => editor?.chain().focus().liftListItem("listItem").run()}
-                    disabled={!editor || (isClient && activeChatTab === "team")}
-                  >
-                    <Indent className="h-3.5 w-3.5 text-foreground" />
-                  </Button>
-                  <div className="h-4 w-px bg-border mx-0.5" />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0 hover:bg-muted",
-                      editor?.isActive("codeBlock") && "bg-muted border border-primary"
-                    )}
-                    onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
-                    disabled={!editor || (isClient && activeChatTab === "team")}
-                  >
-                    <Code className="h-3.5 w-3.5 text-foreground" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0 hover:bg-muted",
-                      editor?.isActive("blockquote") && "bg-muted border border-primary"
-                    )}
-                    onClick={() => editor?.chain().focus().toggleBlockquote().run()}
-                    disabled={!editor || (isClient && activeChatTab === "team")}
-                  >
-                    <Quote className="h-3.5 w-3.5 text-foreground" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0 hover:bg-muted",
-                      editor?.isActive("link") && "bg-muted border border-primary"
-                    )}
-                    onClick={() => {
-                      const previousUrl = editor?.getAttributes("link").href;
-                      const url = window.prompt("Enter URL:", previousUrl);
-                      if (url === null) {
-                        return;
+                        >
+                          <Bold className="h-3.5 w-3.5 text-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-7 w-7 p-0 hover:bg-muted",
+                            messageEditor?.isActive("italic") &&
+                              "bg-muted border border-primary"
+                          )}
+                          onClick={() =>
+                            messageEditor?.chain().focus().toggleItalic().run()
+                          }
+                          disabled={
+                            !messageEditor ||
+                            (isClient && activeChatTab === "team")
+                          }
+                        >
+                          <Italic className="h-3.5 w-3.5 text-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-7 w-7 p-0 hover:bg-muted",
+                            messageEditor?.isActive("underline") &&
+                              "bg-muted border border-primary"
+                          )}
+                          onClick={() =>
+                            messageEditor
+                              ?.chain()
+                              .focus()
+                              .toggleUnderline()
+                              .run()
+                          }
+                          disabled={
+                            !messageEditor ||
+                            (isClient && activeChatTab === "team")
+                          }
+                        >
+                          <Underline className="h-3.5 w-3.5 text-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-7 w-7 p-0 hover:bg-muted",
+                            messageEditor?.isActive("strike") &&
+                              "bg-muted border border-primary"
+                          )}
+                          onClick={() =>
+                            messageEditor?.chain().focus().toggleStrike().run()
+                          }
+                          disabled={
+                            !messageEditor ||
+                            (isClient && activeChatTab === "team")
+                          }
+                        >
+                          <Strikethrough className="h-3.5 w-3.5 text-foreground" />
+                        </Button>
+                        <div className="h-4 w-px bg-border mx-0.5" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-7 w-7 p-0 hover:bg-muted",
+                            messageEditor?.isActive("bulletList") &&
+                              "bg-muted border border-primary"
+                          )}
+                          onClick={() =>
+                            messageEditor
+                              ?.chain()
+                              .focus()
+                              .toggleBulletList()
+                              .run()
+                          }
+                          disabled={
+                            !messageEditor ||
+                            (isClient && activeChatTab === "team")
+                          }
+                        >
+                          <List className="h-3.5 w-3.5 text-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-7 w-7 p-0 hover:bg-muted",
+                            messageEditor?.isActive("orderedList") &&
+                              "bg-muted border border-primary"
+                          )}
+                          onClick={() =>
+                            messageEditor
+                              ?.chain()
+                              .focus()
+                              .toggleOrderedList()
+                              .run()
+                          }
+                          disabled={
+                            !messageEditor ||
+                            (isClient && activeChatTab === "team")
+                          }
+                        >
+                          <ListOrdered className="h-3.5 w-3.5 text-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 hover:bg-muted"
+                          onClick={() =>
+                            messageEditor
+                              ?.chain()
+                              .focus()
+                              .liftListItem("listItem")
+                              .run()
+                          }
+                          disabled={
+                            !messageEditor ||
+                            (isClient && activeChatTab === "team")
+                          }
+                        >
+                          <Indent className="h-3.5 w-3.5 text-foreground" />
+                        </Button>
+                        <div className="h-4 w-px bg-border mx-0.5" />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-7 w-7 p-0 hover:bg-muted",
+                            messageEditor?.isActive("codeBlock") &&
+                              "bg-muted border border-primary"
+                          )}
+                          onClick={() =>
+                            messageEditor
+                              ?.chain()
+                              .focus()
+                              .toggleCodeBlock()
+                              .run()
+                          }
+                          disabled={
+                            !messageEditor ||
+                            (isClient && activeChatTab === "team")
+                          }
+                        >
+                          <Code className="h-3.5 w-3.5 text-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-7 w-7 p-0 hover:bg-muted",
+                            messageEditor?.isActive("blockquote") &&
+                              "bg-muted border border-primary"
+                          )}
+                          onClick={() =>
+                            messageEditor
+                              ?.chain()
+                              .focus()
+                              .toggleBlockquote()
+                              .run()
+                          }
+                          disabled={
+                            !messageEditor ||
+                            (isClient && activeChatTab === "team")
+                          }
+                        >
+                          <Quote className="h-3.5 w-3.5 text-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-7 w-7 p-0 hover:bg-muted",
+                            messageEditor?.isActive("link") &&
+                              "bg-muted border border-primary"
+                          )}
+                          onClick={() => {
+                            const previousUrl =
+                              messageEditor?.getAttributes("link").href;
+                            const url = window.prompt(
+                              "Enter URL:",
+                              previousUrl
+                            );
+                            if (url === null) {
+                              return;
+                            }
+                            if (url === "") {
+                              messageEditor
+                                ?.chain()
+                                .focus()
+                                .extendMarkRange("link")
+                                .unsetLink()
+                                .run();
+                              return;
+                            }
+                            messageEditor
+                              ?.chain()
+                              .focus()
+                              .extendMarkRange("link")
+                              .setLink({ href: url })
+                              .run();
+                          }}
+                          disabled={
+                            !messageEditor ||
+                            (isClient && activeChatTab === "team")
+                          }
+                        >
+                          <LinkIcon className="h-3.5 w-3.5 text-foreground" />
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 w-7 p-0 hover:bg-muted",
+                        messageEditor?.isActive("bold") &&
+                          "bg-muted border border-primary"
+                      )}
+                      onClick={() =>
+                        messageEditor?.chain().focus().toggleBold().run()
                       }
-                      if (url === "") {
-                        editor?.chain().focus().extendMarkRange("link").unsetLink().run();
-                        return;
+                      disabled={
+                        !messageEditor || (isClient && activeChatTab === "team")
                       }
-                      editor?.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
-                    }}
-                    disabled={!editor || (isClient && activeChatTab === "team")}
-                  >
-                    <LinkIcon className="h-3.5 w-3.5 text-foreground" />
-                  </Button>
-                </div>
-              )}
+                    >
+                      <Bold className="h-3.5 w-3.5 text-foreground" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 w-7 p-0 hover:bg-muted",
+                        messageEditor?.isActive("italic") &&
+                          "bg-muted border border-primary"
+                      )}
+                      onClick={() =>
+                        messageEditor?.chain().focus().toggleItalic().run()
+                      }
+                      disabled={
+                        !messageEditor || (isClient && activeChatTab === "team")
+                      }
+                    >
+                      <Italic className="h-3.5 w-3.5 text-foreground" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 w-7 p-0 hover:bg-muted",
+                        messageEditor?.isActive("underline") &&
+                          "bg-muted border border-primary"
+                      )}
+                      onClick={() =>
+                        messageEditor?.chain().focus().toggleUnderline().run()
+                      }
+                      disabled={
+                        !messageEditor || (isClient && activeChatTab === "team")
+                      }
+                    >
+                      <Underline className="h-3.5 w-3.5 text-foreground" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 w-7 p-0 hover:bg-muted",
+                        messageEditor?.isActive("strike") &&
+                          "bg-muted border border-primary"
+                      )}
+                      onClick={() =>
+                        messageEditor?.chain().focus().toggleStrike().run()
+                      }
+                      disabled={
+                        !messageEditor || (isClient && activeChatTab === "team")
+                      }
+                    >
+                      <Strikethrough className="h-3.5 w-3.5 text-foreground" />
+                    </Button>
+                    <div className="h-4 w-px bg-border mx-0.5" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 w-7 p-0 hover:bg-muted",
+                        messageEditor?.isActive("bulletList") &&
+                          "bg-muted border border-primary"
+                      )}
+                      onClick={() =>
+                        messageEditor?.chain().focus().toggleBulletList().run()
+                      }
+                      disabled={
+                        !messageEditor || (isClient && activeChatTab === "team")
+                      }
+                    >
+                      <List className="h-3.5 w-3.5 text-foreground" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 w-7 p-0 hover:bg-muted",
+                        messageEditor?.isActive("orderedList") &&
+                          "bg-muted border border-primary"
+                      )}
+                      onClick={() =>
+                        messageEditor?.chain().focus().toggleOrderedList().run()
+                      }
+                      disabled={
+                        !messageEditor || (isClient && activeChatTab === "team")
+                      }
+                    >
+                      <ListOrdered className="h-3.5 w-3.5 text-foreground" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 hover:bg-muted"
+                      onClick={() =>
+                        messageEditor
+                          ?.chain()
+                          .focus()
+                          .liftListItem("listItem")
+                          .run()
+                      }
+                      disabled={
+                        !messageEditor || (isClient && activeChatTab === "team")
+                      }
+                    >
+                      <Indent className="h-3.5 w-3.5 text-foreground" />
+                    </Button>
+                    <div className="h-4 w-px bg-border mx-0.5" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 w-7 p-0 hover:bg-muted",
+                        messageEditor?.isActive("codeBlock") &&
+                          "bg-muted border border-primary"
+                      )}
+                      onClick={() =>
+                        messageEditor?.chain().focus().toggleCodeBlock().run()
+                      }
+                      disabled={
+                        !messageEditor || (isClient && activeChatTab === "team")
+                      }
+                    >
+                      <Code className="h-3.5 w-3.5 text-foreground" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 w-7 p-0 hover:bg-muted",
+                        messageEditor?.isActive("blockquote") &&
+                          "bg-muted border border-primary"
+                      )}
+                      onClick={() =>
+                        messageEditor?.chain().focus().toggleBlockquote().run()
+                      }
+                      disabled={
+                        !messageEditor || (isClient && activeChatTab === "team")
+                      }
+                    >
+                      <Quote className="h-3.5 w-3.5 text-foreground" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 w-7 p-0 hover:bg-muted",
+                        messageEditor?.isActive("link") &&
+                          "bg-muted border border-primary"
+                      )}
+                      onClick={() => {
+                        const previousUrl =
+                          messageEditor?.getAttributes("link").href;
+                        const url = window.prompt("Enter URL:", previousUrl);
+                        if (url === null) {
+                          return;
+                        }
+                        if (url === "") {
+                          messageEditor
+                            ?.chain()
+                            .focus()
+                            .extendMarkRange("link")
+                            .unsetLink()
+                            .run();
+                          return;
+                        }
+                        messageEditor
+                          ?.chain()
+                          .focus()
+                          .extendMarkRange("link")
+                          .setLink({ href: url })
+                          .run();
+                      }}
+                      disabled={
+                        !messageEditor || (isClient && activeChatTab === "team")
+                      }
+                    >
+                      <LinkIcon className="h-3.5 w-3.5 text-foreground" />
+                    </Button>
+                  </div>
+                )}
 
-              {/* Comment Button */}
-              <Button
-                onClick={handleSend}
-                disabled={
-                  !editor ||
-                  !hasEditorContent ||
-                  (isClient && activeChatTab === "team")
-                }
-                className="h-[34px] px-[18px] rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span className="text-sm font-medium">Comment</span>
-              </Button>
+                {/* Comment Button */}
+                <Button
+                  onClick={handleSend}
+                  disabled={
+                    !messageEditor ||
+                    !hasEditorContent ||
+                    (isClient && activeChatTab === "team")
+                  }
+                  className="h-[34px] px-[18px] rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="text-sm font-medium">Comment</span>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       </>
     );
 
@@ -1609,7 +1825,11 @@ export function JobTaskView({
     }
 
     // For sheet and dialog variants, use FooterComponent
-    return <FooterComponent className="flex flex-col! border-t p-4 md:p-6 pt-0 gap-0">{footerContent}</FooterComponent>;
+    return (
+      <FooterComponent className="flex flex-col! border-t p-4 md:p-6 pt-0 gap-0">
+        {footerContent}
+      </FooterComponent>
+    );
   };
 
   // Render main content (shared between Sheet and Dialog)
@@ -1619,15 +1839,27 @@ export function JobTaskView({
         ref={scrollContainerRef}
         className={cn(
           "h-full overflow-y-auto",
-          variant === "dialog" ? "max-h-[calc(90vh-200px)]" : variant === "page" ? "h-full" : "flex-1"
+          variant === "dialog"
+            ? "max-h-[calc(90vh-200px)]"
+            : variant === "page"
+            ? "h-full"
+            : "flex-1"
         )}
       >
         <Tabs defaultValue="task" className="gap-0 size-full px-4 md:px-8">
           <TabsList className="grid w-full grid-cols-2 mt-6">
-            <TabsTrigger value="task" onClick={() => setActiveTab("discussion")} className="flex items-center gap-2 cursor-pointer">
+            <TabsTrigger
+              value="task"
+              onClick={() => setActiveTab("discussion")}
+              className="flex items-center gap-2 cursor-pointer"
+            >
               Task
             </TabsTrigger>
-            <TabsTrigger value="media" onClick={() => setActiveTab("media")} className="flex items-center gap-2 cursor-pointer">
+            <TabsTrigger
+              value="media"
+              onClick={() => setActiveTab("media")}
+              className="flex items-center gap-2 cursor-pointer"
+            >
               Media
             </TabsTrigger>
           </TabsList>
@@ -1635,25 +1867,88 @@ export function JobTaskView({
             <div className="py-6 space-y-6">
               {/* Task Fields Grid */}
               <div className="grid grid-cols-[minmax(0,140px)_1fr] gap-y-3.5">
-                {/* Task Name */}
+                {/* Address */}
                 <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-                  Task name
+                  Address
                 </div>
                 <div className="text-sm font-medium text-foreground">
                   {job.propertyAddress}
                 </div>
 
-                {/* Client */}
+                {/* Customer */}
                 <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-                  Client
+                  Customer
                 </div>
                 <div className="text-sm text-foreground">
-                  {job.clientName}
+                  {/* {job.clientName
+                    ? job.clientName
+                    : onSetCustomer && (
+                        <Button
+                          onClick={onSetCustomer}
+                          variant="muted"
+                          size="sm"
+                          className="h-7 rounded-full"
+                        >
+                          Set Customer
+                        </Button>
+                      )} */}
                 </div>
 
-                {/* People */}
+                {/* Project Manager Assigned */}
                 <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-                  People
+                  Project Manager Assigned
+                </div>
+                <div className="flex items-center gap-2">
+                  {projectManager ? (
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
+                        <Avatar className="h-7 w-7">
+                          <AvatarImage
+                            // src={projectManager.avatarUrl}
+                            // alt={projectManager.name}
+                          />
+                          <AvatarFallback className="text-xs bg-muted-foreground/20">
+                            {/* {projectManager.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")} */}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium text-foreground">
+                          {/* {projectManager.name} */}
+                        </span>
+                      </div>
+                      {onChangeTechnician &&
+                        (job?.status === "assigned" ||
+                          job?.status === "in_progress") && (
+                          <Button
+                            onClick={onChangeTechnician}
+                            variant="muted"
+                            size="sm"
+                            className="h-7 rounded-full"
+                          >
+                            <Edit className="h-3.5 w-3.5 mr-1.5" />
+                            Change
+                          </Button>
+                        )}
+                    </div>
+                  ) : (
+                    onAssignTechnician && (
+                      <Button
+                        onClick={onAssignTechnician}
+                        variant="muted"
+                        size="sm"
+                        className="h-7 rounded-full"
+                      >
+                        Assign Project Manager
+                      </Button>
+                    )
+                  )}
+                </div>
+
+                {/* Photographer Assigned */}
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                  Photographer Assigned
                 </div>
                 <div className="flex items-center gap-2">
                   {photographer ? (
@@ -1661,7 +1956,7 @@ export function JobTaskView({
                       <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
                         <Avatar className="h-7 w-7">
                           <AvatarImage
-                            src={photographer.avatar}
+                            src={photographer.avatarUrl}
                             alt={photographer.name}
                           />
                           <AvatarFallback className="text-xs bg-muted-foreground/20">
@@ -1675,10 +1970,11 @@ export function JobTaskView({
                           {photographer.name}
                         </span>
                       </div>
-                      {onChangePhotographer &&
-                        (job?.status === "assigned" || job?.status === "in_progress") && (
+                      {onChangeTechnician &&
+                        (job?.status === "assigned" ||
+                          job?.status === "in_progress") && (
                           <Button
-                            onClick={onChangePhotographer}
+                            onClick={onChangeTechnician}
                             variant="muted"
                             size="sm"
                             className="h-7 rounded-full"
@@ -1689,9 +1985,9 @@ export function JobTaskView({
                         )}
                     </div>
                   ) : (
-                    onAssignPhotographer && (
+                    onAssignTechnician && (
                       <Button
-                        onClick={onAssignPhotographer}
+                        onClick={onAssignTechnician}
                         variant="muted"
                         size="sm"
                         className="h-7 rounded-full"
@@ -1702,9 +1998,61 @@ export function JobTaskView({
                   )}
                 </div>
 
-                {/* Due Date */}
+                {/* Editor Assigned */}
                 <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-                  Due date
+                  Editor Assigned
+                </div>
+                <div className="flex items-center gap-2">
+                  {editor ? (
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
+                        <Avatar className="h-7 w-7">
+                          <AvatarImage
+                            // src={editor.avatarUrl}
+                            // alt={editor.name}
+                          />
+                          <AvatarFallback className="text-xs bg-muted-foreground/20">
+                            {/* {editor.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")} */}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium text-foreground">
+                          {/* {editor.name} */}
+                        </span>
+                      </div>
+                      {onChangeTechnician &&
+                        (job?.status === "assigned" ||
+                          job?.status === "in_progress") && (
+                          <Button
+                            onClick={onChangeTechnician}
+                            variant="muted"
+                            size="sm"
+                            className="h-7 rounded-full"
+                          >
+                            <Edit className="h-3.5 w-3.5 mr-1.5" />
+                            Change
+                          </Button>
+                        )}
+                    </div>
+                  ) : (
+                    onAssignTechnician && (
+                      <Button
+                        onClick={onAssignTechnician}
+                        variant="muted"
+                        size="sm"
+                        className="h-7 rounded-full"
+                      >
+                        Assign Editor
+                      </Button>
+                    )
+                  )}
+                </div>
+
+                {/* Schedule Date */}
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                  Schedule date
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {format(new Date(job.scheduledDate), "d MMMM yyyy")}
@@ -1715,11 +2063,16 @@ export function JobTaskView({
                   Status
                 </div>
                 <div>
-                  <Badge variant="flat" className="flex items-center gap-1.5 mb-1 px-0">
-                    <div className={cn(
-                      "size-1.5 rounded-full",
-                      statusConfig.indicatorColor
-                    )} />
+                  <Badge
+                    variant="flat"
+                    className="flex items-center gap-1.5 mb-1 px-0"
+                  >
+                    <div
+                      className={cn(
+                        "size-1.5 rounded-full",
+                        statusConfig.indicatorColor
+                      )}
+                    />
 
                     <span
                       className={cn(
@@ -1741,11 +2094,7 @@ export function JobTaskView({
                     const Icon = getMediaIcon(type);
 
                     return (
-                      <Badge
-                        key={type}
-                        variant="muted"
-
-                      >
+                      <Badge key={type} variant="muted">
                         <Icon className="h-3 w-3" />
                         {type.charAt(0).toUpperCase() + type.slice(1)}
                       </Badge>
@@ -1758,7 +2107,10 @@ export function JobTaskView({
                   Priority
                 </div>
                 <div
-                  className={cn("text-[13px] font-medium", priorityConfig.color)}
+                  className={cn(
+                    "text-[13px] font-medium",
+                    priorityConfig.color
+                  )}
                 >
                   {priorityConfig.label}
                 </div>
@@ -1837,7 +2189,6 @@ export function JobTaskView({
                     )}
                   </Button> */}
                 </div>
-
               </div>
 
               {/* Tab Content */}
@@ -1860,7 +2211,9 @@ export function JobTaskView({
                         <P className="text-sm">
                           {(() => {
                             // Parse date string as local date to avoid timezone shifts
-                            const [year, month, day] = job.scheduledDate.split('-').map(Number);
+                            const [year, month, day] = job.scheduledDate
+                              .split("-")
+                              .map(Number);
                             const date = new Date(year, month - 1, day);
                             return format(date, "MMM d, yyyy");
                           })()}
@@ -1876,18 +2229,47 @@ export function JobTaskView({
                             ? (() => {
                                 const duration = job.estimatedDuration || 60;
                                 // Parse scheduled date and time in local timezone
-                                const [year, month, day] = job.scheduledDate.split('-').map(Number);
-                                const [hours, minutes] = job.scheduledTime.split(':').map(Number);
-                                const scheduledDateTime = new Date(year, month - 1, day, hours || 0, minutes || 0, 0, 0);
-                                const endDateTime = new Date(scheduledDateTime.getTime() + duration * 60 * 1000);
-                                
+                                const [year, month, day] = job.scheduledDate
+                                  .split("-")
+                                  .map(Number);
+                                const [hours, minutes] = job.scheduledTime
+                                  .split(":")
+                                  .map(Number);
+                                const scheduledDateTime = new Date(
+                                  year,
+                                  month - 1,
+                                  day,
+                                  hours || 0,
+                                  minutes || 0,
+                                  0,
+                                  0
+                                );
+                                const endDateTime = new Date(
+                                  scheduledDateTime.getTime() +
+                                    duration * 60 * 1000
+                                );
+
                                 // Get timezone abbreviation
-                                const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                                const timeZoneName = new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop() || '';
-                                
-                                return `${format(scheduledDateTime, 'h:mm a')} - ${format(endDateTime, 'h:mm a')} ${timeZoneName}`;
+                                const timeZone =
+                                  Intl.DateTimeFormat().resolvedOptions()
+                                    .timeZone;
+                                const timeZoneName =
+                                  new Date()
+                                    .toLocaleTimeString("en-US", {
+                                      timeZoneName: "short",
+                                    })
+                                    .split(" ")
+                                    .pop() || "";
+
+                                return `${format(
+                                  scheduledDateTime,
+                                  "h:mm a"
+                                )} - ${format(
+                                  endDateTime,
+                                  "h:mm a"
+                                )} ${timeZoneName}`;
                               })()
-                            : job.scheduledTime || 'Not scheduled'}
+                            : job.scheduledTime || "Not scheduled"}
                         </P>
                       </div>
                     </div>
@@ -1919,7 +2301,11 @@ export function JobTaskView({
                             </div>
                           ) : (
                             clientProcessed.sortedRootMessages.map((message) =>
-                              renderMessage(message, false, clientProcessed.threadMap)
+                              renderMessage(
+                                message,
+                                false,
+                                clientProcessed.threadMap
+                              )
                             )
                           )}
                         </div>
@@ -1933,7 +2319,11 @@ export function JobTaskView({
                             </div>
                           ) : (
                             teamProcessed.sortedRootMessages.map((message) =>
-                              renderMessage(message, false, teamProcessed.threadMap)
+                              renderMessage(
+                                message,
+                                false,
+                                teamProcessed.threadMap
+                              )
                             )
                           )}
                         </div>
@@ -1954,7 +2344,10 @@ export function JobTaskView({
             <div className="py-6">
               <Accordion type="multiple" className="w-full space-y-2">
                 {/* Images Section */}
-                <AccordionItem value="images" className="border rounded-lg px-4">
+                <AccordionItem
+                  value="images"
+                  className="border rounded-lg px-4"
+                >
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center gap-3">
                       <ImageIcon className="h-5 w-5 text-muted-foreground" />
@@ -1972,7 +2365,10 @@ export function JobTaskView({
                 </AccordionItem>
 
                 {/* Videos Section */}
-                <AccordionItem value="videos" className="border rounded-lg px-4">
+                <AccordionItem
+                  value="videos"
+                  className="border rounded-lg px-4"
+                >
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center gap-3">
                       <Video className="h-5 w-5 text-muted-foreground" />
@@ -1990,7 +2386,10 @@ export function JobTaskView({
                 </AccordionItem>
 
                 {/* Floor Plans Section */}
-                <AccordionItem value="floor-plans" className="border rounded-lg px-4">
+                <AccordionItem
+                  value="floor-plans"
+                  className="border rounded-lg px-4"
+                >
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center gap-3">
                       <FileText className="h-5 w-5 text-muted-foreground" />
@@ -2008,7 +2407,10 @@ export function JobTaskView({
                 </AccordionItem>
 
                 {/* 3D Content Section */}
-                <AccordionItem value="3d-content" className="border rounded-lg px-4">
+                <AccordionItem
+                  value="3d-content"
+                  className="border rounded-lg px-4"
+                >
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center gap-3">
                       <Box className="h-5 w-5 text-muted-foreground" />
@@ -2053,23 +2455,34 @@ export function JobTaskView({
   return (
     <>
       {/* Delete Message Confirmation Dialog */}
-      <AlertDialog open={deletingMessageId !== null} onOpenChange={(open) => !open && handleDeleteCancel()}>
+      <AlertDialog
+        open={deletingMessageId !== null}
+        onOpenChange={(open) => !open && handleDeleteCancel()}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Message</AlertDialogTitle>
             <AlertDialogDescription>
-              {deletingMessageId && (() => {
-                // Check if this message has replies
-                const hasReplies = messages.some((m) => m.threadId === deletingMessageId);
-                return hasReplies
-                  ? "This message has replies. Only the message will be deleted, replies will remain."
-                  : "Are you sure you want to delete this message? This action cannot be undone.";
-              })()}
+              {deletingMessageId &&
+                (() => {
+                  // Check if this message has replies
+                  const hasReplies = messages.some(
+                    (m) => m.threadId === deletingMessageId
+                  );
+                  return hasReplies
+                    ? "This message has replies. Only the message will be deleted, replies will remain."
+                    : "Are you sure you want to delete this message? This action cannot be undone.";
+                })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleDeleteCancel}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogCancel onClick={handleDeleteCancel}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -2077,19 +2490,28 @@ export function JobTaskView({
       </AlertDialog>
 
       {/* Cloud Storage Integration Dialog */}
-      <AlertDialog open={cloudStorageDialog.open} onOpenChange={(open) => setCloudStorageDialog({ open, service: "" })}>
+      <AlertDialog
+        open={cloudStorageDialog.open}
+        onOpenChange={(open) => setCloudStorageDialog({ open, service: "" })}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{cloudStorageDialog.service} Integration</AlertDialogTitle>
+            <AlertDialogTitle>
+              {cloudStorageDialog.service} Integration
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {cloudStorageDialog.service} integration is coming soon! This feature will allow you to directly attach files from your {cloudStorageDialog.service} account.
+              {cloudStorageDialog.service} integration is coming soon! This
+              feature will allow you to directly attach files from your{" "}
+              {cloudStorageDialog.service} account.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => {
-              setCloudStorageDialog({ open: false, service: "" });
-              setConnectingService(null);
-            }}>
+            <AlertDialogAction
+              onClick={() => {
+                setCloudStorageDialog({ open: false, service: "" });
+                setConnectingService(null);
+              }}
+            >
               Got it
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -2098,14 +2520,12 @@ export function JobTaskView({
 
       {variant === "page" ? (
         <div className="size-full flex flex-col overflow-hidden h-[calc(100vh-var(--header-h))]">
-          <div className="border-b flex-shrink-0">{renderHeader(SheetTitle)}</div>
-          <div className="flex-1 overflow-hidden">
-            {renderContent()}
+          <div className="border-b flex-shrink-0">
+            {renderHeader(SheetTitle)}
           </div>
+          <div className="flex-1 overflow-hidden">{renderContent()}</div>
           {activeTab === "discussion" && (
-            <div className="flex-shrink-0">
-              {renderFooter(() => null)}
-            </div>
+            <div className="flex-shrink-0">{renderFooter(() => null)}</div>
           )}
         </div>
       ) : variant === "dialog" ? (
@@ -2114,7 +2534,9 @@ export function JobTaskView({
             <DialogTitle className="sr-only">
               {job.propertyAddress} - {job.clientName}
             </DialogTitle>
-            <DialogHeader className="border-b">{renderHeader(DialogTitle)}</DialogHeader>
+            <DialogHeader className="border-b">
+              {renderHeader(DialogTitle)}
+            </DialogHeader>
             {renderContent()}
             {activeTab === "discussion" && renderFooter(DialogFooter)}
           </DialogContent>

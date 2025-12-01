@@ -14,7 +14,7 @@ interface DashboardViewProps {
   user: User;
   projects: Project[];
   jobCards: JobRequest[];
-  photographers: Technician[];
+  technicians: Technician[];
   auditLog: AuditLogEntry[];
   metrics: Metrics;
 }
@@ -23,12 +23,12 @@ export function DashboardView({
   user,
   projects: _projects,
   jobCards,
-  photographers: initialPhotographers,
+  technicians: initialTechnicians,
   auditLog: initialAuditLog,
   metrics: initialMetrics
 }: DashboardViewProps) {
   const [jobs] = useState(jobCards);
-  const [photographers] = useState(initialPhotographers);
+  const [technicians] = useState(initialTechnicians);
   const [auditLog] = useState(initialAuditLog);
   const [metrics] = useState(initialMetrics);
 
@@ -37,9 +37,9 @@ export function DashboardView({
     console.log('Job created:', job);
   };
 
-  const handleJobAssign = (jobId: string, photographerId: string, score: number) => {
+  const handleJobAssign = (jobId: string, technicianId: string, score: number) => {
     // In a real app, this would assign the job via API
-    console.log('Job assigned:', { jobId, photographerId, score });
+    console.log('Job assigned:', { jobId, technicianId, score });
   };
 
   const handleJobStatusChange = (jobId: string, newStatus: JobRequest['status']) => {
@@ -50,7 +50,7 @@ export function DashboardView({
   return (
     <DispatcherDashboard
       jobs={jobs}
-      photographers={photographers}
+      technicians={technicians}
       auditLog={auditLog}
       metrics={metrics}
       onJobCreate={handleJobCreate}

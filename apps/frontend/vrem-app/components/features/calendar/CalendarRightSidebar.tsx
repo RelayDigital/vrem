@@ -19,7 +19,7 @@ import {
   TechnicianColor,
   CalendarView as ViewType,
 } from "@/types/calendar";
-import { Photographer } from "@/types";
+import { Technician } from "@/types";
 import { format, startOfDay, isSameDay } from "date-fns";
 import { cn } from "@/components/ui/utils";
 import { getWeekRange, getMonthRange } from "@/lib/calendar-utils";
@@ -32,7 +32,7 @@ interface CalendarRightSidebarProps {
   onDateSelect: (date: Date) => void;
   filters: CalendarFilters;
   onFiltersChange: (filters: CalendarFilters) => void;
-  technicians: Photographer[];
+  technicians: Technician[];
   technicianColors: TechnicianColor[];
   territories: string[];
   timezone: string;
@@ -307,7 +307,7 @@ export function CalendarRightSidebar({
         </>
       )}
 
-      {/* Technician Filters - hidden when there are no technicians (e.g. photographer view) */}
+      {/* Technician Filters - hidden when there are no technicians (e.g. technician view) */}
       {canSeeTechnicians && (
         <div>
           <div className="flex items-center justify-between mb-3">

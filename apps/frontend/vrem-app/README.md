@@ -64,12 +64,12 @@ vrem-app/
 │       │   ├── settings/        # Settings (account, personal, product)
 │       │   ├── team/            # Team management
 │       │   └── layout.tsx       # Dispatcher layout
-│       ├── photographer/        # Photographer role pages
+│       ├── technician/        # Technician role pages
 │       │   ├── companies/       # Company applications
 │       │   ├── jobs/            # Job dashboard
 │       │   ├── profile/         # Profile management
-│       │   ├── settings/        # Photographer settings
-│       │   └── layout.tsx       # Photographer layout
+│       │   ├── settings/        # Technician settings
+│       │   └── layout.tsx       # Technician layout
 │       ├── booking/             # Shared booking page
 │       ├── calendar/            # Shared calendar page
 │       ├── dashboard/           # Shared dashboard
@@ -87,7 +87,7 @@ vrem-app/
 │   │   ├── agent/               # Agent features
 │   │   │   ├── AgentBookingFlow.tsx
 │   │   │   ├── AgentJobsView.tsx
-│   │   │   ├── steps/           # Booking wizard steps (Address, Details, Photographer Selection)
+│   │   │   ├── steps/           # Booking wizard steps (Address, Details, Technician Selection)
 │   │   │   └── views/           # Agent views
 │   │   ├── dispatcher/          # Dispatcher/PM features
 │   │   │   ├── DispatcherDashboard.tsx
@@ -96,11 +96,11 @@ vrem-app/
 │   │   │   ├── JobAssignment.tsx
 │   │   │   ├── dialogs/         # Ranking dialogs
 │   │   │   └── views/           # Dashboard, Jobs, Audit, Team, Map views
-│   │   ├── photographer/        # Photographer features
-│   │   │   ├── PhotographerDashboard.tsx
-│   │   │   ├── PhotographerCard.tsx
-│   │   │   ├── PhotographerManagement.tsx
-│   │   │   ├── PhotographerSearch.tsx
+│   │   ├── technician/        # Technician features
+│   │   │   ├── TechnicianDashboard.tsx
+│   │   │   ├── TechnicianCard.tsx
+│   │   │   ├── TechnicianManagement.tsx
+│   │   │   ├── TechnicianSearch.tsx
 │   │   │   └── views/           # Companies, Jobs, Profile views
 │   │   ├── calendar/            # Calendar components
 │   │   │   ├── CalendarView.tsx
@@ -136,11 +136,11 @@ vrem-app/
 │   │   │   └── MetricsDashboard.tsx
 │   │   ├── ranking/             # Ranking components
 │   │   │   └── RankingFactors.tsx
-│   │   ├── photographer/        # Photographer components
-│   │   │   ├── FindPhotographerView.tsx
-│   │   │   └── PhotographerRankingsView.tsx
+│   │   ├── technician/        # Technician components
+│   │   │   ├── FindTechnicianView.tsx
+│   │   │   └── TechnicianRankingsView.tsx
 │   │   ├── tables/              # Data tables
-│   │   │   └── PhotographerTable.tsx
+│   │   │   └── TechnicianTable.tsx
 │   │   ├── settings/            # Settings components
 │   │   │   └── SettingsView.tsx
 │   │   ├── layout/               # Layout components
@@ -208,7 +208,7 @@ vrem-app/
 - **Real-time Calendar Integration**: Calendar slot selection with automatic sync
 - **Payment Capture**: Stripe Checkout integration for seamless payments
 - **Address Search**: Real-time address autocomplete using Mapbox (USA & Canada)
-- **AI Photographer Matching**: Automatic ranking and assignment based on multiple factors
+- **AI Technician Matching**: Automatic ranking and assignment based on multiple factors
 
 ### Pipeline-Driven Workflow
 - **Stage Management**: Visual progression through stages (Booked → Shooting → Editing → Delivered)
@@ -233,22 +233,22 @@ vrem-app/
 ### For Agents
 - **Smart Booking Flow**: Multi-step wizard for booking photo shoots with address search
 - **Job Management**: View and track all bookings in one place
-- **AI Photographer Matching**: Automatic ranking of photographers
-- **Job Chat**: Communicate with dispatchers and photographers directly
+- **AI Technician Matching**: Automatic ranking of technicians
+- **Job Chat**: Communicate with dispatchers and technicians directly
 - **Calendar View**: View all bookings in calendar format
 
 ### For Dispatchers/Project Managers
 - **Intelligent Dashboard**: Overview of all jobs, metrics, and team performance
-- **AI-Powered Assignment**: Rank photographers by availability, proximity, skills, and reliability
-- **Live Map View**: Visualize jobs and photographer locations on interactive maps
+- **AI-Powered Assignment**: Rank technicians by availability, proximity, skills, and reliability
+- **Live Map View**: Visualize jobs and technician locations on interactive maps
 - **Audit Logging**: Complete activity tracking for compliance and transparency
-- **Team Management**: Manage photographer network and preferred vendor relationships
+- **Team Management**: Manage technician network and preferred vendor relationships
 - **Kanban Board**: Visual job management with drag-and-drop functionality
 - **Metrics Dashboard**: Track key performance indicators and analytics
 - **Job Management View**: Detailed job management interface
 - **Settings Management**: Account, personal, and product settings
 
-### For Photographers/Technicians
+### For Technicians/Technicians
 - **Job Dashboard**: View upcoming and completed shoots with detailed task management
 - **Profile Management**: Update services, availability, and portfolio
 - **Company Applications**: Apply to join media companies and organizations
@@ -258,7 +258,7 @@ vrem-app/
 
 ## 🧠 AI Ranking Algorithm
 
-Photographers are automatically ranked and matched to jobs using a weighted algorithm that considers:
+Technicians are automatically ranked and matched to jobs using a weighted algorithm that considers:
 
 - **Availability** (30%): Must be available on the requested date (calendar sync)
 - **Preferred Relationships** (25%): Preferred vendors get priority in assignments
@@ -266,7 +266,7 @@ Photographers are automatically ranked and matched to jobs using a weighted algo
 - **Distance** (15%): Proximity to job location using Haversine formula
 - **Skill Match** (10%): Expertise in required media types (photography, video, aerial, twilight)
 
-The system automatically assigns the highest-ranked available photographer, with fallback logic for declines or timeouts. Agents can review assigned photographers and request reassignment if needed.
+The system automatically assigns the highest-ranked available technician, with fallback logic for declines or timeouts. Agents can review assigned technicians and request reassignment if needed.
 
 See `lib/ranking.ts` for implementation details.
 
@@ -275,7 +275,7 @@ See `lib/ranking.ts` for implementation details.
 The frontend manages the complete media production lifecycle through a pipeline-driven workflow:
 
 1. **Booked**: Agent creates shoot order with payment capture and calendar confirmation
-2. **Shooting**: Photographer assigned, captures media, uploads raw assets
+2. **Shooting**: Technician assigned, captures media, uploads raw assets
 3. **Editing**: Editor processes media, uploads final deliverables
 4. **Delivered**: Client receives delivery page with preview and download options
 
@@ -386,7 +386,7 @@ npm run lint        # Run ESLint
 
 ### Code Organization
 
-- **Feature-based**: Components are organized by feature (agent, dispatcher, photographer)
+- **Feature-based**: Components are organized by feature (agent, dispatcher, technician)
 - **Shared components**: Reusable components in `components/shared/`
 - **UI components**: Design system components in `components/ui/`
 - **Context providers**: Global state in `context/`

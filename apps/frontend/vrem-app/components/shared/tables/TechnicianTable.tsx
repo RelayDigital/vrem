@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Technician, Photographer } from '../../../types';
+import { Technician } from '../../../types';
 import {
   Table,
   TableBody,
@@ -21,31 +21,30 @@ import {
   SelectValue,
 } from '../../ui/select';
 
-interface PhotographerTableProps {
-  photographers?: Photographer[]; // Deprecated: use technicians
-  technicians?: Technician[];
-  onRowClick?: (technician: Technician | Photographer) => void;
+interface TechnicianTableProps {
+  technicians?: Technician[]; // Deprecated: use technicians
+  onRowClick?: (technician: Technician | Technician) => void;
 }
 
-export function PhotographerTable({ photographers, technicians, onRowClick }: PhotographerTableProps) {
-  // Use technicians if provided, fallback to photographers for backwards compatibility
-  const effectiveTechnicians = technicians || photographers || [];
+export function TechnicianTable({ technicians, onRowClick }: TechnicianTableProps) {
+  // Use technicians if provided, fallback to technicians for backwards compatibility
+  const effectiveTechnicians = technicians || technicians || [];
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<string>('name-asc');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
-  // Filter and sort photographers
-  const filteredAndSortedPhotographers = useMemo(() => {
+  // Filter and sort technicians
+  const filteredAndSortedTechnicians = useMemo(() => {
     let result = [...effectiveTechnicians];
 
     // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      result = result.filter((photographer) => {
-        const name = photographer.name.toLowerCase();
-        const email = photographer.email.toLowerCase();
-        const location = getLocationDisplay(photographer.homeLocation.address, true).toLowerCase();
+      result = result.filter((technician) => {
+        const name = technician.name.toLowerCase();
+        const email = technician.email.toLowerCase();
+        const location = getLocationDisplay(technician.homeLocation.address, true).toLowerCase();
         return name.includes(query) || email.includes(query) || location.includes(query);
       });
     }
@@ -153,9 +152,9 @@ export function PhotographerTable({ photographers, technicians, onRowClick }: Ph
       </div>
 
       {/* Results Count */}
-      {filteredAndSortedPhotographers.length > 0 && (
+      {filteredAndSortedTechnicians.length > 0 && (
         <div className="text-sm text-muted-foreground">
-          Showing {filteredAndSortedPhotographers.length} of {effectiveTechnicians.length} technicians
+          Showing {filteredAndSortedTechnicians.length} of {effectiveTechnicians.length} technicians
         </div>
       )}
 
@@ -163,7 +162,7 @@ export function PhotographerTable({ photographers, technicians, onRowClick }: Ph
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Photographer</TableHead>
+          <TableHead>Technician</TableHead>
           <TableHead>Location</TableHead>
           <TableHead>Rating</TableHead>
           <TableHead>Jobs</TableHead>
@@ -172,65 +171,65 @@ export function PhotographerTable({ photographers, technicians, onRowClick }: Ph
         </TableRow>
       </TableHeader>
       <TableBody>
-        {filteredAndSortedPhotographers.length === 0 ? (
+        {filteredAndSortedTechnicians.length === 0 ? (
           <TableRow>
             <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
               No technicians found
             </TableCell>
           </TableRow>
         ) : (
-          filteredAndSortedPhotographers.map((photographer) => (
+          filteredAndSortedTechnicians.map((technician) => (
           <TableRow
-            key={photographer.id}
+            key={technician.id}
             className={onRowClick ? 'cursor-pointer hover:bg-muted/50' : ''}
-            onClick={() => onRowClick?.(photographer)}
+            onClick={() => onRowClick?.(technician)}
           >
             <TableCell>
               <div className="flex items-center gap-3">
                 <Avatar className="size-10 border-2 border-border">
-                  <AvatarImage src={photographer.avatar} />
+                  <AvatarImage src={technician.avatar} />
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    {photographer.name
+                    {technician.name
                       .split(' ')
                       .map((n) => n[0])
                       .join('')}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <div className="font-medium">{photographer.name}</div>
-                  <div className="text-sm text-muted-foreground">{photographer.email}</div>
+                  <div className="font-medium">{technician.name}</div>
+                  <div className="text-sm text-muted-foreground">{technician.email}</div>
                 </div>
               </div>
             </TableCell>
             <TableCell>
               <div className="flex items-center gap-1 text-sm">
                 <MapPin className="h-4 w-4 text-muted-foreground/60" />
-                <span className="text-muted-foreground">{getLocationDisplay(photographer.homeLocation.address, true)}</span>
+                <span className="text-muted-foreground">{getLocationDisplay(technician.homeLocation.address, true)}</span>
               </div>
             </TableCell>
             <TableCell>
               <div className="flex items-center gap-1">
                 <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span>{photographer.rating.overall}</span>
-                <span className="text-sm text-muted-foreground">({photographer.rating.count})</span>
+                <span>{technician.rating.overall}</span>
+                <span className="text-sm text-muted-foreground">({technician.rating.count})</span>
               </div>
             </TableCell>
             <TableCell>
               <div className="flex items-center gap-1">
                 <Briefcase className="h-4 w-4 text-muted-foreground/60" />
-                <span>{photographer.reliability.totalJobs}</span>
+                <span>{technician.reliability.totalJobs}</span>
               </div>
             </TableCell>
             <TableCell>
               <Badge variant="outline">
-                {(photographer.reliability.onTimeRate * 100).toFixed(0)}%
+                {(technician.reliability.onTimeRate * 100).toFixed(0)}%
               </Badge>
             </TableCell>
             <TableCell>
               <Badge
-                variant={photographer.status === 'active' ? 'default' : 'secondary'}
+                variant={technician.status === 'active' ? 'default' : 'secondary'}
               >
-                {photographer.status}
+                {technician.status}
               </Badge>
             </TableCell>
           </TableRow>

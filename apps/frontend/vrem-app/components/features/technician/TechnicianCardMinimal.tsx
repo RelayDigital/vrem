@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Photographer, PhotographerRanking } from "../../../types";
+import { Technician, TechnicianRanking } from "../../../types";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
 import { Badge } from "../../ui/badge";
 import { Progress } from "../../ui/progress";
@@ -31,9 +31,9 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { P } from "@/components/ui/typography";
 
-interface PhotographerCardMinimalProps {
-  photographer: Photographer;
-  ranking?: PhotographerRanking["factors"];
+interface TechnicianCardMinimalProps {
+  technician: Technician;
+  ranking?: TechnicianRanking["factors"];
   score?: number;
   recommended?: boolean;
   onClick?: () => void;
@@ -49,8 +49,8 @@ const scoreChartConfig = {
   },
 } satisfies ChartConfig;
 
-export function PhotographerCardMinimal({
-  photographer,
+export function TechnicianCardMinimal({
+  technician,
   ranking,
   score,
   recommended,
@@ -59,7 +59,7 @@ export function PhotographerCardMinimal({
   selected,
   isAssigning = false,
   onCollapse,
-}: PhotographerCardMinimalProps) {
+}: TechnicianCardMinimalProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const prevExpandedRef = useRef(isExpanded);
   const isAvailable = ranking ? ranking.availability === 100 : true;
@@ -74,7 +74,7 @@ export function PhotographerCardMinimal({
 
   // MapWithSidebar is dispatcher-only, so show full address
   const displayAddress = getLocationDisplay(
-    photographer.homeLocation.address,
+    technician.homeLocation.address,
     true
   );
 
@@ -112,9 +112,9 @@ export function PhotographerCardMinimal({
         {/* Avatar */}
         <div className="relative shrink-0">
           <Avatar className="size-12 border-2 border-background">
-            <AvatarImage src={photographer.avatar} alt={photographer.name} />
+            <AvatarImage src={technician.avatar} alt={technician.name} />
             <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-              {photographer.name
+              {technician.name
                 .split(" ")
                 .map((n) => n[0])
                 .join("")}
@@ -132,7 +132,7 @@ export function PhotographerCardMinimal({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-1">
             <span className="font-medium text-sm truncate">
-              {photographer.name}
+              {technician.name}
             </span>
             {recommended && (
               <Award className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
@@ -142,7 +142,7 @@ export function PhotographerCardMinimal({
             <div className="flex items-center gap-0.5">
               <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
               <span className="text-xs text-foreground">
-                {photographer.rating.overall}
+                {technician.rating.overall}
               </span>
             </div>
             {ranking && (
@@ -182,15 +182,15 @@ export function PhotographerCardMinimal({
               {/* Full Details */}
               <CardHeader className="space-y-3 min-w-0 w-full p-0 gap-0">
                 {/* Company/Independent Status */}
-                {!photographer.isIndependent && photographer.companyName && (
+                {!technician.isIndependent && technician.companyName && (
                   <div className="flex items-center gap-1.5">
                     <Building2 className="h-3.5 w-3.5 text-primary" />
                     <span className="text-xs text-primary">
-                      {photographer.companyName}
+                      {technician.companyName}
                     </span>
                   </div>
                 )}
-                {photographer.isIndependent && (
+                {technician.isIndependent && (
                   <Badge variant="outline" className="text-xs h-5 w-fit">
                     Independent
                   </Badge>
@@ -228,7 +228,7 @@ export function PhotographerCardMinimal({
                     <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
                       <span className="text-muted-foreground">Reliability</span>
                       <span className="text-foreground">
-                        {(photographer.reliability.onTimeRate * 100).toFixed(0)}
+                        {(technician.reliability.onTimeRate * 100).toFixed(0)}
                         %
                       </span>
                     </div>
@@ -247,7 +247,7 @@ export function PhotographerCardMinimal({
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
                             <P className="text-xs">
-                              Calculated by averaging the photographer's skill
+                              Calculated by averaging the technician's skill
                               ratings (1-5 scale) for each media type required
                               by the job. The average is converted to a
                               percentage (multiplied by 20).
@@ -352,7 +352,7 @@ export function PhotographerCardMinimal({
                   <div className="flex items-center justify-center gap-1">
                     <Briefcase className="h-3.5 w-3.5 fill-muted-foreground/60 text-muted-foreground/60" />
                     <span className="text-sm font-semibold text-foreground">
-                      {photographer.reliability.totalJobs}
+                      {technician.reliability.totalJobs}
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground/80 mt-0.5">
@@ -365,7 +365,7 @@ export function PhotographerCardMinimal({
                   <div className="flex items-center justify-center gap-1">
                     <TrendingUp className="h-3.5 w-3.5 fill-muted-foreground/60 text-muted-foreground/60" />
                     <span className="text-sm font-semibold text-foreground">
-                      {photographer.reliability.averageDeliveryTime}h
+                      {technician.reliability.averageDeliveryTime}h
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground/80 mt-0.5">
@@ -395,13 +395,13 @@ export function PhotographerCardMinimal({
                         {recommended && <Award className="h-4 w-4 mr-2" />}
                         {recommended
                           ? "Assign (Recommended)"
-                          : "Assign Photographer"}
+                          : "Assign Technician"}
                       </Button>
                     </span>
                   </TooltipTrigger>
                   {!isAvailable && (
                     <TooltipContent>
-                      <P>This photographer is not available for assignment</P>
+                      <P>This technician is not available for assignment</P>
                     </TooltipContent>
                   )}
                 </Tooltip>

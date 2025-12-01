@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarEvent } from "@/types/calendar";
-import { Photographer } from "@/types";
+import { Technician } from "@/types";
 import {
   Popover,
   PopoverContent,
@@ -16,7 +16,7 @@ import { P } from "@/components/ui/typography";
 
 interface CalendarEventPopoverProps {
   event: CalendarEvent;
-  technician?: Photographer;
+  technician?: Technician;
   technicianColor?: string;
   children: ReactNode;
   onOpenJob?: () => void;

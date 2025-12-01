@@ -28,18 +28,19 @@ interface UseRoleGuardReturn {
 // Map backend role names to frontend role names (for normalization)
 // Same mapping as useRequireRole for consistency
 const roleMap: Record<string, User['role']> = {
-  'ADMIN': 'ADMIN',
-  'PROJECT_MANAGER': 'PROJECT_MANAGER',
-  'TECHNICIAN': 'TECHNICIAN',
-  'EDITOR': 'EDITOR',
-  'AGENT': 'AGENT',
-  // Legacy lowercase mappings (for backwards compatibility)
-  'dispatcher': 'ADMIN',
-  'photographer': 'TECHNICIAN',
-  'agent': 'AGENT',
-  'admin': 'ADMIN',
-  'project_manager': 'PROJECT_MANAGER',
-  'editor': 'EDITOR',
+  DISPATCHER: 'DISPATCHER',
+  TECHNICIAN: 'TECHNICIAN',
+  AGENT: 'AGENT',
+  // Legacy/old mappings to new roles
+  ADMIN: 'DISPATCHER',
+  PROJECT_MANAGER: 'DISPATCHER',
+  EDITOR: 'DISPATCHER',
+  dispatcher: 'DISPATCHER',
+  technician: 'TECHNICIAN',
+  agent: 'AGENT',
+  admin: 'DISPATCHER',
+  project_manager: 'DISPATCHER',
+  editor: 'DISPATCHER',
 };
 
 /**
@@ -100,4 +101,3 @@ export function useRoleGuard(
     isAllowed,
   };
 }
-

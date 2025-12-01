@@ -9,6 +9,6 @@ export type {
 export {
   dispatcherSettingsConfig,
   agentSettingsConfig,
-  photographerSettingsConfig,
+  technicianSettingsConfig,
 } from "./settings-config";
 

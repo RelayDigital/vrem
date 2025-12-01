@@ -5,89 +5,28 @@ import { useRoleGuard } from "@/hooks/useRoleGuard";
 import { TeamView } from "@/components/features/dispatcher/views/TeamView";
 import { TeamLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import { AccessDenied } from "@/components/common/AccessDenied";
-import { PageHeader } from "@/components/shared/layout";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api } from "@/lib/api";
 import { Technician } from "@/types";
+import { fetchOrganizationTechnicians } from "@/lib/technicians";
 
 export default function TeamPage() {
   const { user, isLoading, isAllowed } = useRoleGuard([
     "dispatcher",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
-  const [photographers, setPhotographers] = useState<Technician[]>([]);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [loadingTeam, setLoadingTeam] = useState(true);
 
   // Load team members from backend
   useEffect(() => {
     const loadTeam = async () => {
       try {
-        const members = await api.organizations.listMembers();
-        const technicians = (members || [])
-          .filter((m) => m.role === "TECHNICIAN" && m.user)
-          .map((m) => {
-            const memberUser = m.user!;
-            const personalOrg = m.personalOrg;
-            return {
-              id: memberUser.id,
-              name: memberUser.name || "Unnamed",
-              email: memberUser.email || "",
-              phone: personalOrg?.phone || "",
-              organizationId: memberUser.organizationId,
-              isIndependent: true,
-              status: "active",
-              homeLocation: {
-                lat: 0,
-                lng: 0,
-                address: {
-                  city: personalOrg?.city || "",
-                  stateProvince: personalOrg?.region || "",
-                  country: personalOrg?.countryCode || "",
-                  postalCode: personalOrg?.postalCode || "",
-                  street: personalOrg?.addressLine1 || "",
-                },
-              },
-              availability: [],
-              reliability: {
-                totalJobs: 0,
-                noShows: 0,
-                lateDeliveries: 0,
-                onTimeRate: 0,
-                averageDeliveryTime: 0,
-              },
-              skills: {
-                residential: 0,
-                commercial: 0,
-                aerial: 0,
-                twilight: 0,
-                video: 0,
-              },
-              rating: {
-                overall: 0,
-                count: 0,
-                recent: [],
-              },
-              preferredClients: [],
-              createdAt: new Date(),
-              avatar: undefined,
-              bio: "",
-              services: {
-                photography: true,
-                video: false,
-                aerial: false,
-                twilight: false,
-                editing: false,
-                virtualStaging: false,
-              },
-              portfolio: [],
-              certifications: [],
-            } as Technician;
-          });
-        setPhotographers(technicians);
+        const technicians = await fetchOrganizationTechnicians();
+        setTechnicians(technicians);
       } catch (error) {
         console.error("Failed to load team:", error);
-        setPhotographers([]);
+        setTechnicians([]);
       } finally {
         setLoadingTeam(false);
       }
@@ -145,7 +84,7 @@ export default function TeamPage() {
       {loadingTeam ? (
         <TeamGridSkeleton />
       ) : (
-        <TeamView photographers={photographers} />
+        <TeamView technicians={technicians} />
       )}
     </div>
   );

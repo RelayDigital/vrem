@@ -9,7 +9,7 @@ import { AccessDenied } from "@/components/common/AccessDenied";
 export default function OrganizationBillingPage() {
   const { user, isLoading, isAllowed } = useRoleGuard([
     "dispatcher",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const router = useRouter();

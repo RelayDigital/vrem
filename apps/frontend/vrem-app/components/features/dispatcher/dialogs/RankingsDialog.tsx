@@ -1,6 +1,6 @@
 "use client";
 
-import { JobRequest, Photographer } from "../../../../types";
+import { JobRequest, Technician } from "../../../../types";
 import { MapWithSidebar } from "../../../shared/dashboard/MapWithSidebar";
 import {
   Dialog,
@@ -12,15 +12,15 @@ interface RankingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedJob: JobRequest | null;
-  photographers: Photographer[];
-  onJobAssign: (jobId: string, photographerId: string, score: number) => void;
+  technicians: Technician[];
+  onJobAssign: (jobId: string, technicianId: string, score: number) => void;
 }
 
 export function RankingsDialog({
   open,
   onOpenChange,
   selectedJob,
-  photographers,
+  technicians,
   onJobAssign,
 }: RankingsDialogProps) {
   return (
@@ -28,14 +28,14 @@ export function RankingsDialog({
       <DialogContent className="md:min-w-[90vw] min-w-[calc(100vw-1rem)] md:max-w-[90vw] md:h-[90vh] h-[calc(100vh-1rem)] md:max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col">
         <DialogTitle className="sr-only">
           {selectedJob
-            ? `Photographer Rankings for ${selectedJob.propertyAddress}`
-            : "Photographer Rankings"}
+            ? `Technician Rankings for ${selectedJob.propertyAddress}`
+            : "Technician Rankings"}
         </DialogTitle>
         {selectedJob && (
           <div className="flex-1 min-h-0 overflow-hidden h-full">
             <MapWithSidebar
               jobs={[selectedJob]}
-              photographers={photographers}
+              technicians={technicians}
               selectedJob={selectedJob}
               onSelectJob={() => {}}
               onJobAssign={onJobAssign}

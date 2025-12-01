@@ -1,6 +1,6 @@
 "use client";
 
-import { JobRequest, Photographer } from "../../../types";
+import { JobRequest, Technician } from "../../../types";
 import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
@@ -27,7 +27,7 @@ import { P } from "@/components/ui/typography";
 
 interface JobCardProps {
   job: JobRequest;
-  photographer?: Photographer;
+  technician?: Technician;
   onViewRankings?: () => void;
   onClick?: () => void;
   onViewInProjectManagement?: () => void;
@@ -38,7 +38,7 @@ interface JobCardProps {
 
 export function JobCard({
   job,
-  photographer,
+  technician,
   onViewRankings,
   onClick,
   onViewInProjectManagement,
@@ -467,17 +467,17 @@ export function JobCard({
             )}
           </div>
 
-          {/* Photographer Profile Overlay or Find Photographer Button */}
+          {/* Technician Profile Overlay or Find Technician Button */}
           <div className="flex z-10 self-center w-full">
-            {photographer ? (
+            {technician ? (
               <div className="flex items-center gap-3 pl-1 pr-3 py-1 backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200 rounded-full max-w-[80%] mx-auto h-auto">
                 <Avatar className="size-8">
                   <AvatarImage
-                    src={photographer.avatar}
-                    alt={photographer.name}
+                    src={technician.avatar}
+                    alt={technician.name}
                   />
                   <AvatarFallback className="bg-muted-foreground/20 text-foreground text-xs">
-                    {photographer.name
+                    {technician.name
                       .split(" ")
                       .map((n) => n[0])
                       .join("")}
@@ -486,7 +486,7 @@ export function JobCard({
                 <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                   <div className="inline-flex items-center gap-1.5">
                     <span className="text-sm font-semibold leading-[1.4] text-foreground truncate">
-                      {photographer.name}
+                      {technician.name}
                     </span>
                     <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
                   </div>
@@ -502,7 +502,7 @@ export function JobCard({
                   className="w-full h-auto max-w-[80%] mx-auto px-4 py-2.5 bg-primary text-primary-foreground rounded-3xl shadow-lg hover:bg-primary/90 border-0"
                 >
                   <span className="text-sm font-semibold">
-                    Find Photographer
+                    Find Technician
                   </span>
                   <ArrowRight className="size-4 ml-2" />
                 </Button>

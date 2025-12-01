@@ -5,7 +5,7 @@ import { useRequireRole } from '@/hooks/useRequireRole';
 import { SettingsView } from '@/components/shared/settings';
 import { agentSettingsConfig } from '@/components/shared/settings/settings-config';
 import { agentSettingsComponents } from '@/components/features/agent/settings';
-import { PhotographerDashboard } from '@/components/features/photographer/PhotographerDashboard';
+import { TechnicianDashboard } from '@/components/features/technician/TechnicianDashboard';
 import { useJobManagement } from '@/context/JobManagementContext';
 import { useOrganizations } from '@/hooks/useOrganizations';
 import { SettingsLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
@@ -57,14 +57,14 @@ export default function ProfilePage() {
     );
   }
 
-  // Technician/Photographer: Use PhotographerDashboard with profile view
+  // Technician/Technician: Use TechnicianDashboard with profile view
   if (['TECHNICIAN'].includes(userRole)) {
     const jobs = jobManagement.jobCards;
     const companies = memberships.map(m => m.organization).filter(Boolean);
     const applications: any[] = [];
 
-    // Create a minimal photographer object from user data
-    const photographer = {
+    // Create a minimal technician object from user data
+    const technician = {
       id: user.id,
       name: user.name,
       email: user.email,
@@ -123,8 +123,8 @@ export default function ProfilePage() {
 
     return (
       <div className="size-full overflow-x-hidden">
-        <PhotographerDashboard
-          photographer={photographer}
+        <TechnicianDashboard
+          technician={technician}
           jobs={jobs}
           companies={companies.filter(Boolean) as any[]}
           applications={applications}

@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { H2 } from "@/components/ui/typography";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/components/ui/use-mobile";
 import {
   DropdownMenu,
@@ -33,6 +33,15 @@ import { useJobCreation } from "@/context/JobCreationContext";
 import { useAuth } from "@/context/auth-context";
 import { OrganizationSwitcher } from "@/components/features/dispatcher/OrganizationSwitcher";
 
+function SafeSidebarTrigger() {
+  try {
+    useSidebar();
+  } catch {
+    return null;
+  }
+  return <SidebarTrigger />;
+}
+
 interface AppHeaderProps {
   user: User;
   showNewJobButton?: boolean;
@@ -59,11 +68,11 @@ export function AppHeader({
   const isAgentCalendarView = pathname === "/calendar";
   const isAgentMapView = pathname === "/map";
 
-  // Determine photographer view based on pathname (using canonical routes)
-  const isPhotographerDashboardView = pathname === "/dashboard";
-  const isPhotographerJobsView = pathname.startsWith("/jobs/all-jobs");
-  const isPhotographerCalendarView = pathname === "/calendar";
-  const isPhotographerMapView = pathname === "/map";
+  // Determine technician view based on pathname (using canonical routes)
+  const isTechnicianDashboardView = pathname === "/dashboard";
+  const isTechnicianJobsView = pathname.startsWith("/jobs/all-jobs");
+  const isTechnicianCalendarView = pathname === "/calendar";
+  const isTechnicianMapView = pathname === "/map";
 
   // Determine dispatcher view (check for canonical routes or legacy dispatcher routes)
   const isDispatcherView =
@@ -114,9 +123,7 @@ export function AppHeader({
           <div className="flex items-center justify-between">
             {/* Organization Switcher */}
             <div className="flex items-center gap-3">
-              {(user?.role === "ADMIN" ||
-                user?.role === "PROJECT_MANAGER" ||
-                user?.role === "EDITOR" ||
+              {(user?.role === "DISPATCHER" ||
                 user?.role === ("dispatcher" as any)) && (
                 <OrganizationSwitcher
                   variant="header"
@@ -126,30 +133,24 @@ export function AppHeader({
                 />
               )}
               {(user?.role === "TECHNICIAN" ||
-                user?.role === ("PHOTOGRAPHER" as any) ||
-                user?.role === ("photographer" as any)) && (
+                user?.role === ("technician" as any)) && (
                 <OrganizationSwitcher
                   variant="header"
                   includePersonal
                   showManage={false}
                   onOrgHome={handleOrganizationHome}
-                  accountType="photographer"
+                  accountType="technician"
                 />
               )}
-              {user?.role !== "ADMIN" &&
-                user?.role !== "PROJECT_MANAGER" &&
-                user?.role !== "EDITOR" &&
+              {user?.role !== "DISPATCHER" &&
                 user?.role !== ("dispatcher" as any) &&
                 user?.role !== "TECHNICIAN" &&
-                user?.role !== ("PHOTOGRAPHER" as any) &&
-                user?.role !== ("photographer" as any) && (
+                user?.role !== ("technician" as any) && (
                   <H2 className="p-0 border-0">VX Media</H2>
                 )}
               {!useIsMobile() &&
                 isDispatcherView &&
-                (user?.role === "ADMIN" ||
-                  user?.role === "PROJECT_MANAGER" ||
-                  user?.role === "EDITOR") && <SidebarTrigger />}
+                (user?.role === "DISPATCHER") && <SafeSidebarTrigger />}
             </div>
 
             <div className="flex items-center gap-4">
@@ -187,14 +188,14 @@ export function AppHeader({
                 </div>
               )}
 
-              {/* Photographer View Switcher */}
-              {!useIsMobile() && (user?.role === ("PHOTOGRAPHER" as any) ||
-                user?.role === ("photographer" as any) ||
+              {/* Technician View Switcher */}
+              {!useIsMobile() && (user?.role === ("TECHNICIAN" as any) ||
+                user?.role === ("technician" as any) ||
                 user?.role === ("TECHNICIAN" as any)) && (
                 <div className="flex items-center gap-2">
                   <Button
                     variant={
-                      isPhotographerDashboardView ? "activeFlat" : "mutedFlat"
+                      isTechnicianDashboardView ? "activeFlat" : "mutedFlat"
                     }
                     size="sm"
                     onClick={() => router.push("/dashboard")}
@@ -203,7 +204,7 @@ export function AppHeader({
                   </Button>
                   <Button
                     variant={
-                      isPhotographerJobsView ? "activeFlat" : "mutedFlat"
+                      isTechnicianJobsView ? "activeFlat" : "mutedFlat"
                     }
                     size="sm"
                     onClick={() => router.push("/jobs/all-jobs")}
@@ -212,7 +213,7 @@ export function AppHeader({
                   </Button>
                   <Button
                     variant={
-                      isPhotographerCalendarView ? "activeFlat" : "mutedFlat"
+                      isTechnicianCalendarView ? "activeFlat" : "mutedFlat"
                     }
                     size="sm"
                     onClick={() => router.push("/calendar")}
@@ -220,7 +221,7 @@ export function AppHeader({
                     Calendar
                   </Button>
                   <Button
-                    variant={isPhotographerMapView ? "activeFlat" : "mutedFlat"}
+                    variant={isTechnicianMapView ? "activeFlat" : "mutedFlat"}
                     size="sm"
                     onClick={() => router.push("/map")}
                   >
@@ -231,7 +232,7 @@ export function AppHeader({
 
               {/* New Job Button for Dispatcher */}
               {!useIsMobile() && showNewJobButton &&
-                (user?.role === ("ADMIN" as any) ||
+                (user?.role === ("DISPATCHER" as any) ||
                   user?.role === ("PROJECT_MANAGER" as any) ||
                   user?.role === ("EDITOR" as any)) && (
                   <Button
@@ -253,7 +254,7 @@ export function AppHeader({
                     className="flex items-center gap-3 h-auto p-0"
                   >
                     <Avatar className="h-9 w-9 border-2 border-border shadow-sm">
-                      <AvatarImage src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200" />
+                      <AvatarImage src={user?.avatarUrl || ""} />
                       <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                         {user?.name
                           ? user.name

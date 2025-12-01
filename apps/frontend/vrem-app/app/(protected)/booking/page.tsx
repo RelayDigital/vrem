@@ -11,7 +11,7 @@ import { JobRequest } from "@/types";
 export default function BookingPage() {
   const { user, isLoading } = useRequireRole([
     "AGENT",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const router = useRouter();

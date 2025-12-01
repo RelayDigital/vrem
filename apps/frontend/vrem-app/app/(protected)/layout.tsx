@@ -32,10 +32,11 @@ function LayoutContent({
   const jobManagement = useJobManagement();
   const isMobile = useIsMobile();
 
-  // Determine if user should see sidebar (dispatcher/admin/project manager/editor)
-  const shouldShowSidebar = ['dispatcher', 'ADMIN', 'PROJECT_MANAGER', 'EDITOR'].includes(user.role);
+  // Determine if user should see sidebar (dispatcher only)
+  const normalizedRole = typeof user.role === 'string' ? user.role.toUpperCase() : '';
+  const shouldShowSidebar = normalizedRole === 'DISPATCHER';
   
-  // Determine if user can create jobs (dispatcher/admin/project manager/editor)
+  // Determine if user can create jobs (dispatcher only)
   const canCreateJobs = shouldShowSidebar;
 
   const jobFormContent = (
@@ -101,7 +102,7 @@ function LayoutContent({
         )}
 
         {/* Rankings Dialog - For dispatcher/admin roles */}
-        {/* TODO: replace with real photographer list from backend once users/technicians endpoint is implemented */}
+        {/* TODO: replace with real technician list from backend once users/technicians endpoint is implemented */}
         <RankingsDialog
           open={jobManagement.showRankings}
           onOpenChange={(open) => {
@@ -110,14 +111,14 @@ function LayoutContent({
             }
           }}
           selectedJob={jobManagement.selectedJob}
-          photographers={USE_MOCK_DATA ? [] : []}
+          technicians={USE_MOCK_DATA ? [] : []}
           onJobAssign={jobManagement.assignJob}
         />
       </SidebarProvider>
     );
   }
 
-  // For roles without sidebar (agent, technician/photographer)
+  // For roles without sidebar (agent, technician/technician)
   return (
     <div className="flex h-screen w-full flex-col overflow-y-scroll">
       {/* Header */}
@@ -177,7 +178,7 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   // Support all roles that can access protected routes
-  const { user, isLoading, organizationId } = useRequireRole([
+  const { user, isLoading, organizationId, memberships } = useRequireRole([
     'dispatcher',
     'AGENT',
     'TECHNICIAN',
@@ -186,6 +187,8 @@ export default function ProtectedLayout({
     'PROJECT_MANAGER',
   ]);
   const [initialProjects, setInitialProjects] = useState<Project[] | null>(null);
+  const activeMembershipRole =
+    memberships.find((m) => m.orgId === organizationId)?.role || null;
 
   // Preload projects from dashboard API (reused from agent layout)
   useEffect(() => {
@@ -251,6 +254,8 @@ export default function ProtectedLayout({
       defaultUserId={user?.id}
       defaultOrganizationId={organizationId || undefined}
       initialProjects={initialProjects || undefined}
+      userRole={user?.role}
+      memberRole={activeMembershipRole}
     >
       <JobCreationProviderWrapper
         defaultUserId={user?.id}
@@ -274,7 +279,7 @@ export default function ProtectedLayout({
 }
 
 // Wrapper component to connect JobManagementContext with JobCreationContext
-// Reused from dispatcher/agent/photographer layouts
+// Reused from dispatcher/agent/technician layouts
 function JobCreationProviderWrapper({
   children,
   defaultUserId,

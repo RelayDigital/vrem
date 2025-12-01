@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { DispatcherDashboardView } from "@/components/features/dispatcher/views/DashboardView";
-import { PhotographerDashboardView } from "@/components/features/photographer/views/DashboardView";
+import { TechnicianDashboardView } from "@/components/features/technician/views/DashboardView";
 import { AgentJobsView } from "@/components/features/agent/AgentJobsView";
 import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
-import { JobRequest, Metrics, ProjectStatus } from "@/types";
+import { JobRequest, Metrics, ProjectStatus, Technician } from "@/types";
 import { DashboardLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
@@ -18,6 +18,7 @@ import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
+import { fetchOrganizationTechnicians } from "@/lib/technicians";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -26,18 +27,20 @@ export default function DashboardPage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const jobCreation = useJobCreation();
   const messaging = useMessaging();
   const jobManagement = useJobManagement();
   const navigation = useDispatcherNavigation();
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [loadingTechnicians, setLoadingTechnicians] = useState(false);
   const assignedJobs = useMemo(() => {
     if (!user) return [];
     return jobManagement.jobs.filter(
       (job) =>
-        job.assignedPhotographerId === user.id ||
+        job.assignedTechnicianId === user.id ||
         job.assignedTechnicianId === user.id
     );
   }, [jobManagement.jobs, user]);
@@ -58,7 +61,7 @@ export default function DashboardPage() {
   }, [assignedJobs]);
 
   const shouldFetchMetrics = user
-    ? ["dispatcher", "ADMIN", "PROJECT_MANAGER", "EDITOR"].includes(user.role)
+    ? ["dispatcher", "DISPATCHER", "PROJECT_MANAGER", "EDITOR"].includes(user.role)
     : false;
 
   const {
@@ -72,7 +75,6 @@ export default function DashboardPage() {
     organizationId: "",
     period: "week",
     jobs: { total: 0, pending: 0, assigned: 0, completed: 0, cancelled: 0 },
-    photographers: { active: 0, available: 0, utilization: 0 },
     technicians: { active: 0, available: 0, utilization: 0 },
     performance: {
       averageAssignmentTime: 0,
@@ -108,9 +110,47 @@ export default function DashboardPage() {
   // Fetch messages when selected job changes
   useEffect(() => {
     if (jobManagement.selectedJob) {
-      messaging.fetchMessages(jobManagement.selectedJob.id);
+      messaging.fetchMessages(
+        jobManagement.selectedJob.id,
+        (jobManagement.selectedJob as any)?.organizationId
+      );
     }
   }, [jobManagement.selectedJob, messaging]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTechnicians = async () => {
+      if (!user) {
+        setTechnicians([]);
+        setLoadingTechnicians(false);
+        return;
+      }
+
+      setLoadingTechnicians(true);
+      try {
+        const techs = await fetchOrganizationTechnicians();
+        if (!cancelled) {
+          setTechnicians(techs);
+        }
+      } catch (error) {
+        console.error("Failed to load technicians for dashboard:", error);
+        if (!cancelled) {
+          setTechnicians([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingTechnicians(false);
+        }
+      }
+    };
+
+    loadTechnicians();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   if (isLoading) {
     return <DashboardLoadingSkeleton />;
@@ -120,11 +160,15 @@ export default function DashboardPage() {
     return null; // Redirect handled by hook
   }
 
+  if (loadingTechnicians && technicians.length === 0) {
+    return <DashboardLoadingSkeleton />;
+  }
+
   // Role-based rendering
   const userRole = user.role;
 
   // Dispatcher/Admin/Project Manager/Editor: Use DispatcherDashboardView
-  if (["dispatcher", "ADMIN", "PROJECT_MANAGER", "EDITOR"].includes(userRole)) {
+  if (["dispatcher", "DISPATCHER", "PROJECT_MANAGER", "EDITOR"].includes(userRole)) {
     const displayMetrics = metrics ?? emptyMetrics;
     const handleViewRankings = jobManagement.openRankings;
     const handleJobAssign = jobManagement.assignJob;
@@ -145,9 +189,6 @@ export default function DashboardPage() {
       jobManagement.selectJob(job);
       navigation.navigateToJobInProjectManagement(job);
     };
-
-    // Empty photographers array - backend will provide when endpoint is ready
-    const photographers: any[] = [];
 
     return (
       <div className="size-full overflow-x-hidden space-y-6">
@@ -170,7 +211,7 @@ export default function DashboardPage() {
           ) : (
             <DispatcherDashboardView
               jobs={jobManagement.jobs}
-              photographers={photographers}
+              technicians={technicians}
               metrics={displayMetrics}
               selectedJob={jobManagement.selectedJob}
               onViewRankings={handleViewRankings}
@@ -190,7 +231,7 @@ export default function DashboardPage() {
         {/* Job Task View - Sheet */}
         <JobTaskView
           job={jobManagement.selectedJob}
-          photographer={undefined}
+          // technician={undefined}
           messages={
             jobManagement.selectedJob
               ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
@@ -214,8 +255,8 @@ export default function DashboardPage() {
           }
           onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
           onStatusChange={() => {}}
-          onAssignPhotographer={jobManagement.handleAssignPhotographer}
-          onChangePhotographer={jobManagement.handleChangePhotographer}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
           variant="sheet"
           onFullScreen={handleFullScreen}
           onOpenInNewPage={handleOpenInNewPage}
@@ -224,7 +265,7 @@ export default function DashboardPage() {
         {/* Job Task View - Dialog (Full Screen) */}
         <JobTaskView
           job={jobManagement.selectedJob}
-          photographer={undefined}
+          // technician={undefined}
           messages={
             jobManagement.selectedJob
               ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
@@ -248,15 +289,15 @@ export default function DashboardPage() {
           }
           onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
           onStatusChange={() => {}}
-          onAssignPhotographer={jobManagement.handleAssignPhotographer}
-          onChangePhotographer={jobManagement.handleChangePhotographer}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
           variant="dialog"
         />
       </div>
     );
   }
 
-  // Technician/Photographer: Use PhotographerDashboardView
+  // Technician/Technician: Use TechnicianDashboardView
   if (["TECHNICIAN"].includes(userRole)) {
     const handleJobClick = jobManagement.openTaskView;
     const handleJobSelect = jobManagement.toggleJobSelection;
@@ -284,16 +325,13 @@ export default function DashboardPage() {
       router.push(`/jobs/${job.id}`);
     };
 
-    // Empty photographers array - backend will provide when endpoint is ready
-    const photographers: any[] = [];
-
     return (
       <div className="size-full overflow-x-hidden space-y-6">
         <div className="container relative mx-auto px-md pb-md">
           <JobDataBoundary fallback={<DashboardLoadingSkeleton />}>
-            <PhotographerDashboardView
+            <TechnicianDashboardView
               jobs={assignedJobs}
-              photographers={photographers}
+              technicians={technicians}
               selectedJob={jobManagement.selectedJob}
               stats={assignedJobStats}
               onSelectJob={handleJobSelect}
@@ -311,7 +349,7 @@ export default function DashboardPage() {
         {/* Job Task View - Sheet */}
         <JobTaskView
           job={jobManagement.selectedJob}
-          photographer={undefined}
+          // technician={undefined}
           messages={
             jobManagement.selectedJob
               ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
@@ -350,8 +388,8 @@ export default function DashboardPage() {
               );
             }
           }}
-          onAssignPhotographer={jobManagement.handleAssignPhotographer}
-          onChangePhotographer={jobManagement.handleChangePhotographer}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
           variant="sheet"
           onFullScreen={handleFullScreen}
           onOpenInNewPage={handleOpenInNewPage}
@@ -360,7 +398,7 @@ export default function DashboardPage() {
         {/* Job Task View - Dialog (Full Screen) */}
         <JobTaskView
           job={jobManagement.selectedJob}
-          photographer={undefined}
+          // technician={undefined}
           messages={
             jobManagement.selectedJob
               ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
@@ -399,8 +437,8 @@ export default function DashboardPage() {
               );
             }
           }}
-          onAssignPhotographer={jobManagement.handleAssignPhotographer}
-          onChangePhotographer={jobManagement.handleChangePhotographer}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
           variant="dialog"
         />
       </div>

@@ -51,7 +51,7 @@ interface ExpandableListModalProps<T> {
   useGridLayout?: boolean; // Use 3-column grid layout in modal (default: true)
   renderHeaderActions?: (scrollLeft: () => void, scrollRight: () => void) => React.ReactNode; // Render navigation buttons in header
   onScrollControlsReady?: (scrollLeft: () => void, scrollRight: () => void) => void; // Callback to expose scroll controls
-  nestedView?: React.ReactNode; // Nested view to show instead of items (e.g., photographer rankings)
+  nestedView?: React.ReactNode; // Nested view to show instead of items (e.g., technician rankings)
   nestedViewTitle?: string; // Title for nested view
   onNestedViewClose?: () => void; // Callback when nested view should close
   onShowNestedView?: (show: (view: React.ReactNode, title: string) => void) => void; // Callback to expose function to show nested view

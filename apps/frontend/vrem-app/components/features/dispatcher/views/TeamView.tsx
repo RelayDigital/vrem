@@ -1,20 +1,20 @@
 "use client";
 
 import { H2 } from "@/components/ui/typography";
-import { Photographer } from "../../../../types";
-import { PhotographerManagement } from "../../photographer";
+import { Technician } from "../../../../types";
+import { TechnicianManagement } from "../../technician";
 
 interface TeamViewProps {
-  photographers: Photographer[];
+  technicians: Technician[];
 }
 
-export function TeamView({ photographers }: TeamViewProps) {
+export function TeamView({ technicians }: TeamViewProps) {
   return (
     <main className="container relative mx-auto">
       <article className="flex flex-col gap-2xl md:gap-3xl px-md">
         <div className="@container w-full mt-md mb-md">
           <H2 className="text-4xl mb-xs">Team</H2>
-          <PhotographerManagement photographers={photographers} />
+          <TechnicianManagement technicians={technicians} />
         </div>
       </article>
     </main>

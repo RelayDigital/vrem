@@ -15,7 +15,7 @@ export default function SupportContactPage() {
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "ADMIN",
+    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const [subject, setSubject] = useState("");
