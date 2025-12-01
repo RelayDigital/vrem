@@ -12,7 +12,6 @@ import {
 import { ScrollArea } from "../../ui/scroll-area";
 import {
   FileText,
-  UserPlus,
   UserCheck,
   CheckCircle2,
   XCircle,
@@ -21,12 +20,14 @@ import {
   Clock,
 } from "lucide-react";
 import { H2, P } from "@/components/ui/typography";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface AuditLogProps {
   entries: AuditLogEntry[];
+  isLoading?: boolean;
 }
 
-export function AuditLog({ entries }: AuditLogProps) {
+export function AuditLog({ entries, isLoading = false }: AuditLogProps) {
   const getActionIcon = (action: string) => {
     if (action.includes("created")) return FileText;
     if (action.includes("assigned")) return UserCheck;
@@ -89,72 +90,99 @@ export function AuditLog({ entries }: AuditLogProps) {
                 <TableHead>Details</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {sortedEntries.map((entry) => {
-                const ActionIcon = getActionIcon(entry.action);
-                const actionColor = getActionColor(entry.action);
-
-                return (
-                  <TableRow key={entry.id}>
+          <TableBody>
+            {isLoading
+              ? Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={`audit-skeleton-${index}`}>
                     <TableCell>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        <span>{formatTimestamp(entry.timestamp)}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {entry.timestamp.toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          second: "2-digit",
-                        })}
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-40" />
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm">{entry.userName}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {entry.userId}
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-3 w-20" />
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className={`flex items-center gap-2 ${actionColor}`}>
-                        <ActionIcon className="h-4 w-4" />
-                        <span className="text-sm">{entry.action}</span>
-                      </div>
+                      <Skeleton className="h-4 w-32" />
                     </TableCell>
                     <TableCell>
-                      <div className="space-y-1">
-                        <Badge variant="outline">{entry.resourceType}</Badge>
-                        <div className="text-xs text-muted-foreground">
-                          {entry.resourceId}
-                        </div>
-                      </div>
+                      <Skeleton className="h-6 w-20" />
                     </TableCell>
                     <TableCell>
-                      <div className="space-y-1 max-w-[300px]">
-                        {Object.entries(entry.details).map(([key, value]) => (
-                          <div key={key} className="text-xs">
-                            <span className="text-muted-foreground">
-                              {key}:
-                            </span>{" "}
-                            <span>
-                              {typeof value === "object"
-                                ? JSON.stringify(value)
-                                : String(value)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </ScrollArea>
-      </div>
+                ))
+              : sortedEntries.map((entry) => {
+                  const ActionIcon = getActionIcon(entry.action);
+                  const actionColor = getActionColor(entry.action);
+
+                  return (
+                    <TableRow key={entry.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <span>{formatTimestamp(entry.timestamp)}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {entry.timestamp.toLocaleString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                          })}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">{entry.userName}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {entry.userId}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className={`flex items-center gap-2 ${actionColor}`}>
+                          <ActionIcon className="h-4 w-4" />
+                          <span className="text-sm">{entry.action}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <Badge variant="outline">{entry.resourceType}</Badge>
+                          <div className="text-xs text-muted-foreground">
+                            {entry.resourceId}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1 max-w-[300px]">
+                          {Object.entries(entry.details).map(([key, value]) => (
+                            <div key={key} className="text-xs">
+                              <span className="text-muted-foreground">
+                                {key}:
+                              </span>{" "}
+                              <span>
+                                {typeof value === "object"
+                                  ? JSON.stringify(value)
+                                  : String(value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+          </TableBody>
+        </Table>
+      </ScrollArea>
+    </div>
     </div>
   );
 }

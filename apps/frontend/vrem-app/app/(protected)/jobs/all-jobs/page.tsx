@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { useRequireRole } from '@/hooks/useRequireRole';
-import { JobsView } from '@/components/features/dispatcher/views/JobsView';
-import { AgentJobsView } from '@/components/features/agent/AgentJobsView';
-import { JobTaskView } from '@/components/shared/tasks/JobTaskView';
-import { ProjectStatus } from '@/types';
-import { JobsLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
-import { useJobManagement } from '@/context/JobManagementContext';
-import { useMessaging } from '@/context/MessagingContext';
+import { useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRequireRole } from "@/hooks/useRequireRole";
+import { JobsView } from "@/components/features/dispatcher/views/JobsView";
+import { AgentJobsView } from "@/components/features/agent/AgentJobsView";
+import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
+import { ProjectStatus } from "@/types";
+import { JobsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { useJobManagement } from "@/context/JobManagementContext";
+import { useMessaging } from "@/context/MessagingContext";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -18,17 +18,19 @@ import {
   BreadcrumbLink,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
+} from "@/components/ui/breadcrumb";
+import { PageHeader } from "@/components/shared/layout";
+import { JobDataBoundary, JobsGridSkeleton } from "@/components/shared/jobs";
 
 export default function JobsPage() {
   const router = useRouter();
   const { user, isLoading } = useRequireRole([
-    'dispatcher',
-    'AGENT',
-    'TECHNICIAN',
-    'EDITOR',
-    'ADMIN',
-    'PROJECT_MANAGER',
+    "dispatcher",
+    "AGENT",
+    "TECHNICIAN",
+    "EDITOR",
+    "ADMIN",
+    "PROJECT_MANAGER",
   ]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
@@ -51,9 +53,15 @@ export default function JobsPage() {
       }
     };
 
-    window.addEventListener('openJobTaskView', handleOpenJobTaskView as EventListener);
+    window.addEventListener(
+      "openJobTaskView",
+      handleOpenJobTaskView as EventListener
+    );
     return () => {
-      window.removeEventListener('openJobTaskView', handleOpenJobTaskView as EventListener);
+      window.removeEventListener(
+        "openJobTaskView",
+        handleOpenJobTaskView as EventListener
+      );
     };
   }, [jobManagement]);
 
@@ -89,18 +97,21 @@ export default function JobsPage() {
 
   const handleJobStatusChangeWrapper = (jobId: string, status: string) => {
     const statusMap: Record<string, ProjectStatus> = {
-      'pending': ProjectStatus.BOOKED,
-      'assigned': ProjectStatus.SHOOTING,
-      'in_progress': ProjectStatus.SHOOTING,
-      'editing': ProjectStatus.EDITING,
-      'delivered': ProjectStatus.DELIVERED,
-      'cancelled': ProjectStatus.BOOKED,
+      pending: ProjectStatus.BOOKED,
+      assigned: ProjectStatus.SHOOTING,
+      in_progress: ProjectStatus.SHOOTING,
+      editing: ProjectStatus.EDITING,
+      delivered: ProjectStatus.DELIVERED,
+      cancelled: ProjectStatus.BOOKED,
     };
-    jobManagement.changeJobStatus(jobId, statusMap[status] || ProjectStatus.BOOKED);
+    jobManagement.changeJobStatus(
+      jobId,
+      statusMap[status] || ProjectStatus.BOOKED
+    );
   };
 
   // Dispatcher/Admin/Project Manager/Editor: Use JobsView
-  if (['dispatcher', 'ADMIN', 'PROJECT_MANAGER', 'EDITOR'].includes(userRole)) {
+  if (["dispatcher", "ADMIN", "PROJECT_MANAGER", "EDITOR"].includes(userRole)) {
     // Empty photographers array - backend will provide when endpoint is ready
     const photographers: any[] = [];
 
@@ -123,34 +134,51 @@ export default function JobsPage() {
           </Breadcrumb>
         </div>
 
-        {/* Jobs View */}
-        <JobsView
-          jobs={jobManagement.jobs}
-          photographers={photographers}
-          messages={messaging.messages}
-          onViewRankings={handleViewRankings}
-          onChangePhotographer={handleViewRankings}
-          onJobStatusChange={handleJobStatusChangeWrapper}
-          onJobClick={handleJobClick}
-          activeView="all"
-        />
+        <JobDataBoundary fallback={<JobsGridSkeleton />}>
+          <JobsView
+            jobs={jobManagement.jobs}
+            photographers={photographers}
+            messages={messaging.messages}
+            onViewRankings={handleViewRankings}
+            onChangePhotographer={handleViewRankings}
+            onJobStatusChange={handleJobStatusChangeWrapper}
+            onJobClick={handleJobClick}
+            activeView="all"
+          />
+        </JobDataBoundary>
 
         {/* Job Task View - Sheet */}
         <JobTaskView
           job={jobManagement.selectedJob}
           photographer={undefined}
-          messages={jobManagement.selectedJob ? messaging.getMessagesForJob(jobManagement.selectedJob.id) : []}
-          currentUserId={user?.id || 'current-user-id'}
-          currentUserName={user?.name || 'Current User'}
+          messages={
+            jobManagement.selectedJob
+              ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
+              : []
+          }
+          currentUserId={user?.id || "current-user-id"}
+          currentUserName={user?.name || "Current User"}
           isClient={false}
           open={jobManagement.showTaskView}
           onOpenChange={handleTaskViewClose}
-          onSendMessage={(content, chatType, threadId) => messaging.sendMessage(jobManagement.selectedJob?.id || '', content, chatType, threadId)}
-          onEditMessage={(messageId, content) => messaging.editMessage(messageId, content)}
+          onSendMessage={(content, chatType, threadId) =>
+            messaging.sendMessage(
+              jobManagement.selectedJob?.id || "",
+              content,
+              chatType,
+              threadId
+            )
+          }
+          onEditMessage={(messageId, content) =>
+            messaging.editMessage(messageId, content)
+          }
           onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
           onStatusChange={(status) => {
             if (jobManagement.selectedJob) {
-              handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
+              handleJobStatusChangeWrapper(
+                jobManagement.selectedJob.id,
+                status
+              );
             }
           }}
           onAssignPhotographer={jobManagement.handleAssignPhotographer}
@@ -164,18 +192,34 @@ export default function JobsPage() {
         <JobTaskView
           job={jobManagement.selectedJob}
           photographer={undefined}
-          messages={jobManagement.selectedJob ? messaging.getMessagesForJob(jobManagement.selectedJob.id) : []}
-          currentUserId={user?.id || 'current-user-id'}
-          currentUserName={user?.name || 'Current User'}
+          messages={
+            jobManagement.selectedJob
+              ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
+              : []
+          }
+          currentUserId={user?.id || "current-user-id"}
+          currentUserName={user?.name || "Current User"}
           isClient={false}
           open={jobManagement.showTaskDialog}
           onOpenChange={handleTaskDialogClose}
-          onSendMessage={(content, chatType, threadId) => messaging.sendMessage(jobManagement.selectedJob?.id || '', content, chatType, threadId)}
-          onEditMessage={(messageId, content) => messaging.editMessage(messageId, content)}
+          onSendMessage={(content, chatType, threadId) =>
+            messaging.sendMessage(
+              jobManagement.selectedJob?.id || "",
+              content,
+              chatType,
+              threadId
+            )
+          }
+          onEditMessage={(messageId, content) =>
+            messaging.editMessage(messageId, content)
+          }
           onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
           onStatusChange={(status) => {
             if (jobManagement.selectedJob) {
-              handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
+              handleJobStatusChangeWrapper(
+                jobManagement.selectedJob.id,
+                status
+              );
             }
           }}
           onAssignPhotographer={jobManagement.handleAssignPhotographer}
@@ -187,23 +231,24 @@ export default function JobsPage() {
   }
 
   // Technician/Photographer: Filter to assigned jobs only
-  if (['TECHNICIAN'].includes(userRole)) {
+  if (["TECHNICIAN"].includes(userRole)) {
     // Empty photographers array - backend will provide when endpoint is ready
     const photographers: any[] = [];
 
     return (
-      <div className="size-full overflow-x-hidden">
-        {/* Jobs View (list only, scoped to assigned jobs) */}
-        <JobsView
-          jobs={assignedJobs}
-          photographers={photographers}
-          messages={messaging.messages}
-          onViewRankings={() => {}}
-          onChangePhotographer={undefined}
-          onJobStatusChange={handleJobStatusChangeWrapper}
-          onJobClick={handleJobClick}
-          activeView="all"
-        />
+      <div className="size-full overflow-x-hidden space-y-6">
+        <JobDataBoundary fallback={<JobsGridSkeleton />}>
+          <JobsView
+            jobs={assignedJobs}
+            photographers={photographers}
+            messages={messaging.messages}
+            onViewRankings={() => {}}
+            onChangePhotographer={undefined}
+            onJobStatusChange={handleJobStatusChangeWrapper}
+            onJobClick={handleJobClick}
+            activeView="all"
+          />
+        </JobDataBoundary>
 
         {/* Job Task View - Sheet */}
         <JobTaskView
@@ -214,14 +259,14 @@ export default function JobsPage() {
               ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
               : []
           }
-          currentUserId={user?.id || 'current-user-id'}
-          currentUserName={user?.name || 'Current User'}
+          currentUserId={user?.id || "current-user-id"}
+          currentUserName={user?.name || "Current User"}
           isClient={false}
           open={jobManagement.showTaskView}
           onOpenChange={handleTaskViewClose}
           onSendMessage={(content, chatType, threadId) =>
             messaging.sendMessage(
-              jobManagement.selectedJob?.id || '',
+              jobManagement.selectedJob?.id || "",
               content,
               chatType,
               threadId
@@ -233,7 +278,10 @@ export default function JobsPage() {
           onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
           onStatusChange={(status) => {
             if (jobManagement.selectedJob) {
-              handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
+              handleJobStatusChangeWrapper(
+                jobManagement.selectedJob.id,
+                status
+              );
             }
           }}
           onAssignPhotographer={jobManagement.handleAssignPhotographer}
@@ -252,14 +300,14 @@ export default function JobsPage() {
               ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
               : []
           }
-          currentUserId={user?.id || 'current-user-id'}
-          currentUserName={user?.name || 'Current User'}
+          currentUserId={user?.id || "current-user-id"}
+          currentUserName={user?.name || "Current User"}
           isClient={false}
           open={jobManagement.showTaskDialog}
           onOpenChange={handleTaskDialogClose}
           onSendMessage={(content, chatType, threadId) =>
             messaging.sendMessage(
-              jobManagement.selectedJob?.id || '',
+              jobManagement.selectedJob?.id || "",
               content,
               chatType,
               threadId
@@ -271,7 +319,10 @@ export default function JobsPage() {
           onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
           onStatusChange={(status) => {
             if (jobManagement.selectedJob) {
-              handleJobStatusChangeWrapper(jobManagement.selectedJob.id, status);
+              handleJobStatusChangeWrapper(
+                jobManagement.selectedJob.id,
+                status
+              );
             }
           }}
           onAssignPhotographer={jobManagement.handleAssignPhotographer}
@@ -283,17 +334,19 @@ export default function JobsPage() {
   }
 
   // Agent: Use AgentJobsView
-  if (userRole === 'AGENT') {
+  if (userRole === "AGENT") {
     const technicians: any[] = []; // TODO: Get from backend when endpoint is ready
 
     return (
       <div className="size-full overflow-x-hidden">
-        <AgentJobsView
-          jobs={jobManagement.jobCards}
-          technicians={technicians}
-          organizationId={user.organizationId || ''}
-          onNewJobClick={() => router.push('/booking')}
-        />
+        <JobDataBoundary fallback={<JobsGridSkeleton />}>
+          <AgentJobsView
+            jobs={jobManagement.jobCards}
+            technicians={technicians}
+            organizationId={user.organizationId || ""}
+            onNewJobClick={() => router.push("/booking")}
+          />
+        </JobDataBoundary>
       </div>
     );
   }
@@ -301,8 +354,7 @@ export default function JobsPage() {
   // Fallback
   return (
     <div className="size-full overflow-x-hidden p-6">
-      <h1 className="text-2xl font-bold mb-4">Jobs</h1>
-      <p className="text-muted-foreground">Jobs view for your role is coming soon.</p>
+
     </div>
   );
 }

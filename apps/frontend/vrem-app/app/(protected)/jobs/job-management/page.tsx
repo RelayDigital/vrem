@@ -18,6 +18,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { PageHeader } from "@/components/shared/layout";
+import { JobDataBoundary, JobsGridSkeleton } from "@/components/shared/jobs";
 
 export default function JobManagementPage() {
   const router = useRouter();
@@ -94,7 +96,7 @@ export default function JobManagementPage() {
   return (
     <div className="size-full overflow-x-hidden flex flex-col h-[calc(100vh-var(--header-h))]">
       {/* Breadcrumb */}
-      <div className="container relative mx-auto px-md pt-md shrink-0">
+      <div className="container relative mx-auto px-md pt-md shrink-0 space-y-6">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -111,7 +113,8 @@ export default function JobManagementPage() {
       </div>
 
       {/* Jobs View with Kanban */}
-      <div className="flex-1 min-h-0">
+
+      <JobDataBoundary fallback={<JobsGridSkeleton />}>
         <JobsView
           jobs={jobManagement.jobs}
           photographers={photographers}
@@ -122,7 +125,7 @@ export default function JobManagementPage() {
           onJobClick={handleJobClick}
           activeView="kanban"
         />
-      </div>
+      </JobDataBoundary>
 
       {/* Job Task View - Sheet */}
       <JobTaskView

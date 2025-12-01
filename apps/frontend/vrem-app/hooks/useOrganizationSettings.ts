@@ -5,15 +5,17 @@ import { Organization } from '@/types';
 import { api } from '@/lib/api';
 import { useCurrentOrganization } from './useCurrentOrganization';
 
-export function useOrganizationSettings() {
+export function useOrganizationSettings(orgIdOverride?: string) {
   const { activeOrganizationId } = useCurrentOrganization();
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
+  const effectiveOrgId = orgIdOverride || activeOrganizationId;
+
   const loadOrganization = useCallback(async () => {
-    if (!activeOrganizationId) {
+    if (!effectiveOrgId) {
       setOrganization(null);
       return;
     }
@@ -21,7 +23,7 @@ export function useOrganizationSettings() {
     setIsLoading(true);
     setError(null);
     try {
-      const org = await api.organizations.getById(activeOrganizationId);
+      const org = await api.organizations.getById(effectiveOrgId);
       setOrganization(org);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to load organization'));
@@ -29,21 +31,21 @@ export function useOrganizationSettings() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeOrganizationId]);
+  }, [effectiveOrgId]);
 
   useEffect(() => {
     loadOrganization();
   }, [loadOrganization]);
 
   const save = useCallback(async (updates: Partial<Organization>) => {
-    if (!activeOrganizationId) {
+    if (!effectiveOrgId) {
       throw new Error('No active organization');
     }
 
     setIsSaving(true);
     setError(null);
     try {
-      const updated = await api.organizations.updateSettings(activeOrganizationId, updates);
+      const updated = await api.organizations.updateSettings(effectiveOrgId, updates);
       setOrganization(updated);
       return updated;
     } catch (err) {
@@ -53,7 +55,7 @@ export function useOrganizationSettings() {
     } finally {
       setIsSaving(false);
     }
-  }, [activeOrganizationId]);
+  }, [effectiveOrgId]);
 
   const reload = useCallback(() => {
     return loadOrganization();
@@ -68,4 +70,3 @@ export function useOrganizationSettings() {
     reload,
   };
 }
-

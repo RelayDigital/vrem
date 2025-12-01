@@ -17,7 +17,13 @@ export function useOrganizations() {
         const data = await api.organizations.listMine();
         setMemberships(data);
         if (!activeOrganizationId && data.length > 0) {
-          setActiveOrganization(data[0].orgId);
+          const personal = data.find(
+            (m) => m.organization?.orgType === 'PERSONAL' || m.organization?.type === 'PERSONAL'
+          );
+          const fallbackOrgId = personal?.orgId || data[0]?.orgId || null;
+          if (fallbackOrgId) {
+            setActiveOrganization(fallbackOrgId);
+          }
         }
       } finally {
         setIsLoading(false);

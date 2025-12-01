@@ -14,7 +14,7 @@ import {
 } from "../../ui/select";
 import { Calendar as CalendarComponent } from "../../ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
-import { JobRequest } from "../../../types";
+import { Customer, JobRequest } from "../../../types";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "../../ui/toggle-group";
 import { mediaTypeOptions } from "./utils";
+import { api } from "@/lib/api";
 
 interface JobRequestFormProps {
   onSubmit: (job: Partial<JobRequest>) => void | Promise<void>;
@@ -217,6 +218,16 @@ export function JobRequestForm({
     requirements: "",
   });
   const [isGeocoding, setIsGeocoding] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({
+    name: "",
+    email: "",
+    phone: "",
+  });
 
   const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number; placeName: string } | null> => {
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -269,11 +280,62 @@ export function JobRequestForm({
     }
   };
 
+  const fetchCustomers = useCallback(async (query?: string) => {
+    setIsLoadingCustomers(true);
+    try {
+      const results = await api.customers.list(query);
+      setCustomers(results);
+    } catch (err) {
+      console.error("Failed to load customers", err);
+      toast.error("Unable to load customers");
+    } finally {
+      setIsLoadingCustomers(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchCustomers();
+  }, [fetchCustomers]);
+
+  const handleCustomerSearch = async () => {
+    await fetchCustomers(customerQuery || undefined);
+  };
+
+  const handleCustomerSelect = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setFormData((prev) => ({
+      ...prev,
+      clientName: customer.name,
+    }));
+    setShowNewCustomer(false);
+  };
+
+  const handleCreateCustomer = async () => {
+    if (!newCustomer.name.trim()) {
+      toast.error("Customer name is required");
+      return;
+    }
+    try {
+      const created = await api.customers.create({
+        name: newCustomer.name.trim(),
+        email: newCustomer.email || undefined,
+        phone: newCustomer.phone || undefined,
+      });
+      setCustomers((prev) => [created, ...prev]);
+      handleCustomerSelect(created);
+      setNewCustomer({ name: "", email: "", phone: "" });
+      toast.success("Customer added");
+    } catch (err) {
+      console.error("Failed to create customer", err);
+      toast.error("Unable to create customer");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
-    if (!formData.clientName.trim()) {
+    if (!formData.clientName.trim() && !selectedCustomer) {
       toast.error("Please enter a client name");
       return;
     }
@@ -328,7 +390,8 @@ export function JobRequestForm({
     // Submit the form
     try {
       await onSubmit({
-        clientName: formData.clientName.trim(),
+        clientName: (selectedCustomer?.name || formData.clientName).trim(),
+        customerId: selectedCustomer?.id,
         propertyAddress: addressToUse, // Use corrected address if geocoded, otherwise use original
         location: location,
         scheduledDate: formData.scheduledDate,
@@ -357,6 +420,7 @@ export function JobRequestForm({
         estimatedDuration: initialValues?.estimatedDuration || 120,
         requirements: "",
       });
+      setSelectedCustomer(null);
     } catch (error) {
       console.error('Error submitting form:', error);
       // Don't reset form on error
@@ -386,6 +450,126 @@ export function JobRequestForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm">Customer</Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowNewCustomer((prev) => !prev)}
+          >
+            {showNewCustomer ? "Cancel" : "Add New"}
+          </Button>
+        </div>
+        <div className="flex flex-col gap-2 md:flex-row">
+          <Input
+            placeholder="Search by name or email"
+            value={customerQuery}
+            onChange={(e) => setCustomerQuery(e.target.value)}
+            className="h-11"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCustomerSearch}
+            disabled={isLoadingCustomers}
+          >
+            {isLoadingCustomers ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Searching
+              </span>
+            ) : (
+              "Search"
+            )}
+          </Button>
+        </div>
+        {customers.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {customers.map((customer) => (
+              <Button
+                key={customer.id}
+                type="button"
+                variant={
+                  selectedCustomer?.id === customer.id ? "default" : "outline"
+                }
+                onClick={() => handleCustomerSelect(customer)}
+                className="justify-start"
+              >
+                <div className="flex flex-col text-left">
+                  <span className="font-medium">{customer.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {customer.email || "No email"}
+                  </span>
+                </div>
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {selectedCustomer && (
+          <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+            Selected customer: <strong>{selectedCustomer.name}</strong>{" "}
+            {selectedCustomer.email && (
+              <span className="text-muted-foreground">
+                ({selectedCustomer.email})
+              </span>
+            )}
+          </div>
+        )}
+
+        {showNewCustomer && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs uppercase text-muted-foreground">
+                Name *
+              </Label>
+              <Input
+                value={newCustomer.name}
+                onChange={(e) =>
+                  setNewCustomer((prev) => ({ ...prev, name: e.target.value }))
+                }
+                placeholder="Customer name"
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs uppercase text-muted-foreground">
+                Email
+              </Label>
+              <Input
+                type="email"
+                value={newCustomer.email}
+                onChange={(e) =>
+                  setNewCustomer((prev) => ({ ...prev, email: e.target.value }))
+                }
+                placeholder="customer@email.com"
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs uppercase text-muted-foreground">
+                Phone
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  value={newCustomer.phone}
+                  onChange={(e) =>
+                    setNewCustomer((prev) => ({ ...prev, phone: e.target.value }))
+                  }
+                  placeholder="(555) 123-4567"
+                  className="h-10"
+                />
+                <Button type="button" onClick={handleCreateCustomer}>
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Client Name */}
         <div className="space-y-2">
@@ -400,7 +584,6 @@ export function JobRequestForm({
             }
             placeholder="Enter client or agency name"
             className="h-11"
-            required
           />
         </div>
 

@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import { useParams } from "next/navigation";
 import { useOrganizationSettings } from "@/hooks/useOrganizationSettings";
+import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
+import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,11 +70,17 @@ interface ServiceArea {
 }
 
 export default function OrganizationSettingsPage() {
-  const {
-    user,
-    isLoading: roleLoading,
-    isAllowed,
-  } = useRoleGuard(["dispatcher", "ADMIN", "PROJECT_MANAGER"]);
+  const params = useParams();
+  const orgId = params?.orgId as string | undefined;
+  const { setActiveOrganization, activeOrganizationId } = useCurrentOrganization();
+  const { user, memberships, isLoading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (orgId && orgId !== activeOrganizationId) {
+      setActiveOrganization(orgId);
+    }
+  }, [orgId, activeOrganizationId, setActiveOrganization]);
+
   const {
     organization,
     isLoading: orgLoading,
@@ -79,7 +88,7 @@ export default function OrganizationSettingsPage() {
     error: orgError,
     save,
     reload,
-  } = useOrganizationSettings();
+  } = useOrganizationSettings(orgId);
 
   const [hasChanges, setHasChanges] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -229,7 +238,22 @@ export default function OrganizationSettingsPage() {
     setHasChanges(false);
   };
 
-  if (roleLoading || orgLoading) {
+  const orgMembership = useMemo(
+    () => memberships.find((m) => m.orgId === orgId),
+    [memberships, orgId]
+  );
+
+  const isPersonalOrg =
+    orgMembership?.organization?.orgType === "PERSONAL" ||
+    (orgMembership?.organization as any)?.type === "PERSONAL";
+  const membershipRole = orgMembership?.role;
+  const isAllowed =
+    user?.role === "ADMIN" ||
+    membershipRole === "ADMIN" ||
+    membershipRole === "PROJECT_MANAGER" ||
+    isPersonalOrg;
+
+  if (authLoading || orgLoading) {
     return <TeamLoadingSkeleton />;
   }
 

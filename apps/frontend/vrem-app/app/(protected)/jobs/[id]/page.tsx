@@ -10,6 +10,7 @@ import { JobsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadi
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
 import { H2, P } from "@/components/ui/typography";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function JobDetailPage() {
   const params = useParams();
@@ -63,7 +64,7 @@ export default function JobDetailPage() {
     }
   }, [jobManagement.selectedJob, jobId, messaging]);
 
-  if (isLoading || loadingJob) {
+  if (isLoading) {
     return <JobsLoadingSkeleton />;
   }
 
@@ -72,36 +73,15 @@ export default function JobDetailPage() {
   }
 
   const selectedJob = jobManagement.selectedJob;
+  const hasSelectedJob = selectedJob && selectedJob.id === jobId;
+  const isJobLoading = loadingJob;
 
-  if (!selectedJob || selectedJob.id !== jobId) {
-    return (
-      <div className="size-full overflow-x-hidden p-6">
-        <H2 className="text-2xl font-bold mb-4">Job Not Found</H2>
-        <P className="text-muted-foreground">
-          The requested job could not be found.
-        </P>
-      </div>
-    );
-  }
-
-  // Check if user has access to this job
   const userRole = user.role;
   const hasAccess =
     ["dispatcher", "ADMIN", "PROJECT_MANAGER", "EDITOR"].includes(userRole) ||
-    selectedJob.assignedPhotographerId === user.id ||
-    selectedJob.assignedTechnicianId === user.id ||
-    selectedJob.createdBy === user.id;
-
-  if (!hasAccess) {
-    return (
-      <div className="size-full overflow-x-hidden p-6">
-        <H2 className="text-2xl font-bold mb-4">Access Denied</H2>
-        <P className="text-muted-foreground">
-          You do not have access to view this job.
-        </P>
-      </div>
-    );
-  }
+    selectedJob?.assignedPhotographerId === user.id ||
+    selectedJob?.assignedTechnicianId === user.id ||
+    selectedJob?.createdBy === user.id;
 
   const handleStatusChange = (status: string) => {
     const statusMap: Record<string, ProjectStatus> = {
@@ -122,39 +102,73 @@ export default function JobDetailPage() {
   const photographers: any[] = [];
 
   return (
-    <div className="size-full overflow-x-hidden">
-      {/* Job Task View - Full Page (Page variant) */}
-      <JobTaskView
-        job={selectedJob}
-        photographer={
-          selectedJob?.assignedPhotographerId
-            ? photographers.find(
-                (p) => p.id === selectedJob?.assignedPhotographerId
-              )
-            : undefined
-        }
-        messages={messaging.getMessagesForJob(selectedJob.id)}
-        currentUserId={user?.id || "current-user-id"}
-        currentUserName={user?.name || "Current User"}
-        isClient={false}
-        open={true}
-        onOpenChange={(open) => {
-          if (!open) {
-            router.push("/jobs/all-jobs");
+    <div className="size-full overflow-x-hidden p-6 space-y-4">
+      {isJobLoading && (
+        <div className="space-y-4">
+          <Skeleton className="h-6 w-32" />
+          <div className="rounded-lg border p-4 space-y-4">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+            <div className="flex gap-2">
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-24" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!isJobLoading && !hasSelectedJob && (
+        <div className="p-6 border rounded-lg">
+          <H2 className="text-2xl font-bold mb-4">Job Not Found</H2>
+          <P className="text-muted-foreground">
+            The requested job could not be found.
+          </P>
+        </div>
+      )}
+
+      {!isJobLoading && hasSelectedJob && !hasAccess && (
+        <div className="p-6 border rounded-lg">
+          <H2 className="text-2xl font-bold mb-4">Access Denied</H2>
+          <P className="text-muted-foreground">
+            You do not have access to view this job.
+          </P>
+        </div>
+      )}
+
+      {!isJobLoading && hasSelectedJob && hasAccess && selectedJob && (
+        <JobTaskView
+          job={selectedJob}
+          photographer={
+            selectedJob?.assignedPhotographerId
+              ? photographers.find(
+                  (p) => p.id === selectedJob?.assignedPhotographerId
+                )
+              : undefined
           }
-        }}
-        onSendMessage={(content, chatType, threadId) =>
-          messaging.sendMessage(selectedJob.id, content, chatType, threadId)
-        }
-        onEditMessage={(messageId, content) =>
-          messaging.editMessage(messageId, content)
-        }
-        onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
-        onStatusChange={handleStatusChange}
-        onAssignPhotographer={jobManagement.handleAssignPhotographer}
-        onChangePhotographer={jobManagement.handleChangePhotographer}
-        variant="page"
-      />
+          messages={messaging.getMessagesForJob(selectedJob.id)}
+          currentUserId={user?.id || "current-user-id"}
+          currentUserName={user?.name || "Current User"}
+          isClient={false}
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) {
+              router.push("/jobs/all-jobs");
+            }
+          }}
+          onSendMessage={(content, chatType, threadId) =>
+            messaging.sendMessage(selectedJob.id, content, chatType, threadId)
+          }
+          onEditMessage={(messageId, content) =>
+            messaging.editMessage(messageId, content)
+          }
+          onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
+          onStatusChange={handleStatusChange}
+          onAssignPhotographer={jobManagement.handleAssignPhotographer}
+          onChangePhotographer={jobManagement.handleChangePhotographer}
+          variant="page"
+        />
+      )}
     </div>
   );
 }

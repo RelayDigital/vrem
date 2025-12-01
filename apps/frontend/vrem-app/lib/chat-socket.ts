@@ -19,8 +19,30 @@ class ChatSocket {
       auth: { token: authToken },
     });
 
-    this.socket.on('connect_error', () => {
-      // keep silent; caller can retry
+    this.socket.on('connect_error', (error) => {
+      // Track websocket connection errors
+      if (typeof window !== 'undefined') {
+        const errorMessage = error.message || 'WebSocket connection failed';
+        window.dispatchEvent(new CustomEvent('backend-websocket-error', {
+          detail: { message: `WebSocket: ${errorMessage}` }
+        }));
+      }
+    });
+
+    this.socket.on('connect', () => {
+      // Track successful websocket connections
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('backend-websocket-success'));
+      }
+    });
+
+    this.socket.on('disconnect', (reason) => {
+      // Track websocket disconnections (especially unexpected ones)
+      if (typeof window !== 'undefined' && reason !== 'io client disconnect') {
+        window.dispatchEvent(new CustomEvent('backend-websocket-error', {
+          detail: { message: `WebSocket disconnected: ${reason}` }
+        }));
+      }
     });
 
     this.socket.on('messageCreated', (msg: any) => {

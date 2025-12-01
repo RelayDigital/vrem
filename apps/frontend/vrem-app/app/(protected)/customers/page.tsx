@@ -6,6 +6,7 @@ import { CustomersView } from '@/components/features/dispatcher/views/CustomersV
 import { Customer } from '@/components/shared/tables/CustomersTable';
 import { TeamLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
 import { AccessDenied } from '@/components/common/AccessDenied';
+import { api } from '@/lib/api';
 
 export default function CustomersPage() {
   const { user, isLoading, isAllowed } = useRoleGuard([
@@ -15,6 +16,7 @@ export default function CustomersPage() {
   ]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Load customers from backend
   useEffect(() => {
@@ -37,15 +39,13 @@ export default function CustomersPage() {
 
     const loadCustomers = async () => {
       try {
-        // TODO: Replace with actual API endpoint when available
-        // const customersData = await api.customers.list();
-        // setCustomers(customersData);
-        
-        // For now, use empty array (backend will provide when endpoint is ready)
-        setCustomers([]);
+        const customersData = await api.customers.list();
+        setCustomers(customersData);
+        setLoadError(null);
       } catch (error) {
         console.error('Failed to load customers:', error);
         setCustomers([]);
+        setLoadError('Unable to load customers');
       } finally {
         setLoadingCustomers(false);
       }
@@ -54,7 +54,7 @@ export default function CustomersPage() {
     loadCustomers();
   }, [user, isAllowed, isLoading]);
 
-  if (isLoading || loadingCustomers) {
+  if (isLoading) {
     return <TeamLoadingSkeleton />;
   }
 
@@ -73,7 +73,12 @@ export default function CustomersPage() {
 
   return (
     <div className="size-full overflow-x-hidden">
-      <CustomersView customers={customers} />
+      <CustomersView customers={customers} isLoading={loadingCustomers} />
+      {loadError && (
+        <div className="container relative mx-auto px-md pb-md text-sm text-destructive">
+          {loadError}
+        </div>
+      )}
     </div>
   );
 }

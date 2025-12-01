@@ -3,6 +3,7 @@ export interface Organization {
   name: string;
   type: 'media_company' | 'real_estate_team' | 'agent';
   createdAt: Date;
+  orgType?: 'COMPANY' | 'PERSONAL';
   avatar?: string;
   description?: string;
   services?: string[];
@@ -42,6 +43,18 @@ export interface User {
   role: 'ADMIN' | 'PROJECT_MANAGER' | 'TECHNICIAN' | 'EDITOR' | 'AGENT';
   organizationId: string;
   organizationType?: 'media_company' | 'real_estate_team' | 'agent';
+}
+
+export interface Customer {
+  id: string;
+  orgId: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  agentId?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Technician {
@@ -128,6 +141,8 @@ export interface OrganizationMember {
   role: User['role'];
   createdAt: Date;
   organization?: Organization;
+  user?: User;
+  personalOrg?: Organization | null;
 }
 
 export interface CalendarEvent {
@@ -160,7 +175,8 @@ export interface Message {
 
 export interface Project {
   id: string;
-  agentId: string;
+  agentId?: string | null;
+  customerId?: string | null;
   address: string;
   notes?: string;
   scheduledTime: Date;
@@ -173,10 +189,11 @@ export interface Project {
   calendarEvent?: CalendarEvent | null;
   media?: Media[];
   messages?: Message[];
-  agent?: User;
+  agent?: User | null;
   editor?: User;
   technician?: User;
   organization?: Organization;
+  customer?: Customer | null;
 }
 
 export interface ProjectAggregate extends Project {
@@ -194,6 +211,7 @@ export interface JobRequest {
   orderNumber: string;
   organizationId: string;
   clientName: string;
+  customerId?: string;
   propertyAddress: string;
   location: {
     lat: number;

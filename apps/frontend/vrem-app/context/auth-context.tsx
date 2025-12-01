@@ -46,8 +46,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const orgs = await api.organizations.listMine();
           setMemberships(orgs);
           const storedOrg = api.organizations.getActiveOrganization();
+          const personal = orgs.find(
+            (m) =>
+              m.organization?.orgType === "PERSONAL" ||
+              (m.organization as any)?.type === "PERSONAL"
+          );
           const resolvedOrgId =
-            storedOrg || orgs[0]?.orgId || user.organizationId || null;
+            storedOrg ||
+            user.organizationId ||
+            personal?.orgId ||
+            orgs[0]?.orgId ||
+            null;
           if (resolvedOrgId) {
             api.organizations.setActiveOrganization(resolvedOrgId);
           }
@@ -75,10 +84,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(response.user);
       const orgs = await api.organizations.listMine();
       setMemberships(orgs);
+      const personal = orgs.find(
+        (m) =>
+          m.organization?.orgType === "PERSONAL" ||
+          (m.organization as any)?.type === "PERSONAL"
+      );
       const resolvedOrgId =
         api.organizations.getActiveOrganization() ||
-        orgs[0]?.orgId ||
         response.user.organizationId ||
+        personal?.orgId ||
+        orgs[0]?.orgId ||
         null;
       if (resolvedOrgId) {
         api.organizations.setActiveOrganization(resolvedOrgId);
@@ -103,10 +118,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(response.user);
       const orgs = await api.organizations.listMine();
       setMemberships(orgs);
+      const personal = orgs.find(
+        (m) =>
+          m.organization?.orgType === "PERSONAL" ||
+          (m.organization as any)?.type === "PERSONAL"
+      );
       const resolvedOrgId =
         api.organizations.getActiveOrganization() ||
-        orgs[0]?.orgId ||
         response.user.organizationId ||
+        personal?.orgId ||
+        orgs[0]?.orgId ||
         null;
       if (resolvedOrgId) {
         api.organizations.setActiveOrganization(resolvedOrgId);

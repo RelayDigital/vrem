@@ -26,6 +26,8 @@ import { H2, Muted } from "@/components/ui/typography";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function OrganizationGeneralPage() {
   const {
@@ -96,7 +98,7 @@ export default function OrganizationGeneralPage() {
     }
   };
 
-  if (roleLoading || isLoading) {
+  if (roleLoading) {
     return <TeamLoadingSkeleton />;
   }
 
@@ -113,22 +115,7 @@ export default function OrganizationGeneralPage() {
     );
   }
 
-  if (error && !organization) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-destructive mb-4">
-                {error.message || "Failed to load organization settings"}
-              </p>
-              <Button onClick={() => reload()}>Retry</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const showFormSkeleton = isLoading && !organization;
 
   return (
     <SettingsRightContentSection
@@ -136,6 +123,28 @@ export default function OrganizationGeneralPage() {
       title="Organization General"
       description="Manage your organization profile and contact information."
     >
+      {error && (
+        <Alert variant="destructive">
+          <AlertTitle>Unable to load organization settings</AlertTitle>
+          <AlertDescription className="flex items-center justify-between gap-4">
+            <span>{error.message}</span>
+            <Button variant="secondary" size="sm" onClick={() => reload()}>
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {showFormSkeleton ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={`org-form-skeleton-${index}`} className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ))}
+        </div>
+      ) : (
       <form onSubmit={handleSubmit}>
         {/* General Information */}
 
@@ -329,6 +338,7 @@ export default function OrganizationGeneralPage() {
           </Button>
         </div>
       </form>
+      )}
     </SettingsRightContentSection>
   );
 }

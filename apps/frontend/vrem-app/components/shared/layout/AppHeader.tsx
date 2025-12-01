@@ -45,7 +45,7 @@ export function AppHeader({
   onNewJobClick,
 }: AppHeaderProps) {
   const { theme, setTheme } = useTheme();
-  const { logout } = useAuth();
+  const { logout, activeOrganizationId } = useAuth();
   const jobCreation = useJobCreation();
   const router = useRouter();
   const pathname = usePathname();
@@ -103,8 +103,8 @@ export function AppHeader({
   };
 
   const handleOrganizationHome = () => {
-    // Navigate to organization home page
-    router.push("/organization");
+    const activeOrgId = activeOrganizationId;
+    router.push(activeOrgId ? `/organization/${activeOrgId}` : "/organization");
   };
 
   return (

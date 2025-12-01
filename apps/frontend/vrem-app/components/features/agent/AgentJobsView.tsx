@@ -25,7 +25,8 @@ import { Badge } from "../../ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
-import { P } from "@/components/ui/typography";
+import { H2, P } from "@/components/ui/typography";
+import { Button } from "@/components/ui/button";
 
 interface AgentJobsViewProps {
   jobs: JobRequest[];
@@ -207,228 +208,252 @@ export function AgentJobsView({
   };
 
   return (
-    <div className="bg-background size-full flex-1">
-      <div className="container mx-auto px-6 py-8 space-y-6">
-        {/* Header */}
-        <PageHeader
-          title="My Jobs"
-          description="View and manage all your photo shoot bookings"
-          action={{
-            label: "New Booking",
-            onClick: onNewJobClick,
-            icon: <Plus className="h-4 w-4 mr-2" />,
-          }}
-        />
-
-        {/* Stats Cards */}
-        <JobsStatsBar
-          pendingCount={pendingJobs.length}
-          assignedCount={assignedJobs.length}
-          inProgressCount={inProgressJobs.length}
-          completedCount={completedJobs.length}
-        />
-
-        {/* Jobs Tabs */}
-        <Tabs defaultValue="all" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="all">All ({myJobs.length})</TabsTrigger>
-            <TabsTrigger value="pending">
-              Pending ({pendingJobs.length})
-            </TabsTrigger>
-            <TabsTrigger value="assigned">
-              Assigned ({assignedJobs.length})
-            </TabsTrigger>
-            <TabsTrigger value="in_progress">
-              In Progress ({inProgressJobs.length})
-            </TabsTrigger>
-            <TabsTrigger value="completed">
-              Completed ({completedJobs.length})
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="all" className="mt-6">
-            <PaginatedJobGrid
-              items={myJobs}
-              searchPlaceholder="Search by address, client, Order #..."
-              searchFields={(job) =>
-                `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
-              }
-              filterOptions={[
-                { label: "Urgent", value: "urgent" },
-                { label: "Rush", value: "rush" },
-                { label: "Standard", value: "standard" },
-              ]}
-              onFilterChange={(value) =>
-                myJobs.filter((j) => value === "all" || j.priority === value)
-              }
-              renderItem={(job) => {
-                const assignedId =
-                  job.assignedTechnicianId || job.assignedPhotographerId;
-                const technician = assignedId
-                  ? effectiveTechnicians.find((t) => t.id === assignedId)
-                  : undefined;
-                return (
-                  <JobCard key={job.id} job={job} photographer={technician} />
-                );
-              }}
-              renderTableRow={renderTableRow}
-              emptyMessage="No jobs yet"
-              emptyIcon={Briefcase}
-              emptyTitle="No jobs yet"
-              emptyDescription="Create your first booking to get started"
-              emptyAction={{
-                label: "Create Booking",
-                onClick: onNewJobClick,
-              }}
-              itemsPerPage={12}
+    <main className="container relative mx-auto">
+      <article className="flex flex-col gap-2xl md:gap-3xl px-md">
+        {/* Metrics */}
+        <div className="@container w-full mt-md mb-md">
+          <div className="mb-md flex items-baseline justify-between">
+            <H2 className="text-4xl mb-xs">My Jobs</H2>
+            <Button variant="default" className="px-0" onClick={onNewJobClick}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Booking
+            </Button>
+          </div>
+          <div className="@container w-full mb-md">
+            <JobsStatsBar
+              pendingCount={pendingJobs.length}
+              assignedCount={assignedJobs.length}
+              inProgressCount={inProgressJobs.length}
+              completedCount={completedJobs.length}
             />
-          </TabsContent>
+          </div>
 
-          <TabsContent value="pending" className="mt-6">
-            <PaginatedJobGrid
-              items={pendingJobs}
-              searchPlaceholder="Search by address, client, Order #..."
-              searchFields={(job) =>
-                `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
-              }
-              filterOptions={[
-                { label: "Urgent", value: "urgent" },
-                { label: "Rush", value: "rush" },
-                { label: "Standard", value: "standard" },
-              ]}
-              onFilterChange={(value) =>
-                pendingJobs.filter(
-                  (j) => value === "all" || j.priority === value
-                )
-              }
-              renderItem={(job) => {
-                const assignedId =
-                  job.assignedTechnicianId || job.assignedPhotographerId;
-                const technician = assignedId
-                  ? effectiveTechnicians.find((t) => t.id === assignedId)
-                  : undefined;
-                return (
-                  <JobCard key={job.id} job={job} photographer={technician} />
-                );
-              }}
-              renderTableRow={renderTableRow}
-              emptyMessage="No pending jobs"
-              emptyIcon={Clock}
-              emptyTitle="No pending jobs"
-              emptyDescription="All your jobs have been assigned"
-              itemsPerPage={12}
-            />
-          </TabsContent>
+          {/* Jobs Tabs */}
+          <div className="@container w-full">
+            <Tabs defaultValue="all" className="w-full">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="all">All ({myJobs.length})</TabsTrigger>
+                <TabsTrigger value="pending">
+                  Pending ({pendingJobs.length})
+                </TabsTrigger>
+                <TabsTrigger value="assigned">
+                  Assigned ({assignedJobs.length})
+                </TabsTrigger>
+                <TabsTrigger value="in_progress">
+                  In Progress ({inProgressJobs.length})
+                </TabsTrigger>
+                <TabsTrigger value="completed">
+                  Completed ({completedJobs.length})
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent value="assigned" className="mt-6">
-            <PaginatedJobGrid
-              items={assignedJobs}
-              searchPlaceholder="Search by address, client, Order #..."
-              searchFields={(job) =>
-                `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
-              }
-              filterOptions={[
-                { label: "Urgent", value: "urgent" },
-                { label: "Rush", value: "rush" },
-                { label: "Standard", value: "standard" },
-              ]}
-              onFilterChange={(value) =>
-                assignedJobs.filter(
-                  (j) => value === "all" || j.priority === value
-                )
-              }
-              renderItem={(job) => {
-                const assignedId =
-                  job.assignedTechnicianId || job.assignedPhotographerId;
-                const technician = assignedId
-                  ? effectiveTechnicians.find((t) => t.id === assignedId)
-                  : undefined;
-                return (
-                  <JobCard key={job.id} job={job} photographer={technician} />
-                );
-              }}
-              renderTableRow={renderTableRow}
-              emptyMessage="No assigned jobs"
-              emptyIcon={Briefcase}
-              emptyTitle="No assigned jobs"
-              emptyDescription="Jobs will appear here once assigned to a technician"
-              itemsPerPage={12}
-            />
-          </TabsContent>
+              <TabsContent value="all" className="mt-6">
+                <PaginatedJobGrid
+                  items={myJobs}
+                  searchPlaceholder="Search by address, client, Order #..."
+                  searchFields={(job) =>
+                    `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
+                  }
+                  filterOptions={[
+                    { label: "Urgent", value: "urgent" },
+                    { label: "Rush", value: "rush" },
+                    { label: "Standard", value: "standard" },
+                  ]}
+                  onFilterChange={(value) =>
+                    myJobs.filter(
+                      (j) => value === "all" || j.priority === value
+                    )
+                  }
+                  renderItem={(job) => {
+                    const assignedId =
+                      job.assignedTechnicianId || job.assignedPhotographerId;
+                    const technician = assignedId
+                      ? effectiveTechnicians.find((t) => t.id === assignedId)
+                      : undefined;
+                    return (
+                      <JobCard
+                        key={job.id}
+                        job={job}
+                        photographer={technician}
+                      />
+                    );
+                  }}
+                  renderTableRow={renderTableRow}
+                  emptyMessage="No jobs yet"
+                  emptyIcon={Briefcase}
+                  emptyTitle="No jobs yet"
+                  emptyDescription="Create your first booking to get started"
+                  emptyAction={{
+                    label: "Create Booking",
+                    onClick: onNewJobClick,
+                  }}
+                  itemsPerPage={12}
+                />
+              </TabsContent>
 
-          <TabsContent value="in_progress" className="mt-6">
-            <PaginatedJobGrid
-              items={inProgressJobs}
-              searchPlaceholder="Search by address, client, Order #..."
-              searchFields={(job) =>
-                `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
-              }
-              filterOptions={[
-                { label: "Urgent", value: "urgent" },
-                { label: "Rush", value: "rush" },
-                { label: "Standard", value: "standard" },
-              ]}
-              onFilterChange={(value) =>
-                inProgressJobs.filter(
-                  (j) => value === "all" || j.priority === value
-                )
-              }
-              renderItem={(job) => {
-                const assignedId =
-                  job.assignedTechnicianId || job.assignedPhotographerId;
-                const technician = assignedId
-                  ? effectiveTechnicians.find((t) => t.id === assignedId)
-                  : undefined;
-                return (
-                  <JobCard key={job.id} job={job} photographer={technician} />
-                );
-              }}
-              renderTableRow={renderTableRow}
-              emptyMessage="No jobs in progress"
-              emptyIcon={Briefcase}
-              emptyTitle="No jobs in progress"
-              emptyDescription="Active shoots will appear here"
-              itemsPerPage={12}
-            />
-          </TabsContent>
+              <TabsContent value="pending" className="mt-6">
+                <PaginatedJobGrid
+                  items={pendingJobs}
+                  searchPlaceholder="Search by address, client, Order #..."
+                  searchFields={(job) =>
+                    `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
+                  }
+                  filterOptions={[
+                    { label: "Urgent", value: "urgent" },
+                    { label: "Rush", value: "rush" },
+                    { label: "Standard", value: "standard" },
+                  ]}
+                  onFilterChange={(value) =>
+                    pendingJobs.filter(
+                      (j) => value === "all" || j.priority === value
+                    )
+                  }
+                  renderItem={(job) => {
+                    const assignedId =
+                      job.assignedTechnicianId || job.assignedPhotographerId;
+                    const technician = assignedId
+                      ? effectiveTechnicians.find((t) => t.id === assignedId)
+                      : undefined;
+                    return (
+                      <JobCard
+                        key={job.id}
+                        job={job}
+                        photographer={technician}
+                      />
+                    );
+                  }}
+                  renderTableRow={renderTableRow}
+                  emptyMessage="No pending jobs"
+                  emptyIcon={Clock}
+                  emptyTitle="No pending jobs"
+                  emptyDescription="All your jobs have been assigned"
+                  itemsPerPage={12}
+                />
+              </TabsContent>
 
-          <TabsContent value="completed" className="mt-6">
-            <PaginatedJobGrid
-              items={completedJobs}
-              searchPlaceholder="Search by address, client, Order #..."
-              searchFields={(job) =>
-                `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
-              }
-              filterOptions={[
-                { label: "Urgent", value: "urgent" },
-                { label: "Rush", value: "rush" },
-                { label: "Standard", value: "standard" },
-              ]}
-              onFilterChange={(value) =>
-                completedJobs.filter(
-                  (j) => value === "all" || j.priority === value
-                )
-              }
-              renderItem={(job) => {
-                const assignedId =
-                  job.assignedTechnicianId || job.assignedPhotographerId;
-                const technician = assignedId
-                  ? effectiveTechnicians.find((t) => t.id === assignedId)
-                  : undefined;
-                return (
-                  <JobCard key={job.id} job={job} photographer={technician} />
-                );
-              }}
-              renderTableRow={renderTableRow}
-              emptyMessage="No completed jobs"
-              emptyIcon={CheckCircle2}
-              emptyTitle="No completed jobs"
-              emptyDescription="Finished jobs will appear here"
-              itemsPerPage={12}
-            />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+              <TabsContent value="assigned" className="mt-6">
+                <PaginatedJobGrid
+                  items={assignedJobs}
+                  searchPlaceholder="Search by address, client, Order #..."
+                  searchFields={(job) =>
+                    `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
+                  }
+                  filterOptions={[
+                    { label: "Urgent", value: "urgent" },
+                    { label: "Rush", value: "rush" },
+                    { label: "Standard", value: "standard" },
+                  ]}
+                  onFilterChange={(value) =>
+                    assignedJobs.filter(
+                      (j) => value === "all" || j.priority === value
+                    )
+                  }
+                  renderItem={(job) => {
+                    const assignedId =
+                      job.assignedTechnicianId || job.assignedPhotographerId;
+                    const technician = assignedId
+                      ? effectiveTechnicians.find((t) => t.id === assignedId)
+                      : undefined;
+                    return (
+                      <JobCard
+                        key={job.id}
+                        job={job}
+                        photographer={technician}
+                      />
+                    );
+                  }}
+                  renderTableRow={renderTableRow}
+                  emptyMessage="No assigned jobs"
+                  emptyIcon={Briefcase}
+                  emptyTitle="No assigned jobs"
+                  emptyDescription="Jobs will appear here once assigned to a technician"
+                  itemsPerPage={12}
+                />
+              </TabsContent>
+
+              <TabsContent value="in_progress" className="mt-6">
+                <PaginatedJobGrid
+                  items={inProgressJobs}
+                  searchPlaceholder="Search by address, client, Order #..."
+                  searchFields={(job) =>
+                    `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
+                  }
+                  filterOptions={[
+                    { label: "Urgent", value: "urgent" },
+                    { label: "Rush", value: "rush" },
+                    { label: "Standard", value: "standard" },
+                  ]}
+                  onFilterChange={(value) =>
+                    inProgressJobs.filter(
+                      (j) => value === "all" || j.priority === value
+                    )
+                  }
+                  renderItem={(job) => {
+                    const assignedId =
+                      job.assignedTechnicianId || job.assignedPhotographerId;
+                    const technician = assignedId
+                      ? effectiveTechnicians.find((t) => t.id === assignedId)
+                      : undefined;
+                    return (
+                      <JobCard
+                        key={job.id}
+                        job={job}
+                        photographer={technician}
+                      />
+                    );
+                  }}
+                  renderTableRow={renderTableRow}
+                  emptyMessage="No jobs in progress"
+                  emptyIcon={Briefcase}
+                  emptyTitle="No jobs in progress"
+                  emptyDescription="Active shoots will appear here"
+                  itemsPerPage={12}
+                />
+              </TabsContent>
+
+              <TabsContent value="completed" className="mt-6">
+                <PaginatedJobGrid
+                  items={completedJobs}
+                  searchPlaceholder="Search by address, client, Order #..."
+                  searchFields={(job) =>
+                    `${job.propertyAddress} ${job.clientName} ${job.scheduledDate} ${job.orderNumber}`
+                  }
+                  filterOptions={[
+                    { label: "Urgent", value: "urgent" },
+                    { label: "Rush", value: "rush" },
+                    { label: "Standard", value: "standard" },
+                  ]}
+                  onFilterChange={(value) =>
+                    completedJobs.filter(
+                      (j) => value === "all" || j.priority === value
+                    )
+                  }
+                  renderItem={(job) => {
+                    const assignedId =
+                      job.assignedTechnicianId || job.assignedPhotographerId;
+                    const technician = assignedId
+                      ? effectiveTechnicians.find((t) => t.id === assignedId)
+                      : undefined;
+                    return (
+                      <JobCard
+                        key={job.id}
+                        job={job}
+                        photographer={technician}
+                      />
+                    );
+                  }}
+                  renderTableRow={renderTableRow}
+                  emptyMessage="No completed jobs"
+                  emptyIcon={CheckCircle2}
+                  emptyTitle="No completed jobs"
+                  emptyDescription="Finished jobs will appear here"
+                  itemsPerPage={12}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+      </article>
+    </main>
   );
 }

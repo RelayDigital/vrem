@@ -16,10 +16,10 @@ export default function OrganizationIntegrationsPage() {
 
   useEffect(() => {
     // Redirect to the canonical organization settings page
-    if (!isLoading && isAllowed) {
-      router.replace("/organization/settings");
+    if (!isLoading && isAllowed && user?.organizationId) {
+      router.replace(`/organization/${user.organizationId}/settings`);
     }
-  }, [isLoading, isAllowed, router]);
+  }, [isLoading, isAllowed, router, user?.organizationId]);
 
   if (isLoading) {
     return <TeamLoadingSkeleton />;
@@ -40,4 +40,3 @@ export default function OrganizationIntegrationsPage() {
 
   return null;
 }
-

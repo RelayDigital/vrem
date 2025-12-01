@@ -8,8 +8,7 @@ import {
   TableRow,
 } from '../../ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
-import { Badge } from '../../ui/badge';
-import { Search, ArrowUpDown, Filter, Settings2, Building2, Mail, Briefcase } from 'lucide-react';
+import { Search, ArrowUpDown, Mail, Briefcase } from 'lucide-react';
 import { Input } from '../../ui/input';
 import {
   Select,
@@ -18,27 +17,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../ui/select';
+import { Skeleton } from '../../ui/skeleton';
 
 export interface Customer {
   id: string;
+  orgId?: string;
   name: string;
-  brokerage: string;
-  email: string;
-  totalJobs: number;
-  lastJob?: string;
-  status: 'Active' | 'Inactive';
+  email?: string;
+  phone?: string;
+  notes?: string;
+  totalJobs?: number;
+  lastJob?: Date | string | null;
+  agentId?: string;
   avatar?: string;
 }
 
 interface CustomersTableProps {
   customers?: Customer[];
   onRowClick?: (customer: Customer) => void;
+  isLoading?: boolean;
 }
 
-export function CustomersTable({ customers = [], onRowClick }: CustomersTableProps) {
+export function CustomersTable({ customers = [], onRowClick, isLoading = false }: CustomersTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<string>('name-asc');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Filter and sort customers
   const filteredAndSortedCustomers = useMemo(() => {
@@ -49,15 +51,11 @@ export function CustomersTable({ customers = [], onRowClick }: CustomersTablePro
       const query = searchQuery.toLowerCase();
       result = result.filter((customer) => {
         const name = customer.name.toLowerCase();
-        const email = customer.email.toLowerCase();
-        const brokerage = customer.brokerage.toLowerCase();
-        return name.includes(query) || email.includes(query) || brokerage.includes(query);
+        const email = (customer.email || '').toLowerCase();
+        const notes = (customer.notes || '').toLowerCase();
+        const phone = (customer.phone || '').toLowerCase();
+        return name.includes(query) || email.includes(query) || notes.includes(query) || phone.includes(query);
       });
-    }
-
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      result = result.filter((c) => c.status.toLowerCase() === statusFilter.toLowerCase());
     }
 
     // Apply sorting
@@ -67,25 +65,21 @@ export function CustomersTable({ customers = [], onRowClick }: CustomersTablePro
           return a.name.localeCompare(b.name);
         case 'name-desc':
           return b.name.localeCompare(a.name);
-        case 'brokerage-asc':
-          return a.brokerage.localeCompare(b.brokerage);
-        case 'brokerage-desc':
-          return b.brokerage.localeCompare(a.brokerage);
+        case 'notes-asc':
+          return (a.notes || '').localeCompare(b.notes || '');
+        case 'notes-desc':
+          return (b.notes || '').localeCompare(a.notes || '');
         case 'jobs-asc':
-          return a.totalJobs - b.totalJobs;
+          return (a.totalJobs || 0) - (b.totalJobs || 0);
         case 'jobs-desc':
-          return b.totalJobs - a.totalJobs;
-        case 'status-asc':
-          return a.status.localeCompare(b.status);
-        case 'status-desc':
-          return b.status.localeCompare(a.status);
+          return (b.totalJobs || 0) - (a.totalJobs || 0);
         default:
           return 0;
       }
     });
 
     return result;
-  }, [customers, searchQuery, sortBy, statusFilter]);
+  }, [customers, searchQuery, sortBy]);
 
   return (
     <div className="space-y-4">
@@ -102,17 +96,6 @@ export function CustomersTable({ customers = [], onRowClick }: CustomersTablePro
             className="pl-10"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger variant="muted" className="w-10 md:w-[140px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
-            <Filter className="h-4 w-4 md:mr-2" />
-            <SelectValue placeholder="Status" className="hidden md:inline" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-          </SelectContent>
-        </Select>
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger variant="muted" className="w-10 md:w-[180px] shrink-0 [&>svg:last-child]:hidden md:[&>svg:last-child]:block">
             <ArrowUpDown className="h-4 w-4 md:mr-2" />
@@ -121,12 +104,10 @@ export function CustomersTable({ customers = [], onRowClick }: CustomersTablePro
           <SelectContent>
             <SelectItem value="name-asc">Name (A-Z)</SelectItem>
             <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-            <SelectItem value="brokerage-asc">Brokerage (A-Z)</SelectItem>
-            <SelectItem value="brokerage-desc">Brokerage (Z-A)</SelectItem>
+            <SelectItem value="notes-asc">Notes (A-Z)</SelectItem>
+            <SelectItem value="notes-desc">Notes (Z-A)</SelectItem>
             <SelectItem value="jobs-desc">Jobs (Most)</SelectItem>
             <SelectItem value="jobs-asc">Jobs (Least)</SelectItem>
-            <SelectItem value="status-asc">Status (A-Z)</SelectItem>
-            <SelectItem value="status-desc">Status (Z-A)</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -143,14 +124,43 @@ export function CustomersTable({ customers = [], onRowClick }: CustomersTablePro
         <TableHeader>
           <TableRow>
             <TableHead>Customer</TableHead>
-            <TableHead>Brokerage</TableHead>
             <TableHead>Email</TableHead>
+            <TableHead>Phone</TableHead>
             <TableHead>Jobs</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead>Last Job</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredAndSortedCustomers.length === 0 ? (
+          {isLoading ? (
+            Array.from({ length: 5 }).map((_, index) => (
+              <TableRow key={`customer-skeleton-${index}`}>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="size-10 border-2 border-border">
+                      <AvatarImage />
+                      <AvatarFallback className="bg-muted" />
+                    </Avatar>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-32" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-24" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-12" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-20" />
+                </TableCell>
+              </TableRow>
+            ))
+          ) : filteredAndSortedCustomers.length === 0 ? (
             <TableRow>
               <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
                 No customers found
@@ -188,28 +198,27 @@ export function CustomersTable({ customers = [], onRowClick }: CustomersTablePro
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1 text-sm">
-                    <Building2 className="h-4 w-4 text-muted-foreground/60" />
-                    <span>{customer.brokerage}</span>
+                    <Mail className="h-4 w-4 text-muted-foreground/60" />
+                    <span className="text-muted-foreground">{customer.email || '—'}</span>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1 text-sm">
-                    <Mail className="h-4 w-4 text-muted-foreground/60" />
-                    <span className="text-muted-foreground">{customer.email}</span>
+                  <div className="text-sm text-muted-foreground">
+                    {customer.phone || '—'}
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1">
                     <Briefcase className="h-4 w-4 text-muted-foreground/60" />
-                    <span>{customer.totalJobs}</span>
+                    <span>{customer.totalJobs ?? 0}</span>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    variant={customer.status === 'Active' ? 'default' : 'secondary'}
-                  >
-                    {customer.status}
-                  </Badge>
+                  <div className="text-sm text-muted-foreground">
+                    {customer.lastJob
+                      ? new Date(customer.lastJob as any).toLocaleDateString()
+                      : '—'}
+                  </div>
                 </TableCell>
               </TableRow>
             ))
@@ -219,4 +228,3 @@ export function CustomersTable({ customers = [], onRowClick }: CustomersTablePro
     </div>
   );
 }
-

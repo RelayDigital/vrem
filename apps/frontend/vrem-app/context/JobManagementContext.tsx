@@ -10,6 +10,9 @@ interface JobManagementContextType {
   projects: Project[];
   jobCards: JobRequest[]; // View Model derived from projects
   jobs: JobRequest[]; // Deprecated alias for jobCards
+  isLoadingJobs: boolean;
+  jobsError: Error | null;
+  refreshJobs: () => Promise<void>;
   getJobById: (jobId: string) => JobRequest | undefined;
   getProjectById: (projectId: string) => Project | undefined;
   updateJob: (jobId: string, updates: Partial<Project>) => void;
@@ -69,6 +72,8 @@ export function JobManagementProvider({
   const [projects, setProjects] = useState<Project[]>(() =>
     initialProjects ? normalizeProjects(initialProjects) : []
   );
+  const [isLoadingJobs, setIsLoadingJobs] = useState(!initialProjects);
+  const [jobsError, setJobsError] = useState<Error | null>(null);
   const [selectedJob, setSelectedJob] = useState<JobRequest | null>(null);
   const [showRankings, setShowRankings] = useState(false);
   const [showTaskView, setShowTaskView] = useState(false);
@@ -88,24 +93,41 @@ export function JobManagementProvider({
   }, [defaultOrganizationId]);
 
   // Load jobs from API when org/user context is ready
-  useEffect(() => {
-    const fetchJobs = async () => {
-      if (!defaultOrganizationId) return;
-      // ensure header is set
-      api.organizations.setActiveOrganization(defaultOrganizationId);
-      try {
-        const fetchedProjects = await api.projects.listForCurrentUser();
-        // Ensure dates are Date objects
-        const projectsWithDates = normalizeProjects(fetchedProjects);
-        setProjects(projectsWithDates);
-      } catch (error) {
-        console.error('Error fetching jobs:', error);
-        toast.error('Failed to load jobs');
-      }
-    };
+  const fetchJobs = useCallback(async () => {
+    setIsLoadingJobs(true);
+    setJobsError(null);
 
-    fetchJobs();
+    if (defaultOrganizationId) {
+      api.organizations.setActiveOrganization(defaultOrganizationId);
+    }
+
+    try {
+      const fetchedProjects = await api.projects.listForCurrentUser();
+      // Ensure dates are Date objects
+      const projectsWithDates = normalizeProjects(fetchedProjects);
+      setProjects(projectsWithDates);
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      setJobsError(error as Error);
+      toast.error('Failed to load jobs');
+    } finally {
+      setIsLoadingJobs(false);
+    }
   }, [defaultOrganizationId, normalizeProjects]);
+
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
+
+  const upsertProject = useCallback((project: Project) => {
+    setProjects((prev) => {
+      const exists = prev.some((p) => p.id === project.id);
+      if (exists) {
+        return prev.map((p) => (p.id === project.id ? project : p));
+      }
+      return [project, ...prev];
+    });
+  }, []);
 
   // Derive jobs view model
   const jobCards = useMemo(() => {
@@ -121,14 +143,14 @@ export function JobManagementProvider({
   useEffect(() => {
     const handleJobCreated = (event: CustomEvent<Project>) => {
       const newProject = event.detail;
-      setProjects((prev) => [newProject, ...prev]);
+      upsertProject(newProject);
     };
 
     window.addEventListener('jobCreated', handleJobCreated as EventListener);
     return () => {
       window.removeEventListener('jobCreated', handleJobCreated as EventListener);
     };
-  }, []);
+  }, [upsertProject]);
 
   const getJobById = useCallback((jobId: string): JobRequest | undefined => {
     return jobCards.find((job) => job.id === jobId);
@@ -196,7 +218,8 @@ export function JobManagementProvider({
         address: job.address || '',
         scheduledTime: job.scheduledTime || new Date(),
         notes: job.notes,
-        agentId: job.agentId || defaultUserId,
+        agentId: job.agentId || undefined,
+        customerId: (job as any).customerId,
         orgId: resolvedOrgId,
       });
       const normalizedProject = {
@@ -205,7 +228,7 @@ export function JobManagementProvider({
         updatedAt: new Date(newProject.updatedAt),
         scheduledTime: new Date(newProject.scheduledTime),
       };
-      setProjects((prev) => [normalizedProject, ...prev]);
+      upsertProject(normalizedProject);
       window.dispatchEvent(new CustomEvent('jobCreated', { detail: normalizedProject }));
       return normalizedProject;
     } catch (error) {
@@ -213,7 +236,7 @@ export function JobManagementProvider({
       toast.error('Failed to create project');
       throw error;
     }
-  }, [defaultUserId, defaultOrganizationId]);
+  }, [defaultUserId, defaultOrganizationId, upsertProject]);
 
   const selectJob = useCallback((job: JobRequest | null) => {
     setSelectedJob(job);
@@ -300,6 +323,9 @@ export function JobManagementProvider({
         projects,
         jobCards,
         jobs: jobCards,
+        isLoadingJobs,
+        jobsError,
+        refreshJobs: fetchJobs,
         getJobById,
         getProjectById,
         updateJob,

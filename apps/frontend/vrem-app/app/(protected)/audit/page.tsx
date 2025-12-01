@@ -36,7 +36,7 @@ export default function AuditPage() {
     }
   }, [user]);
 
-  if (isLoading || loadingAuditLog) {
+  if (isLoading) {
     return <TeamLoadingSkeleton />;
   }
 
@@ -44,6 +44,5 @@ export default function AuditPage() {
     return null; // Redirect handled by hook
   }
 
-  return <AuditView auditLog={auditLog} />;
+  return <AuditView auditLog={auditLog} isLoading={loadingAuditLog} />;
 }
-

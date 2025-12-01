@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { JobRequestForm } from '@/components/shared/jobs';
 import { RankingsDialog } from '@/components/features/dispatcher/dialogs';
+import { BackendHealthAlert } from '@/components/shared/BackendHealthAlert';
 import { useIsMobile } from '@/components/ui/use-mobile';
 import { ReactNode, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
@@ -254,6 +255,7 @@ export default function ProtectedLayout({
       <JobCreationProviderWrapper
         defaultUserId={user?.id}
         defaultOrganizationId={organizationId || undefined}
+        userRole={user?.role}
       >
         <MessagingProvider
           defaultUserId={user?.id}
@@ -263,6 +265,7 @@ export default function ProtectedLayout({
             <LayoutContent user={user}>
               {children}
             </LayoutContent>
+            <BackendHealthAlert />
           </DispatcherNavigationProvider>
         </MessagingProvider>
       </JobCreationProviderWrapper>
@@ -276,10 +279,12 @@ function JobCreationProviderWrapper({
   children,
   defaultUserId,
   defaultOrganizationId,
+  userRole,
 }: {
   children: ReactNode;
   defaultUserId?: string;
   defaultOrganizationId?: string;
+  userRole?: string;
 }) {
   const jobManagement = useJobManagement();
 
@@ -292,7 +297,8 @@ function JobCreationProviderWrapper({
         : undefined,
       // Map other fields as needed
       notes: job.requirements,
-      agentId: job.createdBy,
+      agentId: job.createdBy || (userRole === 'AGENT' ? defaultUserId : undefined),
+      customerId: job.customerId,
       orgId: job.organizationId || defaultOrganizationId,
       // ... copy other matching fields if any
     };

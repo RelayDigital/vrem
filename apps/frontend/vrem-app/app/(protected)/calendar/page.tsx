@@ -1,25 +1,27 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { useRequireRole } from '@/hooks/useRequireRole';
-import { CalendarView } from '@/components/features/calendar/CalendarView';
-import { ProjectStatus } from '@/types';
-import { CalendarLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
-import { useJobManagement } from '@/context/JobManagementContext';
-import { useMessaging } from '@/context/MessagingContext';
-import { useJobCreation } from '@/context/JobCreationContext';
-import { JobTaskView } from '@/components/shared/tasks/JobTaskView';
+import { useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useRequireRole } from "@/hooks/useRequireRole";
+import { CalendarView } from "@/components/features/calendar/CalendarView";
+import { ProjectStatus } from "@/types";
+import { CalendarLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { useJobManagement } from "@/context/JobManagementContext";
+import { useMessaging } from "@/context/MessagingContext";
+import { useJobCreation } from "@/context/JobCreationContext";
+import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
+import { PageHeader } from "@/components/shared/layout";
+import { JobDataBoundary } from "@/components/shared/jobs";
 
 export default function CalendarPage() {
   const router = useRouter();
   const { user, isLoading } = useRequireRole([
-    'dispatcher',
-    'AGENT',
-    'TECHNICIAN',
-    'EDITOR',
-    'ADMIN',
-    'PROJECT_MANAGER',
+    "dispatcher",
+    "AGENT",
+    "TECHNICIAN",
+    "EDITOR",
+    "ADMIN",
+    "PROJECT_MANAGER",
   ]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
@@ -28,18 +30,18 @@ export default function CalendarPage() {
   // Filter jobs based on role
   const displayJobs = useMemo(() => {
     if (!user) return [];
-    
+
     const userRole = user.role;
-    
+
     // Technician/Photographer: Only show assigned jobs
-    if (['TECHNICIAN'].includes(userRole)) {
+    if (["TECHNICIAN"].includes(userRole)) {
       return jobManagement.jobs.filter(
         (job) =>
           job.assignedPhotographerId === user.id ||
           job.assignedTechnicianId === user.id
       );
     }
-    
+
     // Dispatcher/Admin/Project Manager/Editor/Agent: Show all jobs
     return jobManagement.jobs;
   }, [jobManagement.jobs, user]);
@@ -60,8 +62,18 @@ export default function CalendarPage() {
   }
 
   const userRole = user.role;
-  const canCreateJobs = ['dispatcher', 'ADMIN', 'PROJECT_MANAGER', 'EDITOR'].includes(userRole);
-  const canSeeTechnicians = ['dispatcher', 'ADMIN', 'PROJECT_MANAGER', 'EDITOR'].includes(userRole);
+  const canCreateJobs = [
+    "dispatcher",
+    "ADMIN",
+    "PROJECT_MANAGER",
+    "EDITOR",
+  ].includes(userRole);
+  const canSeeTechnicians = [
+    "dispatcher",
+    "ADMIN",
+    "PROJECT_MANAGER",
+    "EDITOR",
+  ].includes(userRole);
 
   // Use context handlers
   const handleJobClick = jobManagement.openTaskView;
@@ -103,14 +115,16 @@ export default function CalendarPage() {
   const photographers: any[] = [];
 
   return (
-    <div className="size-full overflow-x-hidden">
-      <CalendarView
-        canSeeTechnicians={canSeeTechnicians}
-        jobs={displayJobs}
-        photographers={photographers}
-        onJobClick={handleJobClick}
-        onCreateJob={canCreateJobs ? handleCreateJob : undefined}
-      />
+    <div className="size-full overflow-x-hidden space-y-6">
+      <JobDataBoundary fallback={<CalendarLoadingSkeleton />}>
+        <CalendarView
+          canSeeTechnicians={canSeeTechnicians}
+          jobs={displayJobs}
+          photographers={photographers}
+          onJobClick={handleJobClick}
+          onCreateJob={canCreateJobs ? handleCreateJob : undefined}
+        />
+      </JobDataBoundary>
 
       {/* Job Task View - Sheet */}
       <JobTaskView
@@ -121,14 +135,14 @@ export default function CalendarPage() {
             ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
             : []
         }
-        currentUserId={user?.id || 'current-user-id'}
-        currentUserName={user?.name || 'Current User'}
+        currentUserId={user?.id || "current-user-id"}
+        currentUserName={user?.name || "Current User"}
         isClient={false}
         open={jobManagement.showTaskView}
         onOpenChange={handleTaskViewClose}
         onSendMessage={(content, chatType, threadId) =>
           messaging.sendMessage(
-            jobManagement.selectedJob?.id || '',
+            jobManagement.selectedJob?.id || "",
             content,
             chatType,
             threadId
@@ -159,14 +173,14 @@ export default function CalendarPage() {
             ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
             : []
         }
-        currentUserId={user?.id || 'current-user-id'}
-        currentUserName={user?.name || 'Current User'}
+        currentUserId={user?.id || "current-user-id"}
+        currentUserName={user?.name || "Current User"}
         isClient={false}
         open={jobManagement.showTaskDialog}
         onOpenChange={handleTaskDialogClose}
         onSendMessage={(content, chatType, threadId) =>
           messaging.sendMessage(
-            jobManagement.selectedJob?.id || '',
+            jobManagement.selectedJob?.id || "",
             content,
             chatType,
             threadId

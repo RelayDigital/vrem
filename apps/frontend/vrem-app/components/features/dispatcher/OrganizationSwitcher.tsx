@@ -49,6 +49,28 @@ export function OrganizationSwitcher({
   const { memberships, isLoading, setActiveOrganization } = useOrganizations();
   const { activeOrganizationId } = useCurrentOrganization();
   const router = useRouter();
+  const personalOrg = useMemo(
+    () =>
+      memberships.find(
+        (m) =>
+          m.organization?.orgType === "PERSONAL" ||
+          (m.organization as any)?.type === "PERSONAL"
+      ),
+    [memberships]
+  );
+
+  const companyMemberships = useMemo(
+    () =>
+      memberships.filter(
+        (m) =>
+          !(
+            includePersonal &&
+            (m.organization?.orgType === "PERSONAL" ||
+              (m.organization as any)?.type === "PERSONAL")
+          )
+      ),
+    [memberships, includePersonal]
+  );
 
   // Use sidebar hook - must be called unconditionally (React rules)
   // The header is within SidebarProvider in dispatcher layout, so this is safe
@@ -76,7 +98,12 @@ export function OrganizationSwitcher({
 
   const goToManage = () => {
     // Canonical route for organization settings
-    router.push("/organization/settings");
+    const targetOrgId = activeOrganizationId || personalOrg?.orgId;
+    if (targetOrgId) {
+      router.push(`/organization/${targetOrgId}/settings`);
+    } else {
+      router.push("/organization");
+    }
   };
 
   const handleJoin = () => {
@@ -137,8 +164,9 @@ export function OrganizationSwitcher({
           )}
           {includePersonal && (
             <DropdownMenuItem
-              onClick={() => selectOrg(null)}
+              onClick={() => personalOrg && selectOrg(personalOrg.orgId)}
               className="flex items-center gap-2 cursor-pointer"
+              disabled={!personalOrg}
             >
               <Avatar className="size-8">
                 <AvatarFallback>
@@ -153,13 +181,13 @@ export function OrganizationSwitcher({
                   Marketplace view
                 </span>
               </div>
-              {!activeOrganizationId && (
+              {activeOrganizationId === personalOrg?.orgId && (
                 <Check className="size-4 text-primary ml-auto shrink-0" />
               )}
             </DropdownMenuItem>
           )}
           {!isLoading &&
-            memberships.map((m) => (
+            companyMemberships.map((m) => (
               <DropdownMenuItem
                 key={m.orgId}
                 onClick={() => selectOrg(m.orgId)}

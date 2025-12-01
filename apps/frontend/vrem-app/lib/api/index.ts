@@ -1,4 +1,4 @@
-import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction } from '@/types';
+import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer } from '@/types';
 import {
   currentUser,
   jobRequests,
@@ -117,12 +117,90 @@ class ApiClient {
       (headers as Record<string, string>)['x-org-id'] = orgId;
     }
 
-    const response = await fetch(`${this.baseUrl}${API_PREFIX}${endpoint}`, {
+    const fullUrl = `${this.baseUrl}${API_PREFIX}${endpoint}`;
+    const method = options.method || 'GET';
+    const hasAuth = !!token;
+    const hasOrgId = !!orgId;
+
+    // Log request details before fetch
+    console.log('[API Request]', {
+      endpoint,
+      fullUrl,
+      method,
+      hasAuthorization: hasAuth,
+      hasOrgId: hasOrgId,
+      orgId: orgId || 'none',
+    });
+
+    let response: Response;
+    try {
+      response = await fetch(fullUrl, {
       ...options,
       headers,
     });
+    } catch (error: any) {
+      // Network error (fetch failed completely)
+      const errorMessage = error.message || 'Network request failed';
+      console.error('[API Network Error]', {
+        endpoint,
+        fullUrl,
+        method,
+        error: errorMessage,
+      });
+
+      // Track persistent network errors
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('backend-api-error', {
+          detail: { message: `${method} ${endpoint} failed: ${errorMessage}` }
+        }));
+      }
+
+      throw new Error(`Network Error: ${errorMessage}`);
+    }
 
     if (!response.ok) {
+      // Try to parse response body as JSON, fallback to text
+      let responseBody: any;
+      const contentType = response.headers.get('content-type');
+      try {
+        if (contentType && contentType.includes('application/json')) {
+          responseBody = await response.json();
+        } else {
+          responseBody = await response.text();
+        }
+      } catch (e) {
+        responseBody = `Failed to parse response body: ${e}`;
+      }
+
+      // Log error details
+      console.error('[API Error]', {
+        endpoint,
+        fullUrl,
+        method,
+        status: response.status,
+        statusText: response.statusText,
+        responseBody,
+        hasAuthorization: hasAuth,
+        hasOrgId: hasOrgId,
+        orgId: orgId || 'none',
+      });
+
+      // Track persistent API errors (non-401 errors that indicate backend issues)
+      if (response.status !== 401 && typeof window !== 'undefined') {
+        const errorMessage = typeof responseBody === 'object' && responseBody?.message
+          ? responseBody.message
+          : typeof responseBody === 'string' && responseBody
+          ? responseBody
+          : response.statusText;
+        
+        const issueMessage = `${method} ${endpoint} failed: ${response.status} ${errorMessage}`;
+        
+        // Dispatch event for backend health monitoring
+        window.dispatchEvent(new CustomEvent('backend-api-error', {
+          detail: { message: issueMessage }
+        }));
+      }
+
       if (response.status === 401) {
         if (typeof window !== 'undefined') {
           localStorage.removeItem('token');
@@ -131,8 +209,23 @@ class ApiClient {
           // window.location.href = '/login'; 
         }
       }
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `API Error: ${response.statusText}`);
+
+      // Create error with status code and backend message
+      const errorMessage = typeof responseBody === 'object' && responseBody?.message
+        ? responseBody.message
+        : typeof responseBody === 'string' && responseBody
+        ? responseBody
+        : response.statusText;
+      
+      const error = new Error(`API Error [${response.status}]: ${errorMessage}`);
+      (error as any).status = response.status;
+      (error as any).responseBody = responseBody;
+      throw error;
+    }
+
+    // Track successful API calls
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('backend-api-success'));
     }
 
     return response.json();
@@ -222,6 +315,24 @@ class ApiClient {
         createdAt: new Date(org.createdAt),
       };
     },
+    listMembers: async (): Promise<OrganizationMember[]> => {
+      if (USE_MOCK_DATA) {
+        return [];
+      }
+      const orgId = this.organizations.getActiveOrganization();
+      if (!orgId) return [];
+      const members = await this.request<any[]>(`/organizations/${orgId}/members`);
+      return members.map((m) => ({
+        ...m,
+        createdAt: new Date(m.createdAt),
+        personalOrg: m.personalOrg
+          ? {
+              ...m.personalOrg,
+              createdAt: m.personalOrg.createdAt ? new Date(m.personalOrg.createdAt) : undefined,
+            }
+          : null,
+      }));
+    },
     updateSettings: async (orgId: string, payload: Partial<Organization>): Promise<Organization> => {
       if (USE_MOCK_DATA) {
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -249,6 +360,53 @@ class ApiClient {
     getActiveOrganization: (): string | null => {
       if (typeof window === 'undefined') return null;
       return localStorage.getItem('organizationId');
+    },
+  };
+
+  customers = {
+    list: async (search?: string): Promise<Customer[]> => {
+      if (USE_MOCK_DATA) {
+        return [];
+      }
+      const query = search ? `?search=${encodeURIComponent(search)}` : '';
+      const customers = await this.request<Customer[]>(`/customers${query}`);
+      return customers.map((c) => ({
+        ...c,
+        createdAt: new Date(c.createdAt),
+        updatedAt: new Date(c.updatedAt),
+        lastJob: c.lastJob ? new Date(c.lastJob as any) : null,
+      }));
+    },
+    create: async (payload: Partial<Customer>): Promise<Customer> => {
+      if (USE_MOCK_DATA) {
+        const now = new Date();
+        return {
+          id: `cust-${Date.now()}`,
+          orgId: payload.orgId || 'org-mock',
+          name: payload.name || 'New Customer',
+          email: payload.email,
+          phone: payload.phone,
+          notes: payload.notes,
+          agentId: payload.agentId,
+          createdAt: now,
+          updatedAt: now,
+        };
+      }
+      const customer = await this.request<Customer>('/customers', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: payload.name,
+          email: payload.email,
+          phone: payload.phone,
+          notes: payload.notes,
+          agentId: payload.agentId,
+        }),
+      });
+      return {
+        ...customer,
+        createdAt: new Date(customer.createdAt),
+        updatedAt: new Date(customer.updatedAt),
+      };
     },
   };
 
@@ -623,7 +781,8 @@ class ApiClient {
       id: project.id,
       orderNumber: project.id.substring(0, 8), // Use part of ID as order number
       organizationId: project.orgId,
-      clientName: project.agent?.name || 'Unknown Client',
+      clientName: project.customer?.name || project.agent?.name || 'Unassigned',
+      customerId: project.customerId || undefined,
       propertyAddress: project.address || '',
       location: location,
       scheduledDate: scheduledDate.toISOString().split('T')[0],
