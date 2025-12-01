@@ -27,7 +27,7 @@ export class OrganizationsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  @Roles(Role.ADMIN) // Only global ADMIN can create an organization
+  @Roles(Role.DISPATCHER) // Only global ADMIN can create an organization
   async createOrg(
     @CurrentUser() user,
     @Body() dto: CreateOrganizationDto,
@@ -85,15 +85,15 @@ export class OrganizationsController {
     @Body() dto: UpdateOrganizationSettingsDto,
     @Req() req: any,
   ) {
-    // Check if user has ADMIN or PROJECT_MANAGER role in the organization
+    // Check if user has OWNER or ADMIN role in the organization
     const membership = req.membership || req.activeOrgMembership;
     if (
       !membership ||
-      (membership.role !== OrgRole.ADMIN &&
-        membership.role !== OrgRole.PROJECT_MANAGER)
+      (membership.role !== OrgRole.OWNER &&
+        membership.role !== OrgRole.ADMIN)
     ) {
       throw new ForbiddenException(
-        'Only ADMIN and PROJECT_MANAGER can update organization settings',
+        'Only OWNER and ADMIN can update organization settings',
       );
     }
 

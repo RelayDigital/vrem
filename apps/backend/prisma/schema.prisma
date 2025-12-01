@@ -17,10 +17,10 @@ model User {
   updatedAt      DateTime             @updatedAt
   messages       Message[]
   organizations  OrganizationMember[]
-  agentProjects  Project[]            @relation("AgentProjects")
   editorProjects Project[]            @relation("EditorProjects")
   techProjects   Project[]            @relation("TechProjects")
-  customers      Customer[]
+  managerProjects Project[]           @relation("ManagerProjects")
+  customers      OrganizationCustomer[]
 }
 
 model Organization {
@@ -45,7 +45,7 @@ model Organization {
   invitations  Invitation[]
   members      OrganizationMember[]
   projects     Project[]
-  customers    Customer[]
+  customers    OrganizationCustomer[]
 }
 
 model OrganizationMember {
@@ -84,13 +84,13 @@ model Message {
 
 model Project {
   id            String         @id @default(uuid())
-  agentId       String?
   address       String
   notes         String?
   scheduledTime DateTime
   status        ProjectStatus  @default(BOOKED)
   technicianId  String?
   editorId      String?
+  projectManagerId String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   orgId         String
@@ -98,14 +98,14 @@ model Project {
   calendarEvent CalendarEvent?
   media         Media[]
   messages      Message[]
-  agent         User?          @relation("AgentProjects", fields: [agentId], references: [id])
   editor        User?          @relation("EditorProjects", fields: [editorId], references: [id])
   organization  Organization   @relation(fields: [orgId], references: [id])
   technician    User?          @relation("TechProjects", fields: [technicianId], references: [id])
-  customer      Customer?      @relation(fields: [customerId], references: [id])
+  projectManager User?         @relation("ManagerProjects", fields: [projectManagerId], references: [id])
+  customer      OrganizationCustomer? @relation(fields: [customerId], references: [id])
 }
 
-model Customer {
+model OrganizationCustomer {
   id        String        @id @default(uuid())
   orgId     String
   name      String

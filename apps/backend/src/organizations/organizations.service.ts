@@ -25,7 +25,7 @@ export class OrganizationsService {
     if (!user) throw new NotFoundException('User not found');
 
     // ENFORCEMENT: only global ADMIN can create organizations
-    if (user.role !== Role.ADMIN) {
+    if (user.role !== Role.DISPATCHER) {
       throw new ForbiddenException(
         'Only ADMIN users can create a media company',
       );
@@ -39,12 +39,12 @@ export class OrganizationsService {
       },
     });
 
-    // Make the creator an OrgRole.ADMIN
+    // Make the creator an OrgRole.DISPATCHER
     await this.prisma.organizationMember.create({
       data: {
         userId,
         orgId: org.id,
-        role: OrgRole.ADMIN,
+        role: OrgRole.DISPATCHER,
       },
     });
 
@@ -204,7 +204,7 @@ export class OrganizationsService {
           data: {
             userId: techId,
             orgId: personalOrg.id,
-            role: OrgRole.ADMIN,
+            role: OrgRole.DISPATCHER,
           },
         });
       }

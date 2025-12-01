@@ -6,10 +6,10 @@ const TEST_ORG_NAME = 'VX Test Org';
 // Test user emails and their corresponding organization roles
 // Note: Agents cannot be part of organizations, so they are excluded
 const TEST_USERS = [
-  { email: 'projectmanager@example.com', orgRole: OrgRole.PROJECT_MANAGER },
-  { email: 'editor@example.com', orgRole: OrgRole.EDITOR },
+  { email: 'projectmanager@example.com', orgRole: OrgRole.DISPATCHER },
+  { email: 'editor@example.com', orgRole: OrgRole.DISPATCHER },
   { email: 'technician@example.com', orgRole: OrgRole.TECHNICIAN },
-  { email: 'admin@example.com', orgRole: OrgRole.ADMIN },
+  { email: 'admin@example.com', orgRole: OrgRole.DISPATCHER },
 ];
 
 async function seedTestOrg() {

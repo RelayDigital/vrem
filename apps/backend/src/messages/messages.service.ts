@@ -12,8 +12,8 @@ export class MessagesService {
   constructor(private prisma: PrismaService) {}
 
   async userHasAccessToProject(userId: string, role: Role, projectId: string) {
-    // PMs and Admins get full access
-    if (role === Role.ADMIN || role === Role.PROJECT_MANAGER) {
+    // Dispatchers get full access
+    if (role === Role.DISPATCHER) {
       return true;
     }
 
@@ -87,7 +87,7 @@ export class MessagesService {
 
   //   const isOwner = message.userId === currentUser.id;
   //   const canModerate =
-  //     currentUser.role === Role.ADMIN || currentUser.role === Role.PROJECT_MANAGER;
+  //     currentUser.role === Role.DISPATCHER || currentUser.role === Role.DISPATCHER;
 
   //   if (!isOwner && !canModerate) {
   //     throw new ForbiddenException('You are not allowed to delete this message');

@@ -27,7 +27,7 @@ export class OnboardingService {
     //
     // GLOBAL ADMIN FLOW
     //
-    if (globalRole === Role.ADMIN) {
+    if (globalRole === Role.DISPATCHER) {
       if (membershipCount === 0) {
         return {
           step: 'create-organization',
@@ -61,9 +61,9 @@ export class OnboardingService {
     if (membershipCount === 0) {
       return {
         step: 'no-organizations-yet',
-        canCreateOrganization: user.role === Role.ADMIN,
+        canCreateOrganization: user.role === Role.DISPATCHER,
         canJoinOrganization: true,
-        showCreateOrgCTA: user.role === Role.ADMIN,
+        showCreateOrgCTA: user.role === Role.DISPATCHER,
         showJoinOrgCTA: true,
         message: 'You are not part of any organization yet.',
       };

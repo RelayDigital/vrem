@@ -8,18 +8,16 @@ type CurrentUser = { id: string; role: Role };
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
-  async getDashboardForUser(user: CurrentUser) {
+  async getDashboardForUser(user: CurrentUser, orgId: string | null) {
     switch (user.role) {
       case Role.AGENT:
         return this.getAgentDashboard(user.id);
       case Role.TECHNICIAN:
-        return this.getTechnicianDashboard(user.id);
-      case Role.EDITOR:
-        return this.getEditorDashboard(user.id);
-      case Role.PROJECT_MANAGER:
-        return this.getPmDashboard();
-      case Role.ADMIN:
-        return this.getAdminDashboard();
+        if (!orgId) return this.getTechnicianDashboard(user.id);
+        return this.getTechnicianDashboard(user.id, orgId);
+      case Role.DISPATCHER:
+        if (!orgId) return this.getAdminDashboard();
+        return this.getOrgManagerDashboard(orgId);
       default:
         return { role: user.role, data: null };
     }
@@ -75,10 +73,11 @@ export class DashboardService {
 
   // ---------- Technician ----------
 
-  private async getTechnicianDashboard(technicianId: string) {
+  private async getTechnicianDashboard(technicianId: string, orgId?: string) {
     const assignedShoots = await this.prisma.project.findMany({
       where: {
         technicianId,
+        ...(orgId ? { orgId } : {}),
         status: {
           in: [ProjectStatus.BOOKED, ProjectStatus.SHOOTING],
         },
@@ -108,104 +107,64 @@ export class DashboardService {
     };
   }
 
-  // ---------- Editor ----------
+  // ---------- Org Manager (dispatcher/admin) ----------
 
-  private async getEditorDashboard(editorId: string) {
-    const editingQueue = await this.prisma.project.findMany({
-      where: {
-        editorId,
-        status: ProjectStatus.EDITING,
-      },
-      orderBy: { updatedAt: 'asc' },
+  private async getOrgManagerDashboard(orgId: string) {
+    const projects = await this.prisma.project.findMany({
+      where: { orgId },
       include: {
         agent: true,
         technician: true,
+        editor: true,
+        customer: true,
         media: true,
+        messages: true,
       },
+      orderBy: { createdAt: 'desc' },
     });
 
-    const recentlyDelivered = await this.prisma.project.findMany({
-      where: {
-        editorId,
-        status: ProjectStatus.DELIVERED,
+    const counts = projects.reduce(
+      (acc, p) => {
+        acc[p.status] = (acc[p.status] || 0) + 1;
+        return acc;
       },
-      orderBy: { updatedAt: 'desc' },
-      take: 10,
-      include: {
-        agent: true,
-      },
-    });
+      {} as Record<string, number>,
+    );
 
     return {
-      role: Role.EDITOR,
-      editingQueue,
-      recentlyDelivered,
+      role: Role.DISPATCHER,
+      projects,
+      counts,
     };
   }
 
-  // ---------- Project Manager ----------
-
-  private async getPmDashboard() {
-    const [booked, shooting, editing, delivered] = await Promise.all([
-      this.prisma.project.findMany({
-        where: { status: ProjectStatus.BOOKED },
-        include: { agent: true, technician: true, editor: true },
-        orderBy: { scheduledTime: 'asc' },
-      }),
-      this.prisma.project.findMany({
-        where: { status: ProjectStatus.SHOOTING },
-        include: { agent: true, technician: true, editor: true },
-        orderBy: { scheduledTime: 'asc' },
-      }),
-      this.prisma.project.findMany({
-        where: { status: ProjectStatus.EDITING },
-        include: { agent: true, technician: true, editor: true },
-        orderBy: { updatedAt: 'asc' },
-      }),
-      this.prisma.project.findMany({
-        where: { status: ProjectStatus.DELIVERED },
-        include: { agent: true, technician: true, editor: true },
-        orderBy: { updatedAt: 'desc' },
-        take: 50,
-      }),
-    ]);
-
-    return {
-      role: Role.PROJECT_MANAGER,
-      pipeline: {
-        booked,
-        shooting,
-        editing,
-        delivered,
-      },
-      counts: {
-        booked: booked.length,
-        shooting: shooting.length,
-        editing: editing.length,
-        delivered: delivered.length,
-      },
-    };
-  }
-
-  // ---------- Admin ----------
+  // ---------- Admin (fallback) ----------
 
   private async getAdminDashboard() {
-    const pmDashboard = await this.getPmDashboard();
+    const projects = await this.prisma.project.findMany({
+      include: {
+        agent: true,
+        technician: true,
+        editor: true,
+        customer: true,
+        media: true,
+        messages: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
-    const [userCounts, totalProjects] = await Promise.all([
-      this.prisma.user.groupBy({
-        by: ['role'],
-        _count: { _all: true },
-      }),
-      this.prisma.project.count(),
-    ]);
+    const counts = projects.reduce(
+      (acc, p) => {
+        acc[p.status] = (acc[p.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     return {
-      role: Role.ADMIN,
-      pipeline: pmDashboard.pipeline,
-      counts: pmDashboard.counts,
-      usersByRole: userCounts,
-      totalProjects,
+      role: Role.DISPATCHER,
+      projects,
+      counts,
     };
   }
 }

@@ -32,7 +32,7 @@ export class ProjectsController {
   // GET all projects in this organization
   @Get()
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Roles(Role.DISPATCHER)
   getProjects(@CurrentOrg() org) {
     return this.projectsService.findForOrg(org.id);
   }
@@ -50,7 +50,7 @@ export class ProjectsController {
   // GET messages for a project
   @Get(':id/messages')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.AGENT, Role.TECHNICIAN, Role.EDITOR, Role.PROJECT_MANAGER, Role.ADMIN)
+  @Roles(Role.AGENT, Role.TECHNICIAN, Role.DISPATCHER, Role.DISPATCHER, Role.DISPATCHER)
   getMessages(
     @Param('id') id: string,
     @CurrentUser() user,
@@ -62,7 +62,7 @@ export class ProjectsController {
   // POST message
   @Post(':id/messages')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.AGENT, Role.TECHNICIAN, Role.EDITOR, Role.PROJECT_MANAGER, Role.ADMIN)
+  @Roles(Role.AGENT, Role.TECHNICIAN, Role.DISPATCHER, Role.DISPATCHER, Role.DISPATCHER)
   addMessage(
     @Param('id') id: string,
     @Body() dto: CreateMessageDto,
@@ -75,7 +75,7 @@ export class ProjectsController {
   // CREATE project
   @Post('create')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.AGENT, Role.PROJECT_MANAGER, Role.ADMIN)
+  @Roles(Role.AGENT, Role.DISPATCHER, Role.DISPATCHER)
   createProject(
     @CurrentUser() user,
     @CurrentOrg() org,
@@ -114,7 +114,7 @@ export class ProjectsController {
   // ASSIGN tech + editor
   @Patch(':id/assign')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.PROJECT_MANAGER, Role.ADMIN)
+  @Roles(Role.DISPATCHER, Role.DISPATCHER)
   assign(
     @Param('id') id: string,
     @Body() dto: AssignProjectDto,
@@ -126,7 +126,7 @@ export class ProjectsController {
   // UPDATE project
   @Patch(':id')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.PROJECT_MANAGER, Role.ADMIN)
+  @Roles(Role.DISPATCHER, Role.DISPATCHER)
   updateProject(
     @Param('id') id: string,
     @Body() dto: UpdateProjectDto,
@@ -138,7 +138,7 @@ export class ProjectsController {
   // REMOVE
   @Delete(':id')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.PROJECT_MANAGER, Role.ADMIN)
+  @Roles(Role.DISPATCHER, Role.DISPATCHER)
   remove(@Param('id') id: string, @CurrentOrg() org) {
     return this.projectsService.remove(id, org.id);
   }
@@ -146,7 +146,7 @@ export class ProjectsController {
   // ASSIGN AGENT
   @Patch(':id/assign-agent')
   @UseGuards(OrgMemberGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Roles(Role.DISPATCHER, Role.DISPATCHER)
   assignAgent(
     @Param('id') id: string,
     @Body('agentId') agentId: string,
@@ -158,19 +158,43 @@ export class ProjectsController {
   // ASSIGN TECHNICIAN
   @Patch(':id/assign-technician')
   @UseGuards(OrgMemberGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Roles(Role.DISPATCHER)
   assignTechnician(
     @Param('id') id: string,
     @Body('technicianId') technicianId: string,
     @CurrentOrg() org,
+    @Req() req,
   ) {
+    const membershipRole = req?.membership?.role;
+    const allowed = ['OWNER', 'ADMIN', 'DISPATCHER', 'PROJECT_MANAGER'];
+    if (!allowed.includes(membershipRole)) {
+      throw new ForbiddenException('You are not allowed to assign technicians for this organization');
+    }
     return this.projectsService.assignTechnician(id, technicianId, org.id);
+  }
+
+  // ASSIGN CUSTOMER
+  @Patch(':id/assign-customer')
+  @UseGuards(OrgMemberGuard, RolesGuard)
+  @Roles(Role.DISPATCHER)
+  assignCustomer(
+    @Param('id') id: string,
+    @Body('customerId') customerId: string,
+    @CurrentOrg() org,
+    @Req() req,
+  ) {
+    const membershipRole = req?.membership?.role;
+    const allowed = ['OWNER', 'ADMIN', 'DISPATCHER', 'PROJECT_MANAGER'];
+    if (!allowed.includes(membershipRole)) {
+      throw new ForbiddenException('You are not allowed to assign customers for this organization');
+    }
+    return this.projectsService.assignCustomer(id, customerId, org.id);
   }
 
   // ASSIGN EDITOR
   @Patch(':id/assign-editor')
   @UseGuards(OrgMemberGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Roles(Role.DISPATCHER, Role.DISPATCHER)
   assignEditor(
     @Param('id') id: string,
     @Body('editorId') editorId: string,
@@ -182,7 +206,7 @@ export class ProjectsController {
   // SCHEDULE
   @Patch(':id/schedule')
   @UseGuards(OrgMemberGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Roles(Role.DISPATCHER, Role.DISPATCHER)
   scheduleProject(
     @Param('id') id: string,
     @Body('scheduledTime') scheduledTime: string,

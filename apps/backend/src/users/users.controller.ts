@@ -19,7 +19,7 @@ import { Role } from '@prisma/client';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+@Roles(Role.DISPATCHER, Role.DISPATCHER)
 export class UsersController {
   constructor(private usersService: UsersService) {}
 

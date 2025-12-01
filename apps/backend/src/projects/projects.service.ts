@@ -101,7 +101,7 @@ export class ProjectsService {
         return result;
   }
 
-  if (role === Role.EDITOR) {
+  if (role === Role.DISPATCHER) {
         if (!orgId) {
           throw new ForbiddenException('Organization ID required for editors');
         }
@@ -199,6 +199,14 @@ async assignTechnician(projectId: string, technicianId: string, orgId: string) {
   const updated = await this.prisma.project.update({
     where: { id: projectId },
     data: { technicianId },
+    include: {
+      agent: true,
+      technician: true,
+      editor: true,
+      media: true,
+      messages: true,
+      customer: true,
+    },
   });
 
   if (project.scheduledTime && process.env.CRONOFY_ACCESS_TOKEN) {
@@ -206,6 +214,24 @@ async assignTechnician(projectId: string, technicianId: string, orgId: string) {
   }
 
   return updated;
+}
+
+async assignCustomer(projectId: string, customerId: string, orgId: string) {
+  await this.ensureProjectInOrg(projectId, orgId);
+  await this.ensureCustomerInOrg(customerId, orgId);
+
+  return this.prisma.project.update({
+    where: { id: projectId },
+    data: { customerId },
+    include: {
+      agent: true,
+      technician: true,
+      editor: true,
+      media: true,
+      messages: true,
+      customer: true,
+    },
+  });
 }
 
 
@@ -259,8 +285,8 @@ async updateStatus(
 
   const current = project.status;
 
-  // PM/Admin override
-  if (user.role === Role.ADMIN || user.role === Role.PROJECT_MANAGER) {
+  // Dispatcher override
+  if (user.role === Role.DISPATCHER) {
     return this.setProjectStatus(projectId, newStatus);
   }
 
@@ -273,14 +299,6 @@ async updateStatus(
       return this.setProjectStatus(projectId, newStatus);
     }
     throw new ForbiddenException('Technician cannot perform this transition');
-  }
-
-  // Editor
-  if (user.role === Role.EDITOR) {
-    if (current === ProjectStatus.EDITING && newStatus === ProjectStatus.DELIVERED) {
-      return this.setProjectStatus(projectId, newStatus);
-    }
-    throw new ForbiddenException('Editor cannot perform this transition');
   }
 
   throw new ForbiddenException('You do not have permission');
@@ -329,11 +347,10 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
 
     if (!project) return null;
 
-    if (role === 'ADMIN' || role === 'PROJECT_MANAGER') return project;
+    if (role === Role.DISPATCHER) return project;
 
-    if (role === 'AGENT' && project.agentId !== userId) return null;
-    if (role === 'TECHNICIAN' && project.technicianId !== userId) return null;
-    if (role === 'EDITOR' && project.editorId !== userId) return null;
+    if (role === Role.AGENT && project.agentId !== userId) return null;
+    if (role === Role.TECHNICIAN && project.technicianId !== userId) return null;
 
     return project;
   }
@@ -393,7 +410,7 @@ async getMessages(
   if (user.role === Role.TECHNICIAN && project.technicianId !== user.id) {
     throw new ForbiddenException('Not allowed');
   }
-  if (user.role === Role.EDITOR && project.editorId !== user.id) {
+  if (user.role === Role.DISPATCHER && project.editorId !== user.id) {
     throw new ForbiddenException('Not allowed');
   }
 
@@ -436,7 +453,7 @@ async addMessage(
   if (user.role === Role.TECHNICIAN && project.technicianId !== user.id)
     throw new ForbiddenException("Not allowed");
 
-  if (user.role === Role.EDITOR && project.editorId !== user.id)
+  if (user.role === Role.DISPATCHER && project.editorId !== user.id)
     throw new ForbiddenException("Not allowed");
 
   // PM & Admin always allowed

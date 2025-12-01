@@ -14,13 +14,13 @@ export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Roles(Role.DISPATCHER, Role.DISPATCHER)
   list(@CurrentOrg() org, @Query('search') search?: string) {
     return this.customersService.listForOrg(org.id, search);
   }
 
   @Post()
-  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Roles(Role.DISPATCHER, Role.DISPATCHER)
   create(@CurrentOrg() org, @Body() dto: CreateCustomerDto) {
     return this.customersService.create(org.id, dto);
   }

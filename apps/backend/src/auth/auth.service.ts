@@ -46,7 +46,7 @@ export class AuthService {
       data: {
         userId,
         orgId: personalOrg.id,
-        role: OrgRole.ADMIN,
+        role: OrgRole.DISPATCHER,
       },
     });
 

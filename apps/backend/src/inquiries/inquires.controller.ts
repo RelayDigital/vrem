@@ -28,28 +28,28 @@ export class InquiriesController {
 
   // Admin + PM only
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Roles(Role.DISPATCHER, Role.DISPATCHER)
   @Get()
   getAllInquiries() {
     return this.inquiriesService.getAllInquiries();
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Roles(Role.DISPATCHER, Role.DISPATCHER)
   @Get(':id')
   getInquiryById(@Param('id') id: string) {
     return this.inquiriesService.getInquiryById(id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Roles(Role.DISPATCHER, Role.DISPATCHER)
   @Patch(':id')
   updateInquiry(@Param('id') id: string, @Body() dto: UpdateInquiryDto) {
     return this.inquiriesService.updateInquiry(id, dto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN, Role.PROJECT_MANAGER)
+  @Roles(Role.DISPATCHER, Role.DISPATCHER)
   @Post(':id/convert')
   convertToProject(@Param('id') id: string, @CurrentOrg() org: { id: string }) {
     return this.inquiriesService.convertToProject(id, org.id);
