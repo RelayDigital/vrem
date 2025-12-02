@@ -28,7 +28,7 @@ export class ProjectsService {
 }
 
   private async ensureCustomerInOrg(customerId: string, orgId: string) {
-    const customer = await this.prisma.customer.findFirst({
+    const customer = await this.prisma.organizationCustomer.findFirst({
       where: { id: customerId, orgId },
     });
 
@@ -44,11 +44,12 @@ export class ProjectsService {
   findAll() {
     return this.prisma.project.findMany({
       include: {
-        agent: true,
         technician: true,
         editor: true,
+        projectManager: true,
         media: true,
         messages: true,
+        customer: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -59,30 +60,29 @@ export class ProjectsService {
     this.logger.log(`findForUser called with userId: ${userId}, role: ${role}, orgId: ${orgId || 'null'}`);
 
     try {
-  if (role === Role.AGENT) {
-        // Agents can query by agentId only (they may not be org members)
-        const whereClause: any = { agentId: userId };
-        if (orgId) {
-          whereClause.orgId = orgId;
-        }
-        
-        this.logger.log(`Querying projects for AGENT: agentId=${userId}, orgId=${orgId || 'any'}`);
-        const result = await this.prisma.project.findMany({
-          where: whereClause,
-          include: { 
-            media: true, 
-            customer: true,
-            messages: {
-              include: { user: true },
-            },
-          },
-          orderBy: { createdAt: 'desc' },
-        });
-        this.logger.log(`Found ${result.length} projects for AGENT`);
-        return result;
-  }
+    if (role === Role.AGENT) {
+      const whereClause: any = { projectManagerId: userId };
+      if (orgId) {
+        whereClause.orgId = orgId;
+      }
 
-  if (role === Role.TECHNICIAN) {
+      this.logger.log(`Querying projects for AGENT: projectManagerId=${userId}, orgId=${orgId || 'any'}`);
+      const result = await this.prisma.project.findMany({
+        where: whereClause,
+        include: {
+          media: true,
+          customer: true,
+          messages: {
+            include: { user: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      this.logger.log(`Found ${result.length} projects for AGENT`);
+      return result;
+    }
+
+    if (role === Role.TECHNICIAN) {
         if (!orgId) {
           throw new ForbiddenException('Organization ID required for technicians');
         }
@@ -101,46 +101,30 @@ export class ProjectsService {
         return result;
   }
 
-  if (role === Role.DISPATCHER) {
-        if (!orgId) {
-          throw new ForbiddenException('Organization ID required for editors');
-        }
-        this.logger.log(`Querying projects for EDITOR: editorId=${userId}, orgId=${orgId}`);
-        const result = await this.prisma.project.findMany({
-      where: { editorId: userId, orgId },
-          include: { 
-            media: true, 
-            customer: true,
-            messages: {
-              include: { user: true },
-            },
-          },
-        });
-        this.logger.log(`Found ${result.length} projects for EDITOR`);
-        return result;
-  }
-
-  // PM / Admin → still scoped to org
+    if (role === Role.DISPATCHER) {
       if (!orgId) {
-        throw new ForbiddenException('Organization ID required for project managers and admins');
+        throw new ForbiddenException('Organization ID required for dispatchers');
       }
-      this.logger.log(`Querying projects for PM/Admin: orgId=${orgId}`);
+      this.logger.log(`Querying projects for DISPATCHER: orgId=${orgId}`);
       const result = await this.prisma.project.findMany({
-    where: { orgId },
-    include: {
-      agent: true,
-      technician: true,
-      editor: true,
-      media: true,
-      customer: true,
+        where: { orgId },
+        include: {
+          media: true,
+          customer: true,
+          technician: true,
+          editor: true,
+          projectManager: true,
           messages: {
             include: { user: true },
           },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-      this.logger.log(`Found ${result.length} projects for PM/Admin`);
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      this.logger.log(`Found ${result.length} projects for DISPATCHER`);
       return result;
+    }
+
+      return [];
     } catch (error: any) {
       this.logger.error(`Error in findForUser: ${error.message}`, error.stack);
       this.logger.error(`Error meta: ${JSON.stringify(error.meta || {})}`);
@@ -161,11 +145,13 @@ export class ProjectsService {
     return this.prisma.project.create({
       data: {
         orgId,
-        agentId: dto.agentId,
         customerId: dto.customerId,
         address: dto.address,
         notes: dto.notes,
         scheduledTime: new Date(dto.scheduledTime),
+        projectManagerId: dto.projectManagerId,
+        technicianId: dto.technicianId,
+        editorId: dto.editorId,
       }
     });
   }
@@ -183,15 +169,6 @@ export class ProjectsService {
     });
   }
 
-  async assignAgent(projectId: string, agentId: string, orgId: string) {
-  await this.ensureUserExists(agentId);
-  await this.ensureProjectInOrg(projectId, orgId)
-  return this.prisma.project.update({
-    where: { id: projectId },
-    data: { agentId },
-  });
-}
-
 async assignTechnician(projectId: string, technicianId: string, orgId: string) {
   const project = await this.ensureProjectInOrg(projectId, orgId);
   const technician = await this.ensureUserExists(technicianId);
@@ -200,12 +177,12 @@ async assignTechnician(projectId: string, technicianId: string, orgId: string) {
     where: { id: projectId },
     data: { technicianId },
     include: {
-      agent: true,
       technician: true,
       editor: true,
       media: true,
       messages: true,
       customer: true,
+      projectManager: true,
     },
   });
 
@@ -224,12 +201,12 @@ async assignCustomer(projectId: string, customerId: string, orgId: string) {
     where: { id: projectId },
     data: { customerId },
     include: {
-      agent: true,
       technician: true,
       editor: true,
       media: true,
       messages: true,
       customer: true,
+      projectManager: true,
     },
   });
 }
@@ -242,6 +219,15 @@ async assignEditor(projectId: string, editorId: string, orgId: string) {
   return this.prisma.project.update({
     where: { id: projectId },
     data: { editorId },
+  });
+}
+
+async assignProjectManager(projectId: string, projectManagerId: string, orgId: string) {
+  await this.ensureUserExists(projectManagerId);
+  await this.ensureProjectInOrg(projectId, orgId);
+  return this.prisma.project.update({
+    where: { id: projectId },
+    data: { projectManagerId },
   });
 }
 
@@ -319,9 +305,9 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
     return this.prisma.project.findUnique({
       where: { id },
       include: {
-        agent: true,
         technician: true,
         editor: true,
+        projectManager: true,
         media: true,
         customer: true,
         messages: true,
@@ -334,9 +320,9 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
     const project = await this.prisma.project.findFirst({
       where: { id, orgId },
       include: {
-        agent: true,
         technician: true,
         editor: true,
+        projectManager: true,
         media: true,
         customer: true,
         messages: {
@@ -349,7 +335,7 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
 
     if (role === Role.DISPATCHER) return project;
 
-    if (role === Role.AGENT && project.agentId !== userId) return null;
+    if (role === Role.AGENT && project.projectManagerId !== userId) return null;
     if (role === Role.TECHNICIAN && project.technicianId !== userId) return null;
 
     return project;
@@ -369,7 +355,7 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
 async findForOrg(orgId: string) {
   return this.prisma.project.findMany({
     where: { orgId },
-    include: { agent: true, technician: true, editor: true, customer: true },
+    include: { projectManager: true, technician: true, editor: true, customer: true },
     orderBy: { createdAt: 'desc' },
   });
 }
@@ -393,7 +379,6 @@ async getMessages(
       orgId: orgId,
     },
     include: {
-      agent: true,
       technician: true,
       editor: true
     }
@@ -404,13 +389,10 @@ async getMessages(
   }
 
   // Ensure the user has permission to see it
-  if (user.role === Role.AGENT && project.agentId !== user.id) {
+  if (user.role === Role.AGENT && project.projectManagerId !== user.id) {
     throw new ForbiddenException('Not allowed');
   }
   if (user.role === Role.TECHNICIAN && project.technicianId !== user.id) {
-    throw new ForbiddenException('Not allowed');
-  }
-  if (user.role === Role.DISPATCHER && project.editorId !== user.id) {
     throw new ForbiddenException('Not allowed');
   }
 
@@ -436,7 +418,6 @@ async addMessage(
   const project = await this.prisma.project.findFirst({
     where: { id: projectId, orgId },
     include: {
-      agent: true,
       technician: true,
       editor: true,
     }
@@ -447,13 +428,10 @@ async addMessage(
   }
 
   // Permission checks
-  if (user.role === Role.AGENT && project.agentId !== user.id)
+  if (user.role === Role.AGENT && project.projectManagerId !== user.id)
     throw new ForbiddenException("Not allowed");
 
   if (user.role === Role.TECHNICIAN && project.technicianId !== user.id)
-    throw new ForbiddenException("Not allowed");
-
-  if (user.role === Role.DISPATCHER && project.editorId !== user.id)
     throw new ForbiddenException("Not allowed");
 
   // PM & Admin always allowed

@@ -38,7 +38,6 @@ export class InquiriesService {
     const project = await this.prisma.project.create({
       data: {
         orgId,
-        agentId: '', // to be filled by PM later or from auth
         address: inquiry.address || '',
         notes: inquiry.message || '',
         scheduledTime: new Date(), // placeholder - updated later

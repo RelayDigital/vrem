@@ -20,16 +20,16 @@ export class MessagesService {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: {
-        agentId: true,
         technicianId: true,
         editorId: true,
+        projectManagerId: true,
       },
     });
 
     if (!project) return false;
 
     return (
-      project.agentId === userId ||
+      project.projectManagerId === userId ||
       project.technicianId === userId ||
       project.editorId === userId
     );

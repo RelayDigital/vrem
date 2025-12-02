@@ -1,6 +1,6 @@
 import { IsEmail, IsOptional, IsString } from 'class-validator';
 
-export class CreateCustomerDto {
+export class UpdateCustomerDto {
   @IsOptional()
   @IsString()
   name?: string;
@@ -16,8 +16,4 @@ export class CreateCustomerDto {
   @IsOptional()
   @IsString()
   notes?: string;
-
-  @IsOptional()
-  @IsString()
-  userId?: string;
 }

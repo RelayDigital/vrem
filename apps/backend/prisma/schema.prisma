@@ -112,12 +112,12 @@ model OrganizationCustomer {
   email     String?
   phone     String?
   notes     String?
-  agentId   String?
+  userId    String?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
   organization Organization @relation(fields: [orgId], references: [id])
-  agent        User?        @relation(fields: [agentId], references: [id])
+  user         User?        @relation(fields: [userId], references: [id])
   projects     Project[]
 }
 

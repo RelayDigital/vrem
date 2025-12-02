@@ -81,21 +81,8 @@ export class ProjectsController {
     @CurrentOrg() org,
     @Body() dto: CreateProjectDto,
   ) {
-    dto.agentId = dto.agentId || user.id;
-
-    if (user.role === Role.AGENT) {
-      dto.agentId = user.id;
-      // For agents, orgId might come from the request body if they're not org members
-      // But we still need an orgId to create the project
-      const orgId = org?.id || dto.orgId;
-      if (!orgId) {
-        throw new ForbiddenException('Organization ID is required to create a project');
-      }
-      return this.projectsService.create(dto, orgId);
-    }
-    // PM/Admin must be org members, so org.id should always exist
     if (!org?.id) {
-      throw new ForbiddenException('Organization ID is required');
+      throw new ForbiddenException('Organization ID is required to create a project');
     }
     return this.projectsService.create(dto, org.id);
   }
@@ -143,18 +130,6 @@ export class ProjectsController {
     return this.projectsService.remove(id, org.id);
   }
 
-  // ASSIGN AGENT
-  @Patch(':id/assign-agent')
-  @UseGuards(OrgMemberGuard, RolesGuard)
-  @Roles(Role.DISPATCHER, Role.DISPATCHER)
-  assignAgent(
-    @Param('id') id: string,
-    @Body('agentId') agentId: string,
-    @CurrentOrg() org,
-  ) {
-    return this.projectsService.assignAgent(id, agentId, org.id);
-  }
-
   // ASSIGN TECHNICIAN
   @Patch(':id/assign-technician')
   @UseGuards(OrgMemberGuard, RolesGuard)
@@ -189,6 +164,24 @@ export class ProjectsController {
       throw new ForbiddenException('You are not allowed to assign customers for this organization');
     }
     return this.projectsService.assignCustomer(id, customerId, org.id);
+  }
+
+  // ASSIGN PROJECT MANAGER
+  @Patch(':id/assign-project-manager')
+  @UseGuards(OrgMemberGuard, RolesGuard)
+  @Roles(Role.DISPATCHER)
+  assignProjectManager(
+    @Param('id') id: string,
+    @Body('projectManagerId') projectManagerId: string,
+    @CurrentOrg() org,
+    @Req() req,
+  ) {
+    const membershipRole = req?.membership?.role;
+    const allowed = ['OWNER', 'ADMIN', 'DISPATCHER', 'PROJECT_MANAGER'];
+    if (!allowed.includes(membershipRole)) {
+      throw new ForbiddenException('You are not allowed to assign project managers for this organization');
+    }
+    return this.projectsService.assignProjectManager(id, projectManagerId, org.id);
   }
 
   // ASSIGN EDITOR

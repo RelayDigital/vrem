@@ -1,13 +1,14 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
+import { UpdateCustomerDto } from './dto/update-customer.dto';
 
 @Injectable()
 export class CustomersService {
   constructor(private prisma: PrismaService) {}
 
   async listForOrg(orgId: string, search?: string) {
-    const customers = await this.prisma.customer.findMany({
+    const customers = await this.prisma.organizationCustomer.findMany({
       where: {
         orgId,
         OR: search
@@ -43,7 +44,7 @@ export class CustomersService {
         email: customer.email,
         phone: customer.phone,
         notes: customer.notes,
-        agentId: customer.agentId,
+        userId: customer.userId,
         totalJobs,
         lastJob: lastJobDate,
         createdAt: customer.createdAt,
@@ -54,35 +55,55 @@ export class CustomersService {
 
   async create(orgId: string, dto: CreateCustomerDto) {
     // Optional: ensure linked agent user exists
-    let agentName: string | undefined;
-    if (dto.agentId) {
-      const user = await this.prisma.user.findUnique({ where: { id: dto.agentId } });
+    let linkedUserName: string | undefined;
+    if (dto.userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: dto.userId } });
       if (!user) {
-        throw new NotFoundException('Linked agent not found');
+        throw new NotFoundException('Linked user not found');
       }
-      agentName = user.name;
+      linkedUserName = user.name;
     }
 
     // If an agent is linked, always use their name; otherwise, fall back to provided name/email
-    const name = agentName || dto.name?.trim() || dto.email || 'Customer';
+    const name = linkedUserName || dto.name?.trim() || dto.email || 'Customer';
 
-    return this.prisma.customer.create({
+    return this.prisma.organizationCustomer.create({
       data: {
         orgId,
         name,
         email: dto.email,
         phone: dto.phone,
         notes: dto.notes,
-        agentId: dto.agentId,
+        userId: dto.userId,
       },
     });
   }
 
   async ensureCustomerInOrg(customerId: string, orgId: string) {
-    const customer = await this.prisma.customer.findFirst({ where: { id: customerId, orgId } });
+    const customer = await this.prisma.organizationCustomer.findFirst({ where: { id: customerId, orgId } });
     if (!customer) {
       throw new ForbiddenException('Customer does not belong to your organization');
     }
     return customer;
+  }
+
+  async update(orgId: string, customerId: string, dto: UpdateCustomerDto) {
+    await this.ensureCustomerInOrg(customerId, orgId);
+
+    return this.prisma.organizationCustomer.update({
+      where: { id: customerId },
+      data: {
+        name: dto.name?.trim(),
+        email: dto.email,
+        phone: dto.phone,
+        notes: dto.notes,
+      },
+    });
+  }
+
+  async delete(orgId: string, customerId: string) {
+    await this.ensureCustomerInOrg(customerId, orgId);
+    await this.prisma.organizationCustomer.delete({ where: { id: customerId } });
+    return { success: true };
   }
 }

@@ -30,7 +30,7 @@ export class DashboardService {
 
     const upcomingShoots = await this.prisma.project.findMany({
       where: {
-        agentId,
+        projectManagerId: agentId,
         status: {
           in: [
             ProjectStatus.BOOKED,
@@ -48,7 +48,7 @@ export class DashboardService {
 
     const deliveredProjects = await this.prisma.project.findMany({
       where: {
-        agentId,
+        projectManagerId: agentId,
         status: ProjectStatus.DELIVERED,
       },
       orderBy: { updatedAt: 'desc' },
@@ -59,7 +59,7 @@ export class DashboardService {
     });
 
     const lastProject = await this.prisma.project.findFirst({
-      where: { agentId },
+      where: { projectManagerId: agentId },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -84,7 +84,7 @@ export class DashboardService {
       },
       orderBy: { scheduledTime: 'asc' },
       include: {
-        agent: true,
+        projectManager: true,
       },
     });
 
@@ -96,7 +96,7 @@ export class DashboardService {
       orderBy: { updatedAt: 'desc' },
       take: 10,
       include: {
-        agent: true,
+        projectManager: true,
       },
     });
 
@@ -113,9 +113,9 @@ export class DashboardService {
     const projects = await this.prisma.project.findMany({
       where: { orgId },
       include: {
-        agent: true,
         technician: true,
         editor: true,
+        projectManager: true,
         customer: true,
         media: true,
         messages: true,
@@ -143,9 +143,9 @@ export class DashboardService {
   private async getAdminDashboard() {
     const projects = await this.prisma.project.findMany({
       include: {
-        agent: true,
         technician: true,
         editor: true,
+        projectManager: true,
         customer: true,
         media: true,
         messages: true,
