@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -19,21 +20,57 @@ import { Badge } from "@/components/ui/badge";
 import { H2 } from "@/components/ui/typography";
 import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 import { api } from "@/lib/api";
-import { Technician } from "../../../../types";
+import { OrganizationMember, Technician } from "../../../../types";
 import { TechnicianManagement } from "../../technician";
+import { RoleChangeDialog } from "./RoleChangeDialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface TeamViewProps {
   technicians: Technician[];
+  currentUserId?: string;
 }
 
-export function TeamView({ technicians }: TeamViewProps) {
-  const [technicianList, setTechnicianList] = useState<Technician[]>(technicians);
+export function TeamView({
+  technicians,
+  currentUserId: userIdProp,
+}: TeamViewProps) {
+  const [technicianList, setTechnicianList] =
+    useState<Technician[]>(technicians);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmails, setInviteEmails] = useState<string[]>([]);
   const [emailInput, setEmailInput] = useState("");
   const [isInviting, setIsInviting] = useState(false);
   const [magicLink, setMagicLink] = useState("https://app.vrem.io/invite/team");
   const { activeOrganizationId } = useCurrentOrganization();
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [technicianToRemove, setTechnicianToRemove] =
+    useState<Technician | null>(null);
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [pendingRole, setPendingRole] = useState<
+    Technician["role"] | undefined
+  >(undefined);
+  const [pendingTechnician, setPendingTechnician] = useState<Technician | null>(
+    null
+  );
+  const [currentUserId, setCurrentUserId] = useState<string | null>(
+    userIdProp ?? null
+  );
+  const [currentUserMemberId, setCurrentUserMemberId] = useState<string | null>(
+    null
+  );
+  const currentUserRole = useMemo(
+    () => technicianList.find((t) => t.id === currentUserId)?.role,
+    [technicianList, currentUserId]
+  );
+  const [inviteRole, setInviteRole] =
+    useState<Technician["role"]>("TECHNICIAN");
 
   const linkOrigin = useMemo(() => {
     if (typeof window !== "undefined") {
@@ -50,7 +87,20 @@ export function TeamView({ technicians }: TeamViewProps) {
 
   useEffect(() => {
     setTechnicianList(technicians);
-  }, [technicians]);
+    try {
+      const storedUserId =
+        typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+      if (storedUserId) setCurrentUserId(storedUserId);
+      else if (userIdProp) setCurrentUserId(userIdProp);
+      const storedMemberId =
+        typeof window !== "undefined"
+          ? localStorage.getItem("membershipId")
+          : null;
+      if (storedMemberId) setCurrentUserMemberId(storedMemberId);
+    } catch (error) {
+      // ignore
+    }
+  }, [technicians, userIdProp]);
 
   const addEmails = (emails: string[]) => {
     setInviteEmails((prev) => {
@@ -119,7 +169,7 @@ export function TeamView({ technicians }: TeamViewProps) {
     try {
       await Promise.all(
         emails.map((email) =>
-          api.organizations.createInvite(email, "TECHNICIAN")
+          api.organizations.createInvite(email, inviteRole || "TECHNICIAN")
         )
       );
       toast.success(
@@ -176,7 +226,7 @@ export function TeamView({ technicians }: TeamViewProps) {
         </span>
       </div>
       <Badge variant="outline" className="shrink-0">
-        Technician
+        {technician.role || "Technician"}
       </Badge>
     </div>
   );
@@ -190,11 +240,80 @@ export function TeamView({ technicians }: TeamViewProps) {
   };
 
   const handleRemoveTechnician = (technician: Technician) => {
-    if (!confirm(`Remove ${technician.name || "technician"} from the team?`)) {
+    setTechnicianToRemove(technician);
+    setRemoveDialogOpen(true);
+  };
+
+  const confirmRemoveTechnician = () => {
+    if (!technicianToRemove) return;
+    setTechnicianList((prev) =>
+      prev.filter((t) => t.id !== technicianToRemove.id)
+    );
+    toast.success("Technician removed from team");
+    setRemoveDialogOpen(false);
+    setTechnicianToRemove(null);
+  };
+
+  const handleRoleChange = async (
+    technician: Technician,
+    role: Technician["role"]
+  ) => {
+    if (!technician.memberId) {
+      toast.error("Unable to update role: missing member id");
       return;
     }
-    setTechnicianList((prev) => prev.filter((t) => t.id !== technician.id));
-    toast.success("Technician removed from team");
+    if (role === "OWNER") {
+      setPendingTechnician(technician);
+      setPendingRole(role);
+      setRoleDialogOpen(true);
+      return;
+    }
+    setUpdatingRoleId(technician.id);
+    try {
+      const updated = await api.organizations.updateMemberRole(
+        technician.memberId,
+        role as OrganizationMember["role"]
+      );
+      setTechnicianList((prev) =>
+        prev.map((t) =>
+          t.id === technician.id ? { ...t, role: updated.role } : t
+        )
+      );
+      toast.success("Role updated");
+    } catch (error) {
+      console.error("Failed to update role", error);
+      toast.error("Unable to update role");
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  };
+
+  const confirmOwnerChange = async () => {
+    if (!pendingTechnician || !pendingRole || !pendingTechnician.memberId) {
+      setRoleDialogOpen(false);
+      return;
+    }
+    setUpdatingRoleId(pendingTechnician.id);
+    try {
+      const updated = await api.organizations.updateMemberRole(
+        pendingTechnician.memberId,
+        pendingRole
+      );
+      setTechnicianList((prev) =>
+        prev.map((t) =>
+          t.id === pendingTechnician.id ? { ...t, role: updated.role } : t
+        )
+      );
+      toast.success("Role updated");
+    } catch (error) {
+      console.error("Failed to update role", error);
+      toast.error("Unable to update role");
+    } finally {
+      setUpdatingRoleId(null);
+      setRoleDialogOpen(false);
+      setPendingRole(undefined);
+      setPendingTechnician(null);
+    }
   };
 
   return (
@@ -210,7 +329,7 @@ export function TeamView({ technicians }: TeamViewProps) {
                   Invite Teammate
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl w-full flex flex-col">
                 <DialogHeader className="space-y-1.5">
                   <DialogTitle className="text-xl">
                     Invite people to your team
@@ -221,33 +340,34 @@ export function TeamView({ technicians }: TeamViewProps) {
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-5">
+                <div className="space-y-5 w-full">
                   <div className="space-y-3">
                     <div className="text-sm font-semibold">
                       Invite teammates
                     </div>
-                    <div className="flex gap-2 flex-col sm:flex-row">
-                      <div className="flex flex-1 flex-col gap-0 sm:flex-row">
-                        <div className="flex max-w-1/2 overflow-x-scroll scrollbar-hide">
-                          {inviteEmails.map((email) => (
-                            <Badge
-                              key={email}
-                              variant="secondary"
-                              className="flex items-center gap-1"
+                    <div className="flex gap-2 flex-col">
+                      <div className="flex flex-1 gap-2 overflow-x-scroll scrollbar-hide max-w-full">
+                        {inviteEmails.map((email) => (
+                          <Badge
+                            key={email}
+                            variant="secondary"
+                            className="flex items-center gap-1"
+                          >
+                            {email}
+                            <Button
+                              variant="mutedFlat"
+                              className="p-0 w-auto ml-0.5 cursor-pointer"
+                              onClick={() => handleRemoveEmail(email)}
+                              aria-label={`Remove ${email}`}
+                              size="icon-sm"
                             >
-                              {email}
-                              <Button
-                                variant="mutedFlat"
-                                className="p-0 w-auto ml-0.5"
-                                onClick={() => handleRemoveEmail(email)}
-                                aria-label={`Remove ${email}`}
-                                size="icon-sm"
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </Badge>
-                          ))}
-                        </div>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </Badge>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-1 flex-col gap-0 sm:flex-row">
                         <Input
                           placeholder="Enter emails (comma separated)"
                           value={emailInput}
@@ -259,13 +379,38 @@ export function TeamView({ technicians }: TeamViewProps) {
                           autoFocus
                         />
                       </div>
-                      <Button
-                        onClick={handleSendInvites}
-                        disabled={isInviting}
-                        className="sm:w-auto w-full"
-                      >
-                        {isInviting ? "Sending..." : "Invite"}
-                      </Button>
+                      <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+                        <Select
+                          value={inviteRole}
+                          onValueChange={(value) =>
+                            setInviteRole(value as Technician["role"])
+                          }
+                        >
+                          <SelectTrigger className="w-40">
+                            <SelectValue placeholder="Role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="TECHNICIAN">
+                              Technician
+                            </SelectItem>
+                            <SelectItem value="PROJECT_MANAGER">
+                              Project Manager
+                            </SelectItem>
+                            <SelectItem value="EDITOR">Editor</SelectItem>
+                            <SelectItem value="DISPATCHER">
+                              Dispatcher
+                            </SelectItem>
+                            <SelectItem value="ADMIN">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          onClick={handleSendInvites}
+                          disabled={isInviting}
+                          className="sm:w-auto w-full flex-1"
+                        >
+                          {isInviting ? "Sending..." : "Invite"}
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="space-y-2 max-h-64 overflow-auto">
@@ -309,9 +454,63 @@ export function TeamView({ technicians }: TeamViewProps) {
           <TechnicianManagement
             technicians={technicianList}
             onRemove={handleRemoveTechnician}
+            onRoleChange={handleRoleChange}
+            updatingRoleId={updatingRoleId}
+            currentUserId={currentUserId || undefined}
+            currentUserMemberId={currentUserMemberId || undefined}
+            currentUserRole={currentUserRole}
           />
         </div>
       </article>
+      <Dialog
+        open={removeDialogOpen}
+        onOpenChange={(open) => {
+          setRemoveDialogOpen(open);
+          if (!open) setTechnicianToRemove(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove technician</DialogTitle>
+            <DialogDescription>
+              This technician will be removed from your team. You can re-invite
+              them later if needed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-sm">
+            Are you sure you want to remove{" "}
+            <span className="font-medium">
+              {technicianToRemove?.name || "this technician"}
+            </span>
+            ?
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRemoveDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmRemoveTechnician}>
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <RoleChangeDialog
+        open={roleDialogOpen}
+        onOpenChange={(open) => {
+          setRoleDialogOpen(open);
+          if (!open) {
+            setPendingRole(undefined);
+            setPendingTechnician(null);
+          }
+        }}
+        target={pendingTechnician}
+        newRole={pendingRole}
+        onConfirm={confirmOwnerChange}
+        loading={!!updatingRoleId}
+      />
     </main>
   );
 }

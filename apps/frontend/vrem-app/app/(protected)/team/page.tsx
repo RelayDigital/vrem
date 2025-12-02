@@ -84,7 +84,7 @@ export default function TeamPage() {
       {loadingTeam ? (
         <TeamGridSkeleton />
       ) : (
-        <TeamView technicians={technicians} />
+        <TeamView technicians={technicians} currentUserId={user?.id} />
       )}
     </div>
   );

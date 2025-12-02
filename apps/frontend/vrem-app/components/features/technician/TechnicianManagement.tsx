@@ -8,24 +8,43 @@ import { H2 } from "@/components/ui/typography";
 interface TechnicianManagementProps {
   technicians: Technician[];
   onRemove?: (technician: Technician) => void;
+  onRoleChange?: (technician: Technician, role: Technician['role']) => void;
+  updatingRoleId?: string | null;
+  currentUserId?: string;
+  currentUserMemberId?: string | null;
+  currentUserRole?: Technician['role'];
 }
 
 export function TechnicianManagement({
   technicians,
   onRemove,
+  onRoleChange,
+  updatingRoleId,
+  currentUserId,
+  currentUserMemberId,
+  currentUserRole,
 }: TechnicianManagementProps) {
   const activeTechnicians = technicians.filter(
-    (p) => p.status === "active"
+    (p) => p.status === "active" && p.role === "TECHNICIAN"
   );
+
+  const statsRoles = new Set<Technician["role"]>([
+    "TECHNICIAN",
+    "PROJECT_MANAGER",
+    "EDITOR",
+  ]);
+  const statsPool = technicians.filter((t) => statsRoles.has(t.role as any));
+
   const avgRating =
-    technicians.length > 0
-      ? technicians.reduce((sum, p) => sum + p.rating.overall, 0) /
-        technicians.length
+    statsPool.length > 0
+      ? statsPool.reduce((sum, p) => sum + p.rating.overall, 0) /
+        statsPool.length
       : 0;
+
   const avgOnTimeRate =
-    technicians.length > 0
-      ? technicians.reduce((sum, p) => sum + p.reliability.onTimeRate, 0) /
-        technicians.length
+    statsPool.length > 0
+      ? statsPool.reduce((sum, p) => sum + p.reliability.onTimeRate, 0) /
+        statsPool.length
       : 0;
 
   return (
@@ -60,7 +79,15 @@ export function TechnicianManagement({
           <H2 className="text-lg border-0">Team Members</H2>
         </div> */}
         <div className="">
-          <TechnicianTable technicians={technicians} onRemove={onRemove} />
+          <TechnicianTable
+            technicians={technicians}
+            onRemove={onRemove}
+            onRoleChange={onRoleChange}
+            updatingRoleId={updatingRoleId}
+            currentUserId={currentUserId}
+            currentUserMemberId={currentUserMemberId}
+            currentUserRole={currentUserRole}
+          />
         </div>
       </div>
     </div>

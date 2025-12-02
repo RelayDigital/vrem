@@ -36,9 +36,23 @@ interface TechnicianTableProps {
   technicians?: Technician[]; // Deprecated: use technicians
   onRowClick?: (technician: Technician | Technician) => void;
   onRemove?: (technician: Technician) => void;
+  onRoleChange?: (technician: Technician, role: Technician['role']) => void;
+  updatingRoleId?: string | null;
+  currentUserId?: string;
+  currentUserMemberId?: string | null;
+  currentUserRole?: Technician['role'];
 }
 
-export function TechnicianTable({ technicians, onRowClick, onRemove }: TechnicianTableProps) {
+export function TechnicianTable({
+  technicians,
+  onRowClick,
+  onRemove,
+  onRoleChange,
+  updatingRoleId,
+  currentUserId,
+  currentUserMemberId,
+  currentUserRole,
+}: TechnicianTableProps) {
   // Use technicians if provided, fallback to technicians for backwards compatibility
   const effectiveTechnicians = technicians || technicians || [];
   const [searchQuery, setSearchQuery] = useState('');
@@ -230,13 +244,14 @@ export function TechnicianTable({ technicians, onRowClick, onRemove }: Technicia
           <TableHead>On-Time</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Joined</TableHead>
+          <TableHead>Role</TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {filteredAndSortedTechnicians.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+            <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
               No technicians found
             </TableCell>
           </TableRow>
@@ -265,28 +280,44 @@ export function TechnicianTable({ technicians, onRowClick, onRemove }: Technicia
               </div>
             </TableCell>
             <TableCell>
-              <div className="flex items-center gap-1 text-sm">
-                <MapPin className="h-4 w-4 text-muted-foreground/60" />
-                <span className="text-muted-foreground">{getLocationDisplay(technician.homeLocation.address, true)}</span>
-              </div>
+              {technician.role && technician.role !== 'TECHNICIAN' ? (
+                <span className="text-sm text-muted-foreground">N/A</span>
+              ) : (
+                <div className="flex items-center gap-1 text-sm">
+                  <MapPin className="h-4 w-4 text-muted-foreground/60" />
+                  <span className="text-muted-foreground">{getLocationDisplay(technician.homeLocation.address, true)}</span>
+                </div>
+              )}
             </TableCell>
             <TableCell>
-              <div className="flex items-center gap-1">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span>{technician.rating.overall}</span>
-                <span className="text-sm text-muted-foreground">({technician.rating.count})</span>
-              </div>
+              {['OWNER', 'ADMIN'].includes(technician.role || '') ? (
+                <span className="text-sm text-muted-foreground">N/A</span>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                  <span>{technician.rating.overall}</span>
+                  <span className="text-sm text-muted-foreground">({technician.rating.count})</span>
+                </div>
+              )}
             </TableCell>
             <TableCell>
-              <div className="flex items-center gap-1">
-                <Briefcase className="h-4 w-4 text-muted-foreground/60" />
-                <span>{technician.reliability.totalJobs}</span>
-              </div>
+              {['OWNER', 'ADMIN'].includes(technician.role || '') ? (
+                <span className="text-sm text-muted-foreground">N/A</span>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <Briefcase className="h-4 w-4 text-muted-foreground/60" />
+                  <span>{technician.reliability.totalJobs}</span>
+                </div>
+              )}
             </TableCell>
             <TableCell>
-              <Badge variant="outline">
-                {(technician.reliability.onTimeRate * 100).toFixed(0)}%
-              </Badge>
+              {['OWNER', 'ADMIN'].includes(technician.role || '') ? (
+                <span className="text-sm text-muted-foreground">N/A</span>
+              ) : (
+                <Badge variant="outline">
+                  {(technician.reliability.onTimeRate * 100).toFixed(0)}%
+                </Badge>
+              )}
             </TableCell>
             <TableCell>
               <Badge
@@ -310,6 +341,31 @@ export function TechnicianTable({ technicians, onRowClick, onRemove }: Technicia
               </Tooltip>
             </TableCell>
             <TableCell>
+              <Select
+                value={technician.role || 'TECHNICIAN'}
+                onValueChange={(val) =>
+                  onRoleChange?.(technician, val as Technician['role'])
+                }
+                disabled={
+                  !onRoleChange ||
+                  updatingRoleId === technician.id ||
+                  (currentUserId && technician.id === currentUserId)
+                }
+              >
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="OWNER">Owner</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                  <SelectItem value="TECHNICIAN">Technician</SelectItem>
+                  <SelectItem value="PROJECT_MANAGER">Project Manager</SelectItem>
+                  <SelectItem value="EDITOR">Editor</SelectItem>
+                  <SelectItem value="DISPATCHER">Dispatcher</SelectItem>
+                </SelectContent>
+              </Select>
+            </TableCell>
+            <TableCell>
               <div className="flex justify-end">
                 <Button
                   variant="ghost"
@@ -318,7 +374,13 @@ export function TechnicianTable({ technicians, onRowClick, onRemove }: Technicia
                     e.stopPropagation();
                     onRemove?.(technician);
                   }}
-                  disabled={!onRemove}
+                  disabled={
+                    !onRemove ||
+                    (currentUserId && technician.id === currentUserId) ||
+                    (currentUserMemberId && technician.memberId === currentUserMemberId) ||
+                    technician.role === 'OWNER' ||
+                    (technician.role === 'ADMIN' && currentUserRole !== 'OWNER')
+                  }
                 >
                   <Trash className="h-4 w-4 text-destructive" />
                 </Button>

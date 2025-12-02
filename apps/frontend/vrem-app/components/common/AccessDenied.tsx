@@ -23,8 +23,8 @@ export function AccessDenied({
   return (
     <div className="size-full overflow-x-hidden flex items-center justify-center p-6">
       <Card className="max-w-md w-full">
-        <CardHeader>
-          <div className="flex items-center gap-3">
+        <CardHeader className="mb-md">
+          <div className="flex items-center gap-3 mb-xs">
             <AlertCircle className="h-6 w-6 text-destructive" />
             <CardTitle>{title}</CardTitle>
           </div>

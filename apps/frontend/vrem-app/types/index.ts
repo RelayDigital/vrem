@@ -73,10 +73,12 @@ export type Customer = OrganizationCustomer;
 
 export interface Technician {
   id: string;
+  memberId?: string;
   name: string;
   email: string;
   phone: string;
   organizationId: string;
+  role?: OrganizationMember['role'];
   isIndependent: boolean;
   companyId?: string; // ID of media company they work for
   companyName?: string;

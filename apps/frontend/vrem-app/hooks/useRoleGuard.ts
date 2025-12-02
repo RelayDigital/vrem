@@ -53,7 +53,7 @@ export function useRoleGuard(
   options: UseRoleGuardOptions = {}
 ): UseRoleGuardReturn {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, memberships, activeOrganizationId } = useAuth();
   const { redirectOnDeny = false, redirectTo = '/dashboard' } = options;
 
   useEffect(() => {
@@ -73,9 +73,16 @@ export function useRoleGuard(
       roleMap[role] || (role as User['role'])
     );
     const normalizedUserRole = roleMap[user.role] || user.role;
+    const activeMembership = memberships.find(
+      (m) => m.orgId === activeOrganizationId
+    );
+    const effectiveUserRole =
+      activeMembership && ['OWNER', 'ADMIN'].includes(activeMembership.role)
+        ? 'DISPATCHER'
+        : normalizedUserRole;
 
     // Check if user has one of the required roles
-    const hasRequiredRole = normalizedRequiredRoles.includes(normalizedUserRole);
+    const hasRequiredRole = normalizedRequiredRoles.includes(effectiveUserRole);
 
     // Redirect if access is denied and redirectOnDeny is true
     if (!hasRequiredRole && redirectOnDeny) {
@@ -92,7 +99,14 @@ export function useRoleGuard(
       roleMap[role] || (role as User['role'])
     );
     const normalizedUserRole = roleMap[user.role] || user.role;
-    return normalizedRequiredRoles.includes(normalizedUserRole);
+    const activeMembership = memberships.find(
+      (m) => m.orgId === activeOrganizationId
+    );
+    const effectiveUserRole =
+      activeMembership && ['OWNER', 'ADMIN'].includes(activeMembership.role)
+        ? 'DISPATCHER'
+        : normalizedUserRole;
+    return normalizedRequiredRoles.includes(effectiveUserRole);
   })();
 
   return {

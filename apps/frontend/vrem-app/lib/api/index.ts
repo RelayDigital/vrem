@@ -377,6 +377,35 @@ class ApiClient {
         createdAt: new Date(org.createdAt),
       };
     },
+    updateMemberRole: async (
+      memberId: string,
+      role: OrganizationMember['role']
+    ): Promise<OrganizationMember> => {
+      if (USE_MOCK_DATA) {
+        return {
+          id: memberId,
+          userId: '',
+          orgId: '',
+          role,
+          createdAt: new Date(),
+        };
+      }
+      const orgId = this.organizations.getActiveOrganization();
+      if (!orgId) {
+        throw new Error('No active organization selected');
+      }
+      const member = await this.request<OrganizationMember>(
+        `/organizations/${orgId}/members/${memberId}/role`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ role }),
+        }
+      );
+      return {
+        ...member,
+        createdAt: new Date(member.createdAt),
+      };
+    },
     setActiveOrganization: (orgId: string | null) => {
       if (typeof window === 'undefined') return;
       if (orgId) {

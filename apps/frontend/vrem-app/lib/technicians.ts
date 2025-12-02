@@ -45,7 +45,7 @@ export async function geocodeAddress(address: string) {
 export async function mapMemberToTechnician(
   member: OrganizationMember
 ): Promise<Technician | null> {
-  if (member.role !== "TECHNICIAN" || !member.user) return null;
+  if (!member.user) return null;
 
   const memberUser = member.user;
   const personalOrg = member.personalOrg;
@@ -68,6 +68,8 @@ export async function mapMemberToTechnician(
 
   const technician: Technician = {
     id: memberUser.id,
+    memberId: member.id,
+    role: member.role,
     name: memberUser.name || "Unnamed",
     email: memberUser.email || "",
     phone: personalOrg?.phone || "",
@@ -108,7 +110,7 @@ export async function mapMemberToTechnician(
     },
     preferredClients: [],
     status: "active",
-    createdAt: new Date(),
+    createdAt: member.createdAt ? new Date(member.createdAt) : new Date(),
     avatar: memberUser.avatarUrl,
     bio: "",
     services: {
