@@ -16,6 +16,7 @@ import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto';
+import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { OrgMemberGuard } from './org-member.guard';
 import { Role, OrgRole } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
@@ -98,5 +99,23 @@ export class OrganizationsController {
     }
 
     return this.orgs.updateOrganizationSettings(orgId, dto);
+  }
+
+  @UseGuards(OrgMemberGuard)
+  @Patch(':orgId/members/:memberId/role')
+  async updateMemberRole(
+    @Param('orgId') orgId: string,
+    @Param('memberId') memberId: string,
+    @Body() dto: UpdateMemberRoleDto,
+    @Req() req: any,
+  ) {
+    const membership = req.membership || req.activeOrgMembership;
+    if (
+      !membership ||
+      (membership.role !== OrgRole.OWNER && membership.role !== OrgRole.ADMIN)
+    ) {
+      throw new ForbiddenException('Only OWNER and ADMIN can update member roles');
+    }
+    return this.orgs.updateMemberRole(orgId, memberId, dto.role, membership);
   }
 }

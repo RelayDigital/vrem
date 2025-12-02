@@ -8,7 +8,7 @@ import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto';
-import { OrgRole, Role, OrgType } from '@prisma/client';
+import { OrgRole, Role, OrgType, OrganizationMember, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -232,5 +232,42 @@ export class OrganizationsService {
         personalOrg,
       };
     });
+  }
+
+  async updateMemberRole(orgId: string, memberId: string, role: OrgRole, actingMembership: OrganizationMember) {
+    const member = await this.prisma.organizationMember.findFirst({
+      where: { id: memberId, orgId },
+    });
+    if (!member) {
+      throw new NotFoundException('Member not found in organization');
+    }
+
+    const updates: Prisma.PrismaPromise<any>[] = [];
+
+    // If promoting someone else to OWNER, demote acting OWNER to ADMIN
+    if (
+      role === OrgRole.OWNER &&
+      actingMembership.role === OrgRole.OWNER &&
+      actingMembership.id !== memberId
+    ) {
+      updates.push(
+        this.prisma.organizationMember.update({
+          where: { id: actingMembership.id },
+          data: { role: OrgRole.ADMIN },
+        }),
+      );
+    }
+
+    updates.push(
+      this.prisma.organizationMember.update({
+        where: { id: memberId },
+        data: { role },
+        include: { user: true, organization: true },
+      }),
+    );
+
+    const results = await this.prisma.$transaction(updates);
+    const updatedMember = results[results.length - 1];
+    return updatedMember;
   }
 }

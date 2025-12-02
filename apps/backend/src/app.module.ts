@@ -12,6 +12,9 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { ActiveOrgMiddleware } from './organizations/active-org.middleware';
 import { PrismaService } from './prisma/prisma.service';
 import { CustomersModule } from './customers/customers.module';
+import { RolesGuard } from './auth/roles.guard';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { Reflector } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -26,7 +29,7 @@ import { CustomersModule } from './customers/customers.module';
     CustomersModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService, ActiveOrgMiddleware],
+  providers: [AppService, PrismaService, ActiveOrgMiddleware, RolesGuard, JwtAuthGuard, Reflector],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
