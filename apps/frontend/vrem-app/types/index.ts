@@ -56,17 +56,20 @@ export interface User {
   organizationType?: "COMPANY" | "PERSONAL";
 }
 
-export interface Customer {
+export interface OrganizationCustomer {
   id: string;
   orgId: string;
   name: string;
   email?: string;
   phone?: string;
   notes?: string;
-  agentId?: string;
+  userId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Backwards compatibility alias
+export type Customer = OrganizationCustomer;
 
 export interface Technician {
   id: string;
@@ -189,7 +192,6 @@ export interface Message {
 
 export interface Project {
   id: string;
-  agentId?: string | null;
   customerId?: string | null;
   address: string;
   notes?: string;
@@ -197,17 +199,18 @@ export interface Project {
   status: ProjectStatus;
   technicianId?: string;
   editorId?: string;
+  projectManagerId?: string | null;
   createdAt: Date;
   updatedAt: Date;
   orgId: string;
   calendarEvent?: CalendarEvent | null;
   media?: Media[];
   messages?: Message[];
-  agent?: User | null;
   editor?: User;
   technician?: User;
+  projectManager?: User | null;
   organization?: Organization;
-  customer?: Customer | null;
+  customer?: OrganizationCustomer | null;
 }
 
 export interface ProjectAggregate extends Project {
@@ -226,6 +229,8 @@ export interface JobRequest {
   organizationId: string;
   clientName: string;
   customerId?: string;
+  projectManagerId?: string | null;
+  editorId?: string | null;
   propertyAddress: string;
   location: {
     lat: number;

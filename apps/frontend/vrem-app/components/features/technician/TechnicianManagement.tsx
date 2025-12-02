@@ -7,10 +7,12 @@ import { H2 } from "@/components/ui/typography";
 
 interface TechnicianManagementProps {
   technicians: Technician[];
+  onRemove?: (technician: Technician) => void;
 }
 
 export function TechnicianManagement({
   technicians,
+  onRemove,
 }: TechnicianManagementProps) {
   const activeTechnicians = technicians.filter(
     (p) => p.status === "active"
@@ -54,11 +56,11 @@ export function TechnicianManagement({
 
       {/* Table */}
       <div className="@container md:col-span-3 mt-md">
-        <div className="mb-md flex items-baseline justify-between">
+        {/* <div className="mb-md flex items-baseline justify-between">
           <H2 className="text-lg border-0">Team Members</H2>
-        </div>
+        </div> */}
         <div className="">
-          <TechnicianTable technicians={technicians} />
+          <TechnicianTable technicians={technicians} onRemove={onRemove} />
         </div>
       </div>
     </div>

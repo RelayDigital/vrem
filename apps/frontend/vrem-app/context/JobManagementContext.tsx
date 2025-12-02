@@ -109,13 +109,24 @@ export function JobManagementProvider({
     try {
     const userRoleUpper = (userRole || '').toUpperCase();
     const memberRoleUpper = (memberRole || '').toUpperCase();
-    const isOrgManager = ['OWNER', 'ADMIN', 'DISPATCHER', 'PROJECT_MANAGER'].includes(
-      memberRoleUpper || userRoleUpper
-    );
+    const isDispatcher = ['DISPATCHER'].includes(memberRoleUpper || userRoleUpper);
 
-    const fetchedProjects = isOrgManager
-      ? await api.projects.listForOrg()
-      : await api.projects.listForCurrentUser();
+    let fetchedProjects: Project[] = [];
+    if (isDispatcher) {
+      try {
+        fetchedProjects = await api.projects.listForOrg();
+      } catch (err: any) {
+        // If org-scoped fetch fails (e.g., not a member of the selected org), fallback to user-scoped fetch
+        const message = err?.message || '';
+        const isForbidden = message.includes('403') || message.toLowerCase().includes('forbidden');
+        if (!isForbidden) {
+          throw err;
+        }
+        fetchedProjects = await api.projects.listForCurrentUser();
+      }
+    } else {
+      fetchedProjects = await api.projects.listForCurrentUser();
+    }
       // Ensure dates are Date objects
       const projectsWithDates = normalizeProjects(fetchedProjects);
       setProjects(projectsWithDates);
@@ -246,8 +257,10 @@ export function JobManagementProvider({
         address: job.address || '',
         scheduledTime: job.scheduledTime || new Date(),
         notes: job.notes,
-        agentId: job.agentId || undefined,
         customerId: (job as any).customerId,
+        projectManagerId: (job as any).projectManagerId,
+        technicianId: job.technicianId,
+        editorId: job.editorId,
         orgId: resolvedOrgId,
       });
       const normalizedProject = {

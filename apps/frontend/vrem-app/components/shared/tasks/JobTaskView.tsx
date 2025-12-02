@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import UnderlineExtension from "@tiptap/extension-underline";
 import LinkExtension from "@tiptap/extension-link";
-import { JobRequest, OrganizationMember, Technician } from "../../../types";
+import {
+  JobRequest,
+  OrganizationMember,
+  Technician,
+  OrganizationCustomer,
+} from "../../../types";
 import { ChatMessage } from "../../../types/chat";
 import {
   Sheet,
@@ -14,18 +19,18 @@ import {
   SheetHeader,
   SheetTitle,
   SheetFooter,
-} from "../../ui/sheet";
+} from "@/components/ui/sheet";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "../../ui/dialog";
-import { Badge } from "../../ui/badge";
-import { Button } from "../../ui/button";
-import { Separator } from "../../ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   MapPin,
   Calendar,
@@ -49,6 +54,7 @@ import {
   Italic,
   Underline,
   Smile,
+  ChevronDown,
   Edit,
   Trash2,
   Paperclip,
@@ -77,7 +83,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "../../ui/tooltip";
+} from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -87,11 +93,18 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "../../ui/alert-dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
-import { ScrollArea } from "../../ui/scroll-area";
-import { useIsMobile } from "../../ui/use-mobile";
-import { cn } from "../../ui/utils";
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useIsMobile } from "@/components/ui/use-mobile";
+import { cn } from "@/components/ui/utils";
 import {
   DndContext,
   closestCenter,
@@ -103,6 +116,7 @@ import {
 } from "@dnd-kit/core";
 import { SiGoogledrive, SiDropbox } from "react-icons/si";
 
+
 import { FileUploaderRegular } from "@uploadcare/react-uploader/next";
 import "@uploadcare/react-uploader/core.css";
 import {
@@ -113,17 +127,28 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "../../ui/accordion";
-import { Input } from "../../ui/input";
-import { ButtonGroup } from "../../ui/button-group";
+} from "@/components/ui/accordion";
+import { Input } from "@/components/ui/input";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { FaGoogleDrive, FaDropbox } from "react-icons/fa";
 import { DiOnedrive } from "react-icons/di";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { api } from "@/lib/api";
+import { fetchOrganizationTechnicians } from "@/lib/technicians";
+import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
+import { useJobManagement } from "@/context/JobManagementContext";
 
 interface JobTaskViewProps {
   job: JobRequest | null;
@@ -147,6 +172,9 @@ interface JobTaskViewProps {
   onStatusChange?: (status: JobRequest["status"]) => void;
   onAssignTechnician?: () => void;
   onChangeTechnician?: () => void; // For reassigning technician
+  onAssignCustomer?: (customerId: string) => void;
+  onAssignProjectManager?: (userId: string) => void;
+  onAssignEditor?: (userId: string) => void;
   variant?: "sheet" | "dialog" | "page";
   onFullScreen?: () => void; // Opens larger dialog
   onOpenInNewPage?: () => void; // Navigates to full page view
@@ -170,10 +198,15 @@ export function JobTaskView({
   onStatusChange,
   onAssignTechnician,
   onChangeTechnician,
+  onAssignCustomer,
+  onAssignProjectManager,
+  onAssignEditor,
   variant = "sheet",
   onFullScreen,
   onOpenInNewPage,
 }: JobTaskViewProps) {
+  const { activeOrganizationId, activeMembership } = useCurrentOrganization();
+  const jobManagement = useJobManagement();
   const [activeTab, setActiveTab] = useState<
     "description" | "discussion" | "attachments" | "media"
   >("discussion");
@@ -205,12 +238,116 @@ export function JobTaskView({
   const [connectingService, setConnectingService] = useState<string | null>(
     null
   );
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [customers, setCustomers] = useState<OrganizationCustomer[]>([]);
+  const [projectManagers, setProjectManagers] = useState<OrganizationMember[]>([]);
+  const [editors, setEditors] = useState<OrganizationMember[]>([]);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [pmSearch, setPmSearch] = useState("");
+  const [editorSearch, setEditorSearch] = useState("");
+  const [loadingAssignments, setLoadingAssignments] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const floorPlanInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const canAssign = useMemo(() => {
+    const orgRole = activeMembership?.role;
+    return ["OWNER", "ADMIN", "DISPATCHER", "PROJECT_MANAGER"].includes(
+      orgRole || ""
+    );
+  }, [activeMembership]);
+  const getInitials = (value?: string | null) =>
+    value
+      ? value
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .slice(0, 2)
+      : "NA";
+  const renderAssigneeBadge = (name: string, avatar?: string) => (
+    <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
+      <Avatar className="h-7 w-7">
+        <AvatarImage src={avatar} alt={name} />
+        <AvatarFallback className="text-xs bg-muted-foreground/20">
+          {getInitials(name)}
+        </AvatarFallback>
+      </Avatar>
+      <span className="text-sm font-medium text-foreground">{name}</span>
+    </div>
+  );
+
+  const filterPeople = <T extends { user?: { name?: string; email?: string }; name?: string; email?: string }>(
+    list: T[],
+    query: string,
+    getName: (item: T) => string,
+    getEmail?: (item: T) => string | undefined
+  ) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((item) => {
+      const name = getName(item)?.toLowerCase() || "";
+      const email = (getEmail?.(item) || "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  };
+
+  const filteredCustomers = useMemo(
+    () =>
+      filterPeople(
+        customers,
+        customerSearch,
+        (c) => c.name || "",
+        (c) => c.email
+      ),
+    [customers, customerSearch]
+  );
+
+  const filteredProjectManagers = useMemo(
+    () =>
+      filterPeople(
+        projectManagers,
+        pmSearch,
+        (m) => m.user?.name || m.personalOrg?.legalName || "",
+        (m) => m.user?.email
+      ),
+    [projectManagers, pmSearch]
+  );
+
+  const filteredEditors = useMemo(
+    () =>
+      filterPeople(
+        editors,
+        editorSearch,
+        (m) => m.user?.name || m.personalOrg?.legalName || "",
+        (m) => m.user?.email
+      ),
+    [editors, editorSearch]
+  );
+  const assignedCustomer = useMemo(() => {
+    if (!job?.customerId) return null;
+    return customers.find((customer) => customer.id === job.customerId) || null;
+  }, [customers, job]);
+  const assignedProjectManager = useMemo(() => {
+    if (!job?.projectManagerId) return null;
+    return (
+      projectManagers.find(
+        (member) =>
+          member.userId === job.projectManagerId ||
+          member.user?.id === job.projectManagerId
+      ) || null
+    );
+  }, [job, projectManagers]);
+  const assignedEditor = useMemo(() => {
+    if (!job?.editorId) return null;
+    return (
+      editors.find(
+        (member) =>
+          member.userId === job.editorId || member.user?.id === job.editorId
+      ) || null
+    );
+  }, [editors, job]);
 
   const messageEditor = useEditor({
     extensions: [
@@ -239,6 +376,113 @@ export function JobTaskView({
       },
     },
   });
+
+  useEffect(() => {
+    const loadData = async () => {
+      const orgId = activeOrganizationId || job?.organizationId;
+      if (!orgId || !open) return;
+      api.organizations.setActiveOrganization(orgId);
+      try {
+        const [techs, custs, members] = await Promise.all([
+          fetchOrganizationTechnicians(),
+          api.customers.list(),
+          api.organizations.listMembers(),
+        ]);
+        setTechnicians(techs);
+        setCustomers(custs);
+        setProjectManagers(
+          members.filter((m) =>
+            ["OWNER", "ADMIN", "DISPATCHER", "PROJECT_MANAGER"].includes(m.role)
+          )
+        );
+        setEditors(members.filter((m) => m.role === "EDITOR"));
+      } catch (error) {
+        console.error("Failed to load assignment data", error);
+      }
+    };
+    void loadData();
+  }, [activeOrganizationId, job?.organizationId, open]);
+
+  const handleAssignCustomerInline = async (customerId: string) => {
+    if (!job || !customerId || !canAssign) return;
+    setLoadingAssignments(true);
+    try {
+      if (onAssignCustomer) {
+        await onAssignCustomer(customerId);
+        await jobManagement.refreshJobs();
+        const refreshed = jobManagement.getJobById(job.id);
+        if (refreshed) {
+          jobManagement.selectJob(refreshed);
+        }
+      } else {
+        const updatedProject = await api.projects.assignCustomer(
+          job.id,
+          customerId
+        );
+        jobManagement.updateJob(job.id, updatedProject);
+        jobManagement.selectJob(api.mapProjectToJobCard(updatedProject));
+      }
+      toast.success("Customer assigned");
+    } catch (error: any) {
+      console.error("Failed to assign customer", error);
+    } finally {
+      setLoadingAssignments(false);
+    }
+  };
+
+  const handleAssignProjectManagerInline = async (userId: string) => {
+    if (!job || !userId || !canAssign) return;
+    setLoadingAssignments(true);
+    try {
+      if (onAssignProjectManager) {
+        await onAssignProjectManager(userId);
+        await jobManagement.refreshJobs();
+        const refreshed = jobManagement.getJobById(job.id);
+        if (refreshed) {
+          jobManagement.selectJob(refreshed);
+        }
+      } else {
+        const updatedProject = await api.projects.assignProjectManager(
+          job.id,
+          userId
+        );
+        jobManagement.updateJob(job.id, updatedProject);
+        jobManagement.selectJob(api.mapProjectToJobCard(updatedProject));
+      }
+      toast.success("Project manager assigned");
+    } catch (error: any) {
+      console.error("Failed to assign project manager", error);
+    } finally {
+      setLoadingAssignments(false);
+    }
+  };
+
+  const handleAssignEditorInline = async (userId: string) => {
+    if (!job || !userId || !canAssign) return;
+    setLoadingAssignments(true);
+    try {
+      if (onAssignEditor) {
+        await onAssignEditor(userId);
+        await jobManagement.refreshJobs();
+        const refreshed = jobManagement.getJobById(job.id);
+        if (refreshed) {
+          jobManagement.selectJob(refreshed);
+        }
+      } else {
+        const updatedProject = await api.projects.assignEditor(
+          job.id,
+          userId
+        );
+        jobManagement.updateJob(job.id, updatedProject);
+        jobManagement.selectJob(api.mapProjectToJobCard(updatedProject));
+      }
+      toast.success("Editor assigned");
+    } catch (error: any) {
+      console.error("Failed to assign editor", error);
+    } finally {
+      setLoadingAssignments(false);
+    }
+  };
 
   // Editor for editing messages
   const editMessageEditor = useEditor({
@@ -445,6 +689,42 @@ export function JobTaskView({
 
   // Early return must be after all hooks
   if (!job) return null;
+
+  const customerDisplayName =
+    assignedCustomer?.name || job.clientName || "Unassigned";
+  const projectManagerDisplay = assignedProjectManager
+    ? {
+        name:
+          assignedProjectManager.user?.name ||
+          assignedProjectManager.personalOrg?.legalName ||
+          "Unassigned",
+        avatar: assignedProjectManager.user?.avatarUrl,
+        userId:
+          assignedProjectManager.user?.id || assignedProjectManager.userId,
+      }
+    : projectManager
+    ? {
+        name: (projectManager as any).name,
+        avatar: (projectManager as any).avatarUrl,
+        userId: (projectManager as any).id,
+      }
+    : null;
+  const editorDisplay = assignedEditor
+    ? {
+        name:
+          assignedEditor.user?.name ||
+          assignedEditor.personalOrg?.legalName ||
+          "Unassigned",
+        avatar: assignedEditor.user?.avatarUrl,
+        userId: assignedEditor.user?.id || assignedEditor.userId,
+      }
+    : editor
+    ? {
+        name: (editor as any).name,
+        avatar: (editor as any).avatarUrl,
+        userId: (editor as any).id,
+      }
+    : null;
 
   const getMediaIcon = (type: string) => {
     switch (type) {
@@ -1879,70 +2159,151 @@ export function JobTaskView({
                 <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
                   Customer
                 </div>
-                <div className="text-sm text-foreground">
-                  {/* {job.clientName
-                    ? job.clientName
-                    : onSetCustomer && (
+                <div className="text-sm text-foreground flex items-center gap-2 flex-wrap">
+                  {customerDisplayName ? (
+                    renderAssigneeBadge(customerDisplayName)
+                  ) : (
+                    <Badge variant="outline">Unassigned</Badge>
+                  )}
+                  {canAssign && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
                         <Button
-                          onClick={onSetCustomer}
                           variant="muted"
                           size="sm"
                           className="h-7 rounded-full"
+                          disabled={loadingAssignments}
                         >
-                          Set Customer
+                          {assignedCustomer ? "Change" : "Assign Customer"}
+                          <ChevronDown className="h-3.5 w-3.5 ml-2" />
                         </Button>
-                      )} */}
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-72 max-h-[300px] overflow-y-auto p-0">
+                        <div className="px-2 py-2 sticky top-0 bg-background z-10">
+                          <Input
+                            placeholder="Search customers..."
+                            value={customerSearch}
+                            onChange={(e) => setCustomerSearch(e.target.value)}
+                            autoFocus
+                          />
+                        </div>
+                        <DropdownMenuSeparator />
+                        {filteredCustomers.map((customer) => (
+                          <DropdownMenuItem
+                            key={customer.id}
+                            onSelect={(event) => {
+                              event.preventDefault();
+                              handleAssignCustomerInline(customer.id);
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="text-xs bg-muted">
+                                {getInitials(customer.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium">
+                                {customer.name}
+                              </span>
+                              {customer.email && (
+                                <span className="text-xs text-muted-foreground">
+                                  {customer.email}
+                                </span>
+                              )}
+                            </div>
+                          </DropdownMenuItem>
+                        ))}
+                        {filteredCustomers.length === 0 && (
+                          <DropdownMenuItem disabled>
+                            No customers found
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
 
                 {/* Project Manager Assigned */}
                 <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
                   Project Manager Assigned
                 </div>
-                <div className="flex items-center gap-2">
-                  {projectManager ? (
-                    <div className="flex items-center gap-2">
-                      <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
-                        <Avatar className="h-7 w-7">
-                          <AvatarImage
-                            // src={projectManager.avatarUrl}
-                            // alt={projectManager.name}
-                          />
-                          <AvatarFallback className="text-xs bg-muted-foreground/20">
-                            {/* {projectManager.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")} */}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm font-medium text-foreground">
-                          {/* {projectManager.name} */}
-                        </span>
-                      </div>
-                      {onChangeTechnician &&
-                        (job?.status === "assigned" ||
-                          job?.status === "in_progress") && (
-                          <Button
-                            onClick={onChangeTechnician}
-                            variant="muted"
-                            size="sm"
-                            className="h-7 rounded-full"
-                          >
-                            <Edit className="h-3.5 w-3.5 mr-1.5" />
-                            Change
-                          </Button>
-                        )}
-                    </div>
-                  ) : (
-                    onAssignTechnician && (
-                      <Button
-                        onClick={onAssignTechnician}
-                        variant="muted"
-                        size="sm"
-                        className="h-7 rounded-full"
-                      >
-                        Assign Project Manager
-                      </Button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {projectManagerDisplay ? (
+                    renderAssigneeBadge(
+                      projectManagerDisplay.name,
+                      projectManagerDisplay.avatar
                     )
+                  ) : (
+                    <Badge variant="outline">Unassigned</Badge>
+                  )}
+                  {canAssign && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="muted"
+                          size="sm"
+                          className="h-7 rounded-full"
+                          disabled={loadingAssignments}
+                        >
+                          {projectManagerDisplay ? "Change" : "Assign Project Manager"}
+                          <ChevronDown className="h-3.5 w-3.5 ml-2" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-72 max-h-[300px] overflow-y-auto p-0">
+                        <div className="px-2 py-2 sticky top-0 bg-background z-10">
+                          <Input
+                            placeholder="Search project managers..."
+                            value={pmSearch}
+                            onChange={(e) => setPmSearch(e.target.value)}
+                            autoFocus
+                          />
+                        </div>
+                        <DropdownMenuSeparator />
+                        {filteredProjectManagers.map((member) => {
+                          const userId = member.user?.id || member.userId;
+                          const name =
+                            member.user?.name ||
+                            member.personalOrg?.legalName ||
+                            "Unassigned";
+                          const avatar = member.user?.avatarUrl;
+                          return (
+                            <DropdownMenuItem
+                              key={member.id}
+                              onSelect={(event) => {
+                                event.preventDefault();
+                                if (userId) {
+                                  handleAssignProjectManagerInline(userId);
+                                }
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={avatar} alt={name} />
+                                <AvatarFallback className="text-xs bg-muted">
+                                  {getInitials(name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium">
+                                  {name}
+                                </span>
+                                {member.user?.email && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {member.user.email}
+                                  </span>
+                                )}
+                              </div>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                        {filteredProjectManagers.length === 0 && (
+                          <DropdownMenuItem disabled>
+                            No project managers available
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
 
@@ -2002,51 +2363,82 @@ export function JobTaskView({
                 <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
                   Editor Assigned
                 </div>
-                <div className="flex items-center gap-2">
-                  {editor ? (
-                    <div className="flex items-center gap-2">
-                      <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
-                        <Avatar className="h-7 w-7">
-                          <AvatarImage
-                            // src={editor.avatarUrl}
-                            // alt={editor.name}
-                          />
-                          <AvatarFallback className="text-xs bg-muted-foreground/20">
-                            {/* {editor.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")} */}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm font-medium text-foreground">
-                          {/* {editor.name} */}
-                        </span>
-                      </div>
-                      {onChangeTechnician &&
-                        (job?.status === "assigned" ||
-                          job?.status === "in_progress") && (
-                          <Button
-                            onClick={onChangeTechnician}
-                            variant="muted"
-                            size="sm"
-                            className="h-7 rounded-full"
-                          >
-                            <Edit className="h-3.5 w-3.5 mr-1.5" />
-                            Change
-                          </Button>
-                        )}
-                    </div>
-                  ) : (
-                    onAssignTechnician && (
-                      <Button
-                        onClick={onAssignTechnician}
-                        variant="muted"
-                        size="sm"
-                        className="h-7 rounded-full"
-                      >
-                        Assign Editor
-                      </Button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {editorDisplay ? (
+                    renderAssigneeBadge(
+                      editorDisplay.name,
+                      editorDisplay.avatar
                     )
+                  ) : (
+                    <Badge variant="outline">Unassigned</Badge>
+                  )}
+                  {canAssign && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="muted"
+                          size="sm"
+                          className="h-7 rounded-full"
+                          disabled={loadingAssignments}
+                        >
+                          {editorDisplay ? "Change" : "Assign Editor"}
+                          <ChevronDown className="h-3.5 w-3.5 ml-2" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-72 max-h-[300px] overflow-y-auto p-0">
+                        <div className="px-2 py-2 sticky top-0 bg-background z-10">
+                          <Input
+                            placeholder="Search editors..."
+                            value={editorSearch}
+                            onChange={(e) => setEditorSearch(e.target.value)}
+                            autoFocus
+                          />
+                        </div>
+                        <DropdownMenuSeparator />
+                        {filteredEditors.map((member) => {
+                          const userId = member.user?.id || member.userId;
+                          const name =
+                            member.user?.name ||
+                            member.personalOrg?.legalName ||
+                            "Unassigned";
+                          const avatar = member.user?.avatarUrl;
+                          return (
+                            <DropdownMenuItem
+                              key={member.id}
+                              onSelect={(event) => {
+                                event.preventDefault();
+                                if (userId) {
+                                  handleAssignEditorInline(userId);
+                                }
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={avatar} alt={name} />
+                                <AvatarFallback className="text-xs bg-muted">
+                                  {getInitials(name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium">
+                                  {name}
+                                </span>
+                                {member.user?.email && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {member.user.email}
+                                  </span>
+                                )}
+                              </div>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                        {filteredEditors.length === 0 && (
+                          <DropdownMenuItem disabled>
+                            No editors available
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useRequireRole } from "@/hooks/useRequireRole";
@@ -19,8 +19,9 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { PageHeader } from "@/components/shared/layout";
 import { JobDataBoundary, JobsGridSkeleton } from "@/components/shared/jobs";
+import { Technician } from "@/types";
+import { fetchOrganizationTechnicians } from "@/lib/technicians";
 
 export default function JobsPage() {
   const router = useRouter();
@@ -34,6 +35,8 @@ export default function JobsPage() {
   ]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [, setLoadingTechnicians] = useState(false);
   const assignedJobs = useMemo(() => {
     if (!user) return [];
     return jobManagement.jobs.filter(
@@ -75,6 +78,35 @@ export default function JobsPage() {
     }
   }, [jobManagement.selectedJob, messaging]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadTechnicians = async () => {
+      if (!user) return;
+      setLoadingTechnicians(true);
+      try {
+        const techs = await fetchOrganizationTechnicians();
+        if (!cancelled) {
+          setTechnicians(techs);
+        }
+      } catch (error) {
+        console.error("Failed to load technicians for jobs list:", error);
+        if (!cancelled) {
+          setTechnicians([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingTechnicians(false);
+        }
+      }
+    };
+
+    loadTechnicians();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   if (isLoading) {
     return <JobsLoadingSkeleton />;
   }
@@ -115,8 +147,7 @@ export default function JobsPage() {
 
   // Dispatcher/Admin/Project Manager/Editor: Use JobsView
   if (["dispatcher", "DISPATCHER", "PROJECT_MANAGER", "EDITOR"].includes(userRole)) {
-    // Empty technicians array - backend will provide when endpoint is ready
-    const technicians: any[] = [];
+    const technicianList = technicians;
 
     return (
       <div className="size-full overflow-x-hidden">
@@ -140,7 +171,7 @@ export default function JobsPage() {
         <JobDataBoundary fallback={<JobsGridSkeleton />}>
           <JobsView
             jobs={jobManagement.jobs}
-            technicians={technicians}
+            technicians={technicianList}
             messages={messaging.messages}
             onViewRankings={handleViewRankings}
             onChangeTechnician={handleViewRankings}
@@ -235,15 +266,14 @@ export default function JobsPage() {
 
   // Technician/Technician: Filter to assigned jobs only
   if (["TECHNICIAN"].includes(userRole)) {
-    // Empty technicians array - backend will provide when endpoint is ready
-    const technicians: any[] = [];
+    const technicianList = technicians;
 
     return (
       <div className="size-full overflow-x-hidden space-y-6">
         <JobDataBoundary fallback={<JobsGridSkeleton />}>
           <JobsView
             jobs={assignedJobs}
-            technicians={technicians}
+            technicians={technicianList}
             messages={messaging.messages}
             onViewRankings={() => {}}
             onChangeTechnician={undefined}
@@ -338,14 +368,14 @@ export default function JobsPage() {
 
   // Agent: Use AgentJobsView
   if (userRole === "AGENT") {
-    const technicians: any[] = []; // TODO: Get from backend when endpoint is ready
+    const technicianList = technicians;
 
     return (
       <div className="size-full overflow-x-hidden">
         <JobDataBoundary fallback={<JobsGridSkeleton />}>
           <AgentJobsView
             jobs={jobManagement.jobCards}
-            technicians={technicians}
+            technicians={technicianList}
             organizationId={user.organizationId || ""}
             onNewJobClick={() => router.push("/booking")}
           />

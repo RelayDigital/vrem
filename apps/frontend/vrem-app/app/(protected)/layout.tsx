@@ -17,8 +17,9 @@ import { BackendHealthAlert } from '@/components/shared/BackendHealthAlert';
 import { useIsMobile } from '@/components/ui/use-mobile';
 import { ReactNode, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { JobRequest, Project } from '@/types';
+import { JobRequest, Project, Technician } from '@/types';
 import { USE_MOCK_DATA } from '@/lib/utils';
+import { fetchOrganizationTechnicians } from '@/lib/technicians';
 
 // Layout content component that renders header, sidebar, and dialogs
 function LayoutContent({
@@ -31,6 +32,37 @@ function LayoutContent({
   const jobCreation = useJobCreation();
   const jobManagement = useJobManagement();
   const isMobile = useIsMobile();
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [, setLoadingTechnicians] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadTechnicians = async () => {
+      if (!user?.organizationId) return;
+      setLoadingTechnicians(true);
+      try {
+        const techs = await fetchOrganizationTechnicians();
+        if (!cancelled) {
+          setTechnicians(techs);
+        }
+      } catch (error) {
+        console.error('Failed to load technicians for rankings', error);
+        if (!cancelled) {
+          setTechnicians([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingTechnicians(false);
+        }
+      }
+    };
+
+    loadTechnicians();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.organizationId]);
 
   // Determine if user should see sidebar (dispatcher only)
   const normalizedRole = typeof user.role === 'string' ? user.role.toUpperCase() : '';
@@ -102,7 +134,6 @@ function LayoutContent({
         )}
 
         {/* Rankings Dialog - For dispatcher/admin roles */}
-        {/* TODO: replace with real technician list from backend once users/technicians endpoint is implemented */}
         <RankingsDialog
           open={jobManagement.showRankings}
           onOpenChange={(open) => {
@@ -111,7 +142,7 @@ function LayoutContent({
             }
           }}
           selectedJob={jobManagement.selectedJob}
-          technicians={USE_MOCK_DATA ? [] : []}
+          technicians={USE_MOCK_DATA ? [] : technicians}
           onJobAssign={jobManagement.assignJob}
         />
       </SidebarProvider>
@@ -302,9 +333,9 @@ function JobCreationProviderWrapper({
         : undefined,
       // Map other fields as needed
       notes: job.requirements,
-      agentId: job.createdBy || (userRole === 'AGENT' ? defaultUserId : undefined),
       customerId: job.customerId,
       orgId: job.organizationId || defaultOrganizationId,
+      projectManagerId: job.createdBy || (userRole === 'AGENT' ? defaultUserId : undefined),
       // ... copy other matching fields if any
     };
 

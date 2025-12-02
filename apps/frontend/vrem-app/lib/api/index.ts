@@ -55,7 +55,7 @@ class ApiClient {
 
     return {
       id: job.id,
-      agentId: job.createdBy,
+      projectManagerId: job.createdBy,
       address: job.propertyAddress,
       notes: notes,
       scheduledTime,
@@ -333,6 +333,34 @@ class ApiClient {
           : null,
       }));
     },
+    createInvite: async (
+      email: string,
+      role: OrganizationMember['role'] = 'TECHNICIAN'
+    ) => {
+      if (USE_MOCK_DATA) {
+        return {
+          id: `invite-${Date.now()}`,
+          orgId: this.organizations.getActiveOrganization() || 'org-mock',
+          email,
+          role,
+          token: 'mock-token',
+          accepted: false,
+          createdAt: new Date(),
+        };
+      }
+      const orgId = this.organizations.getActiveOrganization();
+      if (!orgId) {
+        throw new Error('No active organization selected');
+      }
+      const invite = await this.request<any>(`/organizations/${orgId}/invite`, {
+        method: 'POST',
+        body: JSON.stringify({ email, role }),
+      });
+      return {
+        ...invite,
+        createdAt: invite?.createdAt ? new Date(invite.createdAt) : new Date(),
+      };
+    },
     updateSettings: async (orgId: string, payload: Partial<Organization>): Promise<Organization> => {
       if (USE_MOCK_DATA) {
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -386,7 +414,7 @@ class ApiClient {
           email: payload.email,
           phone: payload.phone,
           notes: payload.notes,
-          agentId: payload.agentId,
+          userId: payload.userId,
           createdAt: now,
           updatedAt: now,
         };
@@ -398,7 +426,7 @@ class ApiClient {
           email: payload.email,
           phone: payload.phone,
           notes: payload.notes,
-          agentId: payload.agentId,
+          userId: payload.userId,
         }),
       });
       return {
@@ -406,6 +434,40 @@ class ApiClient {
         createdAt: new Date(customer.createdAt),
         updatedAt: new Date(customer.updatedAt),
       };
+    },
+    update: async (id: string, payload: Partial<Customer>): Promise<Customer> => {
+      if (USE_MOCK_DATA) {
+        const now = new Date();
+        return {
+          id,
+          orgId: payload.orgId || 'org-mock',
+          name: payload.name || 'Updated Customer',
+          email: payload.email,
+          phone: payload.phone,
+          notes: payload.notes,
+          userId: payload.userId,
+          createdAt: now,
+          updatedAt: now,
+        };
+      }
+      const customer = await this.request<Customer>(`/customers/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: payload.name,
+          email: payload.email,
+          phone: payload.phone,
+          notes: payload.notes,
+        }),
+      });
+      return {
+        ...customer,
+        createdAt: new Date(customer.createdAt),
+        updatedAt: new Date(customer.updatedAt),
+      };
+    },
+    delete: async (id: string): Promise<void> => {
+      if (USE_MOCK_DATA) return;
+      await this.request(`/customers/${id}`, { method: 'DELETE' });
     },
   };
 
@@ -446,7 +508,6 @@ class ApiClient {
           createdAt: payload.createdAt || new Date(),
           updatedAt: payload.updatedAt || new Date(),
           scheduledTime: payload.scheduledTime || new Date(),
-          agentId: payload.agentId || currentUser.id,
           orgId: payload.orgId || currentUser.organizationId,
           status: payload.status || ProjectStatus.BOOKED,
         } as Project));
@@ -457,10 +518,13 @@ class ApiClient {
         this.organizations.setActiveOrganization(payload.orgId);
       }
       const dto = {
-        agentId: payload.agentId,
         address: payload.address,
         notes: payload.notes,
         scheduledTime: payload.scheduledTime?.toISOString() || new Date().toISOString(),
+        customerId: payload.customerId,
+        projectManagerId: payload.projectManagerId,
+        technicianId: payload.technicianId,
+        editorId: payload.editorId,
       };
       const project = await this.request<Project>('/projects/create', {
         method: 'POST',
@@ -520,6 +584,17 @@ class ApiClient {
       });
       return this.normalizeProject(project);
     },
+    assignProjectManager: async (id: string, projectManagerId: string): Promise<Project> => {
+      if (USE_MOCK_DATA) {
+        const project = await this.projects.getById(id);
+        return { ...project, projectManagerId, updatedAt: new Date() };
+      }
+      const project = await this.request<Project>(`/projects/${id}/assign-project-manager`, {
+        method: 'PATCH',
+        body: JSON.stringify({ projectManagerId }),
+      });
+      return this.normalizeProject(project);
+    },
     assignEditor: async (id: string, editorId: string): Promise<Project> => {
       if (USE_MOCK_DATA) {
         const project = await this.projects.getById(id);
@@ -528,17 +603,6 @@ class ApiClient {
       const project = await this.request<Project>(`/projects/${id}/assign-editor`, {
         method: 'PATCH',
         body: JSON.stringify({ editorId }),
-      });
-      return this.normalizeProject(project);
-    },
-    assignAgent: async (id: string, agentId: string): Promise<Project> => {
-      if (USE_MOCK_DATA) {
-        const project = await this.projects.getById(id);
-        return { ...project, agentId, updatedAt: new Date() };
-      }
-      const project = await this.request<Project>(`/projects/${id}/assign-agent`, {
-        method: 'PATCH',
-        body: JSON.stringify({ agentId }),
       });
       return this.normalizeProject(project);
     },
@@ -789,8 +853,10 @@ class ApiClient {
       id: project.id,
       orderNumber: project.id.substring(0, 8), // Use part of ID as order number
       organizationId: project.orgId,
-      clientName: project.customer?.name || project.agent?.name || 'Unassigned',
+      clientName: project.customer?.name || 'Unassigned',
       customerId: project.customerId || undefined,
+      projectManagerId: project.projectManagerId || null,
+      editorId: project.editorId || null,
       propertyAddress: project.address || '',
       location: location,
       scheduledDate: scheduledDate.toISOString().split('T')[0],
@@ -801,7 +867,7 @@ class ApiClient {
       assignedTechnicianId: project.technicianId,
       estimatedDuration: 120, // Default duration
       requirements: requirements,
-      createdBy: project.agentId || 'system',
+      createdBy: project.projectManagerId || 'system',
       createdAt: new Date(project.createdAt),
       assignedAt: project.technicianId ? new Date(project.updatedAt) : undefined,
       propertyImage: 'https://images.unsplash.com/photo-1706808849780-7a04fbac83ef?w=800', // Default image

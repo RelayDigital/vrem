@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Technician } from '../../../types';
 import {
   Table,
@@ -10,7 +10,7 @@ import {
 } from '../../ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
 import { Badge } from '../../ui/badge';
-import { Star, MapPin, Briefcase, Search, ArrowUpDown, Filter, Settings2 } from 'lucide-react';
+import { Star, MapPin, Briefcase, Search, ArrowUpDown, Filter, Settings2, Trash } from 'lucide-react';
 import { getLocationDisplay } from '../../../lib/utils';
 import { Input } from '../../ui/input';
 import {
@@ -20,19 +20,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../ui/select';
+import { Button } from '../../ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/tooltip';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '../../ui/pagination';
 
 interface TechnicianTableProps {
   technicians?: Technician[]; // Deprecated: use technicians
   onRowClick?: (technician: Technician | Technician) => void;
+  onRemove?: (technician: Technician) => void;
 }
 
-export function TechnicianTable({ technicians, onRowClick }: TechnicianTableProps) {
+export function TechnicianTable({ technicians, onRowClick, onRemove }: TechnicianTableProps) {
   // Use technicians if provided, fallback to technicians for backwards compatibility
   const effectiveTechnicians = technicians || technicians || [];
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<string>('name-asc');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Filter and sort technicians
   const filteredAndSortedTechnicians = useMemo(() => {
@@ -93,6 +107,53 @@ export function TechnicianTable({ technicians, onRowClick }: TechnicianTableProp
 
     return result;
   }, [effectiveTechnicians, searchQuery, sortBy, statusFilter, typeFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedTechnicians.length / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTechnicians = filteredAndSortedTechnicians.slice(startIndex, endIndex);
+
+  useEffect(() => {
+    const nextTotal = Math.max(1, Math.ceil(filteredAndSortedTechnicians.length / itemsPerPage));
+    if (currentPage > nextTotal) {
+      setCurrentPage(nextTotal);
+    } else if (currentPage < 1) {
+      setCurrentPage(1);
+    }
+  }, [filteredAndSortedTechnicians.length, itemsPerPage, currentPage]);
+
+  const changePage = (page: number) => {
+    const next = Math.min(Math.max(page, 1), totalPages);
+    setCurrentPage(next);
+  };
+
+  const pageNumbers = () => {
+    const pages: (number | 'ellipsis')[] = [];
+    const maxVisible = 5;
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push('ellipsis');
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (currentPage < totalPages - 2) pages.push('ellipsis');
+      pages.push(totalPages);
+    }
+    return pages;
+  };
+
+  const formatDate = (value?: Date | string) => {
+    if (!value) return '—';
+    const date = typeof value === 'string' ? new Date(value) : value;
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -168,17 +229,19 @@ export function TechnicianTable({ technicians, onRowClick }: TechnicianTableProp
           <TableHead>Jobs</TableHead>
           <TableHead>On-Time</TableHead>
           <TableHead>Status</TableHead>
+          <TableHead>Joined</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {filteredAndSortedTechnicians.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+            <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
               No technicians found
             </TableCell>
           </TableRow>
         ) : (
-          filteredAndSortedTechnicians.map((technician) => (
+          paginatedTechnicians.map((technician) => (
           <TableRow
             key={technician.id}
             className={onRowClick ? 'cursor-pointer hover:bg-muted/50' : ''}
@@ -232,12 +295,99 @@ export function TechnicianTable({ technicians, onRowClick }: TechnicianTableProp
                 {technician.status}
               </Badge>
             </TableCell>
+            <TableCell>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-sm text-muted-foreground cursor-default">
+                    {formatDate(technician.createdAt)}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {technician.createdAt
+                    ? new Date(technician.createdAt).toISOString()
+                    : 'Unknown'}
+                </TooltipContent>
+              </Tooltip>
+            </TableCell>
+            <TableCell>
+              <div className="flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove?.(technician);
+                  }}
+                  disabled={!onRemove}
+                >
+                  <Trash className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </TableCell>
           </TableRow>
           ))
         )}
       </TableBody>
     </Table>
+    {!filteredAndSortedTechnicians.length ? null : (
+      <div className="flex items-center justify-between gap-4 mt-3">
+        <div className="text-sm text-muted-foreground">
+          Showing {startIndex + 1}-{Math.min(endIndex, filteredAndSortedTechnicians.length)} of {filteredAndSortedTechnicians.length}
+        </div>
+        <div className="flex items-center gap-3">
+          <Select
+            value={itemsPerPage.toString()}
+            onValueChange={(val) => {
+              setItemsPerPage(Number(val));
+              setCurrentPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Per page" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10 per page</SelectItem>
+              <SelectItem value="25">25 per page</SelectItem>
+              <SelectItem value="50">50 per page</SelectItem>
+              <SelectItem value="100">100 per page</SelectItem>
+            </SelectContent>
+          </Select>
+          {totalPages > 1 && (
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => changePage(currentPage - 1)}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                {pageNumbers().map((page, idx) => (
+                  <PaginationItem key={`${page}-${idx}`}>
+                    {page === 'ellipsis' ? (
+                      <PaginationEllipsis />
+                    ) : (
+                      <PaginationLink
+                        onClick={() => changePage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    )}
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => changePage(currentPage + 1)}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </div>
+      </div>
+    )}
     </div>
   );
 }
-

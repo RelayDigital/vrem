@@ -36,6 +36,10 @@ export default function DashboardPage() {
   const navigation = useDispatcherNavigation();
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [loadingTechnicians, setLoadingTechnicians] = useState(false);
+  const technicianProfile = useMemo(() => {
+    if (!user) return null;
+    return technicians.find((tech) => tech.id === user.id) || null;
+  }, [technicians, user]);
   const assignedJobs = useMemo(() => {
     if (!user) return [];
     return jobManagement.jobs.filter(
@@ -55,10 +59,12 @@ export default function DashboardPage() {
     return {
       upcoming: upcomingJobs.length,
       completed: completedJobs.length,
-      rating: 0, // TODO: Get from backend when available
-      onTimeRate: "0",
+      rating: technicianProfile?.rating.overall ?? 0,
+      onTimeRate: (
+        (technicianProfile?.reliability.onTimeRate || 0) * 100
+      ).toFixed(0),
     };
-  }, [assignedJobs]);
+  }, [assignedJobs, technicianProfile]);
 
   const shouldFetchMetrics = user
     ? ["dispatcher", "DISPATCHER", "PROJECT_MANAGER", "EDITOR"].includes(user.role)
@@ -447,13 +453,13 @@ export default function DashboardPage() {
 
   // Agent: Use AgentJobsView (their dashboard is essentially the jobs list)
   if (userRole === "AGENT") {
-    const technicians: any[] = []; // TODO: Get from backend when endpoint is ready
+    const technicianList = technicians;
 
     return (
       <div className="size-full overflow-x-hidden">
         <AgentJobsView
           jobs={jobManagement.jobCards}
-          technicians={technicians}
+          technicians={technicianList}
           organizationId={user.organizationId || ""}
           onNewJobClick={() => router.push("/booking")}
         />

@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
-import { ProjectStatus } from "@/types";
+import { ProjectStatus, Technician } from "@/types";
 import { api } from "@/lib/api";
 import { JobsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
 import { H2, P } from "@/components/ui/typography";
 import { Skeleton } from "@/components/ui/skeleton";
+import { fetchOrganizationTechnicians } from "@/lib/technicians";
 
 export default function JobDetailPage() {
   const params = useParams();
@@ -26,6 +27,8 @@ export default function JobDetailPage() {
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
   const [loadingJob, setLoadingJob] = useState(true);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [, setLoadingTechnicians] = useState(false);
 
   const jobId = params?.id as string;
 
@@ -67,6 +70,34 @@ export default function JobDetailPage() {
     }
   }, [jobManagement.selectedJob, jobId, messaging]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadTechnicians = async () => {
+      if (!user) return;
+      setLoadingTechnicians(true);
+      try {
+        const techs = await fetchOrganizationTechnicians();
+        if (!cancelled) {
+          setTechnicians(techs);
+        }
+      } catch (error) {
+        console.error("Failed to load technicians for job detail:", error);
+        if (!cancelled) {
+          setTechnicians([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingTechnicians(false);
+        }
+      }
+    };
+
+    loadTechnicians();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   if (isLoading) {
     return <JobsLoadingSkeleton />;
   }
@@ -78,6 +109,21 @@ export default function JobDetailPage() {
   const selectedJob = jobManagement.selectedJob;
   const hasSelectedJob = selectedJob && selectedJob.id === jobId;
   const isJobLoading = loadingJob;
+  const assignedTechnician = selectedJob?.assignedTechnicianId
+    ? technicians.find(
+        (tech) => tech.id === selectedJob.assignedTechnicianId
+      )
+    : undefined;
+  const photographer = assignedTechnician
+    ? {
+        id: assignedTechnician.id,
+        name: assignedTechnician.name,
+        email: assignedTechnician.email,
+        role: "TECHNICIAN" as const,
+        organizationId: assignedTechnician.organizationId,
+        avatarUrl: assignedTechnician.avatar,
+      }
+    : undefined;
 
   const userRole = user.role;
   const hasAccess =
@@ -100,9 +146,6 @@ export default function JobDetailPage() {
       statusMap[status] || ProjectStatus.BOOKED
     );
   };
-
-  // Empty technicians array - backend will provide when endpoint is ready
-  const technicians: any[] = [];
 
   return (
     <div className="size-full overflow-x-hidden p-6 space-y-4">
@@ -142,13 +185,7 @@ export default function JobDetailPage() {
       {!isJobLoading && hasSelectedJob && hasAccess && selectedJob && (
         <JobTaskView
           job={selectedJob}
-          // technician={
-          //   selectedJob?.assignedTechnicianId
-          //     ? technicians.find(
-          //         (p) => p.id === selectedJob?.assignedTechnicianId
-          //       )
-          //     : undefined
-          // }
+          photographer={photographer}
           messages={messaging.getMessagesForJob(selectedJob.id)}
           currentUserId={user?.id || "current-user-id"}
           currentUserName={user?.name || "Current User"}

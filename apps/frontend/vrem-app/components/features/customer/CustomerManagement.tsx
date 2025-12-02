@@ -7,11 +7,25 @@ import { H2 } from "@/components/ui/typography";
 interface CustomerManagementProps {
   customers: Customer[];
   isLoading?: boolean;
+  onEdit?: (customer: Customer) => void;
+  onDelete?: (customer: Customer) => void;
+  deletingId?: string | null;
+  isDeleting?: boolean;
+  selectedIds?: string[];
+  onToggleSelect?: (customerId: string, selected: boolean) => void;
+  onToggleSelectAll?: (customerIds: string[], selected: boolean) => void;
 }
 
 export function CustomerManagement({
   customers,
   isLoading = false,
+  onEdit,
+  onDelete,
+  deletingId,
+  isDeleting,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
 }: CustomerManagementProps) {
   const activeCustomers = customers.filter(
     () => true
@@ -61,11 +75,21 @@ export function CustomerManagement({
 
       {/* Table */}
       <div className="@container md:col-span-3 mt-md">
-        <div className="mb-md flex items-baseline justify-between">
+        {/* <div className="mb-md flex items-baseline justify-between">
           <H2 className="text-lg border-0">Customers</H2>
-        </div>
+        </div> */}
         <div className="">
-          <CustomersTable customers={customers} isLoading={isLoading} />
+          <CustomersTable
+            customers={customers}
+            isLoading={isLoading}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            deletingId={deletingId}
+            isDeleting={isDeleting}
+            selectedIds={selectedIds}
+            onToggleSelect={onToggleSelect}
+            onToggleSelectAll={onToggleSelectAll}
+          />
         </div>
       </div>
     </div>

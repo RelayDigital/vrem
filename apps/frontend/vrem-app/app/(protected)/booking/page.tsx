@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { AgentBookingFlow } from "@/components/features/agent";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { useRouter } from "next/navigation";
-import { JobRequest } from "@/types";
+import { JobRequest, Organization, Technician } from "@/types";
+import { fetchOrganizationTechnicians } from "@/lib/technicians";
 
 export default function BookingPage() {
   const { user, isLoading } = useRequireRole([
@@ -15,23 +16,62 @@ export default function BookingPage() {
     "PROJECT_MANAGER",
   ]);
   const router = useRouter();
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [preferredVendors, setPreferredVendors] = useState<string[]>([]);
+  const [, setLoadingData] = useState(false);
 
-  // TODO: wire to backend once we have a users/technicians endpoint
-  const technicians: any[] = [];
-  // TODO: wire to backend once we have an organizations endpoint
-  const organizations: any[] = [];
-  // TODO: wire to backend once we have a preferred vendors endpoint
-  const preferredVendors: string[] = [];
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadData = async () => {
+      if (!user) return;
+      setLoadingData(true);
+      try {
+        api.organizations.setActiveOrganization(user.organizationId || null);
+        const [techs, memberships] = await Promise.all([
+          fetchOrganizationTechnicians(),
+          api.organizations.listMine(),
+        ]);
+
+        if (!cancelled) {
+          setTechnicians(techs);
+          const orgs = memberships
+            .map((membership) => membership.organization)
+            .filter((org): org is Organization => Boolean(org));
+          setOrganizations(orgs);
+          setPreferredVendors([]); // Placeholder until preferred vendors API exists
+        }
+      } catch (error) {
+        console.error("Failed to load booking data:", error);
+        if (!cancelled) {
+          setTechnicians([]);
+          setOrganizations([]);
+          setPreferredVendors([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingData(false);
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
   const createJobRequest = async (job: Partial<JobRequest>) => {
     try {
       const project = await api.projects.create({
         address: job.propertyAddress || "",
         notes: job.requirements,
         scheduledTime:
-          job.scheduledDate && job.scheduledTime
+            job.scheduledDate && job.scheduledTime
             ? new Date(`${job.scheduledDate}T${job.scheduledTime}`)
             : new Date(),
-        agentId: user?.id,
+        projectManagerId: user?.id,
         orgId: user?.organizationId,
       });
       toast.success("Booking created");
