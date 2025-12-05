@@ -141,6 +141,8 @@ export async function fetchOrganizationTechnicians(): Promise<Provider[]> {
     members.map((member) => mapMemberToTechnician(member))
   );
 
+  // Always include providers with personal organization details filled.
+  // For company orgs, the API should return company technicians via listMembers.
   return technicians.filter(
     (technician): technician is Provider => Boolean(technician)
   );

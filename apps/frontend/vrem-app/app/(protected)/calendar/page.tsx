@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { CalendarView } from "@/components/features/calendar/CalendarView";
@@ -13,6 +13,8 @@ import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
 import { PageHeader } from "@/components/shared/layout";
 import { JobDataBoundary } from "@/components/shared/jobs";
 import { getEffectiveOrgRole, isDispatcherRole } from "@/lib/roles";
+import { fetchOrganizationTechnicians } from "@/lib/technicians";
+import { Technician } from "@/types";
 
 export default function CalendarPage() {
   const router = useRouter();
@@ -27,6 +29,7 @@ export default function CalendarPage() {
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
   const jobCreation = useJobCreation();
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
 
   // Filter jobs based on role
   const displayJobs = useMemo(() => {
@@ -70,8 +73,37 @@ export default function CalendarPage() {
   }
 
   const effectiveRole = getEffectiveOrgRole(user, memberships, organizationId);
+  const activeMembership = memberships.find((m) => m.orgId === organizationId);
+  const isPersonalOrg =
+    activeMembership?.organization?.type === "PERSONAL" ||
+    (activeMembership as any)?.organizationType === "PERSONAL";
   const canCreateJobs = isDispatcherRole(effectiveRole);
-  const canSeeTechnicians = isDispatcherRole(effectiveRole);
+  const canSeeTechnicians = isDispatcherRole(effectiveRole) && !isPersonalOrg;
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadTechs = async () => {
+      if (!canSeeTechnicians) {
+        setTechnicians([]);
+        return;
+      }
+      try {
+        const techs = await fetchOrganizationTechnicians();
+        if (!cancelled) {
+          setTechnicians(techs);
+        }
+      } catch (error) {
+        console.error("Failed to load technicians for calendar", error);
+        if (!cancelled) {
+          setTechnicians([]);
+        }
+      }
+    };
+    loadTechs();
+    return () => {
+      cancelled = true;
+    };
+  }, [canSeeTechnicians, organizationId]);
 
   // Use context handlers
   const handleJobClick = jobManagement.openTaskView;
@@ -110,8 +142,6 @@ export default function CalendarPage() {
   };
 
   // Empty technicians array - backend will provide when endpoint is ready
-  const technicians: any[] = [];
-
   return (
     <div className="size-full overflow-x-hidden space-y-6">
       <JobDataBoundary fallback={<CalendarLoadingSkeleton />}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
@@ -32,6 +32,12 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "../../ui/toggle-group";
 import { mediaTypeOptions } from "./utils";
 import { api } from "@/lib/api";
+const getInitials = (name: string) =>
+  (name || "")
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
 
 interface JobRequestFormProps {
   onSubmit: (job: Partial<JobRequest>) => void | Promise<void>;
@@ -71,7 +77,12 @@ interface AddressAutocompleteProps {
   isGeocoding?: boolean;
 }
 
-function AddressAutocomplete({ value, onChange, onBlur, isGeocoding }: AddressAutocompleteProps) {
+function AddressAutocomplete({
+  value,
+  onChange,
+  onBlur,
+  isGeocoding,
+}: AddressAutocompleteProps) {
   const [query, setQuery] = useState(value);
   const [isFocused, setIsFocused] = useState(false);
   const [predictions, setPredictions] = useState<MapboxFeature[]>([]);
@@ -220,19 +231,33 @@ export function JobRequestForm({
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerQuery, setCustomerQuery] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null
+  );
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
     name: "",
     email: "",
     phone: "",
   });
+  const filteredCustomers = useMemo(() => {
+    const q = customerQuery.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter((c) => {
+      const name = (c.name || "").toLowerCase();
+      const email = (c.email || "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [customers, customerQuery]);
 
-  const geocodeAddress = async (address: string): Promise<{ lat: number; lng: number; placeName: string } | null> => {
+  const geocodeAddress = async (
+    address: string
+  ): Promise<{ lat: number; lng: number; placeName: string } | null> => {
     const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
     if (!token) {
-      console.warn('Mapbox token not configured');
+      console.warn("Mapbox token not configured");
       return null;
     }
 
@@ -243,21 +268,21 @@ export function JobRequestForm({
 
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error('Geocoding request failed');
+        throw new Error("Geocoding request failed");
       }
 
       const data: MapboxGeocodingResponse = await response.json();
-      
+
       if (data.features && data.features.length > 0) {
         const feature = data.features[0];
         // Mapbox returns coordinates as [lng, lat], we need [lat, lng]
         const [lng, lat] = feature.center;
         return { lat, lng, placeName: feature.place_name };
       }
-      
+
       return null;
     } catch (err) {
-      console.error('Geocoding error:', err);
+      console.error("Geocoding error:", err);
       return null;
     }
   };
@@ -268,12 +293,12 @@ export function JobRequestForm({
       setIsGeocoding(true);
       const trimmedAddress = formData.propertyAddress.trim();
       const geocodedResult = await geocodeAddress(trimmedAddress);
-      
+
       if (geocodedResult) {
-        setFormData((prev) => ({ 
-          ...prev, 
+        setFormData((prev) => ({
+          ...prev,
           location: { lat: geocodedResult.lat, lng: geocodedResult.lng },
-          propertyAddress: geocodedResult.placeName // Update to use corrected address
+          propertyAddress: geocodedResult.placeName, // Update to use corrected address
         }));
       }
       setIsGeocoding(false);
@@ -363,13 +388,13 @@ export function JobRequestForm({
     // Always geocode on submit to ensure address and location are in sync
     let location = formData.location;
     let addressToUse = formData.propertyAddress.trim();
-    
+
     if (formData.propertyAddress.trim()) {
       const trimmedAddress = formData.propertyAddress.trim();
       toast.loading("Geocoding address...", { id: "geocoding" });
-      
+
       const geocodedResult = await geocodeAddress(trimmedAddress);
-      
+
       if (geocodedResult) {
         // Always use the geocoded location and standardized address to ensure they match
         location = { lat: geocodedResult.lat, lng: geocodedResult.lng };
@@ -378,8 +403,11 @@ export function JobRequestForm({
       } else {
         // If geocoding fails, use existing location if available, otherwise default
         if (!location) {
-        toast.error("Could not find location for this address. Using default location.", { id: "geocoding" });
-        location = { lat: 51.0447, lng: -114.0719 };
+          toast.error(
+            "Could not find location for this address. Using default location.",
+            { id: "geocoding" }
+          );
+          location = { lat: 51.0447, lng: -114.0719 };
         } else {
           toast.dismiss("geocoding");
           // Keep existing location and address as-is if geocoding fails
@@ -422,7 +450,7 @@ export function JobRequestForm({
       });
       setSelectedCustomer(null);
     } catch (error) {
-      console.error('Error submitting form:', error);
+      console.error("Error submitting form:", error);
       // Don't reset form on error
     }
   };
@@ -462,46 +490,62 @@ export function JobRequestForm({
             {showNewCustomer ? "Cancel" : "Add New"}
           </Button>
         </div>
-        <div className="flex flex-col gap-2 md:flex-row">
-          <Input
-            placeholder="Search by name or email"
-            value={customerQuery}
-            onChange={(e) => setCustomerQuery(e.target.value)}
-            className="h-11"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleCustomerSearch}
-            disabled={isLoadingCustomers}
-          >
-            {isLoadingCustomers ? (
-              <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Searching
-              </span>
-            ) : (
-              "Search"
-            )}
-          </Button>
-        </div>
-        {customers.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {customers.map((customer) => (
+        {!showNewCustomer && (
+          <div className="flex flex-col gap-2 md:flex-row">
+            <Input
+              placeholder="Search by name or email"
+              value={customerQuery}
+              onChange={(e) => setCustomerQuery(e.target.value)}
+              onFocus={() => setShowCustomerDropdown(true)}
+              onBlur={() => {
+                setTimeout(() => setShowCustomerDropdown(false), 100);
+              }}
+              className="h-11"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11"
+              onClick={handleCustomerSearch}
+              disabled={isLoadingCustomers}
+            >
+              {isLoadingCustomers ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Searching
+                </span>
+              ) : (
+                "Search"
+              )}
+            </Button>
+          </div>
+        )}
+        {showCustomerDropdown && filteredCustomers.length > 0 && (
+          <div className="flex flex-col gap-2 max-h-56 overflow-y-auto pr-1">
+            {filteredCustomers.map((customer) => (
               <Button
                 key={customer.id}
                 type="button"
                 variant={
                   selectedCustomer?.id === customer.id ? "default" : "outline"
                 }
-                onClick={() => handleCustomerSelect(customer)}
-                className="justify-start"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleCustomerSelect(customer);
+                  setShowCustomerDropdown(false);
+                }}
+                className="justify-start h-auto py-2"
               >
-                <div className="flex flex-col text-left">
-                  <span className="font-medium">{customer.name}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {customer.email || "No email"}
-                  </span>
+                <div className="flex items-center gap-3 text-left w-full">
+                  <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center text-xs font-semibold">
+                    {getInitials(customer.name)}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{customer.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {customer.email || "No email"}
+                    </span>
+                  </div>
                 </div>
               </Button>
             ))}
@@ -520,7 +564,7 @@ export function JobRequestForm({
         )}
 
         {showNewCustomer && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="flex flex-col gap-3 bg-muted/20 p-3 rounded-md border">
             <div className="space-y-1">
               <Label className="text-xs uppercase text-muted-foreground">
                 Name *
@@ -556,12 +600,19 @@ export function JobRequestForm({
                 <Input
                   value={newCustomer.phone}
                   onChange={(e) =>
-                    setNewCustomer((prev) => ({ ...prev, phone: e.target.value }))
+                    setNewCustomer((prev) => ({
+                      ...prev,
+                      phone: e.target.value,
+                    }))
                   }
                   placeholder="(555) 123-4567"
                   className="h-10"
                 />
-                <Button type="button" onClick={handleCreateCustomer}>
+                <Button
+                  type="button"
+                  onClick={handleCreateCustomer}
+                  className="h-10"
+                >
                   Save
                 </Button>
               </div>
@@ -884,11 +935,17 @@ export function JobRequestForm({
             type="number"
             value={formData.estimatedDuration}
             onChange={(e) => {
-              const value = e.target.value === '' ? '' : parseInt(e.target.value);
+              const value =
+                e.target.value === "" ? "" : parseInt(e.target.value);
               // Allow free typing, minimum validation handled by HTML min attribute
               setFormData({
                 ...formData,
-                estimatedDuration: value === '' ? 120 : (isNaN(value as number) ? 120 : value as number),
+                estimatedDuration:
+                  value === ""
+                    ? 120
+                    : isNaN(value as number)
+                    ? 120
+                    : (value as number),
               });
             }}
             onBlur={(e) => {
@@ -899,7 +956,7 @@ export function JobRequestForm({
                   ...formData,
                   estimatedDuration: 15,
                 });
-            }
+              }
             }}
             min="15"
             step="1"
@@ -955,11 +1012,7 @@ export function JobRequestForm({
         />
       </div>
 
-      <Button
-        type="submit"
-        variant="default"
-        className="w-full h-12"
-      >
+      <Button type="submit" variant="default" className="w-full h-12">
         Create Job Request
       </Button>
     </form>

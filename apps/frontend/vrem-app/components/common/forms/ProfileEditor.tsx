@@ -1,38 +1,96 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "../../ui/button";
-import { Card } from "../../ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
 import { Badge } from "../../ui/badge";
 import { Textarea } from "../../ui/textarea";
 import { Label } from "../../ui/label";
+import { Input } from "../../ui/input";
 import { Checkbox } from "../../ui/checkbox";
 import { H2, H3, Small, Muted, Large } from "../../ui/typography";
 import { ProviderProfile } from "../../../types";
-import { CheckCircle2, XCircle, Settings } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 interface ProfileEditorProps {
   provider: ProviderProfile;
-  onSave: (updates: Partial<ProviderProfile>) => void;
+  onSave: (updates: Partial<ProviderProfile>) => void | Promise<void>;
+  organizationSettingsPath?: string;
 }
 
-export function ProfileEditor({ provider, onSave }: ProfileEditorProps) {
+export function ProfileEditor({
+  provider,
+  onSave,
+  organizationSettingsPath,
+}: ProfileEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
     bio: provider.bio || "",
     services: provider.services,
+    phone: provider.phone || "",
+    homeLocation: {
+      lat: provider.homeLocation?.lat ?? 51.0447,
+      lng: provider.homeLocation?.lng ?? -114.0719,
+      address: {
+        street: provider.homeLocation?.address.street || "",
+        city: provider.homeLocation?.address.city || "",
+        stateProvince: provider.homeLocation?.address.stateProvince || "",
+        country: provider.homeLocation?.address.country || "",
+        postalCode: provider.homeLocation?.address.postalCode || "",
+      },
+    },
   });
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
-    onSave(profileData);
-    setIsEditing(false);
+  useEffect(() => {
+    setProfileData({
+      bio: provider.bio || "",
+      services: provider.services,
+      phone: provider.phone || "",
+      homeLocation: {
+        lat: provider.homeLocation?.lat ?? 51.0447,
+        lng: provider.homeLocation?.lng ?? -114.0719,
+        address: {
+          street: provider.homeLocation?.address.street || "",
+          city: provider.homeLocation?.address.city || "",
+          stateProvince: provider.homeLocation?.address.stateProvince || "",
+          country: provider.homeLocation?.address.country || "",
+          postalCode: provider.homeLocation?.address.postalCode || "",
+        },
+      },
+    });
+  }, [provider]);
+
+  const addressDisplay = useMemo(() => {
+    const { street, city, stateProvince, postalCode, country } =
+      profileData.homeLocation.address;
+    const parts = [street, city, stateProvince, postalCode, country].filter(
+      Boolean
+    );
+    return parts.join(", ");
+  }, [
+    profileData.homeLocation.address.street,
+    profileData.homeLocation.address.city,
+    profileData.homeLocation.address.stateProvince,
+    profileData.homeLocation.address.postalCode,
+    profileData.homeLocation.address.country,
+  ]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onSave(profileData);
+      setIsEditing(false);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <main className="container relative mx-auto">
       <article className="flex flex-col gap-2xl md:gap-3xl px-md">
-        <div className="@container w-full mt-md">
+        <div className="@container w-full mt-md mb-md">
           {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-lg border-0">My Profile</H2>
@@ -49,16 +107,38 @@ export function ProfileEditor({ provider, onSave }: ProfileEditorProps) {
                 <Button
                   variant="outline"
                   className=""
-                  onClick={() => setIsEditing(false)}
+                  onClick={() => {
+                    setIsEditing(false);
+                    setProfileData({
+                      bio: provider.bio || "",
+                      services: provider.services,
+                      phone: provider.phone || "",
+                      homeLocation: {
+                        lat: provider.homeLocation?.lat ?? 51.0447,
+                        lng: provider.homeLocation?.lng ?? -114.0719,
+                        address: {
+                          street:
+                            provider.homeLocation?.address.street || "",
+                          city: provider.homeLocation?.address.city || "",
+                          stateProvince:
+                            provider.homeLocation?.address.stateProvince || "",
+                          country: provider.homeLocation?.address.country || "",
+                          postalCode:
+                            provider.homeLocation?.address.postalCode || "",
+                        },
+                      },
+                    });
+                  }}
                 >
                   Cancel
                 </Button>
                 <Button
                   variant="default"
                   className=""
-                  onClick={() => setIsEditing(false)}
+                  disabled={isSaving}
+                  onClick={handleSave}
                 >
-                  Save Changes
+                  {isSaving ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             )}
@@ -111,6 +191,155 @@ export function ProfileEditor({ provider, onSave }: ProfileEditorProps) {
                 <Small className="text-muted-foreground">
                   {provider.bio || "No bio added yet"}
                 </Small>
+              )}
+            </div>
+
+            {/* Location */}
+            <div className="space-y-3 pt-6 border-t">
+              <div className="flex items-center justify-between">
+                <Label>Location &amp; Address</Label>
+                {organizationSettingsPath && (
+                  <Button
+                    variant="flat"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    asChild
+                  >
+                    <Link href={organizationSettingsPath}>
+                      Manage in Personal Organization Settings
+                    </Link>
+                  </Button>
+                )}
+              </div>
+
+              {isEditing ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={profileData.phone}
+                      onChange={(e) =>
+                        setProfileData({
+                          ...profileData,
+                          phone: e.target.value,
+                        })
+                      }
+                      placeholder="+1 (555) 123-4567"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="street">Street Address</Label>
+                    <Input
+                      id="street"
+                      value={profileData.homeLocation.address.street}
+                      onChange={(e) =>
+                        setProfileData({
+                          ...profileData,
+                          homeLocation: {
+                            ...profileData.homeLocation,
+                            address: {
+                              ...profileData.homeLocation.address,
+                              street: e.target.value,
+                            },
+                          },
+                        })
+                      }
+                      placeholder="123 Main Street"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      value={profileData.homeLocation.address.city}
+                      onChange={(e) =>
+                        setProfileData({
+                          ...profileData,
+                          homeLocation: {
+                            ...profileData.homeLocation,
+                            address: {
+                              ...profileData.homeLocation.address,
+                              city: e.target.value,
+                            },
+                          },
+                        })
+                      }
+                      placeholder="City"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="stateProvince">State / Province</Label>
+                    <Input
+                      id="stateProvince"
+                      value={profileData.homeLocation.address.stateProvince}
+                      onChange={(e) =>
+                        setProfileData({
+                          ...profileData,
+                          homeLocation: {
+                            ...profileData.homeLocation,
+                            address: {
+                              ...profileData.homeLocation.address,
+                              stateProvince: e.target.value,
+                            },
+                          },
+                        })
+                      }
+                      placeholder="State / Province"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="postalCode">Postal Code</Label>
+                    <Input
+                      id="postalCode"
+                      value={profileData.homeLocation.address.postalCode}
+                      onChange={(e) =>
+                        setProfileData({
+                          ...profileData,
+                          homeLocation: {
+                            ...profileData.homeLocation,
+                            address: {
+                              ...profileData.homeLocation.address,
+                              postalCode: e.target.value,
+                            },
+                          },
+                        })
+                      }
+                      placeholder="Postal Code"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country">Country</Label>
+                    <Input
+                      id="country"
+                      value={profileData.homeLocation.address.country}
+                      onChange={(e) =>
+                        setProfileData({
+                          ...profileData,
+                          homeLocation: {
+                            ...profileData.homeLocation,
+                            address: {
+                              ...profileData.homeLocation.address,
+                              country: e.target.value,
+                            },
+                          },
+                        })
+                      }
+                      placeholder="Country"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <div className="text-foreground">
+                    {profileData.phone || "No phone provided"}
+                  </div>
+                  <div>{addressDisplay || "No address saved yet"}</div>
+                  <Muted className="text-xs">
+                    Location is pulled from your personal organization settings.
+                  </Muted>
+                </div>
               )}
             </div>
 

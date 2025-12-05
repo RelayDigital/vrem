@@ -61,11 +61,33 @@ export function CompanyDashboardView({
   }, [jobs]);
 
   const displayTechnicians = technicians ?? [];
+  const techniciansWithLocation = useMemo(
+    () =>
+      displayTechnicians.filter((tech) => {
+        if (
+          !tech?.homeLocation ||
+          typeof tech.homeLocation.lat !== "number" ||
+          typeof tech.homeLocation.lng !== "number"
+        ) {
+          return false;
+        }
+        const address = tech.homeLocation.address || {};
+        const hasAddressDetails = [
+          address.street,
+          address.city,
+          address.stateProvince,
+          address.postalCode,
+          address.country,
+        ].some(Boolean);
+        return hasAddressDetails;
+      }),
+    [displayTechnicians]
+  );
 
   // Generate technician colors
   const technicianColors = useMemo(
-    () => generateTechnicianColors(displayTechnicians),
-    [displayTechnicians]
+    () => generateTechnicianColors(techniciansWithLocation),
+    [techniciansWithLocation]
   );
 
   // Handle event click
@@ -141,7 +163,7 @@ export function CompanyDashboardView({
             <MonthView
               currentDate={currentDate}
               events={calendarEvents}
-              technicians={displayTechnicians}
+              technicians={techniciansWithLocation}
               technicianColors={technicianColors}
               onEventClick={handleEventClick}
               onDayClick={handleDayClick}

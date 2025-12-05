@@ -16,6 +16,7 @@ interface ProviderDashboardProps {
   onUpdateProfile: (updates: Partial<ProviderProfile>) => void;
   onApplyToCompany: (companyId: string, message: string) => void;
   activeView?: "jobs" | "profile" | "companies";
+  organizationSettingsPath?: string;
 }
 
 export function ProviderDashboard({
@@ -26,6 +27,7 @@ export function ProviderDashboard({
   onUpdateProfile,
   onApplyToCompany,
   activeView = "jobs",
+  organizationSettingsPath,
 }: ProviderDashboardProps) {
   const myJobs = jobs.filter((j) => j.assignedTechnicianId === provider.userId);
   const upcomingJobs = myJobs.filter((j) => j.status === "assigned");
@@ -43,7 +45,11 @@ export function ProviderDashboard({
       )}
 
       {activeView === "profile" && (
-        <ProfileView provider={provider} onUpdateProfile={onUpdateProfile} />
+        <ProfileView
+          provider={provider}
+          onUpdateProfile={onUpdateProfile}
+          organizationSettingsPath={organizationSettingsPath}
+        />
       )}
 
       {activeView === "companies" && (

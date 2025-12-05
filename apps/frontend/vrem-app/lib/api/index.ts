@@ -100,6 +100,18 @@ class ApiClient {
     }
   }
 
+  private withLocationNotes(
+    notes: string | undefined,
+    location?: { lat: number; lng: number }
+  ): string | undefined {
+    const locationNote = location
+      ? `__LOCATION__:${JSON.stringify(location)}__`
+      : '';
+    const parts = [locationNote, notes].filter(Boolean);
+    const combined = parts.join(' ').trim();
+    return combined || undefined;
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const orgId = typeof window !== 'undefined' ? localStorage.getItem('organizationId') : null;
@@ -279,6 +291,20 @@ class ApiClient {
     },
   };
 
+  users = {
+    update: async (id: string, payload: Partial<Pick<User, 'name' | 'avatarUrl'>>) => {
+      if (USE_MOCK_DATA) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return { ...currentUser, id, ...payload };
+      }
+      const user = await this.request<User>(`/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+      return user;
+    },
+  };
+
   organizations = {
     listMine: async (): Promise<OrganizationMember[]> => {
       if (USE_MOCK_DATA) {
@@ -372,6 +398,9 @@ class ApiClient {
       }
       const org = await this.request<Organization>(`/organizations/${orgId}/settings`, {
         method: 'PATCH',
+        headers: {
+          'x-org-id': orgId,
+        },
         body: JSON.stringify(payload),
       });
       return {
@@ -553,7 +582,10 @@ class ApiClient {
       }
       const dto = {
         address: payload.address,
-        notes: payload.notes,
+        notes: this.withLocationNotes(
+          payload.notes,
+          (payload as any)?.location
+        ),
         scheduledTime: payload.scheduledTime?.toISOString() || new Date().toISOString(),
         customerId: payload.customerId,
         projectManagerId: payload.projectManagerId,
@@ -576,7 +608,10 @@ class ApiClient {
       }
       const dto = {
         address: payload.address,
-        notes: payload.notes,
+        notes: this.withLocationNotes(
+          payload.notes,
+          (payload as any)?.location
+        ),
         scheduledTime: payload.scheduledTime?.toISOString(),
       };
       const project = await this.request<Project>(`/projects/${id}`, {
@@ -868,6 +903,22 @@ class ApiClient {
     return null;
   }
 
+  // Parse "lat,lng" style addresses if backend stores coordinates in address column
+  private parseLocationFromAddress(address?: string): { lat: number; lng: number } | null {
+    if (!address) return null;
+    // Match patterns like "51.0447,-114.0719" or "lat:51.0447, lng:-114.0719"
+    const match = address.match(
+      /(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)/i
+    );
+    if (!match) return null;
+    const lat = parseFloat(match[1]);
+    const lng = parseFloat(match[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng };
+    }
+    return null;
+  }
+
   // Helper to extract requirements from notes (removing location metadata)
   private extractRequirementsFromNotes(notes?: string): string {
     if (!notes) return '';
@@ -880,7 +931,11 @@ class ApiClient {
     const scheduledDate = project.scheduledTime ? new Date(project.scheduledTime) : new Date();
     
     // Try to extract location from notes metadata, fallback to default
-    const location = this.extractLocationFromNotes(project.notes) || { lat: 51.0447, lng: -114.0719 };
+    const location =
+      (project as any)?.location ||
+      this.extractLocationFromNotes(project.notes) ||
+      this.parseLocationFromAddress(project.address) ||
+      { lat: 51.0447, lng: -114.0719 };
     const requirements = this.extractRequirementsFromNotes(project.notes);
     
     return {

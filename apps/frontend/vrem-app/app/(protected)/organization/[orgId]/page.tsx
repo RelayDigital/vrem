@@ -123,7 +123,7 @@ export default function OrganizationByIdPage() {
                 )
               )}
               {!isLoadingOrg && (
-                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                <div className="flex flex-col gap-2 text-sm text-muted-foreground">
                   {address && (
                     <div className="flex items-center gap-2">
                       <MapPin className="size-4" />

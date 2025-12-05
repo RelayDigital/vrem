@@ -32,6 +32,31 @@ export function useOrganizations() {
     load();
   }, []);
 
+  useEffect(() => {
+    const handleOrganizationUpdated = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail;
+      const updatedOrg = detail?.organization;
+      if (!updatedOrg) return;
+      setMemberships((prev) =>
+        prev.map((m) =>
+          m.orgId === updatedOrg.id
+            ? { ...m, organization: { ...m.organization, ...updatedOrg } }
+            : m
+        )
+      );
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('organizationUpdated', handleOrganizationUpdated);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('organizationUpdated', handleOrganizationUpdated);
+      }
+    };
+  }, []);
+
   return {
     memberships,
     isLoading,

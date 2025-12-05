@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { ProfileEditor } from "@/components/common/forms/ProfileEditor";
 import { ProviderProfile } from "@/types";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { api } from "@/lib/api";
 
 export default function ProfilePage() {
   const { user, memberships, organizationId, isLoading } = useRequireRole([
@@ -14,21 +15,41 @@ export default function ProfilePage() {
     "COMPANY",
   ]);
 
-  const provider: ProviderProfile | null = useMemo(() => {
+  const personalOrgMembership = useMemo(
+    () =>
+      memberships.find(
+        (m) =>
+          m.organization?.type === "PERSONAL" ||
+          (m as any)?.organizationType === "PERSONAL" ||
+          (m as any)?.personalOrg?.type === "PERSONAL"
+      ),
+    [memberships]
+  );
+  const personalOrg =
+    personalOrgMembership?.organization ||
+    (personalOrgMembership as any)?.personalOrg ||
+    null;
+  const personalOrgId =
+    personalOrgMembership?.orgId || (personalOrg as any)?.id || null;
+
+  const baseProvider: ProviderProfile | null = useMemo(() => {
     if (!user) return null;
     const membership =
       memberships.find((m) => m.orgId === organizationId) || memberships[0];
 
     const org = membership?.organization;
+    const locationOrg = personalOrg || org;
     return {
       id: user.id,
       userId: user.id,
       orgMemberId: membership?.id || "",
-      orgId: membership?.orgId || organizationId || "",
-      role: (membership?.orgRole || (membership as any)?.role || "TECHNICIAN") as any,
+      orgId: membership?.orgId || organizationId || personalOrgId || "",
+      role: (membership?.orgRole ||
+        (membership as any)?.role ||
+        "TECHNICIAN") as any,
       name: user.name || "Provider",
       email: user.email || "",
-      phone: org?.phone || "",
+      phone: (locationOrg as any)?.phone || "",
       isIndependent: !org || org.type === "PERSONAL",
       companyId: org?.type === "COMPANY" ? org.id : undefined,
       companyName: org?.type === "COMPANY" ? org.name : undefined,
@@ -36,11 +57,11 @@ export default function ProfilePage() {
         lat: 51.0447,
         lng: -114.0719,
         address: {
-          street: org?.addressLine1 || "",
-          city: org?.city || "",
-          stateProvince: org?.region || "",
-          country: org?.countryCode || "",
-          postalCode: org?.postalCode || "",
+          street: (locationOrg as any)?.addressLine1 || "",
+          city: (locationOrg as any)?.city || "",
+          stateProvince: (locationOrg as any)?.region || "",
+          country: (locationOrg as any)?.countryCode || "",
+          postalCode: (locationOrg as any)?.postalCode || "",
         },
       },
       availability: [],
@@ -81,7 +102,79 @@ export default function ProfilePage() {
       portfolio: [],
       certifications: [],
     };
-  }, [user, memberships, organizationId]);
+  }, [user, memberships, organizationId, personalOrg, personalOrgId]);
+
+  const [provider, setProvider] = useState<ProviderProfile | null>(null);
+
+  useEffect(() => {
+    if (baseProvider) {
+      setProvider((prev) => {
+        if (!prev) return baseProvider;
+        if (prev.userId !== baseProvider.userId || prev.orgId !== baseProvider.orgId) {
+          return baseProvider;
+        }
+        return prev;
+      });
+    }
+  }, [baseProvider]);
+
+  const organizationSettingsPath = personalOrgId
+    ? `/organization/${personalOrgId}/settings`
+    : organizationId
+    ? `/organization/${organizationId}/settings`
+    : undefined;
+
+  const handleSaveProfile = async (updates: Partial<ProviderProfile>) => {
+    if (!provider) return;
+
+    const previous = provider;
+    const nextProvider: ProviderProfile = {
+      ...provider,
+      ...updates,
+      services: updates.services
+        ? { ...provider.services, ...updates.services }
+        : provider.services,
+      homeLocation: updates.homeLocation
+        ? {
+            ...provider.homeLocation,
+            ...updates.homeLocation,
+            address: {
+              ...provider.homeLocation.address,
+              ...(updates.homeLocation.address || {}),
+            },
+          }
+        : provider.homeLocation,
+      phone: updates.phone ?? provider.phone,
+      bio: updates.bio ?? provider.bio,
+    };
+
+    setProvider(nextProvider);
+
+    if (personalOrgId) {
+      try {
+        await api.organizations.updateSettings(personalOrgId, {
+          phone: nextProvider.phone || undefined,
+          addressLine1: nextProvider.homeLocation.address.street || undefined,
+          city: nextProvider.homeLocation.address.city || undefined,
+          region: nextProvider.homeLocation.address.stateProvince || undefined,
+          postalCode: nextProvider.homeLocation.address.postalCode || undefined,
+          countryCode: nextProvider.homeLocation.address.country || undefined,
+        } as any);
+        toast.success("Profile and location updated");
+      } catch (error) {
+        setProvider(previous);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to update organization settings"
+        );
+      }
+    } else {
+      toast.success(
+        "Profile updated. Update your address in organization settings."
+      );
+    }
+  };
 
   if (isLoading || !provider) {
     return (
@@ -96,9 +189,8 @@ export default function ProfilePage() {
     <div className="size-full overflow-x-hidden space-y-6">
       <ProfileEditor
         provider={provider}
-        onSave={() => {
-          toast.success("Profile updated");
-        }}
+        organizationSettingsPath={organizationSettingsPath}
+        onSave={handleSaveProfile}
       />
     </div>
   );

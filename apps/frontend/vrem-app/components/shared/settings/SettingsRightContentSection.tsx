@@ -16,6 +16,7 @@ interface SettingsRightContentSectionProps {
   noContentWrapper?: boolean;
   onSave?: () => void;
   saveButtonText?: string;
+  isSaving?: boolean;
 }
 
 export const SettingsRightContentSection = forwardRef<
@@ -34,6 +35,7 @@ export const SettingsRightContentSection = forwardRef<
       noContentWrapper = false,
       onSave,
       saveButtonText = "Save Changes",
+      isSaving = false,
     },
     ref
   ) => {
@@ -58,7 +60,9 @@ export const SettingsRightContentSection = forwardRef<
             {/* Save Button */}
             {onSave && (
               <div className="flex justify-end">
-                <Button onClick={onSave}>{saveButtonText || "Save Changes"}</Button>
+                <Button onClick={onSave} disabled={isSaving}>
+                  {isSaving ? "Saving..." : saveButtonText || "Save Changes"}
+                </Button>
               </div>
             )}
           </div>

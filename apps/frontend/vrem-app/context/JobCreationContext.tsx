@@ -77,13 +77,15 @@ export function JobCreationProvider({
     const currentJobs = storedJobs ? JSON.parse(storedJobs) : [];
     const currentCount = currentJobs.length;
 
+    const DEFAULT_LOCATION = { lat: 51.0447, lng: -114.0719 };
+
     const newJob: JobRequest = {
       id: `job-${Date.now()}`,
       orderNumber: (currentCount + 1).toString().padStart(4, '0'),
       organizationId: defaultOrganizationId || 'org-vx-001',
       clientName: job.clientName!,
       propertyAddress: job.propertyAddress!,
-      location: job.location || { lat: 51.0447, lng: -114.0719 },
+      location: job.location || DEFAULT_LOCATION,
       scheduledDate: job.scheduledDate!,
       scheduledTime: job.scheduledTime!,
       mediaType: job.mediaType!,

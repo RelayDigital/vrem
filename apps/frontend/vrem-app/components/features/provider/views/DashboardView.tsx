@@ -34,6 +34,7 @@ interface ProviderDashboardViewProps {
   onNavigateToCalendarView?: () => void;
   onNavigateToJobInProjectManagement?: (job: JobRequest) => void;
   onJobClick?: (job: JobRequest) => void;
+  currentUserId?: string | null;
 }
 
 export function ProviderDashboardView({
@@ -47,6 +48,7 @@ export function ProviderDashboardView({
   onNavigateToCalendarView,
   onNavigateToJobInProjectManagement,
   onJobClick,
+  currentUserId,
 }: ProviderDashboardViewProps) {
   const assignedJobs = jobs.filter((j) => j.status === "assigned");
   const [currentDate] = useState(new Date());
@@ -64,6 +66,42 @@ export function ProviderDashboardView({
   // Use empty array when mock data is disabled
   const displayTechnicians = technicians ?? [];
 
+  const techniciansWithLocation = useMemo(
+    () =>
+      displayTechnicians.filter((tech) => {
+        if (
+          !tech?.homeLocation ||
+          typeof tech.homeLocation.lat !== "number" ||
+          typeof tech.homeLocation.lng !== "number"
+        ) {
+          return false;
+        }
+        const address = tech.homeLocation.address || {};
+        const hasAddressDetails = [
+          address.street,
+          address.city,
+          address.stateProvince,
+          address.postalCode,
+          address.country,
+        ].some(Boolean);
+        return hasAddressDetails;
+      }),
+    [displayTechnicians]
+  );
+
+  const selfTechnician = useMemo(
+    () =>
+      currentUserId
+        ? techniciansWithLocation.find((tech) => tech.id === currentUserId)
+        : undefined,
+    [techniciansWithLocation, currentUserId]
+  );
+
+  const calendarTechnicians =
+    techniciansWithLocation.length > 0
+      ? techniciansWithLocation
+      : displayTechnicians;
+
   // For the technician dashboard, only show the current technician on the map.
   // Derive the technician IDs that appear on this user's jobs and filter to those.
   const mapTechnicians = useMemo(() => {
@@ -72,13 +110,14 @@ export function ProviderDashboardView({
         .map((job) => job.assignedTechnicianId || job.assignedTechnicianId)
         .filter((id): id is string => Boolean(id))
     );
-    const filtered = displayTechnicians.filter((p) => ids.has(p.id));
+    const filtered = techniciansWithLocation.filter((p) => ids.has(p.id));
     if (filtered.length > 0) return filtered;
-    // Fallback: show at least the first technician so the user can see themselves on the map
-    return displayTechnicians.length > 0
-      ? [displayTechnicians[0]]
+    if (selfTechnician) return [selfTechnician];
+    // Fallback: show the first technician with a location so the user sees a marker
+    return techniciansWithLocation.length > 0
+      ? [techniciansWithLocation[0]]
       : [];
-  }, [jobs, displayTechnicians]);
+  }, [jobs, techniciansWithLocation, selfTechnician]);
 
   // Generate technician colors for the (possibly single) technician shown on the map
   const technicianColors = useMemo(
@@ -160,7 +199,7 @@ export function ProviderDashboardView({
             <MonthView
               currentDate={currentDate}
               events={calendarEvents}
-              technicians={displayTechnicians}
+              technicians={calendarTechnicians}
               technicianColors={technicianColors}
               onEventClick={handleEventClick}
               onDayClick={handleDayClick}

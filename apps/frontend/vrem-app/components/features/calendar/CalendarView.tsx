@@ -57,9 +57,8 @@ export function CalendarView({
   onJobClick,
   onCreateJob,
 }: CalendarViewProps) {
-  // Use empty array when mock data is disabled
-  const baseTechnicians = technicians || technicians || [];
-  const effectiveTechnicians = USE_MOCK_DATA ? baseTechnicians : [];
+  const baseTechnicians = technicians || [];
+  const effectiveTechnicians = canSeeTechnicians ? baseTechnicians : [];
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>("week");
   const [timezone, setTimezone] = useState("America/Edmonton");

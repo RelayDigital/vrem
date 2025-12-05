@@ -145,9 +145,87 @@ export default function DashboardPage() {
 
       setLoadingProviders(true);
       try {
-        const providers = await fetchOrganizationTechnicians();
+        const fetchedProviders = await fetchOrganizationTechnicians();
+        const activeMembership = memberships.find(
+          (m) => m.orgId === organizationId
+        );
+        const isPersonalOrg =
+          activeMembership?.organization?.type === "PERSONAL" ||
+          (activeMembership as any)?.organizationType === "PERSONAL";
+
+        // If viewing a personal organization, show the current provider using personal org details
+        if (isPersonalOrg && user && activeMembership?.organization) {
+          const personalOrg: any = activeMembership.organization;
+          const selfProvider: ProviderProfile = {
+            id: user.id,
+            userId: user.id,
+            orgMemberId: activeMembership.id,
+            orgId: activeMembership.orgId,
+            role: (activeMembership.role || "TECHNICIAN") as any,
+            name: user.name || "Provider",
+            email: user.email || "",
+            phone: personalOrg.phone || "",
+            organizationId: activeMembership.orgId,
+            isIndependent: true,
+            companyId: undefined,
+            companyName: undefined,
+            homeLocation: {
+              lat: personalOrg?.serviceArea?.lat || 51.0447,
+              lng: personalOrg?.serviceArea?.lng || -114.0719,
+              address: {
+                street: personalOrg.addressLine1 || "",
+                city: personalOrg.city || "",
+                stateProvince: personalOrg.region || "",
+                country: personalOrg.countryCode || "",
+                postalCode: personalOrg.postalCode || "",
+              },
+            },
+            availability: [],
+            reliability: {
+              totalJobs: 0,
+              noShows: 0,
+              lateDeliveries: 0,
+              onTimeRate: 0,
+              averageDeliveryTime: 0,
+            },
+            skills: {
+              residential: 0,
+              commercial: 0,
+              aerial: 0,
+              twilight: 0,
+              video: 0,
+            },
+            rating: {
+              overall: 0,
+              count: 0,
+              recent: [],
+            },
+            preferredClients: [],
+            status: "active",
+            createdAt: new Date(),
+            avatar: user.avatarUrl,
+            bio: "",
+            services: {
+              photography: true,
+              video: false,
+              aerial: false,
+              floorplan: false,
+              measurement: false,
+              twilight: false,
+              editing: false,
+              virtualStaging: false,
+            },
+            portfolio: [],
+            certifications: [],
+          };
+          if (!cancelled) {
+            setProviders([selfProvider]);
+          }
+          return;
+        }
+
         if (!cancelled) {
-          setProviders(providers);
+          setProviders(fetchedProviders);
         }
       } catch (error) {
         console.error("Failed to load providers for dashboard:", error);
@@ -166,7 +244,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, memberships, organizationId]);
 
   if (isLoading) {
     return <DashboardLoadingSkeleton />;
@@ -358,6 +436,7 @@ export default function DashboardPage() {
               handleNavigateToJobInProjectManagement
             }
             onJobClick={handleJobClick}
+            currentUserId={user?.id}
           />
         </JobDataBoundary>
 

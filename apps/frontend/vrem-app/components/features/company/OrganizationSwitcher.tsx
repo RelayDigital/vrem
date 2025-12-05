@@ -30,6 +30,7 @@ import { useIsMobile } from "@/components/ui/use-mobile";
 import { toast } from "sonner";
 import { OrganizationMember } from "@/types";
 import { useAuth } from "@/context/auth-context";
+import { Badge } from "@/components/ui/badge";
 
 interface OrganizationSwitcherProps {
   variant?: "sidebar" | "header";
@@ -123,7 +124,7 @@ export function OrganizationSwitcher({
               <div className="flex flex-col items-start">
                 <span className="text-sm font-medium">
                   {!activeOrganizationId
-                    ? "Personal dashboard"
+                    ? "Personal workspace"
                     : activeOrg?.name || "Select organization"}
                 </span>
               </div>
@@ -182,13 +183,13 @@ export function OrganizationSwitcher({
                   <div className="flex flex-col flex-1 min-w-0">
                     <span className="text-sm font-medium truncate">
                       {isPersonal
-                        ? "Personal dashboard"
+                        ? "Personal workspace"
                         : m.organization?.name || m.orgId}
                     </span>
                     {!isPersonal && (
-                      <span className="text-xs text-muted-foreground capitalize truncate">
-                        {m.organization?.type?.replace("_", " ") || "Member"}
-                      </span>
+                      <Badge variant="muted" className="truncate">
+                        {m.orgRole || (m as any).role || "Member"}
+                      </Badge>
                     )}
                   </div>
                   {/* Check if the organization is active */}
@@ -206,32 +207,43 @@ export function OrganizationSwitcher({
           {onOrgHome && (
             <DropdownMenuItem onClick={onOrgHome}>
               <Home className="size-4 mr-2" />
-              Org home
+              {memberships.find((m) => m.orgId === activeOrganizationId)
+                ?.organization?.type === "COMPANY"
+                ? "Company home"
+                : "Workspace home"}
             </DropdownMenuItem>
           )}
-          {/* Join organization */}
-          {user?.accountType === "PROVIDER" && (
-            <DropdownMenuItem onClick={handleJoin}>
-              <UserPlus className="size-4 mr-2" />
-              Join organization
-              <span className="ml-auto text-xs text-muted-foreground">
-                Mock
-              </span>
-            </DropdownMenuItem>
-          )}
+
           {/* Manage organization */}
           {memberships.some(
             (m) =>
               m.organization?.type === "COMPANY" &&
-              ["OWNER", "ADMIN"].includes(
-                m.orgRole || (m as any).role || ""
-              )
+              ["OWNER", "ADMIN"].includes(m.orgRole || (m as any).role || "")
           ) && (
             <DropdownMenuItem onClick={goToManage}>
               <Settings className="size-4 mr-2" />
-              Manage organization
+              {memberships.find((m) => m.orgId === activeOrganizationId)
+                ?.organization?.type === "COMPANY"
+                ? "Company settings"
+                : "Workspace settings"}
             </DropdownMenuItem>
           )}
+
+          {/* Join organization (only when in personal workspace) */}
+          {user?.accountType === "PROVIDER" &&
+            activeMembership &&
+            isPersonalOrg(activeMembership) && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleJoin} disabled>
+                  <UserPlus className="size-4 mr-2" />
+                  Join company
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    Coming soon
+                  </span>
+                </DropdownMenuItem>
+              </>
+            )}
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>

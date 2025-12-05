@@ -101,7 +101,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useIsMobile } from "@/components/ui/use-mobile";
 import { cn } from "@/components/ui/utils";
@@ -115,7 +119,6 @@ import {
   DragOverlay,
 } from "@dnd-kit/core";
 import { SiGoogledrive, SiDropbox } from "react-icons/si";
-
 
 import { FileUploaderRegular } from "@uploadcare/react-uploader/next";
 import "@uploadcare/react-uploader/core.css";
@@ -152,7 +155,7 @@ import { useJobManagement } from "@/context/JobManagementContext";
 
 interface JobTaskViewProps {
   job: JobRequest | null;
-  photographer?: OrganizationMember["user"] & {
+  technician?: OrganizationMember["user"] & {
     role: string;
     accountType?: string;
   };
@@ -185,7 +188,7 @@ interface JobTaskViewProps {
 
 export function JobTaskView({
   job,
-  photographer,
+  technician,
   projectManager,
   editor,
   messages,
@@ -243,7 +246,9 @@ export function JobTaskView({
   );
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [customers, setCustomers] = useState<OrganizationCustomer[]>([]);
-  const [projectManagers, setProjectManagers] = useState<OrganizationMember[]>([]);
+  const [projectManagers, setProjectManagers] = useState<OrganizationMember[]>(
+    []
+  );
   const [editors, setEditors] = useState<OrganizationMember[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
   const [pmSearch, setPmSearch] = useState("");
@@ -270,18 +275,28 @@ export function JobTaskView({
           .slice(0, 2)
       : "NA";
   const renderAssigneeBadge = (name: string, avatar?: string) => (
-    <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
-      <Avatar className="h-7 w-7">
-        <AvatarImage src={avatar} alt={name} />
-        <AvatarFallback className="text-xs bg-muted-foreground/20">
-          {getInitials(name)}
-        </AvatarFallback>
-      </Avatar>
-      <span className="text-sm font-medium text-foreground">{name}</span>
-    </div>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Avatar className="h-7 w-7">
+          <AvatarImage src={avatar} alt={name} />
+          <AvatarFallback className="text-xs bg-muted-foreground/20">
+            {getInitials(name)}
+          </AvatarFallback>
+        </Avatar>
+      </TooltipTrigger>
+      <TooltipContent>
+        <span className="text-sm font-medium text-secondary">{name}</span>
+      </TooltipContent>
+    </Tooltip>
   );
 
-  const filterPeople = <T extends { user?: { name?: string; email?: string }; name?: string; email?: string }>(
+  const filterPeople = <
+    T extends {
+      user?: { name?: string; email?: string };
+      name?: string;
+      email?: string;
+    }
+  >(
     list: T[],
     query: string,
     getName: (item: T) => string,
@@ -478,10 +493,7 @@ export function JobTaskView({
           jobManagement.selectJob(refreshed);
         }
       } else {
-        const updatedProject = await api.projects.assignEditor(
-          job.id,
-          userId
-        );
+        const updatedProject = await api.projects.assignEditor(job.id, userId);
         jobManagement.updateJob(job.id, updatedProject);
         jobManagement.selectJob(api.mapProjectToJobCard(updatedProject));
       }
@@ -2172,7 +2184,8 @@ export function JobTaskView({
                   {customerDisplayName ? (
                     renderAssigneeBadge(customerDisplayName)
                   ) : (
-                    <Badge variant="outline">Unassigned</Badge>
+                    // <Badge variant="outline">Unassigned</Badge>
+                    <></>
                   )}
                   {canAssign && (
                     <DropdownMenu>
@@ -2187,7 +2200,10 @@ export function JobTaskView({
                           <ChevronDown className="h-3.5 w-3.5 ml-2" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-72 max-h-[300px] overflow-y-auto p-0">
+                      <DropdownMenuContent
+                        align="start"
+                        className="w-72 max-h-[300px] overflow-y-auto p-0"
+                      >
                         <div className="px-2 py-2 sticky top-0 bg-background z-10">
                           <Input
                             placeholder="Search customers..."
@@ -2196,7 +2212,7 @@ export function JobTaskView({
                             autoFocus
                           />
                         </div>
-                        <DropdownMenuSeparator />
+                        <DropdownMenuSeparator className="mb-0" />
                         {filteredCustomers.map((customer) => (
                           <DropdownMenuItem
                             key={customer.id}
@@ -2235,7 +2251,7 @@ export function JobTaskView({
 
                 {/* Project Manager Assigned */}
                 <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-                  Project Manager Assigned
+                  PM Assigned
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {projectManagerDisplay ? (
@@ -2244,7 +2260,8 @@ export function JobTaskView({
                       projectManagerDisplay.avatar
                     )
                   ) : (
-                    <Badge variant="outline">Unassigned</Badge>
+                    // <Badge variant="outline">Unassigned</Badge>
+                    <></>
                   )}
                   {canAssign && (
                     <DropdownMenu>
@@ -2255,11 +2272,16 @@ export function JobTaskView({
                           className="h-7 rounded-full"
                           disabled={loadingAssignments}
                         >
-                          {projectManagerDisplay ? "Change" : "Assign Project Manager"}
+                          {projectManagerDisplay
+                            ? "Change"
+                            : "Assign Project Manager"}
                           <ChevronDown className="h-3.5 w-3.5 ml-2" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-72 max-h-[300px] overflow-y-auto p-0">
+                      <DropdownMenuContent
+                        align="start"
+                        className="w-72 max-h-[300px] overflow-y-auto p-0"
+                      >
                         <div className="px-2 py-2 sticky top-0 bg-background z-10">
                           <Input
                             placeholder="Search project managers..."
@@ -2268,7 +2290,7 @@ export function JobTaskView({
                             autoFocus
                           />
                         </div>
-                        <DropdownMenuSeparator />
+                        <DropdownMenuSeparator className="mb-0" />
                         {filteredProjectManagers.map((member) => {
                           const userId = member.user?.id || member.userId;
                           const name =
@@ -2316,28 +2338,28 @@ export function JobTaskView({
                   )}
                 </div>
 
-                {/* Photographer Assigned */}
+                {/* Technician Assigned */}
                 <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-                  Photographer Assigned
+                  Tech Assigned
                 </div>
                 <div className="flex items-center gap-2">
-                  {photographer ? (
+                  {technician ? (
                     <div className="flex items-center gap-2">
                       <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
                         <Avatar className="h-7 w-7">
                           <AvatarImage
-                            src={photographer.avatarUrl}
-                            alt={photographer.name}
+                            src={technician.avatarUrl}
+                            alt={technician.name}
                           />
                           <AvatarFallback className="text-xs bg-muted-foreground/20">
-                            {photographer.name
+                            {technician.name
                               .split(" ")
                               .map((n) => n[0])
                               .join("")}
                           </AvatarFallback>
                         </Avatar>
                         <span className="text-sm font-medium text-foreground">
-                          {photographer.name}
+                          {technician.name}
                         </span>
                       </div>
                       {onChangeTechnician &&
@@ -2362,7 +2384,7 @@ export function JobTaskView({
                         size="sm"
                         className="h-7 rounded-full"
                       >
-                        Assign Photographer
+                        Assign Technician
                       </Button>
                     )
                   )}
@@ -2379,7 +2401,8 @@ export function JobTaskView({
                       editorDisplay.avatar
                     )
                   ) : (
-                    <Badge variant="outline">Unassigned</Badge>
+                    // <Badge variant="outline">Unassigned</Badge>
+                    <></>
                   )}
                   {canAssign && (
                     <DropdownMenu>
@@ -2390,11 +2413,14 @@ export function JobTaskView({
                           className="h-7 rounded-full"
                           disabled={loadingAssignments}
                         >
-                          {editorDisplay ? "Change" : "Assign Editor"}
-                          <ChevronDown className="h-3.5 w-3.5 ml-2" />
+                          {editorDisplay ? "Change" : <><span>Assign Editor</span><ChevronDown className="h-3.5 w-3.5 ml-2" /></>}
+                          
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-72 max-h-[300px] overflow-y-auto p-0">
+                      <DropdownMenuContent
+                        align="start"
+                        className="w-72 max-h-[300px] overflow-y-auto p-0"
+                      >
                         <div className="px-2 py-2 sticky top-0 bg-background z-10">
                           <Input
                             placeholder="Search editors..."
@@ -2403,7 +2429,7 @@ export function JobTaskView({
                             autoFocus
                           />
                         </div>
-                        <DropdownMenuSeparator />
+                        <DropdownMenuSeparator className="mb-0" />
                         {filteredEditors.map((member) => {
                           const userId = member.user?.id || member.userId;
                           const name =

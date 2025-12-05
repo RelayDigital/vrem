@@ -111,11 +111,9 @@ export default function JobDetailPage() {
   const hasSelectedJob = selectedJob && selectedJob.id === jobId;
   const isJobLoading = loadingJob;
   const assignedTechnician = selectedJob?.assignedTechnicianId
-    ? technicians.find(
-        (tech) => tech.id === selectedJob.assignedTechnicianId
-      )
+    ? technicians.find((tech) => tech.id === selectedJob.assignedTechnicianId)
     : undefined;
-  const photographer = assignedTechnician
+  const technician = assignedTechnician
     ? ({
         id: assignedTechnician.id,
         name: assignedTechnician.name,
@@ -186,8 +184,8 @@ export default function JobDetailPage() {
 
       {!isJobLoading && hasSelectedJob && hasAccess && selectedJob && (
         <JobTaskView
-        job={selectedJob}
-          photographer={photographer as any}
+          job={selectedJob}
+          technician={technician as any}
           messages={messaging.getMessagesForJob(selectedJob.id)}
           currentUserId={user?.id || "current-user-id"}
           currentUserName={user?.name || "Current User"}
@@ -205,7 +203,9 @@ export default function JobDetailPage() {
             messaging.editMessage(messageId, content)
           }
           onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
-          onStatusChange={(status) => handleStatusChange(status, selectedJob.id)}
+          onStatusChange={(status) =>
+            handleStatusChange(status, selectedJob.id)
+          }
           onAssignTechnician={jobManagement.handleAssignTechnician}
           onChangeTechnician={jobManagement.handleChangeTechnician}
           variant="page"

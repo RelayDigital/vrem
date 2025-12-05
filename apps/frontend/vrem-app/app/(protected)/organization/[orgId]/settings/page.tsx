@@ -61,6 +61,7 @@ import { TeamLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingS
 import { AccessDenied } from "@/components/common/AccessDenied";
 import { useRoleGuard } from "@/hooks/useRoleGuard";
 import { api } from "@/lib/api";
+import { Organization } from "@/types";
 
 interface ServiceArea {
   id: string;
@@ -122,7 +123,7 @@ export default function OrganizationSettingsPage() {
   // Initialize form from org data when it loads
   useEffect(() => {
     if (organization) {
-      setCompanyName(organization.name || "");
+      setCompanyName(personalOrgName || organization.name || "");
       setCompanyType((organization as any).type || "");
       setDescription((organization as any).description || "");
       setLogo(
@@ -186,9 +187,16 @@ export default function OrganizationSettingsPage() {
     });
   };
 
+  const broadcastOrganizationUpdate = (updated: Organization) => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("organizationUpdated", { detail: { organization: updated } })
+    );
+  };
+
   const handleSave = async () => {
     try {
-      await save({
+      const updated = await save({
         name: companyName,
         legalName: (organization as any)?.legalName || undefined,
         websiteUrl: (organization as any)?.websiteUrl || undefined,
@@ -208,6 +216,9 @@ export default function OrganizationSettingsPage() {
       } as any);
       toast.success("Organization settings saved successfully");
       setHasChanges(false);
+      if (updated) {
+        broadcastOrganizationUpdate(updated as Organization);
+      }
     } catch (err) {
       toast.error(
         err instanceof Error
@@ -220,7 +231,7 @@ export default function OrganizationSettingsPage() {
   const handleCancel = () => {
     // Revert to original org data
     if (organization) {
-      setCompanyName(organization.name || "");
+      setCompanyName(personalOrgName || organization.name || "");
       setCompanyType((organization as any).type || "");
       setDescription((organization as any).description || "");
       setLogo(
@@ -247,6 +258,8 @@ export default function OrganizationSettingsPage() {
   const isPersonalOrg =
     orgMembership?.organization?.type === "PERSONAL" ||
     (orgMembership?.organization as any)?.type === "PERSONAL";
+  const personalOrgName =
+    isPersonalOrg && user?.name ? `${user.name}'s Workspace` : undefined;
   const membershipRole = orgMembership?.role;
   const membershipElevated =
     !!membershipRole &&
@@ -254,6 +267,35 @@ export default function OrganizationSettingsPage() {
     !isPersonalOrg;
 
   const isAllowed = membershipElevated || isPersonalOrg;
+
+  const companyOnlySections = ["branding", "serviceAreas", "booking", "analytics"];
+  const sections = useMemo(() => {
+    const base = [
+      { id: "companyDetails", label: "Company Details" },
+      { id: "branding", label: "Branding" },
+      { id: "address", label: "Address & Location" },
+      { id: "serviceAreas", label: "Service Areas & Regions" },
+      { id: "contact", label: "Contact & Communication" },
+      { id: "booking", label: "Booking & Operations" },
+      { id: "analytics", label: "Analytics" },
+    ];
+
+    if (isPersonalOrg) {
+      return base.filter(
+        (section) =>
+          !companyOnlySections.includes(section.id) &&
+          section.id !== "companyDetails"
+      );
+    }
+    return base;
+  }, [isPersonalOrg]);
+
+  useEffect(() => {
+    setCurrentSectionIndex(0);
+  }, [isPersonalOrg]);
+
+  const sectionIsVisible = (id: string) =>
+    sections.some((section) => section.id === id);
 
   if (authLoading || orgLoading) {
     return <TeamLoadingSkeleton />;
@@ -299,23 +341,6 @@ export default function OrganizationSettingsPage() {
     );
   }
 
-  const sections = [
-    { id: "companyDetails", label: "Company Details" },
-    { id: "branding", label: "Branding" },
-    { id: "address", label: "Address & Location" },
-    { id: "serviceAreas", label: "Service Areas & Regions" },
-    { id: "contact", label: "Contact & Communication" },
-    { id: "booking", label: "Booking & Operations" },
-    { id: "analytics", label: "Analytics" },
-  ];
-
-  // Filter sections based on search
-  const filteredSections = searchQuery
-    ? sections.filter((s) =>
-        s.label.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : sections;
-
   // Mobile navigation handlers
   const handleSectionChange = (sectionId: string) => {
     const index = sections.findIndex((s) => s.id === sectionId);
@@ -352,8 +377,9 @@ export default function OrganizationSettingsPage() {
             <div>
               <H2 className="text-2xl mb-2">Organization Settings</H2>
               <Muted className="text-sm">
-                Manage your company profile, service areas, and operational
-                preferences.
+                {isPersonalOrg
+                  ? "Manage your personal organization details. Company-only settings are hidden."
+                  : "Manage your company profile, service areas, and operational preferences."}
               </Muted>
             </div>
 
@@ -399,8 +425,9 @@ export default function OrganizationSettingsPage() {
               <div className="mb-6">
                 <H2 className="text-2xl mb-2">Organization Settings</H2>
                 <Muted className="text-sm">
-                  Manage your company profile, service areas, and operational
-                  preferences.
+                  {isPersonalOrg
+                    ? "Personal organization: company-only settings are hidden."
+                    : "Manage your company profile, service areas, and operational preferences."}
                 </Muted>
               </div>
               <nav className="space-y-1">
@@ -437,195 +464,205 @@ export default function OrganizationSettingsPage() {
             </div>
 
             <div className="@container w-full flex flex-col">
-              {/* Section 1: Company Details */}
-              <section
-                ref={sectionRefs.companyDetails}
-                id="company-details"
-                className="mb-md border-b pb-md"
-              >
-                {/* Heading */}
-                <div className="mb-md flex items-baseline justify-between">
-                  <H2 className="text-lg border-0">Company Details</H2>
+              {isPersonalOrg && (
+                <div className="mb-md rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+                  Some settings (branding, service areas, booking, analytics) are only available to company organizations and are hidden for personal organizations.
                 </div>
+              )}
 
-                {/* Content */}
-                <div className="grid grid-cols-1 gap-lg">
-                  {/* Company Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
-                    {/* Company Name */}
-                    <div className="space-y-2">
-                      <Label htmlFor="company-name">Company Name</Label>
-                      <Input
-                        id="company-name"
-                        value={companyName}
-                        onChange={(e) => {
-                          setCompanyName(e.target.value);
-                          setHasChanges(true);
-                        }}
-                        placeholder="Acme Media Co."
-                      />
-                      <Muted className="text-xs">
-                        Your organization's legal or display name
-                      </Muted>
+              {/* Section 1: Company Details */}
+              {!isPersonalOrg && (
+                <section
+                  ref={sectionRefs.companyDetails}
+                  id="company-details"
+                  className="mb-md border-b pb-md"
+                >
+                  {/* Heading */}
+                  <div className="mb-md flex items-baseline justify-between">
+                    <H2 className="text-lg border-0">Company Details</H2>
+                  </div>
+
+                  {/* Content */}
+                  <div className="grid grid-cols-1 gap-lg">
+                    {/* Company Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
+                      {/* Company Name */}
+                      <div className="space-y-2">
+                        <Label htmlFor="company-name">Company Name</Label>
+                        <Input
+                          id="company-name"
+                          value={companyName}
+                          onChange={(e) => {
+                            setCompanyName(e.target.value);
+                            setHasChanges(true);
+                          }}
+                          placeholder="Acme Media Co."
+                        />
+                        <Muted className="text-xs">
+                          Your organization's legal or display name
+                        </Muted>
+                      </div>
+                      {/* Company Type */}
+                      {/* <div className="space-y-2">
+                        <Label htmlFor="company-type">Company Type</Label>
+                        <Select
+                          value={companyType}
+                          onValueChange={(v) => {
+                            setCompanyType(v);
+                            setHasChanges(true);
+                          }}
+                        >
+                          <SelectTrigger id="company-type">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="media_company">
+                              Media Company
+                            </SelectItem>
+                            <SelectItem value="real_estate_team">
+                              Real Estate Team
+                            </SelectItem>
+                            <SelectItem value="agent">Agent</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div> */}
+                      {/* Company Description */}
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="description">Company Description</Label>
+                        <Textarea
+                          id="description"
+                          value={description}
+                          onChange={(e) => {
+                            setDescription(e.target.value);
+                            setHasChanges(true);
+                          }}
+                          placeholder="Describe your company, services, and expertise..."
+                          rows={4}
+                        />
+                        <Muted className="text-xs">
+                          This description may be visible to clients and partners
+                        </Muted>
+                      </div>
                     </div>
-                    {/* Company Type */}
-                    {/* <div className="space-y-2">
-                      <Label htmlFor="company-type">Company Type</Label>
-                      <Select
-                        value={companyType}
-                        onValueChange={(v) => {
-                          setCompanyType(v);
-                          setHasChanges(true);
-                        }}
+                    {/* Save Button */}
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={handleSave}
+                        disabled={!hasChanges || isSaving}
                       >
-                        <SelectTrigger id="company-type">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="media_company">
-                            Media Company
-                          </SelectItem>
-                          <SelectItem value="real_estate_team">
-                            Real Estate Team
-                          </SelectItem>
-                          <SelectItem value="agent">Agent</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div> */}
-                    {/* Company Description */}
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="description">Company Description</Label>
-                      <Textarea
-                        id="description"
-                        value={description}
-                        onChange={(e) => {
-                          setDescription(e.target.value);
-                          setHasChanges(true);
-                        }}
-                        placeholder="Describe your company, services, and expertise..."
-                        rows={4}
-                      />
-                      <Muted className="text-xs">
-                        This description may be visible to clients and partners
-                      </Muted>
+                        {isSaving && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Save Details
+                      </Button>
                     </div>
                   </div>
-                  {/* Save Button */}
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={handleSave}
-                      disabled={!hasChanges || isSaving}
-                    >
-                      {isSaving && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      )}
-                      Save Details
-                    </Button>
-                  </div>
-                </div>
-              </section>
+                </section>
+              )}
 
               {/* Section 2: Branding */}
-              <section
-                ref={sectionRefs.branding}
-                id="branding"
-                className="mb-md border-b pb-md"
-              >
-                {/* Heading */}
-                <div className="mb-md flex items-baseline justify-between">
-                  <H2 className="text-lg border-0">Branding</H2>
-                </div>
+              {sectionIsVisible("branding") && (
+                <section
+                  ref={sectionRefs.branding}
+                  id="branding"
+                  className="mb-md border-b pb-md"
+                >
+                  {/* Heading */}
+                  <div className="mb-md flex items-baseline justify-between">
+                    <H2 className="text-lg border-0">Branding</H2>
+                  </div>
 
-                {/* Content */}
-                <div className="grid grid-cols-1 gap-lg">
-                  {/* Company Logo */}
-                  <div className="flex flex-col gap-lg">
-                    <Label>Company Logo</Label>
-                    <div className="flex items-start gap-lg">
-                      <div className="shrink-0">
-                        {logo ? (
-                          <div className="relative">
-                            <Avatar className="size-24 border-2 border-border">
-                              <AvatarImage src={logo} />
-                              <AvatarFallback>
-                                <ImageIcon className="size-12" />
-                              </AvatarFallback>
-                            </Avatar>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                              onClick={() => {
-                                setLogo(null);
-                                setHasChanges(true);
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
+                  {/* Content */}
+                  <div className="grid grid-cols-1 gap-lg">
+                    {/* Company Logo */}
+                    <div className="flex flex-col gap-lg">
+                      <Label>Company Logo</Label>
+                      <div className="flex items-start gap-lg">
+                        <div className="shrink-0">
+                          {logo ? (
+                            <div className="relative">
+                              <Avatar className="size-24 border-2 border-border">
+                                <AvatarImage src={logo} />
+                                <AvatarFallback>
+                                  <ImageIcon className="size-12" />
+                                </AvatarFallback>
+                              </Avatar>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                                onClick={() => {
+                                  setLogo(null);
+                                  setHasChanges(true);
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="size-24 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center bg-muted/30">
+                              <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
+                            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                            <p className="text-sm font-medium mb-1">
+                              Click to upload logo
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              or drag and drop
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              PNG, JPG, GIF up to 2MB
+                            </p>
                           </div>
-                        ) : (
-                          <div className="size-24 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center bg-muted/30">
-                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 space-y-2">
-                        <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer">
-                          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                          <p className="text-sm font-medium mb-1">
-                            Click to upload logo
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            or drag and drop
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            PNG, JPG, GIF up to 2MB
-                          </p>
                         </div>
                       </div>
                     </div>
-                  </div>
-                  {/* Branding Colors */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
-                    <div className="space-y-2">
-                      <Label htmlFor="brand-color">
-                        Brand Accent Color (Optional)
-                      </Label>
-                      <div className="flex gap-3">
-                        <Input
-                          id="brand-color"
-                          type="color"
-                          value={brandColor}
-                          onChange={(e) => {
-                            setBrandColor(e.target.value);
-                            setHasChanges(true);
-                          }}
-                          className="h-10 w-20 p-1 cursor-pointer"
-                        />
-                        <Input
-                          value={brandColor}
-                          onChange={(e) => {
-                            setBrandColor(e.target.value);
-                            setHasChanges(true);
-                          }}
-                          placeholder="#3B82F6"
-                          className="flex-1"
+                    {/* Branding Colors */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
+                      <div className="space-y-2">
+                        <Label htmlFor="brand-color">
+                          Brand Accent Color (Optional)
+                        </Label>
+                        <div className="flex gap-3">
+                          <Input
+                            id="brand-color"
+                            type="color"
+                            value={brandColor}
+                            onChange={(e) => {
+                              setBrandColor(e.target.value);
+                              setHasChanges(true);
+                            }}
+                            className="h-10 w-20 p-1 cursor-pointer"
+                          />
+                          <Input
+                            value={brandColor}
+                            onChange={(e) => {
+                              setBrandColor(e.target.value);
+                              setHasChanges(true);
+                            }}
+                            placeholder="#3B82F6"
+                            className="flex-1"
+                          />
+                        </div>
+                        <Muted className="text-xs">
+                          Used for accents and highlights throughout the platform
+                        </Muted>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Color Preview</Label>
+                        <div
+                          className="h-10 rounded-md border"
+                          style={{ backgroundColor: brandColor }}
                         />
                       </div>
-                      <Muted className="text-xs">
-                        Used for accents and highlights throughout the platform
-                      </Muted>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Color Preview</Label>
-                      <div
-                        className="h-10 rounded-md border"
-                        style={{ backgroundColor: brandColor }}
-                      />
                     </div>
                   </div>
-                </div>
-              </section>
+                </section>
+              )}
 
               {/* Section 3: Address & Location */}
               <section
@@ -755,101 +792,103 @@ export default function OrganizationSettingsPage() {
               </section>
 
               {/* Section 4: Service Areas & Regions */}
-              <section
-                ref={sectionRefs.serviceAreas}
-                id="service-areas"
-                className="mb-md border-b pb-md"
-              >
-                {/* Heading */}
-                <div className="mb-md flex items-baseline justify-between">
-                  <H2 className="text-lg border-0">Service Areas & Regions</H2>
-                </div>
-
-                {/* Content */}
-                <div className="grid grid-cols-1 gap-lg">
-                  {/* Service Areas */}
-                  <div>
-                    <Muted className="text-sm">
-                      Used to set map defaults and booking rules.
-                    </Muted>
-                    {serviceAreas.length === 0 ? (
-                      <div className="mt-2 py-12 text-center border-2 border-dashed rounded-lg">
-                        <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">
-                          No service areas defined yet
-                        </p>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="mt-4"
-                          onClick={() => toast.info("Add service area dialog")}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Your First Service Area
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {serviceAreas.map((area) => (
-                          <div
-                            key={area.id}
-                            className="flex items-center gap-4 p-4 border rounded-lg"
-                          >
-                            <Badge
-                              variant={area.active ? "default" : "secondary"}
-                            >
-                              {area.type}
-                            </Badge>
-                            <div className="flex-1">
-                              <p className="font-medium">{area.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {area.value}
-                              </p>
-                            </div>
-                            <Badge
-                              variant={area.active ? "default" : "outline"}
-                            >
-                              {area.active ? "Active" : "Inactive"}
-                            </Badge>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => toast.info("Edit service area")}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setServiceAreas(
-                                  serviceAreas.filter((a) => a.id !== area.id)
-                                );
-                                setHasChanges(true);
-                              }}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+              {sectionIsVisible("serviceAreas") && (
+                <section
+                  ref={sectionRefs.serviceAreas}
+                  id="service-areas"
+                  className="mb-md border-b pb-md"
+                >
+                  {/* Heading */}
+                  <div className="mb-md flex items-baseline justify-between">
+                    <H2 className="text-lg border-0">Service Areas & Regions</H2>
                   </div>
-                  {/* Service Areas Map Preview */}
-                  <div className="mt-6">
-                    <Label>Service Coverage Map</Label>
-                    <div className="mt-2 h-48 rounded-lg border bg-muted/30 flex items-center justify-center">
-                      <div className="text-center text-muted-foreground">
-                        <MapPin className="h-8 w-8 mx-auto mb-2" />
-                        <p className="text-sm">Service area visualization</p>
-                        <p className="text-xs">
-                          Will display when areas are defined
-                        </p>
+
+                  {/* Content */}
+                  <div className="grid grid-cols-1 gap-lg">
+                    {/* Service Areas */}
+                    <div>
+                      <Muted className="text-sm">
+                        Used to set map defaults and booking rules.
+                      </Muted>
+                      {serviceAreas.length === 0 ? (
+                        <div className="mt-2 py-12 text-center border-2 border-dashed rounded-lg">
+                          <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            No service areas defined yet
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-4"
+                            onClick={() => toast.info("Add service area dialog")}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Your First Service Area
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {serviceAreas.map((area) => (
+                            <div
+                              key={area.id}
+                              className="flex items-center gap-4 p-4 border rounded-lg"
+                            >
+                              <Badge
+                                variant={area.active ? "default" : "secondary"}
+                              >
+                                {area.type}
+                              </Badge>
+                              <div className="flex-1">
+                                <p className="font-medium">{area.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {area.value}
+                                </p>
+                              </div>
+                              <Badge
+                                variant={area.active ? "default" : "outline"}
+                              >
+                                {area.active ? "Active" : "Inactive"}
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => toast.info("Edit service area")}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setServiceAreas(
+                                    serviceAreas.filter((a) => a.id !== area.id)
+                                  );
+                                  setHasChanges(true);
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* Service Areas Map Preview */}
+                    <div className="mt-6">
+                      <Label>Service Coverage Map</Label>
+                      <div className="mt-2 h-48 rounded-lg border bg-muted/30 flex items-center justify-center">
+                        <div className="text-center text-muted-foreground">
+                          <MapPin className="h-8 w-8 mx-auto mb-2" />
+                          <p className="text-sm">Service area visualization</p>
+                          <p className="text-xs">
+                            Will display when areas are defined
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </section>
+                </section>
+              )}
 
               {/* Section 5: Contact & Communication */}
               <section
@@ -987,174 +1026,178 @@ export default function OrganizationSettingsPage() {
               </section>
 
               {/* Section 6: Booking & Operations */}
-              <section
-                ref={sectionRefs.booking}
-                id="booking"
-                className="mb-md border-b pb-md"
-              >
-                {/* Heading */}
-                <div className="mb-md flex items-baseline justify-between">
-                  <H2 className="text-lg border-0">Booking & Operations</H2>
-                </div>
+              {sectionIsVisible("booking") && (
+                <section
+                  ref={sectionRefs.booking}
+                  id="booking"
+                  className="mb-md border-b pb-md"
+                >
+                  {/* Heading */}
+                  <div className="mb-md flex items-baseline justify-between">
+                    <H2 className="text-lg border-0">Booking & Operations</H2>
+                  </div>
 
-                {/* Content */}
-                <div className="grid grid-cols-1 gap-lg">
-                  {/* Booking & Operations */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
-                    <div className="space-y-2">
-                      <Label htmlFor="booking-start">Booking Hours Start</Label>
-                      <Input
-                        id="booking-start"
-                        type="time"
-                        value={bookingStart}
-                        onChange={(e) => {
-                          setBookingStart(e.target.value);
-                          setHasChanges(true);
-                        }}
-                      />
+                  {/* Content */}
+                  <div className="grid grid-cols-1 gap-lg">
+                    {/* Booking & Operations */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
+                      <div className="space-y-2">
+                        <Label htmlFor="booking-start">Booking Hours Start</Label>
+                        <Input
+                          id="booking-start"
+                          type="time"
+                          value={bookingStart}
+                          onChange={(e) => {
+                            setBookingStart(e.target.value);
+                            setHasChanges(true);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="booking-end">Booking Hours End</Label>
+                        <Input
+                          id="booking-end"
+                          type="time"
+                          value={bookingEnd}
+                          onChange={(e) => {
+                            setBookingEnd(e.target.value);
+                            setHasChanges(true);
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="capacity-notes">
+                          Default Capacity Notes
+                        </Label>
+                        <Textarea
+                          id="capacity-notes"
+                          value={capacityNotes}
+                          onChange={(e) => {
+                            setCapacityNotes(e.target.value);
+                            setHasChanges(true);
+                          }}
+                          placeholder="Describe any capacity limits or requirements..."
+                          rows={3}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="travel-radius">
+                          Travel Radius Default (km)
+                        </Label>
+                        <Input
+                          id="travel-radius"
+                          type="number"
+                          value={travelRadius}
+                          onChange={(e) => {
+                            setTravelRadius(e.target.value);
+                            setHasChanges(true);
+                          }}
+                          placeholder="50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="cancellation-window">
+                          Job Cancellation Window (hours)
+                        </Label>
+                        <Select
+                          value={cancellationWindow}
+                          onValueChange={(v) => {
+                            setCancellationWindow(v);
+                            setHasChanges(true);
+                          }}
+                        >
+                          <SelectTrigger id="cancellation-window">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">1 hour</SelectItem>
+                            <SelectItem value="6">6 hours</SelectItem>
+                            <SelectItem value="12">12 hours</SelectItem>
+                            <SelectItem value="24">24 hours</SelectItem>
+                            <SelectItem value="48">48 hours</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2 md:col-span-1">
+                        <Label htmlFor="assignment-strategy">
+                          Assignment Strategy
+                        </Label>
+                        <Select
+                          value={assignmentStrategy}
+                          onValueChange={(v) => {
+                            setAssignmentStrategy(v);
+                            setHasChanges(true);
+                          }}
+                        >
+                          <SelectTrigger id="assignment-strategy">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="closest">
+                              Closest Technician
+                            </SelectItem>
+                            <SelectItem value="manual">
+                              Manual Assignment Only
+                            </SelectItem>
+                            <SelectItem value="round_robin">
+                              Round Robin
+                            </SelectItem>
+                            <SelectItem value="availability">
+                              Best Availability Match
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="booking-end">Booking Hours End</Label>
-                      <Input
-                        id="booking-end"
-                        type="time"
-                        value={bookingEnd}
-                        onChange={(e) => {
-                          setBookingEnd(e.target.value);
-                          setHasChanges(true);
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="capacity-notes">
-                        Default Capacity Notes
-                      </Label>
-                      <Textarea
-                        id="capacity-notes"
-                        value={capacityNotes}
-                        onChange={(e) => {
-                          setCapacityNotes(e.target.value);
-                          setHasChanges(true);
-                        }}
-                        placeholder="Describe any capacity limits or requirements..."
-                        rows={3}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="travel-radius">
-                        Travel Radius Default (km)
-                      </Label>
-                      <Input
-                        id="travel-radius"
-                        type="number"
-                        value={travelRadius}
-                        onChange={(e) => {
-                          setTravelRadius(e.target.value);
-                          setHasChanges(true);
-                        }}
-                        placeholder="50"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="cancellation-window">
-                        Job Cancellation Window (hours)
-                      </Label>
-                      <Select
-                        value={cancellationWindow}
-                        onValueChange={(v) => {
-                          setCancellationWindow(v);
-                          setHasChanges(true);
-                        }}
-                      >
-                        <SelectTrigger id="cancellation-window">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">1 hour</SelectItem>
-                          <SelectItem value="6">6 hours</SelectItem>
-                          <SelectItem value="12">12 hours</SelectItem>
-                          <SelectItem value="24">24 hours</SelectItem>
-                          <SelectItem value="48">48 hours</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2 md:col-span-1">
-                      <Label htmlFor="assignment-strategy">
-                        Assignment Strategy
-                      </Label>
-                      <Select
-                        value={assignmentStrategy}
-                        onValueChange={(v) => {
-                          setAssignmentStrategy(v);
-                          setHasChanges(true);
-                        }}
-                      >
-                        <SelectTrigger id="assignment-strategy">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="closest">
-                            Closest Technician
-                          </SelectItem>
-                          <SelectItem value="manual">
-                            Manual Assignment Only
-                          </SelectItem>
-                          <SelectItem value="round_robin">
-                            Round Robin
-                          </SelectItem>
-                          <SelectItem value="availability">
-                            Best Availability Match
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                    {/* On-site Requirements */}
+                    <div className="space-y-3">
+                      <Label>On-site Requirements</Label>
+                      <div className="space-y-2">
+                        {[
+                          "Lockbox",
+                          "Pets Secured",
+                          "Access Code Required",
+                          "Parking Available",
+                        ].map((req) => (
+                          <div key={req} className="flex items-center space-x-2">
+                            <Checkbox id={req} />
+                            <Label
+                              htmlFor={req}
+                              className="text-sm font-normal cursor-pointer"
+                            >
+                              {req}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  {/* On-site Requirements */}
-                  <div className="space-y-3">
-                    <Label>On-site Requirements</Label>
-                    <div className="space-y-2">
-                      {[
-                        "Lockbox",
-                        "Pets Secured",
-                        "Access Code Required",
-                        "Parking Available",
-                      ].map((req) => (
-                        <div key={req} className="flex items-center space-x-2">
-                          <Checkbox id={req} />
-                          <Label
-                            htmlFor={req}
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            {req}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </section>
+                </section>
+              )}
 
               {/* Section 7: Analytics */}
-              <section
-                ref={sectionRefs.analytics}
-                id="analytics"
-                className="mb-md"
-              >
-                {/* Heading */}
-                <div className="mb-md flex items-baseline justify-between">
-                  <H2 className="text-lg border-0">Analytics</H2>
-                </div>
-
-                {USE_MOCK_DATA ? (
-                  <AnalyticsContent />
-                ) : (
-                  <div className="py-12 text-center border-2 border-dashed rounded-lg">
-                    <Muted className="text-sm">
-                      Analytics data will appear here when available
-                    </Muted>
+              {sectionIsVisible("analytics") && (
+                <section
+                  ref={sectionRefs.analytics}
+                  id="analytics"
+                  className="mb-md"
+                >
+                  {/* Heading */}
+                  <div className="mb-md flex items-baseline justify-between">
+                    <H2 className="text-lg border-0">Analytics</H2>
                   </div>
-                )}
-              </section>
+
+                  {USE_MOCK_DATA ? (
+                    <AnalyticsContent />
+                  ) : (
+                    <div className="py-12 text-center border-2 border-dashed rounded-lg">
+                      <Muted className="text-sm">
+                        Analytics data will appear here when available
+                      </Muted>
+                    </div>
+                  )}
+                </section>
+              )}
             </div>
           </div>
         </div>

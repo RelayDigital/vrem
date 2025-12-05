@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRequireRole } from '@/hooks/useRequireRole';
 import { SettingsView } from '@/components/shared/settings';
 import { agentSettingsConfig } from '@/components/shared/settings/settings-config';
@@ -17,6 +17,8 @@ import { H2, Muted } from '@/components/ui/typography';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { getEffectiveOrgRole, isDispatcherRole } from '@/lib/roles';
+import { ProviderProfile } from '@/types';
+import { api } from '@/lib/api';
 
 export default function ProfilePage() {
   const { user, isLoading, organizationId, memberships: authMemberships } = useRequireRole([
@@ -31,61 +33,66 @@ export default function ProfilePage() {
   const [settingsSubView, setSettingsSubView] = useState<SettingsSubView>(null);
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState('');
+  const [provider, setProvider] = useState<ProviderProfile | null>(null);
 
-  if (isLoading) {
-    return <SettingsLoadingSkeleton />;
-  }
-
-  if (!user) {
-    return null; // Redirect handled by hook
-  }
+  const personalOrgMembership = useMemo(
+    () =>
+      memberships.find(
+        (m) =>
+          m.organization?.type === 'PERSONAL' ||
+          (m as any)?.organizationType === 'PERSONAL' ||
+          (m as any)?.personalOrg?.type === 'PERSONAL'
+      ),
+    [memberships]
+  );
+  const personalOrg =
+    personalOrgMembership?.organization ||
+    (personalOrgMembership as any)?.personalOrg ||
+    null;
+  const personalOrgId =
+    personalOrgMembership?.orgId || (personalOrg as any)?.id || null;
 
   const technicianMembership =
-    memberships.find((m) => m.userId === user.id && (organizationId ? m.orgId === organizationId : true)) ||
+    personalOrgMembership ||
+    memberships.find(
+      (m) =>
+        m.userId === user?.id && (organizationId ? m.orgId === organizationId : true)
+    ) ||
     memberships[0];
 
-  const userRole = getEffectiveOrgRole(user, authMemberships, organizationId);
+  const baseProvider: ProviderProfile | null = useMemo(() => {
+    if (!user) return null;
+    const org = technicianMembership?.organization;
+    const locationOrg = personalOrg || org;
 
-  // Agent: Use SettingsView with agent config
-  if (userRole === 'AGENT') {
-    return (
-      <div className="size-full overflow-x-hidden">
-        <SettingsView
-          subView={settingsSubView}
-          onNavigate={(subView) => setSettingsSubView(subView)}
-          config={agentSettingsConfig}
-          accountType="agent"
-          componentRegistry={agentSettingsComponents}
-        />
-      </div>
-    );
-  }
-
-  // Technician/Technician: Use ProviderDashboard with profile view
-  if (userRole === 'TECHNICIAN') {
-    const jobs = jobManagement.jobCards;
-    const companies = memberships.map(m => m.organization).filter(Boolean);
-    const applications: any[] = [];
-
-    // Create a minimal technician object from user data
-    const provider = {
+    return {
       id: user.id,
       userId: user.id,
       orgMemberId: technicianMembership?.id || '',
-      orgId: technicianMembership?.orgId || organizationId || '',
-      role: (technicianMembership?.orgRole || 'TECHNICIAN') as any,
+      orgId:
+        technicianMembership?.orgId ||
+        organizationId ||
+        personalOrgId ||
+        user.id,
+      role: (technicianMembership?.orgRole ||
+        (technicianMembership as any)?.role ||
+        'TECHNICIAN') as any,
       name: user.name,
       email: user.email,
-      phone: '',
+      phone: (locationOrg as any)?.phone || '',
       organizationId: technicianMembership?.orgId || organizationId || '',
-      isIndependent: true,
+      isIndependent:
+        (locationOrg as any)?.type === 'PERSONAL' ||
+        (technicianMembership as any)?.organizationType === 'PERSONAL',
       homeLocation: {
         lat: 51.0447,
         lng: -114.0719,
         address: {
-          city: 'Calgary',
-          stateProvince: 'AB',
-          country: 'Canada',
+          street: (locationOrg as any)?.addressLine1 || '',
+          city: (locationOrg as any)?.city || '',
+          stateProvince: (locationOrg as any)?.region || '',
+          country: (locationOrg as any)?.countryCode || '',
+          postalCode: (locationOrg as any)?.postalCode || '',
         },
       },
       availability: [],
@@ -122,9 +129,109 @@ export default function ProfilePage() {
         virtualStaging: false,
       },
     };
+  }, [user, technicianMembership, organizationId, personalOrg, personalOrgId]);
 
-    const handleUpdateProfile = (updates: any) => {
-      toast.success('Profile updated successfully');
+  useEffect(() => {
+    if (baseProvider) {
+      setProvider((prev) => {
+        if (!prev) return baseProvider;
+        if (prev.userId !== baseProvider.userId || prev.orgId !== baseProvider.orgId) {
+          return baseProvider;
+        }
+        return prev;
+      });
+    }
+  }, [baseProvider]);
+
+  if (isLoading) {
+    return <SettingsLoadingSkeleton />;
+  }
+
+  if (!user) {
+    return null; // Redirect handled by hook
+  }
+
+  const userRole = getEffectiveOrgRole(user, authMemberships, organizationId);
+
+  // Agent: Use SettingsView with agent config
+  if (userRole === 'AGENT') {
+    return (
+      <div className="size-full overflow-x-hidden">
+        <SettingsView
+          subView={settingsSubView}
+          onNavigate={(subView) => setSettingsSubView(subView)}
+          config={agentSettingsConfig}
+          accountType="agent"
+          componentRegistry={agentSettingsComponents}
+        />
+      </div>
+    );
+  }
+
+  // Technician/Technician: Use ProviderDashboard with profile view
+  if (userRole === 'TECHNICIAN') {
+    const jobs = jobManagement.jobCards;
+    const companies = memberships.map(m => m.organization).filter(Boolean);
+    const applications: any[] = [];
+
+    const organizationSettingsPath = personalOrgId
+      ? `/organization/${personalOrgId}/settings`
+      : technicianMembership?.orgId
+      ? `/organization/${technicianMembership.orgId}/settings`
+      : undefined;
+
+    if (!provider) {
+      return <SettingsLoadingSkeleton />;
+    }
+
+    const handleUpdateProfile = async (updates: Partial<ProviderProfile>) => {
+      const previous = provider;
+      const nextProvider: ProviderProfile = {
+        ...provider,
+        ...updates,
+        services: updates.services
+          ? { ...provider.services, ...updates.services }
+          : provider.services,
+        homeLocation: updates.homeLocation
+          ? {
+              ...provider.homeLocation,
+              ...updates.homeLocation,
+              address: {
+                ...provider.homeLocation.address,
+                ...(updates.homeLocation.address || {}),
+              },
+            }
+          : provider.homeLocation,
+        phone: updates.phone ?? provider.phone,
+        bio: updates.bio ?? provider.bio,
+      };
+
+      setProvider(nextProvider);
+
+      if (personalOrgId) {
+        try {
+          await api.organizations.updateSettings(personalOrgId, {
+            phone: nextProvider.phone || undefined,
+            addressLine1: nextProvider.homeLocation.address.street || undefined,
+            city: nextProvider.homeLocation.address.city || undefined,
+            region: nextProvider.homeLocation.address.stateProvince || undefined,
+            postalCode: nextProvider.homeLocation.address.postalCode || undefined,
+            countryCode: nextProvider.homeLocation.address.country || undefined,
+          } as any);
+          toast.success('Profile updated successfully');
+        } catch (error) {
+          setProvider(previous);
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : 'Failed to update organization settings'
+          );
+        }
+      } else {
+        toast.success(
+          'Profile updated. Update your address in organization settings.'
+        );
+      }
     };
 
     const handleApplyToCompany = (companyId: string, message: string) => {
@@ -141,6 +248,7 @@ export default function ProfilePage() {
           onUpdateProfile={handleUpdateProfile}
           onApplyToCompany={handleApplyToCompany}
           activeView="profile"
+          organizationSettingsPath={organizationSettingsPath}
         />
       </div>
     );
