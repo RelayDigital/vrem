@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
-import { Role } from '@prisma/client';
+import { UserAccountType } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -17,7 +17,7 @@ export class UsersService {
         email: dto.email,
         name: dto.name,
         password: hashed,
-        role: dto.role,
+        accountType: dto.accountType,
       },
     });
   }
@@ -28,9 +28,9 @@ export class UsersService {
     });
   }
 
-  async findByRole(role: Role) {
+  async findByRole(role: UserAccountType) {
     return this.prisma.user.findMany({
-      where: { role },
+      where: { accountType: role },
     });
   }
 

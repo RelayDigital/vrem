@@ -1,7 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from './roles.decorator';
-import { Role, OrgRole } from '@prisma/client';
+import { OrgRole, UserAccountType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -9,7 +9,7 @@ export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector, private prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
+    const requiredRoles = this.reflector.getAllAndOverride<UserAccountType[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
@@ -21,8 +21,8 @@ export class RolesGuard implements CanActivate {
     const { user } = req;
     if (!user) return false;
 
-    // Allow via org membership: ADMIN/OWNER treated as DISPATCHER for org-scoped routes
-    if (requiredRoles.includes(Role.DISPATCHER)) {
+    // Allow via org membership: ADMIN/OWNER treated as COMPANY for org-scoped routes
+    if (requiredRoles.includes(UserAccountType.COMPANY)) {
       const membership = req.membership || req.activeOrgMembership || null;
       if (
         membership &&
@@ -35,6 +35,7 @@ export class RolesGuard implements CanActivate {
       if (activeOrgId) {
         const dbMembership = await this.prisma.organizationMember.findFirst({
           where: { userId: user.id, orgId: String(activeOrgId) },
+          include: { organization: true },
         });
         if (
           dbMembership &&
@@ -47,6 +48,6 @@ export class RolesGuard implements CanActivate {
       }
     }
 
-    return requiredRoles.includes(user.role);
+    return requiredRoles.includes(user.accountType);
   }
 }

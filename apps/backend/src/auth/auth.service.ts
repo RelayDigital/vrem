@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { Role, OrgRole, OrgType } from '@prisma/client';
+import { OrgRole, OrgType, UserAccountType } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -46,19 +46,19 @@ export class AuthService {
       data: {
         userId,
         orgId: personalOrg.id,
-        role: OrgRole.DISPATCHER,
+        role: OrgRole.OWNER,
       },
     });
 
     return personalOrg;
   }
 
-  async register(email: string, name: string, password: string, role: Role) {
+  async register(email: string, name: string, password: string, role: UserAccountType) {
     // VALIDATION: role must be one of the defined global roles
-    const allowedRoles: Role[] = [
-      Role.DISPATCHER,
-      Role.TECHNICIAN,
-      Role.AGENT,
+    const allowedRoles: UserAccountType[] = [
+      UserAccountType.COMPANY,
+      UserAccountType.PROVIDER,
+      UserAccountType.AGENT,
     ];
 
     if (!allowedRoles.includes(role)) {
@@ -78,19 +78,19 @@ export class AuthService {
         email,
         name,
         password: hashedPassword,
-        role, // IMPORTANT: global identity role
+        accountType: role, // IMPORTANT: global identity role
       },
     });
 
     // Auto-create personal organization for technicians
-    if (role === Role.TECHNICIAN) {
+    if (role === UserAccountType.PROVIDER) {
       await this.ensurePersonalOrganization(user.id, name);
     }
 
     // Create JWT
     const token = this.jwtService.sign({
       sub: user.id,
-      role: user.role,
+      role: user.accountType,
     });
 
     return {
@@ -110,11 +110,11 @@ export class AuthService {
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
     // Ensure technicians have exactly one personal org
-    if (user.role === Role.TECHNICIAN) {
+    if (user.accountType === UserAccountType.PROVIDER) {
       await this.ensurePersonalOrganization(user.id, user.name);
     }
 
-    const token = this.jwtService.sign({ sub: user.id, role: user.role });
+    const token = this.jwtService.sign({ sub: user.id, role: user.accountType });
 
     // Fetch user's organization
     const membership = await this.prisma.organizationMember.findFirst({

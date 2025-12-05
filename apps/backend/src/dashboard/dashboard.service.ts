@@ -1,25 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Role, ProjectStatus } from '@prisma/client';
+import { ProjectStatus, UserAccountType } from '@prisma/client';
 
-type CurrentUser = { id: string; role: Role };
+type CurrentUser = { id: string; accountType: UserAccountType };
 
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
   async getDashboardForUser(user: CurrentUser, orgId: string | null) {
-    switch (user.role) {
-      case Role.AGENT:
+    switch (user.accountType) {
+      case UserAccountType.AGENT:
         return this.getAgentDashboard(user.id);
-      case Role.TECHNICIAN:
-        if (!orgId) return this.getTechnicianDashboard(user.id);
-        return this.getTechnicianDashboard(user.id, orgId);
-      case Role.DISPATCHER:
+      case UserAccountType.PROVIDER:
+        if (!orgId) return this.getProviderDashboard(user.id);
+        return this.getProviderDashboard(user.id, orgId);
+      case UserAccountType.COMPANY:
         if (!orgId) return this.getAdminDashboard();
         return this.getOrgManagerDashboard(orgId);
       default:
-        return { role: user.role, data: null };
+        return { role: user.accountType, data: null };
     }
   }
 
@@ -64,7 +64,7 @@ export class DashboardService {
     });
 
     return {
-      role: Role.AGENT,
+      role: UserAccountType.AGENT,
       upcomingShoots,
       deliveredProjects,
       lastProjectForRebook: lastProject,
@@ -73,7 +73,7 @@ export class DashboardService {
 
   // ---------- Technician ----------
 
-  private async getTechnicianDashboard(technicianId: string, orgId?: string) {
+  private async getProviderDashboard(technicianId: string, orgId?: string) {
     const assignedShoots = await this.prisma.project.findMany({
       where: {
         technicianId,
@@ -101,7 +101,7 @@ export class DashboardService {
     });
 
     return {
-      role: Role.TECHNICIAN,
+      role: UserAccountType.PROVIDER,
       assignedShoots,
       recentCompleted,
     };
@@ -132,7 +132,7 @@ export class DashboardService {
     );
 
     return {
-      role: Role.DISPATCHER,
+      role: UserAccountType.COMPANY,
       projects,
       counts,
     };
@@ -162,7 +162,7 @@ export class DashboardService {
     );
 
     return {
-      role: Role.DISPATCHER,
+      role: UserAccountType.COMPANY,
       projects,
       counts,
     };

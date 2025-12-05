@@ -12,7 +12,7 @@ model User {
   email          String               @unique
   name           String
   password       String
-  role           Role                 @default(AGENT)
+  accountType    UserAccountType      @default(AGENT)
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
   messages       Message[]
@@ -152,16 +152,15 @@ model Invitation {
   organization Organization @relation(fields: [orgId], references: [id])
 }
 
-enum Role {
-  DISPATCHER
-  TECHNICIAN
+enum UserAccountType {
   AGENT
+  PROVIDER
+  COMPANY
 }
 
 enum OrgRole {
   OWNER
   ADMIN
-  DISPATCHER
   TECHNICIAN
   EDITOR
   PROJECT_MANAGER

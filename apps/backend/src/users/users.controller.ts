@@ -15,11 +15,11 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role } from '@prisma/client';
+import { UserAccountType } from '@prisma/client';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.DISPATCHER, Role.DISPATCHER)
+@Roles(UserAccountType.COMPANY, UserAccountType.COMPANY)
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
@@ -30,7 +30,7 @@ export class UsersController {
 
   @Get()
   findAll(@Query('role') role?: string) {
-    if (role) return this.usersService.findByRole(role as Role);
+    if (role) return this.usersService.findByRole(role as UserAccountType);
     return this.usersService.findAll();
   }
 

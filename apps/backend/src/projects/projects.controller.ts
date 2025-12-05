@@ -14,7 +14,7 @@ import { ProjectsService } from './projects.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { Role } from '@prisma/client';
+import { UserAccountType } from '@prisma/client';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { AssignProjectDto } from './dto/assign-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -32,7 +32,7 @@ export class ProjectsController {
   // GET all projects in this organization
   @Get()
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.DISPATCHER)
+  @Roles(UserAccountType.COMPANY)
   getProjects(@CurrentOrg() org) {
     return this.projectsService.findForOrg(org.id);
   }
@@ -40,42 +40,61 @@ export class ProjectsController {
   // GET only user's projects for this org
   @Get('mine')
   @UseGuards(OrgMemberGuard)
-  findMine(@CurrentUser() user, @CurrentOrg() org) {
+  findMine(@CurrentUser() user, @CurrentOrg() org, @Req() req: any) {
     // For agents, org might be null if they're not org members
     // They can still access their projects by agentId
     const orgId = org?.id || null;
-    return this.projectsService.findForUser(user.id, user.role, orgId);
+    const membershipRole = req?.membership?.role;
+    const effectiveRole =
+      membershipRole &&
+      (membershipRole === 'ADMIN' || membershipRole === 'OWNER')
+        ? UserAccountType.COMPANY
+        : user.accountType;
+    return this.projectsService.findForUser(user.id, effectiveRole, orgId);
   }
 
   // GET messages for a project
   @Get(':id/messages')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.AGENT, Role.TECHNICIAN, Role.DISPATCHER, Role.DISPATCHER, Role.DISPATCHER)
+  @Roles(UserAccountType.AGENT, UserAccountType.PROVIDER, UserAccountType.COMPANY, UserAccountType.COMPANY, UserAccountType.COMPANY)
   getMessages(
     @Param('id') id: string,
     @CurrentUser() user,
-    @CurrentOrg() org
+    @CurrentOrg() org,
+    @Req() req,
   ) {
-    return this.projectsService.getMessages(id, user, org.id);
+    return this.projectsService.getMessages(
+      id,
+      user,
+      org.id,
+      req?.membership?.role,
+    );
   }
 
   // POST message
   @Post(':id/messages')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.AGENT, Role.TECHNICIAN, Role.DISPATCHER, Role.DISPATCHER, Role.DISPATCHER)
+  @Roles(UserAccountType.AGENT, UserAccountType.PROVIDER, UserAccountType.COMPANY, UserAccountType.COMPANY, UserAccountType.COMPANY)
   addMessage(
     @Param('id') id: string,
     @Body() dto: CreateMessageDto,
     @CurrentUser() user,
     @CurrentOrg() org,
+    @Req() req,
   ) {
-    return this.projectsService.addMessage(id, dto, user, org.id);
+    return this.projectsService.addMessage(
+      id,
+      dto,
+      user,
+      org.id,
+      req?.membership?.role,
+    );
   }
 
   // CREATE project
   @Post('create')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.AGENT, Role.DISPATCHER, Role.DISPATCHER)
+  @Roles(UserAccountType.AGENT, UserAccountType.COMPANY, UserAccountType.COMPANY)
   createProject(
     @CurrentUser() user,
     @CurrentOrg() org,
@@ -94,14 +113,21 @@ export class ProjectsController {
     @Param('id') id: string,
     @CurrentUser() user,
     @CurrentOrg() org,
+    @Req() req,
   ) {
-    return this.projectsService.findOneForUser(id, user.id, user.role, org.id);
+    return this.projectsService.findOneForUser(
+      id,
+      user.id,
+      user.accountType,
+      org.id,
+      req?.membership?.role,
+    );
   }
 
   // ASSIGN tech + editor
   @Patch(':id/assign')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.DISPATCHER, Role.DISPATCHER)
+  @Roles(UserAccountType.COMPANY, UserAccountType.COMPANY)
   assign(
     @Param('id') id: string,
     @Body() dto: AssignProjectDto,
@@ -113,7 +139,7 @@ export class ProjectsController {
   // UPDATE project
   @Patch(':id')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.DISPATCHER, Role.DISPATCHER)
+  @Roles(UserAccountType.COMPANY, UserAccountType.COMPANY)
   updateProject(
     @Param('id') id: string,
     @Body() dto: UpdateProjectDto,
@@ -125,7 +151,7 @@ export class ProjectsController {
   // REMOVE
   @Delete(':id')
   @UseGuards(OrgMemberGuard)
-  @Roles(Role.DISPATCHER, Role.DISPATCHER)
+  @Roles(UserAccountType.COMPANY, UserAccountType.COMPANY)
   remove(@Param('id') id: string, @CurrentOrg() org) {
     return this.projectsService.remove(id, org.id);
   }
@@ -133,7 +159,7 @@ export class ProjectsController {
   // ASSIGN TECHNICIAN
   @Patch(':id/assign-technician')
   @UseGuards(OrgMemberGuard, RolesGuard)
-  @Roles(Role.DISPATCHER)
+  @Roles(UserAccountType.COMPANY)
   assignTechnician(
     @Param('id') id: string,
     @Body('technicianId') technicianId: string,
@@ -141,7 +167,7 @@ export class ProjectsController {
     @Req() req,
   ) {
     const membershipRole = req?.membership?.role;
-    const allowed = ['OWNER', 'ADMIN', 'DISPATCHER', 'PROJECT_MANAGER'];
+    const allowed = ['OWNER', 'ADMIN', 'PROJECT_MANAGER'];
     if (!allowed.includes(membershipRole)) {
       throw new ForbiddenException('You are not allowed to assign technicians for this organization');
     }
@@ -151,7 +177,7 @@ export class ProjectsController {
   // ASSIGN CUSTOMER
   @Patch(':id/assign-customer')
   @UseGuards(OrgMemberGuard, RolesGuard)
-  @Roles(Role.DISPATCHER)
+  @Roles(UserAccountType.COMPANY)
   assignCustomer(
     @Param('id') id: string,
     @Body('customerId') customerId: string,
@@ -159,7 +185,7 @@ export class ProjectsController {
     @Req() req,
   ) {
     const membershipRole = req?.membership?.role;
-    const allowed = ['OWNER', 'ADMIN', 'DISPATCHER', 'PROJECT_MANAGER'];
+    const allowed = ['OWNER', 'ADMIN', 'PROJECT_MANAGER'];
     if (!allowed.includes(membershipRole)) {
       throw new ForbiddenException('You are not allowed to assign customers for this organization');
     }
@@ -169,7 +195,7 @@ export class ProjectsController {
   // ASSIGN PROJECT MANAGER
   @Patch(':id/assign-project-manager')
   @UseGuards(OrgMemberGuard, RolesGuard)
-  @Roles(Role.DISPATCHER)
+  @Roles(UserAccountType.COMPANY)
   assignProjectManager(
     @Param('id') id: string,
     @Body('projectManagerId') projectManagerId: string,
@@ -177,7 +203,7 @@ export class ProjectsController {
     @Req() req,
   ) {
     const membershipRole = req?.membership?.role;
-    const allowed = ['OWNER', 'ADMIN', 'DISPATCHER', 'PROJECT_MANAGER'];
+    const allowed = ['OWNER', 'ADMIN', 'PROJECT_MANAGER'];
     if (!allowed.includes(membershipRole)) {
       throw new ForbiddenException('You are not allowed to assign project managers for this organization');
     }
@@ -187,7 +213,7 @@ export class ProjectsController {
   // ASSIGN EDITOR
   @Patch(':id/assign-editor')
   @UseGuards(OrgMemberGuard, RolesGuard)
-  @Roles(Role.DISPATCHER, Role.DISPATCHER)
+  @Roles(UserAccountType.COMPANY, UserAccountType.COMPANY)
   assignEditor(
     @Param('id') id: string,
     @Body('editorId') editorId: string,
@@ -199,7 +225,7 @@ export class ProjectsController {
   // SCHEDULE
   @Patch(':id/schedule')
   @UseGuards(OrgMemberGuard, RolesGuard)
-  @Roles(Role.DISPATCHER, Role.DISPATCHER)
+  @Roles(UserAccountType.COMPANY, UserAccountType.COMPANY)
   scheduleProject(
     @Param('id') id: string,
     @Body('scheduledTime') scheduledTime: string,

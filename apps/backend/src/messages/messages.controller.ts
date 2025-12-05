@@ -11,11 +11,11 @@ import { MessagesService } from './messages.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { Role } from '@prisma/client';
+import { UserAccountType } from '@prisma/client';
 
 type CurrentUserType = {
   id: string;
-  role: Role;
+  accountType: UserAccountType;
 };
 
 @Controller('messages')

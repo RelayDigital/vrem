@@ -8,7 +8,7 @@ import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto';
-import { OrgRole, Role, OrgType, OrganizationMember, Prisma } from '@prisma/client';
+import { OrgRole, UserAccountType, OrgType, OrganizationMember, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -19,15 +19,15 @@ export class OrganizationsService {
     // Fetch global user role
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true, name: true },
+      select: { accountType: true, name: true },
     });
 
     if (!user) throw new NotFoundException('User not found');
 
     // ENFORCEMENT: only global ADMIN can create organizations
-    if (user.role !== Role.DISPATCHER) {
+    if (user.accountType !== UserAccountType.COMPANY) {
       throw new ForbiddenException(
-        'Only ADMIN users can create a media company',
+        'Only COMPANY users can create a media company',
       );
     }
 
@@ -39,12 +39,12 @@ export class OrganizationsService {
       },
     });
 
-    // Make the creator an OrgRole.DISPATCHER
+    // Make the creator an OrgRole.OWNER
     await this.prisma.organizationMember.create({
       data: {
         userId,
         orgId: org.id,
-        role: OrgRole.DISPATCHER,
+        role: OrgRole.OWNER,
       },
     });
 
@@ -93,7 +93,7 @@ export class OrganizationsService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      select: { accountType: true },
     });
 
     // Check if already a member
@@ -179,7 +179,7 @@ export class OrganizationsService {
     });
 
     const technicianIds = members
-      .filter((m) => m.user?.role === Role.TECHNICIAN)
+      .filter((m) => m.user?.accountType === UserAccountType.PROVIDER)
       .map((m) => m.userId);
 
     // Ensure each technician has a personal org
@@ -204,7 +204,7 @@ export class OrganizationsService {
           data: {
             userId: techId,
             orgId: personalOrg.id,
-            role: OrgRole.DISPATCHER,
+            role: OrgRole.OWNER,
           },
         });
       }
@@ -240,6 +240,16 @@ export class OrganizationsService {
     });
     if (!member) {
       throw new NotFoundException('Member not found in organization');
+    }
+
+    // Admins cannot change an OWNER's role
+    if (member.role === OrgRole.OWNER && actingMembership.role !== OrgRole.OWNER) {
+      throw new ForbiddenException('Only the current owner can change owner role');
+    }
+
+    // Only an OWNER can promote someone to OWNER
+    if (role === OrgRole.OWNER && actingMembership.role !== OrgRole.OWNER) {
+      throw new ForbiddenException('Only an owner can promote another owner');
     }
 
     const updates: Prisma.PrismaPromise<any>[] = [];

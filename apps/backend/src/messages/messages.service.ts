@@ -5,15 +5,15 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto } from './dto/send-message.dto';
-import { Role } from '@prisma/client';
+import { UserAccountType } from '@prisma/client';
 
 @Injectable()
 export class MessagesService {
   constructor(private prisma: PrismaService) {}
 
-  async userHasAccessToProject(userId: string, role: Role, projectId: string) {
+  async userHasAccessToProject(userId: string, accountType: UserAccountType, projectId: string) {
     // Dispatchers get full access
-    if (role === Role.DISPATCHER) {
+    if (accountType === UserAccountType.COMPANY) {
       return true;
     }
 
@@ -87,7 +87,7 @@ export class MessagesService {
 
   //   const isOwner = message.userId === currentUser.id;
   //   const canModerate =
-  //     currentUser.role === Role.DISPATCHER || currentUser.role === Role.DISPATCHER;
+  //     currentUser.role === Role.COMPANY || currentUser.role === Role.COMPANY;
 
   //   if (!isOwner && !canModerate) {
   //     throw new ForbiddenException('You are not allowed to delete this message');

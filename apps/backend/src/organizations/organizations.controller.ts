@@ -18,7 +18,7 @@ import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { OrgMemberGuard } from './org-member.guard';
-import { Role, OrgRole } from '@prisma/client';
+import { OrgRole, UserAccountType } from '@prisma/client';
 import { Roles } from '../auth/roles.decorator';
 
 @Controller('organizations')
@@ -28,7 +28,7 @@ export class OrganizationsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  @Roles(Role.DISPATCHER) // Only global ADMIN can create an organization
+  @Roles(UserAccountType.COMPANY) // Only global COMPANY users can create an organization
   async createOrg(
     @CurrentUser() user,
     @Body() dto: CreateOrganizationDto,

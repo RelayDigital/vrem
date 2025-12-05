@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { Role } from '@prisma/client';
+import { UserAccountType } from '@prisma/client';
 import { Public } from './public.decorator';
 
 @Controller('auth')
@@ -17,13 +17,13 @@ export class AuthController {
   @Public()
   @Post('register')
   async register(
-    @Body() body: { email: string; name: string; password: string; role: Role },
+    @Body() body: { email: string; name: string; password: string; accountType: UserAccountType },
   ) {
     return this.authService.register(
       body.email,
       body.name,
       body.password,
-      body.role,
+      body.accountType,
     );
   }
 

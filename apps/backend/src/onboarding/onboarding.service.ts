@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Role } from '@prisma/client';
+import { UserAccountType } from '@prisma/client';
 
 @Injectable()
 export class OnboardingService {
@@ -20,14 +20,14 @@ export class OnboardingService {
       return { step: 'error', message: 'User not found' };
     }
 
-    const globalRole = user.role;
+    const globalRole = user.accountType;
     const memberships = user.organizations;
     const membershipCount = memberships.length;
 
     //
     // GLOBAL ADMIN FLOW
     //
-    if (globalRole === Role.DISPATCHER) {
+    if (globalRole === UserAccountType.COMPANY) {
       if (membershipCount === 0) {
         return {
           step: 'create-organization',
@@ -61,9 +61,9 @@ export class OnboardingService {
     if (membershipCount === 0) {
       return {
         step: 'no-organizations-yet',
-        canCreateOrganization: user.role === Role.DISPATCHER,
+        canCreateOrganization: user.accountType === UserAccountType.COMPANY,
         canJoinOrganization: true,
-        showCreateOrgCTA: user.role === Role.DISPATCHER,
+        showCreateOrgCTA: user.accountType === UserAccountType.COMPANY,
         showJoinOrgCTA: true,
         message: 'You are not part of any organization yet.',
       };

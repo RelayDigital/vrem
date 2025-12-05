@@ -59,7 +59,7 @@ export class MessagesGateway
 
     const allowed = await this.messagesService.userHasAccessToProject(
       user.id,
-      user.role,
+      user.accountType,
       data.projectId,
     );
 
@@ -82,7 +82,7 @@ export class MessagesGateway
 
     const allowed = await this.messagesService.userHasAccessToProject(
       user.id,
-      user.role,
+      user.accountType,
       data.projectId,
     );
 

@@ -1,15 +1,20 @@
-import { PrismaClient, OrgRole } from '@prisma/client';
+import { PrismaClient, OrgRole, UserAccountType } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import * as bcrypt from 'bcrypt';
 
 const TEST_ORG_NAME = 'VX Test Org';
 
-// Test user emails and their corresponding organization roles
-// Note: Agents cannot be part of organizations, so they are excluded
-const TEST_USERS = [
-  { email: 'projectmanager@example.com', orgRole: OrgRole.DISPATCHER },
-  { email: 'editor@example.com', orgRole: OrgRole.DISPATCHER },
-  { email: 'technician@example.com', orgRole: OrgRole.TECHNICIAN },
-  { email: 'admin@example.com', orgRole: OrgRole.DISPATCHER },
+// Test users to seed
+const TEST_USERS: Array<{
+  email: string;
+  accountType: UserAccountType;
+  orgRole: OrgRole;
+}> = [
+  { email: 'owner@example.com', accountType: UserAccountType.COMPANY, orgRole: OrgRole.OWNER }, // only global company-level user
+  { email: 'editor@example.com', accountType: UserAccountType.PROVIDER, orgRole: OrgRole.EDITOR },
+  { email: 'projectmanager@example.com', accountType: UserAccountType.PROVIDER, orgRole: OrgRole.PROJECT_MANAGER },
+  { email: 'technician@example.com', accountType: UserAccountType.PROVIDER, orgRole: OrgRole.TECHNICIAN },
+  { email: 'admin@example.com', accountType: UserAccountType.PROVIDER, orgRole: OrgRole.ADMIN },
 ];
 
 async function seedTestOrg() {
@@ -42,15 +47,23 @@ async function seedTestOrg() {
     const skippedUsers: string[] = [];
 
     // Process each test user
-    for (const { email, orgRole } of TEST_USERS) {
-      const user = await prisma.user.findUnique({
+    for (const { email, orgRole, accountType } of TEST_USERS) {
+      let user = await prisma.user.findUnique({
         where: { email },
       });
 
       if (!user) {
-        console.warn(`⚠️  User not found: ${email} - skipping`);
-        skippedUsers.push(email);
-        continue;
+        const passwordHash = await bcrypt.hash('password123', 10);
+        user = await prisma.user.create({
+          data: {
+            id: randomUUID(),
+            email,
+            name: email.split('@')[0],
+            password: passwordHash,
+            accountType,
+          },
+        });
+        console.log(`✅ Created user ${email} with accountType ${accountType}`);
       }
 
       // Upsert OrganizationMember

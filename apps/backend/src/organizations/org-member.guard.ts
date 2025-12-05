@@ -38,13 +38,13 @@ export class OrgMemberGuard implements CanActivate {
     // They can access their own projects by agentId
     if (!orgId) {
       // Check if this is an agent - agents can work without org membership
-      if (user.role === 'AGENT') {
+      if (user.accountType === 'AGENT') {
         this.logger.debug(`OrgMemberGuard: Agent ${user.id} accessing without orgId - allowing`);
         req.membership = null; // No membership, but that's OK for agents
         return true;
       }
       
-      this.logger.warn(`OrgMemberGuard: Organization ID missing for user ${user.id} (role: ${user.role})`);
+      this.logger.warn(`Organization ID missing for user ${user.id} (role: ${user.accountType})`);
       throw new ForbiddenException('Organization ID missing');
     }
 
@@ -53,11 +53,12 @@ export class OrgMemberGuard implements CanActivate {
     try {
     const membership = await this.prisma.organizationMember.findFirst({
         where: { userId: user.id, orgId: String(orgId) },
+        include: { organization: true },
     });
 
     if (!membership) {
         // AGENTS: Allow agents to proceed even if not org members (they work with orgs externally)
-        if (user.role === 'AGENT') {
+        if (user.accountType === 'AGENT') {
           this.logger.debug(`OrgMemberGuard: Agent ${user.id} is not a member of org ${orgId}, but allowing access`);
           req.membership = null; // No membership, but that's OK for agents
           return true;

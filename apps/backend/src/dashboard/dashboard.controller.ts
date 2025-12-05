@@ -2,13 +2,13 @@ import { Controller, Get, UseGuards } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { Role } from '@prisma/client';
+import { UserAccountType } from '@prisma/client';
 import { CurrentOrg } from '../organizations/current-org.decorator';
 import { OrgMemberGuard } from '../organizations/org-member.guard';
 
 type CurrentUserType = {
   id: string;
-  role: Role;
+  accountType: UserAccountType;
 };
 
 @Controller('dashboard')
