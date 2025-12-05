@@ -42,7 +42,7 @@ import {
 import { cn } from "../../ui/utils";
 import { OrganizationSwitcher } from "./OrganizationSwitcher";
 
-export function DispatcherSidebar() {
+export function CompanySidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { state } = useSidebar();
@@ -199,7 +199,7 @@ export function DispatcherSidebar() {
       }
       className={`**:data-[slot=sidebar-container]:top-(--header-height)! **:data-[slot=sidebar-container]:h-[calc(100vh-var(--header-height))]! **:data-[slot=sidebar-container]:bottom-auto!`}
     >
-      <SidebarContent className="pt-header-h">
+      <SidebarContent className="pt-header-h pl-1.5">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>

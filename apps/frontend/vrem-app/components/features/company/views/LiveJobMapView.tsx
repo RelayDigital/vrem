@@ -98,7 +98,7 @@ export function LiveJobMapView({
     >
       <MapWithSidebar
         jobs={jobs}
-        technicians={technicians}
+        providers={technicians}
         selectedJob={selectedJob}
         onSelectJob={onSelectJob}
         onNavigateToJobInProjectManagement={onNavigateToJobInProjectManagement}
@@ -110,4 +110,3 @@ export function LiveJobMapView({
     </main>
   );
 }
-

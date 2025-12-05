@@ -1,11 +1,11 @@
 import { Technician } from "../../../types";
 import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
-import { TechnicianTable } from "../../shared/tables";
+import { TeamTable } from "../../shared/tables";
 import { Users, Star, TrendingUp } from "lucide-react";
 import { StatsCard } from "../../shared/dashboard";
 import { H2 } from "@/components/ui/typography";
 
-interface TechnicianManagementProps {
+interface ProviderManagementProps {
   technicians: Technician[];
   onRemove?: (technician: Technician) => void;
   onRoleChange?: (technician: Technician, role: Technician['role']) => void;
@@ -15,7 +15,7 @@ interface TechnicianManagementProps {
   currentUserRole?: Technician['role'];
 }
 
-export function TechnicianManagement({
+export function ProviderManagement({
   technicians,
   onRemove,
   onRoleChange,
@@ -23,7 +23,7 @@ export function TechnicianManagement({
   currentUserId,
   currentUserMemberId,
   currentUserRole,
-}: TechnicianManagementProps) {
+}: ProviderManagementProps) {
   const activeTechnicians = technicians.filter(
     (p) => p.status === "active" && p.role === "TECHNICIAN"
   );
@@ -79,7 +79,7 @@ export function TechnicianManagement({
           <H2 className="text-lg border-0">Team Members</H2>
         </div> */}
         <div className="">
-          <TechnicianTable
+          <TeamTable
             technicians={technicians}
             onRemove={onRemove}
             onRoleChange={onRoleChange}

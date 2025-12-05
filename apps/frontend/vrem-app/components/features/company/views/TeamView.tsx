@@ -21,7 +21,7 @@ import { H2 } from "@/components/ui/typography";
 import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 import { api } from "@/lib/api";
 import { OrganizationMember, Technician } from "../../../../types";
-import { TechnicianManagement } from "../../technician";
+import { ProviderManagement } from "../../provider";
 import { RoleChangeDialog } from "./RoleChangeDialog";
 import {
   Select,
@@ -262,6 +262,12 @@ export function TeamView({
       toast.error("Unable to update role: missing member id");
       return;
     }
+    // Admins cannot change owner roles; owners cannot demote themselves here
+    if (technician.role === "OWNER") {
+      toast.error("Owners can only be changed by the current owner");
+      return;
+    }
+
     if (role === "OWNER") {
       setPendingTechnician(technician);
       setPendingRole(role);
@@ -274,9 +280,11 @@ export function TeamView({
         technician.memberId,
         role as OrganizationMember["role"]
       );
+      const updatedRole =
+        (updated as any)?.orgRole || updated.role || role;
       setTechnicianList((prev) =>
         prev.map((t) =>
-          t.id === technician.id ? { ...t, role: updated.role } : t
+          t.id === technician.id ? { ...t, role: updatedRole } : t
         )
       );
       toast.success("Role updated");
@@ -299,9 +307,11 @@ export function TeamView({
         pendingTechnician.memberId,
         pendingRole
       );
+      const updatedRole =
+        (updated as any)?.orgRole || updated.role || pendingRole;
       setTechnicianList((prev) =>
         prev.map((t) =>
-          t.id === pendingTechnician.id ? { ...t, role: updated.role } : t
+          t.id === pendingTechnician.id ? { ...t, role: updatedRole } : t
         )
       );
       toast.success("Role updated");
@@ -451,7 +461,7 @@ export function TeamView({
               </DialogContent>
             </Dialog>
           </div>
-          <TechnicianManagement
+          <ProviderManagement
             technicians={technicianList}
             onRemove={handleRemoveTechnician}
             onRoleChange={handleRoleChange}

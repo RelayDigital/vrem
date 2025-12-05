@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { SettingsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { SettingsLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { toast } from "sonner";
 import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
 

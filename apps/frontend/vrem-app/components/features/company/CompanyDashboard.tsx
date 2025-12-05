@@ -10,14 +10,14 @@ import {
 } from "../../../types";
 import { ChatMessage } from "../../../types/chat";
 import { JobTaskView } from "../../shared/tasks/JobTaskView";
-import { DispatcherDashboardView, JobsView, LiveJobMapView, TeamView, AuditView } from "./views";
+import { CompanyDashboardView, JobsView, LiveJobMapView, TeamView, AuditView } from "./views";
 import { CalendarView } from "../calendar";
 import { SettingsView } from "../../shared/settings";
 import { dispatcherSettingsConfig } from "../../shared/settings/settings-config";
 import { dispatcherSettingsComponents } from "./settings";
 import type { SettingsSubView } from "../../shared/settings";
 
-interface DispatcherDashboardProps {
+interface CompanyDashboardProps {
   jobs: JobRequest[];
   technicians: Technician[];
   auditLog: AuditLogEntry[];
@@ -36,7 +36,7 @@ interface DispatcherDashboardProps {
   }) => void;
 }
 
-export function DispatcherDashboard({
+export function CompanyDashboard({
   jobs,
   technicians,
   auditLog,
@@ -49,7 +49,7 @@ export function DispatcherDashboard({
   onNavigateToMapView,
   onNavigateToCalendarView,
   onNewJobClick,
-}: DispatcherDashboardProps) {
+}: CompanyDashboardProps) {
   const [selectedJob, setSelectedJob] = useState<JobRequest | null>(null);
   const [showRankings, setShowRankings] = useState(false);
   const [showNewJobForm, setShowNewJobForm] = useState(false);
@@ -179,7 +179,7 @@ export function DispatcherDashboard({
     <div className="size-full overflow-x-hidden">
       {/* Views */}
       {activeView === "dashboard" && (
-        <DispatcherDashboardView
+        <CompanyDashboardView
           jobs={jobs}
           technicians={technicians}
           metrics={metrics}
@@ -258,7 +258,7 @@ export function DispatcherDashboard({
           subView={settingsSubView}
           onNavigate={(subView) => setSettingsSubView(subView)}
           config={dispatcherSettingsConfig}
-          accountType="dispatcher"
+          accountType="company"
           componentRegistry={dispatcherSettingsComponents}
         />
       )}

@@ -1,5 +1,5 @@
 // Dispatcher feature exports
-export { DispatcherDashboard } from './DispatcherDashboard';
+export { CompanyDashboard } from './CompanyDashboard';
 export { AuditLog } from './AuditLog';
 export { JobAssignment } from './JobAssignment';
 

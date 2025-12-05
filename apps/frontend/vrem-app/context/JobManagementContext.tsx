@@ -107,26 +107,29 @@ export function JobManagementProvider({
     }
 
     try {
-    const userRoleUpper = (userRole || '').toUpperCase();
-    const memberRoleUpper = (memberRole || '').toUpperCase();
-    const isDispatcher = ['DISPATCHER'].includes(memberRoleUpper || userRoleUpper);
+      const memberRoleUpper = (memberRole || '').toUpperCase();
+      const hasOrgRole = Boolean(memberRoleUpper);
+      const canViewOrgProjects = hasOrgRole
+        ? ['DISPATCHER', 'ADMIN', 'OWNER', 'PROJECT_MANAGER', 'EDITOR'].includes(memberRoleUpper)
+        : false;
 
-    let fetchedProjects: Project[] = [];
-    if (isDispatcher) {
-      try {
-        fetchedProjects = await api.projects.listForOrg();
-      } catch (err: any) {
-        // If org-scoped fetch fails (e.g., not a member of the selected org), fallback to user-scoped fetch
-        const message = err?.message || '';
-        const isForbidden = message.includes('403') || message.toLowerCase().includes('forbidden');
-        if (!isForbidden) {
-          throw err;
+      let fetchedProjects: Project[] = [];
+      if (canViewOrgProjects) {
+        try {
+          fetchedProjects = await api.projects.listForOrg();
+        } catch (err: any) {
+          // If org-scoped fetch fails (e.g., not a member of the selected org), fallback to user-scoped fetch
+          const message = err?.message || '';
+          const isForbidden =
+            message.includes('403') || message.toLowerCase().includes('forbidden');
+          if (!isForbidden) {
+            throw err;
+          }
+          fetchedProjects = await api.projects.listForCurrentUser();
         }
+      } else {
         fetchedProjects = await api.projects.listForCurrentUser();
       }
-    } else {
-      fetchedProjects = await api.projects.listForCurrentUser();
-    }
       // Ensure dates are Date objects
       const projectsWithDates = normalizeProjects(fetchedProjects);
       setProjects(projectsWithDates);

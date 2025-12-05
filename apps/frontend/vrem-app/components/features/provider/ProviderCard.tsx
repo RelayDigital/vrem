@@ -28,7 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { getLocationDisplay } from "../../../lib/utils";
 import { P } from '../../ui/typography';
 
-interface TechnicianCardProps {
+interface ProviderCardProps {
   technician: Technician;
   ranking?: TechnicianRanking["factors"];
   score?: number;
@@ -44,7 +44,7 @@ const scoreChartConfig = {
   },
 } satisfies ChartConfig;
 
-export function TechnicianCard({
+export function ProviderCard({
   technician,
   ranking,
   score,
@@ -52,7 +52,7 @@ export function TechnicianCard({
   onAssign,
   onClick,
   showFullAddress = false, // Default to false (only show city/state/country)
-}: TechnicianCardProps) {
+}: ProviderCardProps) {
   const getScoreColor = (s: number) => {
     if (s >= 80) return "hsl(142, 76%, 36%)"; // emerald-600
     if (s >= 60) return "hsl(38, 92%, 50%)"; // amber-500

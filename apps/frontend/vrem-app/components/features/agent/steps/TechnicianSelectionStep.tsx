@@ -1,7 +1,7 @@
 import { Button } from '../../../ui/button';
 import { Badge } from '../../../ui/badge';
-import { TechnicianCard } from '../../technician';
-import { TechnicianSearch } from '../../technician';
+import { ProviderCard } from '../../provider';
+import { ProviderSearch } from '../../provider';
 import { motion } from 'framer-motion';
 import {
   MapPin,
@@ -25,7 +25,7 @@ interface TechnicianSelectionStepProps {
     mediaTypes: string[];
   };
   rankings: TechnicianRanking[];
-  showTechnicianSearch: boolean;
+  showProviderSearch: boolean;
   technicians?: any[];
   companies: any[];
   preferredVendors: string[];
@@ -38,7 +38,7 @@ export function TechnicianSelectionStep({
   selectedAddress,
   jobDetails,
   rankings,
-  showTechnicianSearch,
+  showProviderSearch,
   technicians,
   companies,
   preferredVendors,
@@ -131,7 +131,7 @@ export function TechnicianSelectionStep({
           </CardHeader>
           <CardContent className="p-0!">
           <P className="text-secondary">
-            {showTechnicianSearch
+            {showProviderSearch
               ? 'Search for a specific technician or your preferred media company'
               : 'We\'ve ranked technicians based on availability, proximity, reliability, and your preferred vendors'}
           </P>
@@ -139,25 +139,27 @@ export function TechnicianSelectionStep({
         </Card>
 
         {/* Technician Search or AI Ranking */}
-        {showTechnicianSearch ? (
+        {showProviderSearch ? (
           <div className="bg-card rounded-2xl border-2 border-border p-6 shadow-sm">
-            <TechnicianSearch
+            <ProviderSearch
               technicians={effectiveTechnicians}
               companies={companies}
               preferredVendors={preferredVendors}
               onSelect={onTechnicianSelect}
             />
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {rankings.map((ranking, index) => {
-              // Handle both TechnicianRanking and TechnicianRanking
-              const technician = ranking.technician;
-              return (
-              <TechnicianCard
-                  key={technician.id}
-                  technician={technician}
-                ranking={ranking.factors}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {rankings.map((ranking, index) => {
+                // Handle both legacy TechnicianRanking (technician) and ProviderRanking (provider)
+                const technician =
+                  (ranking as any).provider || (ranking as any).technician;
+                if (!technician) return null;
+                return (
+                <ProviderCard
+                    key={technician.id}
+                    technician={technician}
+                  ranking={ranking.factors}
                 score={ranking.score}
                 recommended={ranking.recommended && index === 0}
                   onAssign={() => onTechnicianSelect(technician.id)}
@@ -181,4 +183,3 @@ export function TechnicianSelectionStep({
     </motion.div>
   );
 }
-

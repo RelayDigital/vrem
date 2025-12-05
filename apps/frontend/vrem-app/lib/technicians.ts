@@ -1,4 +1,4 @@
-import { Organization, OrganizationMember, Technician } from "@/types";
+import { Organization, OrganizationMember, Provider } from "@/types";
 import { api } from "@/lib/api";
 
 const DEFAULT_COORDINATES = { lat: 51.0447, lng: -114.0719 }; // Calgary fallback
@@ -13,7 +13,7 @@ export function buildAddressString(
     personalOrg.addressLine2,
     personalOrg.city,
     personalOrg.region,
-    personalOrg.postalCode,
+    personalOrg.postalCode, 
     personalOrg.countryCode,
   ].filter(Boolean);
   return parts.join(", ");
@@ -44,7 +44,7 @@ export async function geocodeAddress(address: string) {
 
 export async function mapMemberToTechnician(
   member: OrganizationMember
-): Promise<Technician | null> {
+): Promise<Provider | null> {
   if (!member.user) return null;
 
   const memberUser = member.user;
@@ -66,14 +66,17 @@ export async function mapMemberToTechnician(
     }
   }
 
-  const technician: Technician = {
+  const technician: Provider = {
     id: memberUser.id,
+    userId: memberUser.id,
+    orgMemberId: member.id,
+    orgId: member.orgId,
     memberId: member.id,
-    role: member.role,
+    role: (member.role || (member as any).orgRole || "TECHNICIAN") as any,
     name: memberUser.name || "Unnamed",
     email: memberUser.email || "",
     phone: personalOrg?.phone || "",
-    organizationId: memberUser.organizationId,
+    organizationId: memberUser.organizationId || undefined,
     isIndependent: true,
     companyId: undefined,
     companyName: undefined,
@@ -112,23 +115,25 @@ export async function mapMemberToTechnician(
     status: "active",
     createdAt: member.createdAt ? new Date(member.createdAt) : new Date(),
     avatar: memberUser.avatarUrl,
-    bio: "",
-    services: {
-      photography: true,
-      video: false,
-      aerial: false,
-      twilight: false,
-      editing: false,
-      virtualStaging: false,
-    },
-    portfolio: [],
+  bio: "",
+  services: {
+    photography: true,
+    video: false,
+    aerial: false,
+    floorplan: false,
+    measurement: false,
+    twilight: false,
+    editing: false,
+    virtualStaging: false,
+  },
+  portfolio: [],
     certifications: [],
   };
 
   return technician;
 }
 
-export async function fetchOrganizationTechnicians(): Promise<Technician[]> {
+export async function fetchOrganizationTechnicians(): Promise<Provider[]> {
   const members = await api.organizations.listMembers();
   if (!members || members.length === 0) return [];
 
@@ -137,6 +142,6 @@ export async function fetchOrganizationTechnicians(): Promise<Technician[]> {
   );
 
   return technicians.filter(
-    (technician): technician is Technician => Boolean(technician)
+    (technician): technician is Provider => Boolean(technician)
   );
 }

@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useRequireRole } from "@/hooks/useRequireRole";
-import { JobsView } from "@/components/features/dispatcher/views/JobsView";
+import { JobsView } from "@/components/features/company/views/JobsView";
 import { AgentJobsView } from "@/components/features/agent/AgentJobsView";
 import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
 import { ProjectStatus } from "@/types";
-import { JobsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { JobsLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
 import {
@@ -22,10 +22,11 @@ import {
 import { JobDataBoundary, JobsGridSkeleton } from "@/components/shared/jobs";
 import { Technician } from "@/types";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
+import { getEffectiveOrgRole, isDispatcherRole } from "@/lib/roles";
 
 export default function JobsPage() {
   const router = useRouter();
-  const { user, isLoading } = useRequireRole([
+  const { user, isLoading, organizationId, memberships } = useRequireRole([
     "dispatcher",
     "AGENT",
     "TECHNICIAN",
@@ -115,7 +116,7 @@ export default function JobsPage() {
     return null; // Redirect handled by hook
   }
 
-  const userRole = user.role;
+  const userRole = getEffectiveOrgRole(user, memberships, organizationId);
 
   // Use context handlers
   const handleViewRankings = jobManagement.openRankings;
@@ -146,7 +147,7 @@ export default function JobsPage() {
   };
 
   // Dispatcher/Admin/Project Manager/Editor: Use JobsView
-  if (["dispatcher", "DISPATCHER", "PROJECT_MANAGER", "EDITOR"].includes(userRole)) {
+  if (isDispatcherRole(userRole)) {
     const technicianList = technicians;
 
     return (
@@ -265,7 +266,7 @@ export default function JobsPage() {
   }
 
   // Technician/Technician: Filter to assigned jobs only
-  if (["TECHNICIAN"].includes(userRole)) {
+  if (userRole === "TECHNICIAN") {
     const technicianList = technicians;
 
     return (

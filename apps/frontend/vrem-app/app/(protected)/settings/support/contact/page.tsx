@@ -5,7 +5,7 @@ import { useRequireRole } from "@/hooks/useRequireRole";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { SettingsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { SettingsLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { toast } from "sonner";
 import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
 

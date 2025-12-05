@@ -30,6 +30,10 @@ function generateFakeTechnicians(baseLocation: { lat: number; lng: number }): Te
     
     return {
       id: `fake-photo-${index}`,
+      userId: `fake-photo-${index}`,
+      orgMemberId: `fake-member-${index}`,
+      orgId: isIndependent ? `fake-org-${index}` : 'org-vx-001',
+      role: 'TECHNICIAN',
       name,
       email: `${name.toLowerCase().replace(' ', '.')}@${isIndependent ? 'independent.com' : 'photography.com'}`,
       phone: `+1 (555) ${String(100 + index).padStart(3, '0')}-${String(1000 + index).slice(-4)}`,
@@ -78,14 +82,16 @@ function generateFakeTechnicians(baseLocation: { lat: number; lng: number }): Te
       createdAt: new Date('2024-01-01'),
       avatar: `https://images.unsplash.com/photo-${1500000000000 + index}?w=400`,
       bio: 'Professional technician specializing in real estate media.',
-      services: {
-        photography: true,
-        video: Math.random() > 0.5,
-        aerial: Math.random() > 0.5,
-        twilight: Math.random() > 0.5,
-        editing: true,
-        virtualStaging: Math.random() > 0.7,
-      },
+    services: {
+      photography: true,
+      video: Math.random() > 0.5,
+      aerial: Math.random() > 0.5,
+      floorplan: false,
+      measurement: false,
+      twilight: Math.random() > 0.5,
+      editing: true,
+      virtualStaging: Math.random() > 0.7,
+    },
       portfolio: [],
       certifications: [],
     };
@@ -262,4 +268,3 @@ export function LoginMapView() {
     </div>
   );
 }
-

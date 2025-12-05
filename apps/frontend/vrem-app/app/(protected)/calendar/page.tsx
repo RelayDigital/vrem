@@ -5,17 +5,18 @@ import { useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { CalendarView } from "@/components/features/calendar/CalendarView";
 import { ProjectStatus } from "@/types";
-import { CalendarLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { CalendarLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
 import { useJobCreation } from "@/context/JobCreationContext";
 import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
 import { PageHeader } from "@/components/shared/layout";
 import { JobDataBoundary } from "@/components/shared/jobs";
+import { getEffectiveOrgRole, isDispatcherRole } from "@/lib/roles";
 
 export default function CalendarPage() {
   const router = useRouter();
-  const { user, isLoading } = useRequireRole([
+  const { user, isLoading, organizationId, memberships } = useRequireRole([
     "dispatcher",
     "AGENT",
     "TECHNICIAN",
@@ -31,10 +32,14 @@ export default function CalendarPage() {
   const displayJobs = useMemo(() => {
     if (!user) return [];
 
-    const userRole = user.role;
+    const effectiveRole = getEffectiveOrgRole(
+      user,
+      memberships,
+      organizationId
+    );
 
     // Technician/Technician: Only show assigned jobs
-    if (["TECHNICIAN"].includes(userRole)) {
+    if (effectiveRole === "TECHNICIAN") {
       return jobManagement.jobs.filter(
         (job) =>
           job.assignedTechnicianId === user.id ||
@@ -44,7 +49,7 @@ export default function CalendarPage() {
 
     // Dispatcher/Admin/Project Manager/Editor/Agent: Show all jobs
     return jobManagement.jobs;
-  }, [jobManagement.jobs, user]);
+  }, [jobManagement.jobs, memberships, organizationId, user]);
 
   // Fetch messages when selected job changes
   useEffect(() => {
@@ -64,19 +69,9 @@ export default function CalendarPage() {
     return null; // Redirect handled by hook
   }
 
-  const userRole = user.role;
-  const canCreateJobs = [
-    "dispatcher",
-    "DISPATCHER",
-    "PROJECT_MANAGER",
-    "EDITOR",
-  ].includes(userRole);
-  const canSeeTechnicians = [
-    "dispatcher",
-    "DISPATCHER",
-    "PROJECT_MANAGER",
-    "EDITOR",
-  ].includes(userRole);
+  const effectiveRole = getEffectiveOrgRole(user, memberships, organizationId);
+  const canCreateJobs = isDispatcherRole(effectiveRole);
+  const canSeeTechnicians = isDispatcherRole(effectiveRole);
 
   // Use context handlers
   const handleJobClick = jobManagement.openTaskView;

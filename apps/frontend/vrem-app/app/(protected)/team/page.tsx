@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRoleGuard } from "@/hooks/useRoleGuard";
-import { TeamView } from "@/components/features/dispatcher/views/TeamView";
-import { TeamLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { TeamView } from "@/components/features/company/views/TeamView";
+import { TeamLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { AccessDenied } from "@/components/common/AccessDenied";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Technician } from "@/types";

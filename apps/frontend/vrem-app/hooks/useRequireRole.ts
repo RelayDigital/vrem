@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { User } from '@/types';
+import { AccountType, OrgRole, User } from '@/types';
 import { useAuth } from '@/context/auth-context';
 import { OrganizationMember } from '@/types';
 
@@ -18,27 +18,39 @@ interface UseRequireRoleReturn {
 }
 
 // Map backend role names to frontend role names (for normalization)
-const roleMap: Record<string, User['role']> = {
-  DISPATCHER: 'DISPATCHER',
-  TECHNICIAN: 'TECHNICIAN',
+const roleMap: Record<string, OrgRole | AccountType> = {
+  COMPANY: 'COMPANY',
+  PROVIDER: 'PROVIDER',
   AGENT: 'AGENT',
-  // Legacy/old mappings to new roles
-  ADMIN: 'DISPATCHER',
-  PROJECT_MANAGER: 'DISPATCHER',
-  EDITOR: 'DISPATCHER',
-  dispatcher: 'DISPATCHER',
-  technician: 'TECHNICIAN',
-  agent: 'AGENT',
-  admin: 'DISPATCHER',
-  project_manager: 'DISPATCHER',
-  editor: 'DISPATCHER',
+  ADMIN: 'COMPANY',
+  PROJECT_MANAGER: 'COMPANY',
+  EDITOR: 'COMPANY',
+  OWNER: 'COMPANY',
+  TECHNICIAN: 'PROVIDER',
+};
+
+const mapMembershipToEffectiveRole = (
+  membership: any | undefined,
+  fallback: OrgRole | AccountType
+): OrgRole | AccountType => {
+  if (!membership) return fallback;
+  const orgType =
+    membership.organization?.type || membership.organizationType || '';
+  if (orgType === 'PERSONAL') return fallback || 'PROVIDER';
+  const role = (membership.role || '').toUpperCase();
+  if (
+    ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'EDITOR'].includes(role)
+  ) {
+    return 'COMPANY';
+  }
+  return 'PROVIDER';
 };
 
 /**
  * Hook to require a user to have one of the specified roles
  */
 export function useRequireRole(
-  allowedRoles: (User['role'] | string)[],
+  allowedRoles: (string)[],
   options: UseRequireRoleOptions = {}
 ): UseRequireRoleReturn {
   const router = useRouter();
@@ -52,33 +64,37 @@ export function useRequireRole(
       return;
     }
 
-    // Normalize role names (handle both backend and frontend role formats)
-    const normalizedAllowedRoles = allowedRoles.map(role => 
-      roleMap[role] || (role as User['role'])
+    const normalizedAllowedRoles = allowedRoles.map(role =>
+      roleMap[role] || (role as OrgRole | AccountType)
     );
-    const normalizedUserRole = roleMap[user.role] || user.role;
+    const normalizedUserRole: OrgRole | AccountType =
+      roleMap[user.accountType] || 'AGENT';
+    const activeMembership = memberships.find(
+      (m) => m.orgId === activeOrganizationId
+    );
+    const effectiveUserRole = mapMembershipToEffectiveRole(
+      activeMembership,
+      normalizedUserRole
+    );
 
-    // Check if user has one of the allowed roles
-    const hasAllowedRole = normalizedAllowedRoles.includes(normalizedUserRole);
+    const hasAllowedRole = normalizedAllowedRoles.includes(effectiveUserRole);
 
     if (!hasAllowedRole) {
-      // Redirect to user's appropriate dashboard based on their role
       if (options.redirectTo) {
         router.push(options.redirectTo);
       } else {
-        // Get the user's role dashboard path
-        const getUserDashboardPath = (role: User['role']): string => {
-          if (role === 'DISPATCHER') return '/dashboard';
+        const getUserDashboardPath = (role: OrgRole | AccountType): string => {
+          if (role === 'COMPANY') return '/dashboard';
           if (role === 'AGENT') return '/dashboard';
-          if (role === 'TECHNICIAN') return '/dashboard';
+          if (role === 'PROVIDER') return '/dashboard';
           return '/';
         };
-        
-        const dashboardPath = getUserDashboardPath(user.role);
+
+        const dashboardPath = getUserDashboardPath(effectiveUserRole);
         router.push(dashboardPath);
       }
     }
-  }, [user, isLoading, allowedRoles, router, options.redirectTo]);
+  }, [user, isLoading, allowedRoles, router, options.redirectTo, memberships, activeOrganizationId]);
 
   return { user, organizationId: activeOrganizationId, memberships, isLoading };
 }

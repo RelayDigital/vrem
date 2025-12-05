@@ -6,13 +6,20 @@ import { api } from '@/lib/api';
 import { useCurrentOrganization } from './useCurrentOrganization';
 
 export function useOrganizationSettings(orgIdOverride?: string) {
-  const { activeOrganizationId } = useCurrentOrganization();
+  const { activeOrganizationId, setActiveOrganization } = useCurrentOrganization();
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   const effectiveOrgId = orgIdOverride || activeOrganizationId;
+
+  useEffect(() => {
+    if (orgIdOverride && orgIdOverride !== activeOrganizationId) {
+      setActiveOrganization(orgIdOverride);
+      api.organizations.setActiveOrganization(orgIdOverride);
+    }
+  }, [orgIdOverride, activeOrganizationId, setActiveOrganization]);
 
   const loadOrganization = useCallback(async () => {
     if (!effectiveOrgId) {

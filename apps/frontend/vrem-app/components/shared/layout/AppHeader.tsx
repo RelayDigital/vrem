@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { H2 } from "@/components/ui/typography";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
+import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 import { useIsMobile } from "@/components/ui/use-mobile";
 import {
   DropdownMenu,
@@ -31,7 +32,7 @@ import {
 import { User } from "@/types";
 import { useJobCreation } from "@/context/JobCreationContext";
 import { useAuth } from "@/context/auth-context";
-import { OrganizationSwitcher } from "@/components/features/dispatcher/OrganizationSwitcher";
+import { OrganizationSwitcher } from "@/components/features/company/OrganizationSwitcher";
 
 function SafeSidebarTrigger() {
   try {
@@ -46,12 +47,14 @@ interface AppHeaderProps {
   user: User;
   showNewJobButton?: boolean;
   onNewJobClick?: () => void;
+  forceShowNavigation?: boolean;
 }
 
 export function AppHeader({
   user,
   showNewJobButton = false,
   onNewJobClick,
+  forceShowNavigation = false,
 }: AppHeaderProps) {
   const { theme, setTheme } = useTheme();
   const { logout, activeOrganizationId } = useAuth();
@@ -69,25 +72,16 @@ export function AppHeader({
   const isAgentMapView = pathname === "/map";
 
   // Determine technician view based on pathname (using canonical routes)
-  const isTechnicianDashboardView = pathname === "/dashboard";
+  const isProviderDashboardView = pathname === "/dashboard";
   const isTechnicianJobsView = pathname.startsWith("/jobs/all-jobs");
   const isTechnicianCalendarView = pathname === "/calendar";
   const isTechnicianMapView = pathname === "/map";
 
-  // Determine dispatcher view (check for canonical routes or legacy dispatcher routes)
-  const isDispatcherView =
-    pathname.startsWith("/dispatcher") ||
-    pathname === "/dashboard" ||
-    pathname.startsWith("/jobs/all-jobs") ||
-    pathname.startsWith("/calendar") ||
-    pathname.startsWith("/map") ||
-    pathname.startsWith("/team") ||
-    pathname.startsWith("/customers") ||
-    pathname.startsWith("/settings");
-
   const handleNewJobClick = () => {
     // For agents, navigate to booking page
-    if (user?.role === "AGENT") {
+    if (
+      user?.organizationMemberships?.some((m) => ["AGENT"].includes(m.orgRole))
+    ) {
       router.push("/booking");
       return;
     }
@@ -101,7 +95,7 @@ export function AppHeader({
 
   const handleSettingsClick = () => {
     // All roles use canonical settings route
-    router.push("/settings/profile");
+    router.push("/settings");
   };
 
   const handleLogout = () => {
@@ -116,6 +110,12 @@ export function AppHeader({
     router.push(activeOrgId ? `/organization/${activeOrgId}` : "/organization");
   };
 
+  const { memberships } = useCurrentOrganization();
+  const hasOrgRole = (...roles: string[]) =>
+    memberships.some((m) => roles.includes((m as any).orgRole || m.role));
+  const canManage = hasOrgRole("OWNER", "ADMIN");
+  const isProviderOnly = !canManage && hasOrgRole("TECHNICIAN");
+
   return (
     <>
       <header className="sticky top-0 z-50 flex items-center border-b bg-card/80 backdrop-blur-xl shadow-sm w-full pl-2 pr-4 h-header-h">
@@ -123,128 +123,110 @@ export function AppHeader({
           <div className="flex items-center justify-between">
             {/* Organization Switcher */}
             <div className="flex items-center gap-3">
-              {(user?.role === "DISPATCHER" ||
-                user?.role === ("dispatcher" as any)) && (
+              {(canManage || isProviderOnly) && (
                 <OrganizationSwitcher
                   variant="header"
-                  showJoin={false}
                   onOrgHome={handleOrganizationHome}
-                  accountType="dispatcher"
                 />
               )}
-              {(user?.role === "TECHNICIAN" ||
-                user?.role === ("technician" as any)) && (
-                <OrganizationSwitcher
-                  variant="header"
-                  includePersonal
-                  showManage={false}
-                  onOrgHome={handleOrganizationHome}
-                  accountType="technician"
-                />
+              {!canManage && !isProviderOnly && (
+                <H2 className="p-0 border-0">VX Media</H2>
               )}
-              {user?.role !== "DISPATCHER" &&
-                user?.role !== ("dispatcher" as any) &&
-                user?.role !== "TECHNICIAN" &&
-                user?.role !== ("technician" as any) && (
-                  <H2 className="p-0 border-0">VX Media</H2>
-                )}
-              {!useIsMobile() &&
-                isDispatcherView &&
-                (user?.role === "DISPATCHER") && <SafeSidebarTrigger />}
+              {!useIsMobile() && canManage && <SafeSidebarTrigger />}
             </div>
 
             <div className="flex items-center gap-4">
               {/* Agent View Switcher */}
-              {!useIsMobile() && user?.role === ("AGENT" as any) && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={isAgentJobsView ? "activeFlat" : "mutedFlat"}
-                    size="sm"
-                    onClick={() => router.push("/jobs")}
-                  >
-                    My Jobs
-                  </Button>
-                  <Button
-                    variant={isAgentCalendarView ? "activeFlat" : "mutedFlat"}
-                    size="sm"
-                    onClick={() => router.push("/calendar")}
-                  >
-                    Calendar
-                  </Button>
-                  <Button
-                    variant={isAgentMapView ? "activeFlat" : "mutedFlat"}
-                    size="sm"
-                    onClick={() => router.push("/map")}
-                  >
-                    Map
-                  </Button>
-                  <Button
-                    variant={isAgentBookingView ? "activeFlat" : "mutedFlat"}
-                    size="sm"
-                    onClick={handleNewJobClick}
-                  >
-                    New Booking
-                  </Button>
-                </div>
-              )}
+              {(forceShowNavigation || !useIsMobile()) &&
+                user?.organizationMemberships?.some((m) =>
+                  ["AGENT"].includes(m.orgRole)
+                ) && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={isAgentJobsView ? "activeFlat" : "mutedFlat"}
+                      size="sm"
+                      onClick={() => router.push("/jobs")}
+                    >
+                      My Jobs
+                    </Button>
+                    <Button
+                      variant={isAgentCalendarView ? "activeFlat" : "mutedFlat"}
+                      size="sm"
+                      onClick={() => router.push("/calendar")}
+                    >
+                      Calendar
+                    </Button>
+                    <Button
+                      variant={isAgentMapView ? "activeFlat" : "mutedFlat"}
+                      size="sm"
+                      onClick={() => router.push("/map")}
+                    >
+                      Map
+                    </Button>
+                    <Button
+                      variant={isAgentBookingView ? "activeFlat" : "mutedFlat"}
+                      size="sm"
+                      onClick={handleNewJobClick}
+                    >
+                      New Booking
+                    </Button>
+                  </div>
+                )}
 
               {/* Technician View Switcher */}
-              {!useIsMobile() && (user?.role === ("TECHNICIAN" as any) ||
-                user?.role === ("technician" as any) ||
-                user?.role === ("TECHNICIAN" as any)) && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant={
-                      isTechnicianDashboardView ? "activeFlat" : "mutedFlat"
-                    }
-                    size="sm"
-                    onClick={() => router.push("/dashboard")}
-                  >
-                    Dashboard
-                  </Button>
-                  <Button
-                    variant={
-                      isTechnicianJobsView ? "activeFlat" : "mutedFlat"
-                    }
-                    size="sm"
-                    onClick={() => router.push("/jobs/all-jobs")}
-                  >
-                    Jobs
-                  </Button>
-                  <Button
-                    variant={
-                      isTechnicianCalendarView ? "activeFlat" : "mutedFlat"
-                    }
-                    size="sm"
-                    onClick={() => router.push("/calendar")}
-                  >
-                    Calendar
-                  </Button>
-                  <Button
-                    variant={isTechnicianMapView ? "activeFlat" : "mutedFlat"}
-                    size="sm"
-                    onClick={() => router.push("/map")}
-                  >
-                    Map
-                  </Button>
-                </div>
-              )}
-
-              {/* New Job Button for Dispatcher */}
-              {!useIsMobile() && showNewJobButton &&
-                (user?.role === ("DISPATCHER" as any) ||
-                  user?.role === ("PROJECT_MANAGER" as any) ||
-                  user?.role === ("EDITOR" as any)) && (
-                  <Button
-                    onClick={handleNewJobClick}
-                    size="sm"
-                    className="gap-2"
-                    variant="mutedFlat"
-                  >
-                    <Plus className="h-4 w-4" />
-                    New Job
-                  </Button>
+              {forceShowNavigation &&
+                !useIsMobile() &&
+                user?.accountType === "PROVIDER" && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={
+                        isProviderDashboardView ? "activeFlat" : "mutedFlat"
+                      }
+                      size="sm"
+                      onClick={() => router.push("/dashboard")}
+                    >
+                      Dashboard
+                    </Button>
+                    <Button
+                      variant={
+                        isTechnicianJobsView ? "activeFlat" : "mutedFlat"
+                      }
+                      size="sm"
+                      onClick={() => router.push("/jobs/all-jobs")}
+                    >
+                      Jobs
+                    </Button>
+                    <Button
+                      variant={
+                        isTechnicianCalendarView ? "activeFlat" : "mutedFlat"
+                      }
+                      size="sm"
+                      onClick={() => router.push("/calendar")}
+                    >
+                      Calendar
+                    </Button>
+                    <Button
+                      variant={isTechnicianMapView ? "activeFlat" : "mutedFlat"}
+                      size="sm"
+                      onClick={() => router.push("/map")}
+                    >
+                      Map
+                    </Button>
+                  </div>
                 )}
+
+              {/* New Job Button for Owner or Admin */}
+              {!useIsMobile() && showNewJobButton && (
+                <Button
+                  onClick={handleNewJobClick}
+                  size="sm"
+                  className="gap-2"
+                  variant="mutedFlat"
+                >
+                  <Plus className="h-4 w-4" />
+                  New Job
+                </Button>
+              )}
 
               {/* Profile Dropdown */}
               <DropdownMenu>
@@ -278,8 +260,7 @@ export function AppHeader({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => {
-                      // All roles use canonical profile route
-                      router.push("/settings/profile");
+                      router.push("/profile");
                     }}
                   >
                     <UserIcon className="h-4 w-4 mr-2" />

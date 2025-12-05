@@ -4,12 +4,12 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useRequireRole } from "@/hooks/useRequireRole";
-import { JobsView } from "@/components/features/dispatcher/views/JobsView";
+import { JobsView } from "@/components/features/company/views/JobsView";
 import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
 import { ProjectStatus } from "@/types";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
-import { JobsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { JobsLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import {
   Breadcrumb,
   BreadcrumbList,

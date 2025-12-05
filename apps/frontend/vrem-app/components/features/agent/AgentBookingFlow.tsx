@@ -40,7 +40,7 @@ export function AgentBookingFlow({
   const effectiveTechnicians = technicians || [];
   // If we have initial address, start at details step
   const [step, setStep] = useState<Step>(initialAddress ? 'details' : 'address');
-  const [showTechnicianSearch, setShowTechnicianSearch] = useState(false);
+  const [showProviderSearch, setShowProviderSearch] = useState(false);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState(initialAddress || '');
   const [selectedLocation, setSelectedLocation] = useState<{
@@ -171,11 +171,11 @@ export function AgentBookingFlow({
             selectedAddress={selectedAddress}
             jobDetails={jobDetails}
             rankings={rankings}
-            showTechnicianSearch={showTechnicianSearch}
+            showProviderSearch={showProviderSearch}
             technicians={effectiveTechnicians}
             companies={companies}
             preferredVendors={preferredVendors}
-            onToggleSearch={() => setShowTechnicianSearch(!showTechnicianSearch)}
+            onToggleSearch={() => setShowProviderSearch(!showProviderSearch)}
             onTechnicianSelect={handleTechnicianSelect}
             onBack={() => setStep('details')}
           />

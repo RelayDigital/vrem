@@ -2,17 +2,14 @@
 
 import { useState, useEffect } from "react";
 import { useRequireRole } from "@/hooks/useRequireRole";
-import { AuditView } from "@/components/features/dispatcher/views/AuditView";
+import { AuditView } from "@/components/features/company/views/AuditView";
 import { AuditLogEntry } from "@/types";
 import { api } from "@/lib/api";
-import { TeamLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { TeamLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 
 export default function AuditPage() {
-  const { user, isLoading } = useRequireRole([
-    "dispatcher",
-    "DISPATCHER",
-    "PROJECT_MANAGER",
-    "EDITOR",
+  const { user, isLoading, organizationId, memberships } = useRequireRole([
+    "COMPANY",
   ]);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [loadingAuditLog, setLoadingAuditLog] = useState(true);

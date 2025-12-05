@@ -257,10 +257,10 @@ class ApiClient {
           user: { ...currentUser, ...data }
         };
       }
-      // Always inject AGENT role for public signup
+      // Always inject AGENT accountType for public signup
       const payload = {
         ...data,
-        role: 'AGENT',
+        accountType: 'AGENT',
       };
       return this.request<{ token: string; user: User }>('/auth/register', {
         method: 'POST',
@@ -282,13 +282,15 @@ class ApiClient {
   organizations = {
     listMine: async (): Promise<OrganizationMember[]> => {
       if (USE_MOCK_DATA) {
-        return organizations.map((org) => ({
+        return organizations.map<OrganizationMember>((org) => ({
           id: `${org.id}-member`,
           userId: currentUser.id,
           orgId: org.id,
-          role: currentUser.role as OrganizationMember['role'],
+          role: 'ADMIN' as OrganizationMember['orgRole'],
+          orgRole: 'ADMIN' as OrganizationMember['orgRole'],
           createdAt: org.createdAt,
           organization: org,
+          user: currentUser as any,
         }));
       }
       try {
@@ -387,7 +389,10 @@ class ApiClient {
           userId: '',
           orgId: '',
           role,
+          orgRole: (role || 'ADMIN') as OrganizationMember['orgRole'],
           createdAt: new Date(),
+          organization: organizations[0],
+          user: currentUser as any,
         };
       }
       const orgId = this.organizations.getActiveOrganization();
@@ -953,18 +958,22 @@ class ApiClient {
 
   private mockUserFromEmail(email: string): User {
     const lower = email.toLowerCase();
-    const roleMap: Record<string, User['role']> = {
-      dispatcher: 'DISPATCHER',
-      technician: 'TECHNICIAN',
+    const roleMap: Record<string, User['accountType']> = {
+      company: 'COMPANY',
+      technician: 'PROVIDER',
       agent: 'AGENT',
     };
     const matchedKey = Object.keys(roleMap).find((key) => lower.includes(key));
-    const role = matchedKey ? roleMap[matchedKey] : currentUser.role;
+    const accountTypeRaw = matchedKey ? roleMap[matchedKey] : (currentUser as any).accountType;
+    const accountType =
+      (accountTypeRaw as string)?.toUpperCase() === 'COMPANY'
+        ? 'COMPANY'
+        : (accountTypeRaw as User['accountType']);
     return {
       ...currentUser,
       email,
-      role,
-      name: `${role} User`,
+      accountType,
+      name: `${accountType} User`,
     };
   }
 }

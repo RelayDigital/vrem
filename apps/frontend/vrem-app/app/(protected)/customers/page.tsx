@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
-import { CustomersView } from '@/components/features/dispatcher/views/CustomersView';
+import { CustomersView } from '@/components/features/company/views/CustomersView';
 import { Customer } from '@/components/shared/tables/CustomersTable';
-import { TeamLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
+import { TeamLoadingSkeleton } from '@/components/shared/loading/CompanyLoadingSkeletons';
 import { AccessDenied } from '@/components/common/AccessDenied';
 import { api } from '@/lib/api';
 

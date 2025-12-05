@@ -1,4 +1,4 @@
 // Reusable table components
-export { TechnicianTable } from './TechnicianTable';
+export { TeamTable } from './TeamTable';
 export { CustomersTable, type Customer } from './CustomersTable';
 

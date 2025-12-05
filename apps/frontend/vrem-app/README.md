@@ -90,17 +90,17 @@ vrem-app/
 │   │   │   ├── steps/           # Booking wizard steps (Address, Details, Technician Selection)
 │   │   │   └── views/           # Agent views
 │   │   ├── dispatcher/          # Dispatcher/PM features
-│   │   │   ├── DispatcherDashboard.tsx
-│   │   │   ├── DispatcherSidebar.tsx
+│   │   │   ├── CompanyDashboard.tsx
+│   │   │   ├── CompanySidebar.tsx
 │   │   │   ├── AuditLog.tsx
 │   │   │   ├── JobAssignment.tsx
 │   │   │   ├── dialogs/         # Ranking dialogs
 │   │   │   └── views/           # Dashboard, Jobs, Audit, Team, Map views
 │   │   ├── technician/        # Technician features
-│   │   │   ├── TechnicianDashboard.tsx
-│   │   │   ├── TechnicianCard.tsx
-│   │   │   ├── TechnicianManagement.tsx
-│   │   │   ├── TechnicianSearch.tsx
+│   │   │   ├── ProviderDashboard.tsx
+│   │   │   ├── ProviderCard.tsx
+│   │   │   ├── ProviderManagement.tsx
+│   │   │   ├── ProviderSearch.tsx
 │   │   │   └── views/           # Companies, Jobs, Profile views
 │   │   ├── calendar/            # Calendar components
 │   │   │   ├── CalendarView.tsx
@@ -140,7 +140,7 @@ vrem-app/
 │   │   │   ├── FindTechnicianView.tsx
 │   │   │   └── TechnicianRankingsView.tsx
 │   │   ├── tables/              # Data tables
-│   │   │   └── TechnicianTable.tsx
+│   │   │   └── TeamTable.tsx
 │   │   ├── settings/            # Settings components
 │   │   │   └── SettingsView.tsx
 │   │   ├── layout/               # Layout components

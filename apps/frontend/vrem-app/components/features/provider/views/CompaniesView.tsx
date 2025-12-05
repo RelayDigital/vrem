@@ -1,38 +1,42 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '../../../ui/button';
-import { Card } from '../../../ui/card';
-import { ScrollArea } from '../../../ui/scroll-area';
+import { useState } from "react";
+import { Button } from "../../../ui/button";
+import { Card } from "../../../ui/card";
+import { ScrollArea } from "../../../ui/scroll-area";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '../../../ui/dialog';
-import { Organization, CompanyApplication, Technician } from '../../../../types';
-import { CompanyCard, ApplicationCard } from '../../../common';
-import { H2, H3, Small } from '../../../ui/typography';
-import { Building2, Search } from 'lucide-react';
+} from "../../../ui/dialog";
+import {
+  Organization,
+  CompanyApplication,
+  ProviderProfile,
+} from "../../../../types";
+import { CompanyCard, ApplicationCard } from "../../../common";
+import { H2, H3, Small } from "../../../ui/typography";
+import { Building2, Search } from "lucide-react";
 
 interface CompaniesViewProps {
-  technician: Technician;
+  provider: ProviderProfile;
   companies: Organization[];
   applications: CompanyApplication[];
   onApplyToCompany: (companyId: string, message: string) => void;
 }
 
 export function CompaniesView({
-  technician,
+  provider,
   companies,
   applications,
   onApplyToCompany,
 }: CompaniesViewProps) {
   const [showCompanySearch, setShowCompanySearch] = useState(false);
 
-  const mediaCompanies = companies.filter((c) => c.type === 'COMPANY');
+  const mediaCompanies = companies.filter((c) => c.type === "COMPANY");
   const pendingApplications = applications.filter(
-    (a) => a.technicianId === technician.id && a.status === 'pending'
+    (a) => a.userId === provider.userId && a.status === "pending"
   );
 
   return (
@@ -40,7 +44,7 @@ export function CompaniesView({
       <div className="container mx-auto px-6">
         <div className="flex items-center justify-between">
           <H2 className="text-2xl border-0">Media Companies</H2>
-          {technician.isIndependent && (
+          {provider.isIndependent && (
             <Button onClick={() => setShowCompanySearch(true)}>
               <Search className="h-4 w-4 mr-2" />
               Browse Companies
@@ -61,15 +65,17 @@ export function CompaniesView({
         )}
 
         {/* Current Company */}
-        {!technician.isIndependent && technician.companyId && (
+        {!provider.isIndependent && provider.companyId && (
           <Card className="p-6">
             <div className="flex items-center gap-4">
               <div className="p-4 bg-primary rounded-xl">
                 <Building2 className="h-8 w-8 text-primary-foreground" />
               </div>
               <div>
-                <H3 className="text-lg">{technician.companyName}</H3>
-                <Small className="text-muted-foreground">Your current company</Small>
+                <H3 className="text-lg">{provider.companyName}</H3>
+                <Small className="text-muted-foreground">
+                  Your current company
+                </Small>
               </div>
             </div>
           </Card>
@@ -87,9 +93,9 @@ export function CompaniesView({
               {mediaCompanies.map((company) => {
                 const alreadyApplied = applications.some(
                   (a) =>
-                    a.technicianId === technician.id &&
+                    a.userId === provider.userId &&
                     a.companyId === company.id &&
-                    a.status === 'pending'
+                    a.status === "pending"
                 );
 
                 return (
@@ -109,4 +115,3 @@ export function CompaniesView({
     </main>
   );
 }
-

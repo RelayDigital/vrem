@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useOrganizationSettings } from "@/hooks/useOrganizationSettings";
 import { useRoleGuard } from "@/hooks/useRoleGuard";
-import { TeamLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { TeamLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { AccessDenied } from "@/components/common/AccessDenied";
 import {
   Card,

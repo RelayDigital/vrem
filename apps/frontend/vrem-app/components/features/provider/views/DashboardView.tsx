@@ -1,52 +1,53 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { JobRequest, Technician, Metrics } from "../../../../types";
-import { MetricsDashboard } from "../../../shared/metrics";
-import { USE_MOCK_DATA } from "../../../../lib/utils";
-import { JobCard } from "../../../shared/jobs";
-import { MapWithSidebar } from "../../../shared/dashboard/MapWithSidebar";
-import { MonthView } from "../../../features/calendar/MonthView";
-import { Button } from "../../../ui/button";
+import { JobRequest, Technician } from "@/types";
+import { JobCard } from "@/components/shared/jobs";
+import { MapWithSidebar } from "@/components/shared/dashboard/MapWithSidebar";
+import { MonthView } from "@/components/features/calendar/MonthView";
+import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Briefcase } from "lucide-react";
 import { H2 } from "@/components/ui/typography";
-import { EmptyState } from "../../../common";
-import { jobToCalendarEvent } from "../../../../lib/calendar-utils";
+import { EmptyState } from "@/components/common";
+import { jobToCalendarEvent } from "@/lib/calendar-utils";
 import {
   CalendarEvent,
   generateTechnicianColors,
-} from "../../../../types/calendar";
+} from "@/types/calendar";
+import { StatsGrid } from "@/components/shared/dashboard";
+import { CheckCircle2, Star, TrendingUp } from "lucide-react";
 
-interface DispatcherDashboardViewProps {
-  jobs: JobRequest[];
+interface ProviderDashboardViewProps {
+  jobs: JobRequest[]; // Already filtered to assigned jobs
   technicians: Technician[];
-  metrics: Metrics;
   selectedJob: JobRequest | null;
-  onViewRankings: (job: JobRequest) => void;
+  stats: {
+    upcoming: number;
+    completed: number;
+    rating: number;
+    onTimeRate: string;
+  };
   onSelectJob: (job: JobRequest) => void;
   onNavigateToJobsView?: () => void;
   onNavigateToMapView?: () => void;
   onNavigateToCalendarView?: () => void;
   onNavigateToJobInProjectManagement?: (job: JobRequest) => void;
-  onJobAssign?: (jobId: string, technicianId: string, score: number) => void;
   onJobClick?: (job: JobRequest) => void;
 }
 
-export function DispatcherDashboardView({
+export function ProviderDashboardView({
   jobs,
   technicians,
-  metrics,
   selectedJob,
-  onViewRankings,
+  stats,
   onSelectJob,
   onNavigateToJobsView,
   onNavigateToMapView,
   onNavigateToCalendarView,
   onNavigateToJobInProjectManagement,
-  onJobAssign,
   onJobClick,
-}: DispatcherDashboardViewProps) {
+}: ProviderDashboardViewProps) {
   const assignedJobs = jobs.filter((j) => j.status === "assigned");
   const [currentDate] = useState(new Date());
 
@@ -60,12 +61,29 @@ export function DispatcherDashboardView({
     return jobs.map((job) => jobToCalendarEvent(job));
   }, [jobs]);
 
+  // Use empty array when mock data is disabled
   const displayTechnicians = technicians ?? [];
 
-  // Generate technician colors
+  // For the technician dashboard, only show the current technician on the map.
+  // Derive the technician IDs that appear on this user's jobs and filter to those.
+  const mapTechnicians = useMemo(() => {
+    const ids = new Set(
+      jobs
+        .map((job) => job.assignedTechnicianId || job.assignedTechnicianId)
+        .filter((id): id is string => Boolean(id))
+    );
+    const filtered = displayTechnicians.filter((p) => ids.has(p.id));
+    if (filtered.length > 0) return filtered;
+    // Fallback: show at least the first technician so the user can see themselves on the map
+    return displayTechnicians.length > 0
+      ? [displayTechnicians[0]]
+      : [];
+  }, [jobs, displayTechnicians]);
+
+  // Generate technician colors for the (possibly single) technician shown on the map
   const technicianColors = useMemo(
-    () => generateTechnicianColors(displayTechnicians),
-    [displayTechnicians]
+    () => generateTechnicianColors(mapTechnicians),
+    [mapTechnicians]
   );
 
   // Handle event click
@@ -85,43 +103,44 @@ export function DispatcherDashboardView({
     }
   };
 
-  // Use empty metrics when mock data is disabled
-  const displayMetrics = USE_MOCK_DATA
-    ? metrics
-    : {
-        organizationId: "",
-        period: "week" as const,
-        jobs: {
-          total: 0,
-          pending: 0,
-          assigned: 0,
-          completed: 0,
-          cancelled: 0,
-        },
-        technicians: {
-          active: 0,
-          available: 0,
-          utilization: 0,
-        },
-        performance: {
-          averageAssignmentTime: 0,
-          averageDeliveryTime: 0,
-          onTimeRate: 0,
-          clientSatisfaction: 0,
-        },
-        revenue: {
-          total: 0,
-          perJob: 0,
-        },
-      };
-
   return (
     <main className="container relative mx-auto">
       <article className="flex flex-col gap-2xl md:gap-3xl px-md">
         {/* Metrics */}
         <div className="@container w-full mt-md">
-          {/* Content */}
-          <MetricsDashboard metrics={displayMetrics} />
+          <StatsGrid
+            stats={[
+              {
+                icon: Briefcase,
+                value: stats.upcoming,
+                label: "Upcoming Jobs",
+                iconBgColor: "bg-accent",
+                iconColor: "text-primary",
+              },
+              {
+                icon: CheckCircle2,
+                value: stats.completed,
+                label: "Total Completed",
+                iconBgColor: "bg-emerald-100",
+                iconColor: "text-emerald-600",
+              },
+              {
+                icon: Star,
+                value: stats.rating.toFixed(1),
+                label: "Rating",
+                iconBgColor: "bg-yellow-100",
+                iconColor: "text-yellow-600",
+              },
+              {
+                icon: TrendingUp,
+                value: stats.onTimeRate,
+                label: "On-Time Rate",
+                valueSuffix: "%",
+                iconBgColor: "bg-accent",
+                iconColor: "text-primary",
+              },
+            ]}
+          />
         </div>
         {/* Calendar */}
         <div className="@container w-full">
@@ -153,7 +172,6 @@ export function DispatcherDashboardView({
         <div className="@container w-full">
           {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
-            {/* <MapPin className="h-5 w-5 text-primary" /> */}
             <H2 className="text-lg border-0">Live Job Map</H2>
             <Button
               variant="flat"
@@ -167,14 +185,14 @@ export function DispatcherDashboardView({
           {/* Content */}
           <MapWithSidebar
             jobs={jobs}
-            technicians={displayTechnicians}
+            providers={mapTechnicians}
             selectedJob={selectedJob}
             onSelectJob={onSelectJob}
             onNavigateToJobInProjectManagement={
               onNavigateToJobInProjectManagement
             }
-            onJobAssign={onJobAssign}
-            isDispatcherView={true}
+            onJobAssign={undefined} // Technicians cannot assign jobs to themselves
+            isDispatcherView={false}
           />
         </div>
         {/* Active Jobs */}
@@ -210,11 +228,6 @@ export function DispatcherDashboardView({
                       key={job.id}
                       job={job}
                       technician={technician}
-                      onViewRankings={
-                        job.status === "pending"
-                          ? () => onViewRankings(job)
-                          : undefined
-                      }
                       onClick={onJobClick ? () => onJobClick(job) : undefined}
                     />
                   );
@@ -225,7 +238,7 @@ export function DispatcherDashboardView({
             <EmptyState
               icon={Briefcase}
               title="No Active Jobs"
-              description="There are currently no active jobs assigned to technicians."
+              description="There are currently no active jobs assigned to you."
               action={
                 onNavigateToJobsView
                   ? {

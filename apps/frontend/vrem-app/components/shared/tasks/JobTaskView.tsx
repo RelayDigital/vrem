@@ -152,7 +152,10 @@ import { useJobManagement } from "@/context/JobManagementContext";
 
 interface JobTaskViewProps {
   job: JobRequest | null;
-  photographer?: OrganizationMember["user"] & { role: "TECHNICIAN" };
+  photographer?: OrganizationMember["user"] & {
+    role: string;
+    accountType?: string;
+  };
   projectManager?: OrganizationMember["user"] & { role: "PROJECT_MANAGER" };
   editor?: OrganizationMember["user"] & { role: "EDITOR" };
   messages: ChatMessage[];
@@ -392,10 +395,16 @@ export function JobTaskView({
         setCustomers(custs);
         setProjectManagers(
           members.filter((m) =>
-            ["OWNER", "ADMIN", "DISPATCHER", "PROJECT_MANAGER"].includes(m.role)
+            ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(
+              (m.role || (m as any).orgRole || "") as string
+            )
           )
         );
-        setEditors(members.filter((m) => m.role === "EDITOR"));
+        setEditors(
+          members.filter(
+            (m) => (m.role || (m as any).orgRole || "") === "EDITOR"
+          )
+        );
       } catch (error) {
         console.error("Failed to load assignment data", error);
       }

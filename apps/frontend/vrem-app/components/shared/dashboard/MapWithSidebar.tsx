@@ -3,10 +3,10 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "../../ui/use-mobile";
-import { JobRequest, Technician, TechnicianRanking } from "../../../types";
+import { JobRequest, ProviderProfile, ProviderRanking } from "../../../types";
 import { MapView } from "../map";
-import { TechnicianCard } from "../../features/technician/TechnicianCard";
-import { TechnicianCardMinimal } from "../../features/technician/TechnicianCardMinimal";
+import { ProviderCard } from "../../features/provider/ProviderCard";
+import { ProviderCardMinimal } from "../../features/provider/ProviderCardMinimal";
 import { JobCard } from "../jobs/JobCard";
 import { Button } from "../../ui/button";
 import { ScrollArea } from "../../ui/scroll-area";
@@ -43,7 +43,7 @@ import { Card, CardContent, CardHeader } from "../../ui/card";
 
 interface MapWithSidebarProps {
   jobs: JobRequest[];
-  technicians: Technician[];
+  providers: ProviderProfile[];
   selectedJob: JobRequest | null;
   onSelectJob: (job: JobRequest) => void;
   onNavigateToJobInProjectManagement?: (job: JobRequest) => void;
@@ -58,6 +58,11 @@ interface MapWithSidebarProps {
 
 type SidebarView = "pending" | "rankings";
 type PriorityFactor = "availability" | "distance" | "score";
+
+const isTechnicianProvider = (
+  provider: ProviderProfile
+): provider is ProviderProfile & { role: "TECHNICIAN" } =>
+  provider.role === "TECHNICIAN";
 
 // Helper function to calculate distance
 function calculateDistanceLocal(
@@ -81,7 +86,7 @@ function calculateDistanceLocal(
 
 export function MapWithSidebar({
   jobs,
-  technicians,
+  providers,
   selectedJob,
   onSelectJob,
   onNavigateToJobInProjectManagement,
@@ -106,9 +111,13 @@ export function MapWithSidebar({
     "score",
   ]);
   const [assigningId, setAssigningId] = useState<string | null>(null);
-  const [selectedTechnicianId, setSelectedTechnicianId] = useState<
-    string | null
-  >(null);
+  const technicianProviders = useMemo(
+    () => providers.filter(isTechnicianProvider),
+    [providers]
+  );
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
+    null
+  );
 
   const pendingJobs = jobs.filter((j) => j.status === "pending");
 
@@ -124,7 +133,7 @@ export function MapWithSidebar({
   });
 
   const handleFindTechnician = (job: JobRequest) => {
-    setSelectedTechnicianId(null); // Clear selected technician
+    setSelectedProviderId(null); // Clear selected provider
     setJobForRankings(job);
     setSidebarView("rankings");
     // Keep drawer open on mobile when navigating to rankings
@@ -134,31 +143,31 @@ export function MapWithSidebar({
     if (onGoBack) {
       onGoBack();
     } else {
-      setSelectedTechnicianId(null); // Clear selected technician
+      setSelectedProviderId(null); // Clear selected provider
       setSidebarView("pending");
       setJobForRankings(null);
       // Drawer stays open on mobile when going back to pending
     }
   };
 
-  const displayTechnicians = technicians ?? [];
+  const displayProviders = providers ?? [];
 
   // Calculate ranked technicians when in rankings view
   const rankedTechnicians = useMemo(() => {
     if (!jobForRankings) return [];
 
-    const technicianScores = displayTechnicians
+    const providerScores = technicianProviders
       .filter((p) => p.status === "active")
-      .map((technician) => {
+      .map((provider) => {
         const distanceKm = calculateDistanceLocal(
-          technician.homeLocation.lat,
-          technician.homeLocation.lng,
+          provider.homeLocation.lat,
+          provider.homeLocation.lng,
           jobForRankings.location.lat,
           jobForRankings.location.lng
         );
 
         // Check availability
-        const availability = technician.availability.find(
+        const availability = provider.availability.find(
           (a) => a.date === jobForRankings.scheduledDate
         );
         const isAvailable = availability?.available || false;
@@ -171,7 +180,7 @@ export function MapWithSidebar({
         else if (distanceKm <= 50) distanceScore = 25;
 
         // Calculate reliability score
-        const { onTimeRate, noShows, totalJobs } = technician.reliability;
+        const { onTimeRate, noShows, totalJobs } = provider.reliability;
         let reliabilityScore = 50;
         if (totalJobs > 0) {
           const noShowPenalty = (noShows / totalJobs) * 100;
@@ -182,7 +191,7 @@ export function MapWithSidebar({
         }
 
         // Calculate skill match score
-        const skillMap: Record<string, keyof Technician["skills"]> = {
+        const skillMap: Record<string, keyof ProviderProfile["skills"]> = {
           photo: "residential",
           video: "video",
           aerial: "aerial",
@@ -192,8 +201,8 @@ export function MapWithSidebar({
         let skillCount = 0;
         for (const mediaType of jobForRankings.mediaType) {
           const skillKey = skillMap[mediaType];
-          if (skillKey && technician.skills[skillKey] !== undefined) {
-            totalSkillScore += technician.skills[skillKey];
+          if (skillKey && provider.skills[skillKey] !== undefined) {
+            totalSkillScore += provider.skills[skillKey];
             skillCount++;
           }
         }
@@ -202,9 +211,7 @@ export function MapWithSidebar({
 
         // Calculate preferred relationship score
         let preferredScore = 0;
-        if (
-          technician.preferredClients.includes(jobForRankings.organizationId)
-        ) {
+        if (provider.preferredClients.includes(jobForRankings.organizationId)) {
           preferredScore = 100;
         }
 
@@ -217,7 +224,7 @@ export function MapWithSidebar({
           skillScore * 0.1;
 
         return {
-          technician,
+          provider,
           isAvailable,
           distanceKm,
           distanceScore,
@@ -229,7 +236,7 @@ export function MapWithSidebar({
       });
 
     // Sort based on priority order
-    const sorted = [...technicianScores].sort((a, b) => {
+    const sorted = [...providerScores].sort((a, b) => {
       for (const priority of priorityOrder) {
         let comparison = 0;
 
@@ -253,7 +260,7 @@ export function MapWithSidebar({
     });
 
     return sorted.map((item, index) => ({
-      technician: item.technician,
+      provider: item.provider,
       score: item.overallScore,
       factors: {
         availability: item.isAvailable ? 100 : 0,
@@ -265,8 +272,8 @@ export function MapWithSidebar({
       },
       recommended: index === 0 && item.isAvailable && item.overallScore >= 60,
       rank: index + 1,
-    })) as (TechnicianRanking & { rank: number })[];
-  }, [jobForRankings, displayTechnicians, priorityOrder]);
+    })) as (ProviderRanking & { rank: number })[];
+  }, [jobForRankings, technicianProviders, priorityOrder]);
 
   const handleAssign = async (technicianId: string, score: number) => {
     setAssigningId(technicianId);
@@ -325,8 +332,8 @@ export function MapWithSidebar({
     sidebarView === "rankings" && jobForRankings ? [jobForRankings] : jobs;
   const mapTechnicians =
     sidebarView === "rankings" && jobForRankings
-      ? rankedTechnicians.map((r) => r.technician)
-      : displayTechnicians;
+      ? rankedTechnicians.map((r) => r.provider)
+      : technicianProviders;
 
   // Create a Map of technician rankings for MapView
   const technicianRankingsMap = useMemo(() => {
@@ -334,13 +341,13 @@ export function MapWithSidebar({
     const map = new Map<
       string,
       {
-        ranking: TechnicianRanking["factors"];
+        ranking: ProviderRanking["factors"];
         score: number;
         recommended: boolean;
       }
     >();
     rankedTechnicians.forEach((r) => {
-      map.set(r.technician.id, {
+      map.set(r.provider.userId, {
         ranking: r.factors,
         score: r.score,
         recommended: r.recommended,
@@ -401,7 +408,9 @@ export function MapWithSidebar({
                     <CheckCircle2 className="size-12 text-muted-foreground mb-4" />
                     <H3 className="text-lg mb-2">All caught up!</H3>
                     <Muted>
-                      {isDispatcherView ? "No pending assignments" : "No pending jobs"}
+                      {isDispatcherView
+                        ? "No pending assignments"
+                        : "No pending jobs"}
                     </Muted>
                   </div>
                 ) : (
@@ -631,36 +640,33 @@ export function MapWithSidebar({
                       ) : (
                         rankedTechnicians.map((ranking) => {
                           const isSelected =
-                            selectedTechnicianId === ranking.technician.id;
+                            selectedProviderId === ranking.provider.userId;
                           const isAssigning =
-                            assigningId === ranking.technician.id;
+                            assigningId === ranking.provider.userId;
 
                           return (
-                            <TechnicianCardMinimal
-                              key={ranking.technician.id}
-                              technician={ranking.technician}
+                            <ProviderCardMinimal
+                              key={ranking.provider.userId}
+                              technician={ranking.provider}
                               ranking={ranking.factors}
                               score={ranking.score}
                               recommended={ranking.recommended}
                               selected={isSelected}
                               isAssigning={isAssigning}
                               onClick={() =>
-                                setSelectedTechnicianId(
-                                  ranking.technician.id
-                                )
+                                setSelectedProviderId(ranking.provider.userId)
                               }
                               onCollapse={() => {
                                 // Only reset if this technician was selected
                                 if (
-                                  selectedTechnicianId ===
-                                  ranking.technician.id
+                                  selectedProviderId === ranking.provider.userId
                                 ) {
-                                  setSelectedTechnicianId(null);
+                                  setSelectedProviderId(null);
                                 }
                               }}
                               onAssign={() =>
                                 handleAssign(
-                                  ranking.technician.id,
+                                  ranking.provider.userId,
                                   ranking.score
                                 )
                               }
@@ -694,9 +700,8 @@ export function MapWithSidebar({
             sidebarView === "rankings" ? jobForRankings : selectedJob
           }
           selectedTechnician={
-            sidebarView === "rankings" && selectedTechnicianId
-              ? mapTechnicians.find((p) => p.id === selectedTechnicianId) ||
-                null
+            sidebarView === "rankings" && selectedProviderId
+              ? mapTechnicians.find((p) => p.id === selectedProviderId) || null
               : null
           }
           disablePopovers={useIsMobile()}
@@ -721,7 +726,9 @@ export function MapWithSidebar({
               {/* <DrawerHeader> */}
               <DrawerTitle className="sr-only">
                 {sidebarView === "pending"
-                  ? (isDispatcherView ? "Pending Assignments" : "Pending Jobs")
+                  ? isDispatcherView
+                    ? "Pending Assignments"
+                    : "Pending Jobs"
                   : "Ranked Technicians"}
               </DrawerTitle>
               {/* </DrawerHeader> */}

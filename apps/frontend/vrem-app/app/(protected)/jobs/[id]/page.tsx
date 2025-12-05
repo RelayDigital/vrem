@@ -6,17 +6,18 @@ import { useRequireRole } from "@/hooks/useRequireRole";
 import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
 import { ProjectStatus, Technician } from "@/types";
 import { api } from "@/lib/api";
-import { JobsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { JobsLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
 import { H2, P } from "@/components/ui/typography";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
+import { getEffectiveOrgRole } from "@/lib/roles";
 
 export default function JobDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { user, isLoading } = useRequireRole([
+  const { user, isLoading, organizationId, memberships } = useRequireRole([
     "dispatcher",
     "AGENT",
     "TECHNICIAN",
@@ -115,19 +116,20 @@ export default function JobDetailPage() {
       )
     : undefined;
   const photographer = assignedTechnician
-    ? {
+    ? ({
         id: assignedTechnician.id,
         name: assignedTechnician.name,
         email: assignedTechnician.email,
         role: "TECHNICIAN" as const,
+        accountType: "PROVIDER" as const,
         organizationId: assignedTechnician.organizationId,
         avatarUrl: assignedTechnician.avatar,
-      }
+      } as any)
     : undefined;
 
-  const userRole = user.role;
+  const userRole = getEffectiveOrgRole(user, memberships, organizationId);
   const hasAccess =
-    ["dispatcher", "DISPATCHER", "PROJECT_MANAGER", "EDITOR"].includes(userRole) ||
+    userRole === "COMPANY" ||
     selectedJob?.assignedTechnicianId === user.id ||
     selectedJob?.assignedTechnicianId === user.id ||
     selectedJob?.createdBy === user.id;
@@ -184,8 +186,8 @@ export default function JobDetailPage() {
 
       {!isJobLoading && hasSelectedJob && hasAccess && selectedJob && (
         <JobTaskView
-          job={selectedJob}
-          photographer={photographer}
+        job={selectedJob}
+          photographer={photographer as any}
           messages={messaging.getMessagesForJob(selectedJob.id)}
           currentUserId={user?.id || "current-user-id"}
           currentUserName={user?.name || "Current User"}

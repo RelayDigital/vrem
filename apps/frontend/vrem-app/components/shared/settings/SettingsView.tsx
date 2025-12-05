@@ -69,7 +69,7 @@ export interface SettingsConfig {
   product: SettingsOption[];
 }
 
-export type AccountType = "dispatcher" | "agent" | "technician";
+export type AccountType = "company" | "agent" | "provider";
 
 interface SettingsViewProps {
   subView?: SettingsSubView;
@@ -171,18 +171,18 @@ function getSettingsSubViewComponent(
 
   try {
     switch (accountType) {
-      case "dispatcher":
+      case "company":
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        return require(`@/components/features/dispatcher/settings/${componentName}`)
+        return require(`@/components/features/company/settings/${componentName}`)
           .default;
       case "agent":
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         return require(`@/components/features/agent/settings/${componentName}`)
           .default;
-      case "technician":
+      case "provider":
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         return require(
-          `@/components/features/technician/settings/${componentName}`
+          `@/components/features/provider/settings/${componentName}`
         ).default;
       default:
         return null;
@@ -371,4 +371,3 @@ export function SettingsView({
     </main>
   );
 }
-

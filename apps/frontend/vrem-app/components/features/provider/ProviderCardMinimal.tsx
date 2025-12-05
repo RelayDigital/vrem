@@ -31,7 +31,7 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { P } from "@/components/ui/typography";
 
-interface TechnicianCardMinimalProps {
+interface ProviderCardMinimalProps {
   technician: Technician;
   ranking?: TechnicianRanking["factors"];
   score?: number;
@@ -49,7 +49,7 @@ const scoreChartConfig = {
   },
 } satisfies ChartConfig;
 
-export function TechnicianCardMinimal({
+export function ProviderCardMinimal({
   technician,
   ranking,
   score,
@@ -59,7 +59,7 @@ export function TechnicianCardMinimal({
   selected,
   isAssigning = false,
   onCollapse,
-}: TechnicianCardMinimalProps) {
+}: ProviderCardMinimalProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const prevExpandedRef = useRef(isExpanded);
   const isAvailable = ranking ? ranking.availability === 100 : true;

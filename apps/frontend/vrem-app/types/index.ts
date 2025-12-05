@@ -1,8 +1,61 @@
+// =============================
+// Core enums & basic types
+// =============================
+
+export type AccountType = "AGENT" | "PROVIDER" | "COMPANY";
+
+export type OrgType = "PERSONAL" | "TEAM" | "COMPANY";
+
+export type OrgRole =
+  | "OWNER"
+  | "ADMIN"
+  | "PROJECT_MANAGER"
+  | "TECHNICIAN"
+  | "EDITOR"
+  | "AGENT"
+  | "VIEWER";
+
+export enum ProjectStatus {
+  BOOKED = "BOOKED",
+  SHOOTING = "SHOOTING",
+  EDITING = "EDITING",
+  DELIVERED = "DELIVERED",
+}
+
+export enum MediaType {
+  PHOTO = "PHOTO",
+  VIDEO = "VIDEO",
+  FLOORPLAN = "FLOORPLAN",
+  DOCUMENT = "DOCUMENT",
+}
+
+// =============================
+// Identity & tenancy
+// =============================
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  organizationId?: string | null;
+  organizationType?: OrgType;
+  role?: AccountType;
+
+  // Global identity: how they entered the system / what they can create
+  accountType: AccountType;
+
+  // Memberships define what they actually are inside each org
+  organizationMemberships?: OrganizationMember[];
+}
+
 export interface Organization {
   id: string;
   name: string;
-  type: "COMPANY" | "PERSONAL";
+  type: OrgType; // PERSONAL | TEAM | COMPANY
   createdAt: Date;
+
+  // Optional metadata / branding / geography
   avatar?: string;
   description?: string;
   services?: string[];
@@ -26,34 +79,16 @@ export interface Organization {
   serviceArea?: any;
 }
 
-export interface PreferredVendor {
-  agentId: string;
-  vendorId: string; // Organization ID of media company
-  vendorName: string;
-  addedAt: Date;
-  priority: number; // 1 = highest
-}
-
-export interface CompanyApplication {
+export interface OrganizationMember {
   id: string;
-  technicianId: string;
-  technicianName: string;
-  companyId: string;
-  companyName: string;
-  status: "pending" | "approved" | "rejected";
-  message?: string;
-  appliedAt: Date;
-  reviewedAt?: Date;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatarUrl?: string;
-  role: "DISPATCHER" | "TECHNICIAN" | "AGENT";
-  organizationId: string;
-  organizationType?: "COMPANY" | "PERSONAL";
+  userId: string;
+  user: User;
+  orgId: string;
+  organization: Organization;
+  orgRole: OrgRole;
+  createdAt: Date;
+  role?: OrgRole;
+  personalOrg?: Organization | null;
 }
 
 export interface OrganizationCustomer {
@@ -68,101 +103,33 @@ export interface OrganizationCustomer {
   updatedAt: Date;
 }
 
-// Backwards compatibility alias
-export type Customer = OrganizationCustomer;
+// =============================
+// Vendor & applications
+// =============================
 
-export interface Technician {
+export interface PreferredVendor {
+  agentId: string; // User.id (accountType = "AGENT")
+  vendorId: string; // Organization.id (type = "COMPANY")
+  vendorName: string;
+  addedAt: Date;
+  priority: number; // 1 = highest
+}
+
+export interface CompanyApplication {
   id: string;
-  memberId?: string;
-  name: string;
-  email: string;
-  phone: string;
-  organizationId: string;
-  role?: OrganizationMember['role'];
-  isIndependent: boolean;
-  companyId?: string; // ID of media company they work for
-  companyName?: string;
-  homeLocation: {
-    lat: number;
-    lng: number;
-    address: {
-      street?: string;
-      city: string;
-      stateProvince: string;
-      country: string;
-      postalCode?: string;
-    };
-  };
-  availability: {
-    date: string;
-    available: boolean;
-  }[];
-  reliability: {
-    totalJobs: number;
-    noShows: number;
-    lateDeliveries: number;
-    onTimeRate: number;
-    averageDeliveryTime: number; // hours
-  };
-  skills: {
-    residential: number;
-    commercial: number;
-    aerial: number;
-    twilight: number;
-    video: number;
-  };
-  rating: {
-    overall: number;
-    count: number;
-    recent: number[]; // last 10 ratings
-  };
-  preferredClients: string[]; // client organization IDs
-  status: "active" | "inactive" | "suspended";
-  createdAt: Date;
-  avatar?: string;
-  bio?: string;
-  services: {
-    photography: boolean;
-    video: boolean;
-    aerial: boolean;
-    twilight: boolean;
-    editing: boolean;
-    virtualStaging: boolean;
-  };
-  portfolio?: string[];
-  certifications?: string[];
+  userId: string; // User.id (starts as PROVIDER)
+  userName: string;
+  companyId: string; // Organization.id (type = "COMPANY")
+  companyName: string;
+  status: "pending" | "approved" | "rejected";
+  message?: string;
+  appliedAt: Date;
+  reviewedAt?: Date;
 }
 
-export enum ProjectStatus {
-  BOOKED = "BOOKED",
-  SHOOTING = "SHOOTING",
-  EDITING = "EDITING",
-  DELIVERED = "DELIVERED",
-}
-
-export enum MediaType {
-  PHOTO = "PHOTO",
-  VIDEO = "VIDEO",
-  FLOORPLAN = "FLOORPLAN",
-  DOCUMENT = "DOCUMENT",
-}
-
-export interface OrganizationMember {
-  id: string;
-  userId: string;
-  orgId: string;
-  role:
-    | "OWNER"
-    | "ADMIN"
-    | "DISPATCHER"
-    | "TECHNICIAN"
-    | "EDITOR"
-    | "PROJECT_MANAGER";
-  createdAt: Date;
-  organization?: Organization;
-  user?: User;
-  personalOrg?: Organization | null;
-}
+// =============================
+// Core project & media domain
+// =============================
 
 export interface CalendarEvent {
   id: string;
@@ -189,11 +156,13 @@ export interface Message {
   userId: string;
   content: string;
   timestamp: Date;
+
   user?: User;
 }
 
 export interface Project {
   id: string;
+  orgId: string; // tenant boundary
   customerId?: string | null;
   address: string;
   notes?: string;
@@ -204,7 +173,8 @@ export interface Project {
   projectManagerId?: string | null;
   createdAt: Date;
   updatedAt: Date;
-  orgId: string;
+
+  // Optional expansions
   calendarEvent?: CalendarEvent | null;
   media?: Media[];
   messages?: Message[];
@@ -215,33 +185,153 @@ export interface Project {
   customer?: OrganizationCustomer | null;
 }
 
+// Project with relations always present (for places that expect them)
 export interface ProjectAggregate extends Project {
   media: Media[];
   messages: Message[];
   calendarEvent?: CalendarEvent | null;
 }
 
-/**
- * View-model used by job card/list UIs. Canonical data should come from Project.
- */
+// =============================
+// Provider view model
+// =============================
 
+/**
+ * ProviderProfile is a view-model for "this user as a provider in this org".
+ * It is derived from User + OrganizationMember + metrics/profile.
+ */
+export interface ProviderProfile {
+  id: string; // alias for userId
+  userId: string;
+  orgMemberId: string;
+  orgId: string; // org being viewed (PERSONAL or COMPANY)
+  role: OrgRole;
+  memberId?: string;
+  organizationId?: string;
+
+  name: string;
+  email: string;
+  phone: string;
+
+  // true if they effectively operate under their PERSONAL org only
+  isIndependent: boolean;
+
+  // If they are working within a COMPANY org, these identify that org
+  companyId?: string;
+  companyName?: string;
+
+  homeLocation: {
+    lat: number;
+    lng: number;
+    address: {
+      street?: string;
+      city: string;
+      stateProvince: string;
+      country: string;
+      postalCode?: string;
+    };
+  };
+
+  availability: {
+    date: string; // ISO date string
+    available: boolean;
+  }[];
+
+  reliability: {
+    totalJobs: number;
+    noShows: number;
+    lateDeliveries: number;
+    onTimeRate: number; // 0–1 or 0–100, be consistent across app
+    averageDeliveryTime: number; // hours
+  };
+
+  skills: {
+    residential: number;
+    commercial: number;
+    aerial: number;
+    twilight: number;
+    video: number;
+  };
+
+  rating: {
+    overall: number;
+    count: number;
+    recent: number[]; // last N ratings
+  };
+
+  preferredClients: string[]; // Organization.id list
+  status: "active" | "inactive" | "suspended";
+  createdAt: Date;
+  avatar?: string;
+  bio?: string;
+
+  services: {
+    photography: boolean;
+    video: boolean;
+    aerial: boolean;
+    floorplan: boolean;
+    measurement: boolean;
+    twilight: boolean;
+    editing: boolean;
+    virtualStaging: boolean;
+  };
+
+  portfolio?: string[];
+  certifications?: string[];
+}
+
+export interface ProviderRanking {
+  provider: ProviderProfile;
+  score: number;
+  factors: {
+    availability: number;
+    distance: number;
+    distanceKm: number;
+    reliability: number;
+    skillMatch: number;
+    preferredRelationship: number;
+    [key: string]: number;
+  };
+  recommended: boolean;
+}
+
+// Legacy aliases to ease migration from Technician naming
+export type Technician = ProviderProfile;
+export type TechnicianProfile = ProviderProfile;
+export type Provider = ProviderProfile;
+export type TechnicianRanking = ProviderRanking;
+export type Customer = OrganizationCustomer;
+
+// =============================
+// Job / UI view models
+// =============================
+
+/**
+ * View-model used by job card/list UIs.
+ * Canonical data should always come from Project.
+ */
 export interface JobRequest {
   id: string;
   orderNumber: string;
-  organizationId: string;
+  organizationId: string; // maps to Project.orgId
   clientName: string;
   customerId?: string;
   projectManagerId?: string | null;
   editorId?: string | null;
   propertyAddress: string;
+
   location: {
     lat: number;
     lng: number;
   };
-  scheduledDate: string;
-  scheduledTime: string;
+
+  scheduledDate: string; // ISO date string
+  scheduledTime: string; // "HH:mm" local time string
+
   mediaType: ("photo" | "video" | "aerial" | "twilight")[];
+
   priority: "standard" | "rush" | "urgent";
+
   status:
     | "pending"
     | "assigned"
@@ -249,7 +339,8 @@ export interface JobRequest {
     | "editing"
     | "delivered"
     | "cancelled";
-  assignedTechnicianId?: string; // Deprecated: use assignedTechnicianId
+
+  assignedTechnicianId?: string;
   estimatedDuration: number; // minutes
   requirements: string;
   createdBy: string;
@@ -269,34 +360,9 @@ export interface JobDetails {
   requirements: string;
 }
 
-export interface TechnicianRanking {
-  technician: Technician;
-  score: number;
-  factors: {
-    availability: number;
-    distance: number;
-    distanceKm: number;
-    reliability: number;
-    skillMatch: number;
-    preferredRelationship: number;
-  };
-  recommended: boolean;
-}
-
-// Backwards compatibility: TechnicianRanking is now TechnicianRanking
-export interface TechnicianRanking {
-  technician: Technician;
-  score: number;
-  factors: {
-    availability: number;
-    distance: number;
-    distanceKm: number;
-    reliability: number;
-    skillMatch: number;
-    preferredRelationship: number;
-  };
-  recommended: boolean;
-}
+// =============================
+// Audit log
+// =============================
 
 export interface AuditLogEntry {
   id: string;
@@ -305,11 +371,15 @@ export interface AuditLogEntry {
   userName: string;
   organizationId: string;
   action: string;
-  resourceType: "job" | "technician" | "technician" | "organization" | "user";
+  resourceType: "job" | "provider" | "organization" | "user";
   resourceId: string;
   details: Record<string, any>;
   ipAddress?: string;
 }
+
+// =============================
+// Metrics / Analytics DTOs
+// =============================
 
 export interface Metrics {
   organizationId: string;
@@ -329,7 +399,7 @@ export interface Metrics {
   performance: {
     averageAssignmentTime: number; // minutes
     averageDeliveryTime: number; // hours
-    onTimeRate: number;
+    onTimeRate: number; // 0–1 or 0–100, pick one convention
     clientSatisfaction: number;
   };
   revenue: {
@@ -338,7 +408,6 @@ export interface Metrics {
   };
 }
 
-// Analytics
 export interface AnalyticsSummary {
   period: "today" | "week" | "month";
   jobs: Metrics["jobs"];
@@ -347,7 +416,10 @@ export interface AnalyticsSummary {
   performance: Metrics["performance"];
 }
 
+// =============================
 // Marketplace
+// =============================
+
 export interface MarketplaceJob {
   id: string;
   title: string;
@@ -356,7 +428,7 @@ export interface MarketplaceJob {
   compensation: number;
   currency: string;
   status: "open" | "assigned" | "closed";
-  orgId: string;
+  orgId: string; // org that posted the job
   createdAt: Date;
   updatedAt: Date;
 }
@@ -364,16 +436,20 @@ export interface MarketplaceJob {
 export interface JobApplication {
   id: string;
   jobId: string;
-  applicantId: string;
+  applicantId: string; // User.id
   coverLetter?: string;
   status: "pending" | "accepted" | "rejected";
   createdAt: Date;
 }
 
+// =============================
+// Transactions
+// =============================
+
 export interface Transaction {
   id: string;
   jobId?: string;
-  orgId: string;
+  orgId: string; // org that pays or is charged
   amount: number;
   currency: string;
   type: "payout" | "charge";

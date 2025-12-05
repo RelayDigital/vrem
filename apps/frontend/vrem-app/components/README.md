@@ -23,7 +23,7 @@ components/
 │   │   └── index.ts
 │   │
 │   ├── dispatcher/
-│   │   ├── DispatcherDashboard.tsx (194 lines) - Main orchestrator
+│   │   ├── CompanyDashboard.tsx (194 lines) - Main orchestrator
 │   │   ├── AuditLog.tsx (158 lines)
 │   │   ├── JobAssignment.tsx (111 lines)
 │   │   ├── views/               [Dashboard views]
@@ -33,10 +33,10 @@ components/
 │   │   └── index.ts
 │   │
 │   ├── technician/
-│   │   ├── TechnicianDashboard.tsx (78 lines) - Main orchestrator
-│   │   ├── TechnicianManagement.tsx (61 lines)
-│   │   ├── TechnicianCard.tsx (251 lines)
-│   │   ├── TechnicianSearch.tsx (150 lines)
+│   │   ├── ProviderDashboard.tsx (78 lines) - Main orchestrator
+│   │   ├── ProviderManagement.tsx (61 lines)
+│   │   ├── ProviderCard.tsx (251 lines)
+│   │   ├── ProviderSearch.tsx (150 lines)
 │   │   ├── views/               [Dashboard views]
 │   │   │   ├── JobsView.tsx (140 lines)
 │   │   │   ├── ProfileView.tsx (165 lines)
@@ -69,7 +69,7 @@ components/
 │   │   └── index.ts
 │   │
 │   ├── tables/                  [Reusable tables] [NEW!]
-│   │   ├── TechnicianTable.tsx (88 lines)
+│   │   ├── TeamTable.tsx (88 lines)
 │   │   └── index.ts
 │   │
 │   ├── jobs/
@@ -139,7 +139,7 @@ Modular page sections that can be reordered:
 ### Importing Features:
 ```typescript
 import { AgentBookingFlow } from '@/components/features/agent';
-import { DispatcherDashboard } from '@/components/features/dispatcher';
+import { CompanyDashboard } from '@/components/features/dispatcher';
 ```
 
 ### Importing Steps/Views/Sections:
@@ -158,7 +158,7 @@ import { HeroSection, FeaturesSection } from './sections';
 ```typescript
 import { StatsCard, ProgressIndicator } from '@/components/shared/dashboard';
 import { RankingFactors } from '@/components/shared/ranking';
-import { TechnicianTable } from '@/components/shared/tables';
+import { TeamTable } from '@/components/shared/tables';
 ```
 
 ### Importing UI:
@@ -199,10 +199,10 @@ Display technician AI ranking scores:
 <RankingFactors factors={ranking.factors} />
 ```
 
-### TechnicianTable
+### TeamTable
 Consistent technician data table:
 ```typescript
-<TechnicianTable
+<TeamTable
   technicians={technicians}
   onRowClick={(p) => console.log(p)}
 />

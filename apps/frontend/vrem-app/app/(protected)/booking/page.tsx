@@ -6,17 +6,16 @@ import { api } from "@/lib/api";
 import { AgentBookingFlow } from "@/components/features/agent";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { useRouter } from "next/navigation";
-import { JobRequest, Organization, Technician } from "@/types";
+import { JobRequest, Organization, Provider } from "@/types";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
 
 export default function BookingPage() {
-  const { user, isLoading } = useRequireRole([
+  const { user, isLoading, organizationId, memberships } = useRequireRole([
     "AGENT",
-    "DISPATCHER",
-    "PROJECT_MANAGER",
+    "COMPANY",
   ]);
   const router = useRouter();
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [technicians, setTechnicians] = useState<Provider[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [preferredVendors, setPreferredVendors] = useState<string[]>([]);
   const [, setLoadingData] = useState(false);
@@ -64,16 +63,16 @@ export default function BookingPage() {
   }, [user]);
   const createJobRequest = async (job: Partial<JobRequest>) => {
     try {
-      const project = await api.projects.create({
-        address: job.propertyAddress || "",
-        notes: job.requirements,
-        scheduledTime:
+        const project = await api.projects.create({
+          address: job.propertyAddress || "",
+          notes: job.requirements,
+          scheduledTime:
             job.scheduledDate && job.scheduledTime
             ? new Date(`${job.scheduledDate}T${job.scheduledTime}`)
             : new Date(),
-        projectManagerId: user?.id,
-        orgId: user?.organizationId,
-      });
+          projectManagerId: user?.id,
+          orgId: user?.organizationId || undefined,
+        });
       toast.success("Booking created");
       return api.mapProjectToJobCard(project);
     } catch (error) {

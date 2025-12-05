@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SettingsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { SettingsLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { Moon, Sun, Monitor } from "lucide-react";
 import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
 

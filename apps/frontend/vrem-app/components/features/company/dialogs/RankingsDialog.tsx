@@ -1,6 +1,6 @@
 "use client";
 
-import { JobRequest, Technician } from "../../../../types";
+import { JobRequest, ProviderProfile } from "../../../../types";
 import { MapWithSidebar } from "../../../shared/dashboard/MapWithSidebar";
 import {
   Dialog,
@@ -12,7 +12,7 @@ interface RankingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedJob: JobRequest | null;
-  technicians: Technician[];
+  technicians: ProviderProfile[];
   onJobAssign: (jobId: string, technicianId: string, score: number) => void;
 }
 
@@ -35,7 +35,7 @@ export function RankingsDialog({
           <div className="flex-1 min-h-0 overflow-hidden h-full">
             <MapWithSidebar
               jobs={[selectedJob]}
-              technicians={technicians}
+              providers={technicians}
               selectedJob={selectedJob}
               onSelectJob={() => {}}
               onJobAssign={onJobAssign}
@@ -52,4 +52,3 @@ export function RankingsDialog({
     </Dialog>
   );
 }
-

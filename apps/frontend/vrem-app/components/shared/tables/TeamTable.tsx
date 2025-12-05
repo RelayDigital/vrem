@@ -32,7 +32,7 @@ import {
   PaginationPrevious,
 } from '../../ui/pagination';
 
-interface TechnicianTableProps {
+interface TeamTableProps {
   technicians?: Technician[]; // Deprecated: use technicians
   onRowClick?: (technician: Technician | Technician) => void;
   onRemove?: (technician: Technician) => void;
@@ -43,7 +43,7 @@ interface TechnicianTableProps {
   currentUserRole?: Technician['role'];
 }
 
-export function TechnicianTable({
+export function TeamTable({
   technicians,
   onRowClick,
   onRemove,
@@ -52,7 +52,7 @@ export function TechnicianTable({
   currentUserId,
   currentUserMemberId,
   currentUserRole,
-}: TechnicianTableProps) {
+}: TeamTableProps) {
   // Use technicians if provided, fallback to technicians for backwards compatibility
   const effectiveTechnicians = technicians || technicians || [];
   const [searchQuery, setSearchQuery] = useState('');
@@ -343,13 +343,18 @@ export function TechnicianTable({
             <TableCell>
               <Select
                 value={technician.role || 'TECHNICIAN'}
-                onValueChange={(val) =>
-                  onRoleChange?.(technician, val as Technician['role'])
-                }
+                onValueChange={(val) => {
+                  if (technician.role === 'OWNER') {
+                    // Prevent changing owner role via dropdown
+                    return;
+                  }
+                  onRoleChange?.(technician, val as Technician['role']);
+                }}
                 disabled={
                   !onRoleChange ||
                   updatingRoleId === technician.id ||
-                  (currentUserId && technician.id === currentUserId)
+                  (!!currentUserId && technician.id === currentUserId) ||
+                  technician.role === 'OWNER'
                 }
               >
                 <SelectTrigger className="w-[150px]">
@@ -361,7 +366,6 @@ export function TechnicianTable({
                   <SelectItem value="TECHNICIAN">Technician</SelectItem>
                   <SelectItem value="PROJECT_MANAGER">Project Manager</SelectItem>
                   <SelectItem value="EDITOR">Editor</SelectItem>
-                  <SelectItem value="DISPATCHER">Dispatcher</SelectItem>
                 </SelectContent>
               </Select>
             </TableCell>

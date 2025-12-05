@@ -3,15 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
-import { LiveJobMapView } from "@/components/features/dispatcher/views/LiveJobMapView";
+import { LiveJobMapView } from "@/components/features/company/views/LiveJobMapView";
 import { JobRequest, Technician } from "@/types";
-import { MapLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { MapLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { JobDataBoundary } from "@/components/shared/jobs";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
+import { getEffectiveOrgRole, isDispatcherRole } from "@/lib/roles";
 
 export default function MapPage() {
-  const { user, isLoading } = useRequireRole([
+  const { user, isLoading, memberships, organizationId } = useRequireRole([
     "dispatcher",
     "AGENT",
     "TECHNICIAN",
@@ -59,33 +60,49 @@ export default function MapPage() {
     };
   }, [user]);
 
+  const effectiveRole = getEffectiveOrgRole(user, memberships, organizationId);
+  const dispatcherElevated = isDispatcherRole(effectiveRole);
+
   // Filter jobs based on role
   const displayJobs = useMemo(() => {
     if (!user) return [];
 
-    const userRole = user.role;
+    const userRole = effectiveRole;
+
+    // Dispatcher/Admin/Owner: Show all jobs
+    if (dispatcherElevated) {
+      return jobManagement.jobs;
+    }
 
     // Technician/Technician: Only show assigned jobs
-    if (["TECHNICIAN"].includes(userRole)) {
+    if (["TECHNICIAN"].includes(userRole || "")) {
       return jobManagement.jobs.filter(
         (job) =>
           job.assignedTechnicianId === user.id ||
           job.assignedTechnicianId === user.id
       );
     }
-
-    // Dispatcher/Admin/Project Manager/Editor/Agent: Show all jobs
-    return jobManagement.jobs;
-  }, [jobManagement.jobs, user]);
+    // Other roles: fallback to assigned
+    return jobManagement.jobs.filter(
+      (job) =>
+        job.assignedTechnicianId === user.id ||
+        job.assignedTechnicianId === user.id
+    );
+  }, [dispatcherElevated, effectiveRole, jobManagement.jobs, user]);
 
   // Filter technicians based on role
   const displayTechnicians = useMemo(() => {
     if (!user) return [];
 
-    const userRole = user.role;
+    const userRole = effectiveRole;
 
-    // Technician/Technician: Only include technicians that appear in their jobs
-    if (["TECHNICIAN"].includes(userRole)) {
+    // Dispatcher/Admin/Owner: show all technicians
+    if (dispatcherElevated) {
+      return technicians;
+    }
+
+    // Technician: only those involved in their jobs + self
+    if ((userRole || "") === "TECHNICIAN") {
       const ids = new Set(
         displayJobs
           .map((job) => job.assignedTechnicianId || job.assignedTechnicianId)
@@ -94,7 +111,6 @@ export default function MapPage() {
       const filtered = technicians.filter(
         (p) => ids.has(p.id) || p.id === user.id
       );
-      // Ensure the current technician sees themselves even if not on a job yet
       if (!filtered.find((p) => p.id === user.id)) {
         const self = technicians.find((p) => p.id === user.id);
         return self ? [self] : filtered;
@@ -102,9 +118,9 @@ export default function MapPage() {
       return filtered;
     }
 
-    // Dispatcher/Admin/Project Manager/Editor/Agent: Show all technicians
+    // Default: show all technicians
     return technicians;
-  }, [displayJobs, user, technicians]);
+  }, [dispatcherElevated, displayJobs, effectiveRole, technicians, user]);
 
   if (isLoading || loadingTechnicians) {
     return <MapLoadingSkeleton />;
@@ -114,13 +130,8 @@ export default function MapPage() {
     return null; // Redirect handled by hook
   }
 
-  const userRole = user.role;
-  const canAssignJobs = [
-    "dispatcher",
-    "DISPATCHER",
-    "PROJECT_MANAGER",
-    "EDITOR",
-  ].includes(userRole);
+  const userRole = effectiveRole;
+  const canAssignJobs = isDispatcherRole(userRole);
   const isDispatcherView = canAssignJobs; // Only dispatcher roles see "Pending Assignments" language
 
   const handleJobSelect = (job: JobRequest) => {

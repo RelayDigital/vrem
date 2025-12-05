@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { JobRequest, Technician, TechnicianRanking } from '../../../types';
+import { JobRequest, ProviderProfile as Technician, ProviderRanking } from '../../../types';
 import { MapView } from '../map/MapView';
-import { TechnicianCard } from '../../features/technician/TechnicianCard';
+import { ProviderCard } from '../../features/provider/ProviderCard';
 import { Skeleton } from '../../ui/skeleton';
 import { ScrollArea } from '../../ui/scroll-area';
 import { Spinner } from '../../ui/spinner';
@@ -170,7 +170,7 @@ export function FindTechnicianView({
     });
 
     return sorted.map((item, index) => ({
-      technician: item.technician,
+      provider: item.technician,
       score: item.overallScore,
       factors: {
         availability: item.isAvailable ? 100 : 0,
@@ -182,7 +182,7 @@ export function FindTechnicianView({
       },
       recommended: index === 0 && item.isAvailable && item.overallScore >= 60,
       rank: index + 1,
-    })) as (TechnicianRanking & { rank: number })[];
+    })) as (ProviderRanking & { rank: number })[];
   }, [technicianScores, priorityOrder]);
 
   const handleAssign = async (technicianId: string, score: number) => {
@@ -251,13 +251,13 @@ export function FindTechnicianView({
           <div className="absolute inset-0">
           <MapView
             jobs={[job]}
-            technicians={rankedTechnicians.map((r) => r.technician)}
+            technicians={rankedTechnicians.map((r) => r.provider)}
             selectedJob={job}
             selectedTechnician={
               selectedTechnicianId
                 ? rankedTechnicians.find(
-                    (r) => r.technician.id === selectedTechnicianId
-                  )?.technician || null
+                    (r) => r.provider.id === selectedTechnicianId
+                  )?.provider || null
                 : null
             }
           />
@@ -372,27 +372,29 @@ export function FindTechnicianView({
               </div>
             ) : (
               rankedTechnicians.map((ranking) => {
-                const isAssigning = assigningId === ranking.technician.id;
-                const isSelected = selectedTechnicianId === ranking.technician.id;
+                const technician = (ranking as any).provider || (ranking as any).technician;
+                if (!technician) return null;
+                const isAssigning = assigningId === technician.id;
+                const isSelected = selectedTechnicianId === technician.id;
 
                 return (
                   <div
-                    key={ranking.technician.id}
+                    key={technician.id}
                     className={`relative border rounded-lg transition-all ${
                       isSelected ? 'ring-2 ring-primary' : ''
                     } ${isAssigning ? 'opacity-50 pointer-events-none' : ''}`}
                   >
-                    <TechnicianCard
-                      technician={ranking.technician}
+                    <ProviderCard
+                      technician={technician}
                       ranking={ranking.factors}
                       score={ranking.score}
                       recommended={ranking.recommended}
                       showFullAddress={true}
                       onAssign={() => {
-                        setSelectedTechnicianId(ranking.technician.id);
-                        handleAssign(ranking.technician.id, ranking.score);
+                        setSelectedTechnicianId(technician.id);
+                        handleAssign(technician.id, ranking.score);
                       }}
-                      onClick={() => setSelectedTechnicianId(ranking.technician.id)}
+                      onClick={() => setSelectedTechnicianId(technician.id)}
                     />
                     {isAssigning && (
                       <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg z-10">
@@ -409,4 +411,3 @@ export function FindTechnicianView({
     </div>
   );
 }
-

@@ -57,9 +57,10 @@ import { USE_MOCK_DATA } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { StatsCard } from "@/components/shared/dashboard";
-import { TeamLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { TeamLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { AccessDenied } from "@/components/common/AccessDenied";
 import { useRoleGuard } from "@/hooks/useRoleGuard";
+import { api } from "@/lib/api";
 
 interface ServiceArea {
   id: string;
@@ -72,7 +73,7 @@ interface ServiceArea {
 export default function OrganizationSettingsPage() {
   const params = useParams();
   const orgId = params?.orgId as string | undefined;
-  const { setActiveOrganization, activeOrganizationId } = useCurrentOrganization();
+  const { setActiveOrganization, activeOrganizationId, memberships: ctxMemberships } = useCurrentOrganization();
   const { user, memberships, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
@@ -247,11 +248,12 @@ export default function OrganizationSettingsPage() {
     orgMembership?.organization?.type === "PERSONAL" ||
     (orgMembership?.organization as any)?.type === "PERSONAL";
   const membershipRole = orgMembership?.role;
-  const isAllowed =
-    user?.role === "DISPATCHER" ||
-    membershipRole === "DISPATCHER" ||
-    membershipRole === "PROJECT_MANAGER" ||
-    isPersonalOrg;
+  const membershipElevated =
+    !!membershipRole &&
+    ["OWNER", "ADMIN"].includes((membershipRole || "").toUpperCase()) &&
+    !isPersonalOrg;
+
+  const isAllowed = membershipElevated || isPersonalOrg;
 
   if (authLoading || orgLoading) {
     return <TeamLoadingSkeleton />;

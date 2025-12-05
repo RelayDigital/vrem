@@ -29,6 +29,7 @@ import { useOrganizationSettings } from "@/hooks/useOrganizationSettings";
 import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/auth-context";
 
 export default function OrganizationByIdPage() {
   const params = useParams();
@@ -38,6 +39,16 @@ export default function OrganizationByIdPage() {
   const { organization, isLoading, error } = useOrganizationSettings(orgId);
   const router = useRouter();
   const jobManagement = useJobManagement();
+  const { memberships } = useAuth();
+
+  const canManage = useMemo(() => {
+    if (!orgId || !memberships) return false;
+    return memberships.some(
+      (m) =>
+        m.orgId === orgId &&
+        ["OWNER", "ADMIN"].includes((m as any).orgRole || (m as any).role)
+    );
+  }, [memberships, orgId]);
 
   // keep active org in sync
   useEffect(() => {
@@ -147,13 +158,15 @@ export default function OrganizationByIdPage() {
           {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-lg border-0">Organization Information</H2>
-            <Button
-              variant="flat"
-              className="px-0"
-              onClick={() => router.push(`/organization/${orgId}/settings`)}
-            >
-              Edit Organization Settings
-            </Button>
+            {canManage && (
+              <Button
+                variant="flat"
+                className="px-0"
+                onClick={() => router.push(`/organization/${orgId}/settings`)}
+              >
+                Edit Organization Settings
+              </Button>
+            )}
           </div>
 
           {/* Organization Info Grid */}
@@ -243,27 +256,29 @@ export default function OrganizationByIdPage() {
               ))
             ) : (
               <>
-                <Card className="hover:border-primary/50 transition-colors cursor-pointer group">
-                  <Link href={`/organization/${orgId}/settings`}>
-                    <CardHeader className="pb-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
-                            <Settings className="size-5 text-primary" />
+                {canManage && (
+                  <Card className="hover:border-primary/50 transition-colors cursor-pointer group">
+                    <Link href={`/organization/${orgId}/settings`}>
+                      <CardHeader className="pb-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                              <Settings className="size-5 text-primary" />
+                            </div>
+                            <H3 className="text-lg">Organization Settings</H3>
                           </div>
-                          <H3 className="text-lg">Organization Settings</H3>
+                          <ArrowRight className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
                         </div>
-                        <ArrowRight className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <CardDescription>
-                        Manage your organization's details, branding, and
-                        preferences
-                      </CardDescription>
-                    </CardContent>
-                  </Link>
-                </Card>
+                      </CardHeader>
+                      <CardContent>
+                        <CardDescription>
+                          Manage your organization's details, branding, and
+                          preferences
+                        </CardDescription>
+                      </CardContent>
+                    </Link>
+                  </Card>
+                )}
 
                 <Card className="hover:border-primary/50 transition-colors cursor-pointer group">
                   <Link href="/dashboard">
@@ -286,7 +301,7 @@ export default function OrganizationByIdPage() {
                   </Link>
                 </Card>
 
-                {organization?.type === "COMPANY" && (
+                {organization?.type === "COMPANY" && canManage && (
                   <Card className="hover:border-primary/50 transition-colors cursor-pointer group">
                     <Link href="/team">
                       <CardHeader className="pb-6">

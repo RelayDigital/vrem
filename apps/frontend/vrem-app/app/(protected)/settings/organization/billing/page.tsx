@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useRoleGuard } from "@/hooks/useRoleGuard";
-import { TeamLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { TeamLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { AccessDenied } from "@/components/common/AccessDenied";
 
 export default function OrganizationBillingPage() {

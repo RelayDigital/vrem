@@ -3,7 +3,7 @@
 import { JobRequest, Technician, TechnicianRanking } from '../../../types';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
-import { TechnicianTable } from '../../shared/tables';
+import { TeamTable } from '../../shared/tables';
 import { RankingFactors } from '../../shared/ranking';
 import {
   MapPin,
@@ -74,9 +74,12 @@ export function JobAssignment({ job, rankings, onAssign }: JobAssignmentProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {rankings.map((ranking, index) => (
+            {rankings.map((ranking, index) => {
+              const technician = (ranking as any).provider || (ranking as any).technician;
+              if (!technician) return null;
+              return (
               <div
-                key={ranking.technician.id}
+                key={technician.id}
                 className={`p-4 border-2 rounded-xl transition-all ${
                   ranking.recommended && index === 0
                     ? 'border-emerald-500 bg-emerald-50/50'
@@ -86,12 +89,12 @@ export function JobAssignment({ job, rankings, onAssign }: JobAssignmentProps) {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <div className="font-semibold text-lg">
-                      {ranking.technician.name}
+                      {technician.name}
                       {ranking.recommended && index === 0 && (
                         <Badge className="ml-2 bg-emerald-600">Recommended</Badge>
                       )}
                     </div>
-                    <div className="text-sm text-muted-foreground">{ranking.technician.email}</div>
+                    <div className="text-sm text-muted-foreground">{technician.email}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-3xl font-bold text-primary">
@@ -102,7 +105,8 @@ export function JobAssignment({ job, rankings, onAssign }: JobAssignmentProps) {
                 </div>
                 <RankingFactors factors={ranking.factors} />
               </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>

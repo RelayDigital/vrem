@@ -8,19 +8,19 @@ import { Technician, Organization } from '../../../types';
 import { Search, Star, Building2, User as UserIcon, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { P } from '@/components/ui/typography';
-interface TechnicianSearchProps {
+interface ProviderSearchProps {
   technicians: Technician[];
   companies: Organization[];
   onSelect: (technicianId: string) => void;
   preferredVendors?: string[];
 }
 
-export function TechnicianSearch({
+export function ProviderSearch({
   technicians,
   companies,
   onSelect,
   preferredVendors = [],
-}: TechnicianSearchProps) {
+}: ProviderSearchProps) {
   const [query, setQuery] = useState('');
   const [searchType, setSearchType] = useState<'technician' | 'company'>('technician');
 

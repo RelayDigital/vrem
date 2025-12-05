@@ -3,12 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
-import { DispatcherDashboardView } from "@/components/features/dispatcher/views/DashboardView";
-import { TechnicianDashboardView } from "@/components/features/technician/views/DashboardView";
+import { CompanyDashboardView } from "@/components/features/company/views/DashboardView";
+import { ProviderDashboardView } from "@/components/features/provider/views/DashboardView";
 import { AgentJobsView } from "@/components/features/agent/AgentJobsView";
 import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
-import { JobRequest, Metrics, ProjectStatus, Technician } from "@/types";
-import { DashboardLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import {
+  JobRequest,
+  Metrics,
+  ProjectStatus,
+  ProviderProfile,
+  Technician,
+} from "@/types";
+import { DashboardLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
 import { useJobCreation } from "@/context/JobCreationContext";
@@ -19,10 +25,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
+import { getEffectiveOrgRole, isDispatcherRole } from "@/lib/roles";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, isLoading } = useRequireRole([
+  const { user, isLoading, organizationId, memberships } = useRequireRole([
     "dispatcher",
     "AGENT",
     "TECHNICIAN",
@@ -34,12 +41,16 @@ export default function DashboardPage() {
   const messaging = useMessaging();
   const jobManagement = useJobManagement();
   const navigation = useDispatcherNavigation();
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [loadingTechnicians, setLoadingTechnicians] = useState(false);
-  const technicianProfile = useMemo(() => {
+  const [providers, setProviders] = useState<ProviderProfile[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(false);
+  const technicians = useMemo(
+    () => providers.filter((p) => p.role === "TECHNICIAN"),
+    [providers]
+  );
+  const providerProfile = useMemo(() => {
     if (!user) return null;
-    return technicians.find((tech) => tech.id === user.id) || null;
-  }, [technicians, user]);
+    return providers.find((provider) => provider.userId === user.id) || null;
+  }, [providers, user]);
   const assignedJobs = useMemo(() => {
     if (!user) return [];
     return jobManagement.jobs.filter(
@@ -59,16 +70,15 @@ export default function DashboardPage() {
     return {
       upcoming: upcomingJobs.length,
       completed: completedJobs.length,
-      rating: technicianProfile?.rating.overall ?? 0,
+      rating: providerProfile?.rating.overall ?? 0,
       onTimeRate: (
-        (technicianProfile?.reliability.onTimeRate || 0) * 100
+        (providerProfile?.reliability.onTimeRate || 0) * 100
       ).toFixed(0),
     };
-  }, [assignedJobs, technicianProfile]);
+  }, [assignedJobs, providerProfile]);
 
-  const shouldFetchMetrics = user
-    ? ["dispatcher", "DISPATCHER", "PROJECT_MANAGER", "EDITOR"].includes(user.role)
-    : false;
+  const effectiveRole = getEffectiveOrgRole(user, memberships, organizationId);
+  const shouldFetchMetrics = isDispatcherRole(effectiveRole);
 
   const {
     metrics,
@@ -126,32 +136,32 @@ export default function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
 
-    const loadTechnicians = async () => {
+    const loadProviders = async () => {
       if (!user) {
-        setTechnicians([]);
-        setLoadingTechnicians(false);
+        setProviders([]);
+        setLoadingProviders(false);
         return;
       }
 
-      setLoadingTechnicians(true);
+      setLoadingProviders(true);
       try {
-        const techs = await fetchOrganizationTechnicians();
+        const providers = await fetchOrganizationTechnicians();
         if (!cancelled) {
-          setTechnicians(techs);
+          setProviders(providers);
         }
       } catch (error) {
-        console.error("Failed to load technicians for dashboard:", error);
+        console.error("Failed to load providers for dashboard:", error);
         if (!cancelled) {
-          setTechnicians([]);
+          setProviders([]);
         }
       } finally {
         if (!cancelled) {
-          setLoadingTechnicians(false);
+          setLoadingProviders(false);
         }
       }
     };
 
-    loadTechnicians();
+    loadProviders();
 
     return () => {
       cancelled = true;
@@ -166,15 +176,15 @@ export default function DashboardPage() {
     return null; // Redirect handled by hook
   }
 
-  if (loadingTechnicians && technicians.length === 0) {
+  if (loadingProviders && providers.length === 0) {
     return <DashboardLoadingSkeleton />;
   }
 
   // Role-based rendering
-  const userRole = user.role;
+  const userRole = effectiveRole;
 
-  // Dispatcher/Admin/Project Manager/Editor: Use DispatcherDashboardView
-  if (["dispatcher", "DISPATCHER", "PROJECT_MANAGER", "EDITOR"].includes(userRole)) {
+  // Dispatcher/Admin/Project Manager/Editor: Use CompanyDashboardView
+  if (isDispatcherRole(userRole)) {
     const displayMetrics = metrics ?? emptyMetrics;
     const handleViewRankings = jobManagement.openRankings;
     const handleJobAssign = jobManagement.assignJob;
@@ -215,7 +225,7 @@ export default function DashboardPage() {
           {metricsLoading && !metrics ? (
             <DashboardLoadingSkeleton />
           ) : (
-            <DispatcherDashboardView
+            <CompanyDashboardView
               jobs={jobManagement.jobs}
               technicians={technicians}
               metrics={displayMetrics}
@@ -303,8 +313,8 @@ export default function DashboardPage() {
     );
   }
 
-  // Technician/Technician: Use TechnicianDashboardView
-  if (["TECHNICIAN"].includes(userRole)) {
+  // Technician/Technician: Use ProviderDashboardView
+  if (userRole === "TECHNICIAN") {
     const handleJobClick = jobManagement.openTaskView;
     const handleJobSelect = jobManagement.toggleJobSelection;
     const handleFullScreen = jobManagement.openTaskDialog;
@@ -333,29 +343,27 @@ export default function DashboardPage() {
 
     return (
       <div className="size-full overflow-x-hidden space-y-6">
-        <div className="container relative mx-auto px-md pb-md">
-          <JobDataBoundary fallback={<DashboardLoadingSkeleton />}>
-            <TechnicianDashboardView
-              jobs={assignedJobs}
-              technicians={technicians}
-              selectedJob={jobManagement.selectedJob}
-              stats={assignedJobStats}
-              onSelectJob={handleJobSelect}
-              onNavigateToJobsView={handleNavigateToJobsView}
-              onNavigateToMapView={handleNavigateToMapView}
-              onNavigateToCalendarView={handleNavigateToCalendarView}
-              onNavigateToJobInProjectManagement={
-                handleNavigateToJobInProjectManagement
-              }
-              onJobClick={handleJobClick}
-            />
-          </JobDataBoundary>
-        </div>
+        {/* Provider Dashboard View */}
+        <JobDataBoundary fallback={<DashboardLoadingSkeleton />}>
+          <ProviderDashboardView
+            jobs={assignedJobs}
+            technicians={technicians}
+            selectedJob={jobManagement.selectedJob}
+            stats={assignedJobStats}
+            onSelectJob={handleJobSelect}
+            onNavigateToJobsView={handleNavigateToJobsView}
+            onNavigateToMapView={handleNavigateToMapView}
+            onNavigateToCalendarView={handleNavigateToCalendarView}
+            onNavigateToJobInProjectManagement={
+              handleNavigateToJobInProjectManagement
+            }
+            onJobClick={handleJobClick}
+          />
+        </JobDataBoundary>
 
         {/* Job Task View - Sheet */}
         <JobTaskView
           job={jobManagement.selectedJob}
-          // technician={undefined}
           messages={
             jobManagement.selectedJob
               ? messaging.getMessagesForJob(jobManagement.selectedJob.id)

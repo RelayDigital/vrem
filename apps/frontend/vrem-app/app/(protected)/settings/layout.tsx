@@ -50,7 +50,7 @@ const settingsSections: SettingsSection[] = [
     label: "Personal",
     icon: User,
     items: [
-      // Profile is not shown in sidebar - only accessible via avatar dropdown
+      // { id: "profile", label: "Profile", path: "/settings/profile" },
       { id: "account", label: "Account", path: "/settings/account" },
       {
         id: "notifications",
@@ -68,25 +68,25 @@ const settingsSections: SettingsSection[] = [
         id: "general",
         label: "General",
         path: "/settings/organization/general",
-        roles: ["dispatcher", "DISPATCHER", "PROJECT_MANAGER"],
+        roles: ["OWNER", "ADMIN"],
       },
       {
         id: "members",
         label: "Members",
         path: "/settings/organization/members",
-        roles: ["dispatcher", "DISPATCHER", "PROJECT_MANAGER"],
+        roles: ["OWNER", "ADMIN"],
       },
       {
         id: "billing",
         label: "Billing",
         path: "/settings/organization/billing",
-        roles: ["dispatcher", "DISPATCHER", "PROJECT_MANAGER"],
+        roles: ["OWNER", "ADMIN"],
       },
       {
         id: "integrations",
         label: "Integrations",
         path: "/settings/organization/integrations",
-        roles: ["dispatcher", "DISPATCHER", "PROJECT_MANAGER"],
+        roles: ["OWNER", "ADMIN"],
       },
     ],
   },
@@ -99,19 +99,19 @@ const settingsSections: SettingsSection[] = [
         id: "features",
         label: "Features",
         path: "/settings/product/features",
-        roles: ["dispatcher", "DISPATCHER", "PROJECT_MANAGER"],
+        roles: ["OWNER", "ADMIN"],
       },
       {
         id: "plans",
         label: "Plans",
         path: "/settings/product/plans",
-        roles: ["dispatcher", "DISPATCHER", "PROJECT_MANAGER"],
+        roles: ["OWNER", "ADMIN"],
       },
       {
         id: "usage",
         label: "Usage",
         path: "/settings/product/usage",
-        roles: ["dispatcher", "DISPATCHER", "PROJECT_MANAGER"],
+        roles: ["OWNER", "ADMIN"],
       },
     ],
   },
@@ -134,7 +134,6 @@ const settingsSections: SettingsSection[] = [
         id: "api-keys",
         label: "API Keys",
         path: "/settings/security/api-keys",
-        roles: ["dispatcher", "DISPATCHER", "PROJECT_MANAGER"],
       },
       { id: "2fa", label: "2FA", path: "/settings/security/2fa" },
     ],
@@ -181,13 +180,37 @@ const settingsSections: SettingsSection[] = [
   },
 ];
 
+const deriveRoleFromMembership = (
+  membership: any,
+  fallback: string | undefined
+) => {
+  const normalizedFallback =
+    (fallback || "").toUpperCase() === "COMPANY" ? "DISPATCHER" : fallback;
+  if (!membership) return normalizedFallback;
+  const orgType =
+    membership.organization?.type ||
+    (membership as any)?.organizationType ||
+    "";
+  if (orgType === "PERSONAL") return "DISPATCHER";
+  const roleUpper = (membership.role || "").toUpperCase();
+  if (
+    ["OWNER", "ADMIN", "DISPATCHER", "PROJECT_MANAGER", "EDITOR"].includes(
+      roleUpper
+    )
+  ) {
+    return "DISPATCHER";
+  }
+  if (roleUpper === "AGENT") return "AGENT";
+  return "TECHNICIAN";
+};
+
 export default function SettingsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, memberships, activeOrganizationId } = useAuth();
 
   // Determine which section is active
   const getActiveSection = () => {
@@ -229,7 +252,13 @@ export default function SettingsLayout({
   const isItemAllowed = (item: SettingsSection["items"][0]) => {
     if (!item.roles) return true; // Available to all
     if (!user) return false;
-    return item.roles.includes(user.role);
+    const membership = memberships.find(
+      (m) => m.orgId === activeOrganizationId
+    );
+    const effectiveRole =
+      deriveRoleFromMembership(membership, user.accountType) ||
+      user.accountType;
+    return item.roles.includes(effectiveRole);
   };
 
   const filteredSections = settingsSections
@@ -290,7 +319,7 @@ export default function SettingsLayout({
                 Manage your account settings and preferences.
               </Muted>
             </div>
-            
+
             {/* Settings Selector */}
             <Select
               value={pathname || currentItem?.path}
@@ -298,19 +327,17 @@ export default function SettingsLayout({
             >
               <SelectTrigger className="w-full">
                 <SelectValue>
-                  {currentItem ? (
-                    (() => {
-                      const Icon = currentItem.sectionIcon;
-                      return (
-                        <div className="flex items-center gap-2">
-                          {Icon && <Icon className="h-4 w-4" />}
-                          <span>{currentItem.label}</span>
-                        </div>
-                      );
-                    })()
-                  ) : (
-                    "Select a setting"
-                  )}
+                  {currentItem
+                    ? (() => {
+                        const Icon = currentItem.sectionIcon;
+                        return (
+                          <div className="flex items-center gap-2">
+                            {Icon && <Icon className="h-4 w-4" />}
+                            <span>{currentItem.label}</span>
+                          </div>
+                        );
+                      })()
+                    : "Select a setting"}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -325,7 +352,6 @@ export default function SettingsLayout({
                       {section.items.map((item) => (
                         <SelectItem key={item.id} value={item.path}>
                           <div className="flex items-center gap-2">
-                            
                             <span>{item.label}</span>
                           </div>
                         </SelectItem>

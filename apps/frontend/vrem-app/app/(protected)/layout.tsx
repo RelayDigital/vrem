@@ -8,37 +8,65 @@ import { JobManagementProvider, useJobManagement } from '@/context/JobManagement
 import { DispatcherNavigationProvider } from '@/context/DispatcherNavigationContext';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppHeader, MobileMenuDock } from '@/components/shared/layout';
-import { DispatcherSidebar } from '@/components/features/dispatcher/DispatcherSidebar';
+import { CompanySidebar } from '@/components/features/company/CompanySidebar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { JobRequestForm } from '@/components/shared/jobs';
-import { RankingsDialog } from '@/components/features/dispatcher/dialogs';
+import { RankingsDialog } from '@/components/features/company/dialogs';
 import { BackendHealthAlert } from '@/components/shared/BackendHealthAlert';
 import { useIsMobile } from '@/components/ui/use-mobile';
 import { ReactNode, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { JobRequest, Project, Technician } from '@/types';
+import { JobRequest, OrganizationMember, Project, TechnicianProfile } from '@/types';
 import { USE_MOCK_DATA } from '@/lib/utils';
 import { fetchOrganizationTechnicians } from '@/lib/technicians';
+
+const deriveAccountTypeFromMembership = (
+  membership: any,
+  fallback: string | undefined
+) => {
+  const normalizedFallback =
+    (fallback || '').toUpperCase() === 'COMPANY' ? 'COMPANY' : fallback;
+  if (!membership) return normalizedFallback;
+  const orgType =
+    membership?.organization?.type ||
+    membership?.organizationType ||
+    '';
+  if (orgType === 'PERSONAL') return normalizedFallback || 'PROVIDER';
+  const roleUpper = (membership.role || '').toUpperCase();
+  if (
+    ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'EDITOR'].includes(
+      roleUpper
+    )
+  ) {
+    return 'COMPANY';
+  }
+  if (roleUpper === 'AGENT') return 'AGENT';
+  return 'PROVIDER';
+};
 
 // Layout content component that renders header, sidebar, and dialogs
 function LayoutContent({
   children,
   user,
+  memberships,
+  activeOrgId,
 }: {
   children: ReactNode;
   user: any;
+  memberships: any[];
+  activeOrgId: string | null;
 }) {
   const jobCreation = useJobCreation();
   const jobManagement = useJobManagement();
   const isMobile = useIsMobile();
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [technicians, setTechnicians] = useState<TechnicianProfile[]>([]);
   const [, setLoadingTechnicians] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     const loadTechnicians = async () => {
-      if (!user?.organizationId) return;
+      if (!activeOrgId) return;
       setLoadingTechnicians(true);
       try {
         const techs = await fetchOrganizationTechnicians();
@@ -62,13 +90,18 @@ function LayoutContent({
     return () => {
       cancelled = true;
     };
-  }, [user?.organizationId]);
+  }, [activeOrgId]);
 
-  // Determine if user should see sidebar (dispatcher only)
-  const normalizedRole = typeof user.role === 'string' ? user.role.toUpperCase() : '';
-  const shouldShowSidebar = normalizedRole === 'DISPATCHER';
-  
-  // Determine if user can create jobs (dispatcher only)
+  // Determine if user should see sidebar (company or elevated membership only)
+  const activeMembership = memberships.find((m: any) => m?.orgId === activeOrgId);
+  const effectiveAccountType = deriveAccountTypeFromMembership(
+    activeMembership,
+    user.accountType
+  );
+  const userForUi = { ...user, accountType: effectiveAccountType, role: effectiveAccountType };
+  const shouldShowSidebar =
+    (effectiveAccountType || '').toUpperCase() === 'COMPANY';
+  // Determine if user can create jobs (company only)
   const canCreateJobs = shouldShowSidebar;
 
   const jobFormContent = (
@@ -80,17 +113,17 @@ function LayoutContent({
     </>
   );
 
-  // For roles with sidebar (dispatcher/admin/project manager/editor)
+  // For roles with sidebar (admin/project manager/editor)
   if (shouldShowSidebar) {
     return (
       <SidebarProvider>
         {/* Header */}
         <div className="fixed top-0 left-0 right-0 z-50">
-          <AppHeader user={user} showNewJobButton={true} />
+          <AppHeader user={userForUi} showNewJobButton={true} />
         </div>
 
         {/* Sidebar */}
-        <DispatcherSidebar />
+        <CompanySidebar />
 
         {/* Main Content */}
         <SidebarInset
@@ -133,7 +166,7 @@ function LayoutContent({
           </Dialog>
         )}
 
-        {/* Rankings Dialog - For dispatcher/admin roles */}
+        {/* Rankings Dialog - For admin roles */}
         <RankingsDialog
           open={jobManagement.showRankings}
           onOpenChange={(open) => {
@@ -152,10 +185,14 @@ function LayoutContent({
   // For roles without sidebar (agent, technician/technician)
   return (
     <div className="flex h-screen w-full flex-col overflow-y-scroll">
-      {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-50">
-        <AppHeader user={user} showNewJobButton={canCreateJobs} />
-      </div>
+        {/* Header */}
+        <div className="fixed top-0 left-0 right-0 z-50">
+          <AppHeader
+            user={userForUi}
+            showNewJobButton={canCreateJobs}
+            forceShowNavigation={!shouldShowSidebar}
+          />
+        </div>
 
       {/* Main Content */}
       <main className="pt-header-h pb-dock-h md:pb-0! size-full flex-1">
@@ -210,16 +247,22 @@ export default function ProtectedLayout({
 }) {
   // Support all roles that can access protected routes
   const { user, isLoading, organizationId, memberships } = useRequireRole([
-    'dispatcher',
     'AGENT',
     'TECHNICIAN',
-    'EDITOR',
-    'ADMIN',
-    'PROJECT_MANAGER',
+    'COMPANY',
   ]);
   const [initialProjects, setInitialProjects] = useState<Project[] | null>(null);
-  const activeMembershipRole =
-    memberships.find((m) => m.orgId === organizationId)?.role || null;
+  const activeMembership = memberships.find((m) => m.orgId === organizationId);
+  const effectiveAccountType = deriveAccountTypeFromMembership(
+    activeMembership,
+    user?.accountType
+  );
+  const effectiveMemberRole = activeMembership?.orgRole || null;
+  const userForUi = {
+    ...user,
+    accountType: effectiveAccountType,
+    role: effectiveAccountType,
+  };
 
   // Preload projects from dashboard API (reused from agent layout)
   useEffect(() => {
@@ -285,20 +328,24 @@ export default function ProtectedLayout({
       defaultUserId={user?.id}
       defaultOrganizationId={organizationId || undefined}
       initialProjects={initialProjects || undefined}
-      userRole={user?.role}
-      memberRole={activeMembershipRole}
+      userRole={userForUi?.accountType}
+      memberRole={effectiveMemberRole}
     >
       <JobCreationProviderWrapper
         defaultUserId={user?.id}
         defaultOrganizationId={organizationId || undefined}
-        userRole={user?.role}
+        userRole={userForUi?.accountType}
       >
         <MessagingProvider
           defaultUserId={user?.id}
           defaultUserName={user?.name}
         >
           <DispatcherNavigationProvider>
-            <LayoutContent user={user}>
+            <LayoutContent
+              user={userForUi}
+              memberships={memberships}
+              activeOrgId={organizationId}
+            >
               {children}
             </LayoutContent>
             <BackendHealthAlert />

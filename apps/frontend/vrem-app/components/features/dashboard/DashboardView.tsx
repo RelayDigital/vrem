@@ -8,7 +8,7 @@ import {
   Metrics
 } from '@/types';
 import { useState } from 'react';
-import { DispatcherDashboard } from '../dispatcher/DispatcherDashboard';
+import { CompanyDashboard } from '../company/CompanyDashboard';
 
 interface DashboardViewProps {
   user: User;
@@ -48,7 +48,7 @@ export function DashboardView({
   };
 
   return (
-    <DispatcherDashboard
+    <CompanyDashboard
       jobs={jobs}
       technicians={technicians}
       auditLog={auditLog}

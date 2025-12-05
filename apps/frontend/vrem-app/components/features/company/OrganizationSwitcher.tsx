@@ -28,49 +28,37 @@ import { useMemo } from "react";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/components/ui/use-mobile";
 import { toast } from "sonner";
+import { OrganizationMember } from "@/types";
+import { useAuth } from "@/context/auth-context";
 
 interface OrganizationSwitcherProps {
   variant?: "sidebar" | "header";
-  includePersonal?: boolean;
-  showManage?: boolean;
-  showJoin?: boolean;
   onOrgHome?: () => void;
-  accountType?: "dispatcher" | "technician";
 }
 
 export function OrganizationSwitcher({
   variant = "sidebar",
-  includePersonal = false,
-  showManage = true,
-  showJoin = true,
   onOrgHome,
-  accountType = "dispatcher",
 }: OrganizationSwitcherProps) {
+  const { user } = useAuth();
   const { memberships, isLoading, setActiveOrganization } = useOrganizations();
   const { activeOrganizationId } = useCurrentOrganization();
   const router = useRouter();
+  const isPersonalOrg = (membership: OrganizationMember) =>
+    membership.organization?.type === "PERSONAL";
   const personalOrg = useMemo(
-    () =>
-      memberships.find(
-        (m) =>
-          m.organization?.type === "PERSONAL" ||
-          (m.organization as any)?.type === "PERSONAL"
-      ),
+    () => memberships.find((membership) => isPersonalOrg(membership)),
     [memberships]
   );
 
-  const companyMemberships = useMemo(
-    () =>
-      memberships.filter(
-        (m) =>
-          !(
-            includePersonal &&
-            (m.organization?.type === "PERSONAL" ||
-              (m.organization as any)?.type === "PERSONAL")
-          )
-      ),
-    [memberships, includePersonal]
-  );
+  const orderedMemberships = useMemo(() => {
+    const personalFirst = personalOrg ? [personalOrg] : [];
+    const otherMemberships = memberships.filter(
+      (membership) => !isPersonalOrg(membership)
+    );
+
+    return [...personalFirst, ...otherMemberships];
+  }, [memberships, personalOrg]);
 
   // Use sidebar hook - must be called unconditionally (React rules)
   // The header is within SidebarProvider in dispatcher layout, so this is safe
@@ -85,6 +73,11 @@ export function OrganizationSwitcher({
   const activeOrg = useMemo(
     () =>
       memberships.find((m) => m.orgId === activeOrganizationId)?.organization,
+    [memberships, activeOrganizationId]
+  );
+
+  const activeMembership = useMemo(
+    () => memberships.find((m) => m.orgId === activeOrganizationId),
     [memberships, activeOrganizationId]
   );
 
@@ -119,11 +112,9 @@ export function OrganizationSwitcher({
           variant="ghost"
           className="h-auto justify-between text-left pl-1.5! pr-2.5! py-0!"
         >
-          <div
-            className={`flex items-center gap-2 cursor-pointer w-full`}
-          >
+          <div className={`flex items-center gap-2 cursor-pointer w-full`}>
             <Avatar className="size-8">
-              <AvatarImage src={activeOrg?.avatar} alt={activeOrg?.name} />
+              <AvatarImage src={activeOrg?.logoUrl} alt={activeOrg?.name} />
               <AvatarFallback>
                 <Building2 className="size-3" />
               </AvatarFallback>
@@ -131,7 +122,7 @@ export function OrganizationSwitcher({
             {showText && (
               <div className="flex flex-col items-start">
                 <span className="text-sm font-medium">
-                  {includePersonal && !activeOrganizationId
+                  {!activeOrganizationId
                     ? "Personal dashboard"
                     : activeOrg?.name || "Select organization"}
                 </span>
@@ -157,78 +148,85 @@ export function OrganizationSwitcher({
               Loading...
             </div>
           )}
+          {/* No organizations found */}
           {!isLoading && memberships.length === 0 && (
             <div className="px-2 py-1.5 text-sm text-muted-foreground">
               No organizations found
             </div>
           )}
-          {includePersonal && (
-            <DropdownMenuItem
-              onClick={() => personalOrg && selectOrg(personalOrg.orgId)}
-              className="flex items-center gap-2 cursor-pointer"
-              disabled={!personalOrg}
-            >
-              <Avatar className="size-8">
-                <AvatarFallback>
-                  <ChevronsUpDown className="size-4" />
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col flex-1 min-w-0">
-                <span className="text-sm font-medium truncate">
-                  Personal dashboard
-                </span>
-                {/* <span className="text-xs text-muted-foreground capitalize truncate">
-                  Marketplace view
-                </span> */}
-              </div>
-              {activeOrganizationId === personalOrg?.orgId && (
-                <Check className="size-4 text-primary ml-auto shrink-0" />
-              )}
-            </DropdownMenuItem>
-          )}
+          {/* Organizations */}
           {!isLoading &&
-            companyMemberships.map((m) => (
-              <DropdownMenuItem
-                key={m.orgId}
-                onClick={() => selectOrg(m.orgId)}
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <Avatar className="size-8">
-                  <AvatarImage src={m.organization?.avatar} />
-                  <AvatarFallback>
-                    <Building2 className="size-4" />
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col flex-1 min-w-0">
-                  <span className="text-sm font-medium truncate">
-                    {m.organization?.name || m.orgId}
-                  </span>
-                  <span className="text-xs text-muted-foreground capitalize truncate">
-                    {m.organization?.type?.replace("_", " ") || "Member"}
-                  </span>
-                </div>
-                {m.orgId === activeOrganizationId && (
-                  <Check className="size-4 text-primary ml-auto shrink-0" />
-                )}
-              </DropdownMenuItem>
-            ))}
+            orderedMemberships.map((m) => {
+              const isPersonal = isPersonalOrg(m);
+
+              return (
+                <DropdownMenuItem
+                  key={m.orgId}
+                  onClick={() => selectOrg(m.orgId)}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  {/* Organization avatar */}
+                  <Avatar className="size-8">
+                    {!isPersonal && (
+                      <AvatarImage src={m.organization?.logoUrl} />
+                    )}
+                    <AvatarFallback>
+                      {isPersonal ? (
+                        <ChevronsUpDown className="size-4" />
+                      ) : (
+                        <Building2 className="size-4" />
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+                  {/* Organization name */}
+                  <div className="flex flex-col flex-1 min-w-0">
+                    <span className="text-sm font-medium truncate">
+                      {isPersonal
+                        ? "Personal dashboard"
+                        : m.organization?.name || m.orgId}
+                    </span>
+                    {!isPersonal && (
+                      <span className="text-xs text-muted-foreground capitalize truncate">
+                        {m.organization?.type?.replace("_", " ") || "Member"}
+                      </span>
+                    )}
+                  </div>
+                  {/* Check if the organization is active */}
+                  {m.orgId === activeOrganizationId && (
+                    <Check className="size-4 text-primary ml-auto shrink-0" />
+                  )}
+                </DropdownMenuItem>
+              );
+            })}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        {/* Options */}
         <DropdownMenuGroup>
+          {/* Org home */}
           {onOrgHome && (
             <DropdownMenuItem onClick={onOrgHome}>
               <Home className="size-4 mr-2" />
               Org home
             </DropdownMenuItem>
           )}
-          {showJoin && (
+          {/* Join organization */}
+          {user?.accountType === "PROVIDER" && (
             <DropdownMenuItem onClick={handleJoin}>
               <UserPlus className="size-4 mr-2" />
               Join organization
-              <span className="ml-auto text-xs text-muted-foreground">Mock</span>
+              <span className="ml-auto text-xs text-muted-foreground">
+                Mock
+              </span>
             </DropdownMenuItem>
           )}
-          {showManage && (
+          {/* Manage organization */}
+          {memberships.some(
+            (m) =>
+              m.organization?.type === "COMPANY" &&
+              ["OWNER", "ADMIN"].includes(
+                m.orgRole || (m as any).role || ""
+              )
+          ) && (
             <DropdownMenuItem onClick={goToManage}>
               <Settings className="size-4 mr-2" />
               Manage organization

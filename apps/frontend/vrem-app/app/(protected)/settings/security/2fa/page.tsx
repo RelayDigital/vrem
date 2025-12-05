@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { SettingsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { SettingsLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { toast } from "sonner";
 import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
 

@@ -167,6 +167,7 @@ export function rankTechnicians(
         factors.skillMatch * weights.skill;
       
       return {
+        provider: technician,
         technician,
         score,
         factors,

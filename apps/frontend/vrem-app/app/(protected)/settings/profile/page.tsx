@@ -5,10 +5,10 @@ import { useRequireRole } from '@/hooks/useRequireRole';
 import { SettingsView } from '@/components/shared/settings';
 import { agentSettingsConfig } from '@/components/shared/settings/settings-config';
 import { agentSettingsComponents } from '@/components/features/agent/settings';
-import { TechnicianDashboard } from '@/components/features/technician/TechnicianDashboard';
+import { ProviderDashboard } from '@/components/features/provider/ProviderDashboard';
 import { useJobManagement } from '@/context/JobManagementContext';
 import { useOrganizations } from '@/hooks/useOrganizations';
-import { SettingsLoadingSkeleton } from '@/components/shared/loading/DispatcherLoadingSkeletons';
+import { SettingsLoadingSkeleton } from '@/components/shared/loading/CompanyLoadingSkeletons';
 import type { SettingsSubView } from '@/components/shared/settings';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,10 +16,10 @@ import { Button } from '@/components/ui/button';
 import { H2, Muted } from '@/components/ui/typography';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
+import { getEffectiveOrgRole, isDispatcherRole } from '@/lib/roles';
 
 export default function ProfilePage() {
-  const { user, isLoading } = useRequireRole([
-    'dispatcher',
+  const { user, isLoading, organizationId, memberships: authMemberships } = useRequireRole([
     'AGENT',
     'TECHNICIAN',
     'EDITOR',
@@ -40,7 +40,11 @@ export default function ProfilePage() {
     return null; // Redirect handled by hook
   }
 
-  const userRole = user.role;
+  const technicianMembership =
+    memberships.find((m) => m.userId === user.id && (organizationId ? m.orgId === organizationId : true)) ||
+    memberships[0];
+
+  const userRole = getEffectiveOrgRole(user, authMemberships, organizationId);
 
   // Agent: Use SettingsView with agent config
   if (userRole === 'AGENT') {
@@ -57,19 +61,23 @@ export default function ProfilePage() {
     );
   }
 
-  // Technician/Technician: Use TechnicianDashboard with profile view
-  if (['TECHNICIAN'].includes(userRole)) {
+  // Technician/Technician: Use ProviderDashboard with profile view
+  if (userRole === 'TECHNICIAN') {
     const jobs = jobManagement.jobCards;
     const companies = memberships.map(m => m.organization).filter(Boolean);
     const applications: any[] = [];
 
     // Create a minimal technician object from user data
-    const technician = {
+    const provider = {
       id: user.id,
+      userId: user.id,
+      orgMemberId: technicianMembership?.id || '',
+      orgId: technicianMembership?.orgId || organizationId || '',
+      role: (technicianMembership?.orgRole || 'TECHNICIAN') as any,
       name: user.name,
       email: user.email,
       phone: '',
-      organizationId: user.organizationId,
+      organizationId: technicianMembership?.orgId || organizationId || '',
       isIndependent: true,
       homeLocation: {
         lat: 51.0447,
@@ -107,6 +115,8 @@ export default function ProfilePage() {
         photography: true,
         video: false,
         aerial: false,
+        floorplan: false,
+        measurement: false,
         twilight: false,
         editing: false,
         virtualStaging: false,
@@ -123,8 +133,8 @@ export default function ProfilePage() {
 
     return (
       <div className="size-full overflow-x-hidden">
-        <TechnicianDashboard
-          technician={technician}
+        <ProviderDashboard
+          provider={provider}
           jobs={jobs}
           companies={companies.filter(Boolean) as any[]}
           applications={applications}
@@ -137,7 +147,7 @@ export default function ProfilePage() {
   }
 
   // Dispatcher/Admin/Project Manager/Editor: Use SettingsView with dispatcher config or simple profile form
-  if (['dispatcher', 'ADMIN', 'PROJECT_MANAGER', 'EDITOR'].includes(userRole)) {
+  if (isDispatcherRole(userRole)) {
     // For now, show a simple profile form
     // In the future, this could use SettingsView with dispatcher config
     const handleSave = () => {
@@ -246,4 +256,3 @@ export default function ProfilePage() {
     </section>
   );
 }
-

@@ -35,6 +35,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
+  const normalizeUser = (u: any): User => {
+    const accountType =
+      (u.accountType || "").toUpperCase() === "DISPATCHER"
+        ? "COMPANY"
+        : (u.accountType || "").toUpperCase() === "TECHNICIAN"
+        ? "PROVIDER"
+        : u.accountType;
+    return {
+      ...u,
+      accountType,
+      role: accountType, // backward compatibility
+    };
+  };
+
   useEffect(() => {
     const initAuth = async () => {
       const storedToken = localStorage.getItem("token");
@@ -42,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(storedToken);
         try {
           const user = await api.auth.me();
-          setUser(user);
+          setUser(normalizeUser(user));
           const orgs = await api.organizations.listMine();
           setMemberships(orgs);
           const storedOrg = api.organizations.getActiveOrganization();
@@ -81,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await api.auth.login(credentials);
       localStorage.setItem("token", response.token);
       setToken(response.token);
-      setUser(response.user);
+      setUser(normalizeUser(response.user));
       const orgs = await api.organizations.listMine();
       setMemberships(orgs);
       const personal = orgs.find(
@@ -91,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
       const resolvedOrgId =
         api.organizations.getActiveOrganization() ||
-        response.user.organizationId ||
+        response.user.organizationMemberships?.[0]?.orgId ||
         personal?.orgId ||
         orgs[0]?.orgId ||
         null;
@@ -115,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await api.auth.register(data);
       localStorage.setItem("token", response.token);
       setToken(response.token);
-      setUser(response.user);
+      setUser(normalizeUser(response.user));
       const orgs = await api.organizations.listMine();
       setMemberships(orgs);
       const personal = orgs.find(
@@ -125,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
       const resolvedOrgId =
         api.organizations.getActiveOrganization() ||
-        response.user.organizationId ||
+        response.user.organizationMemberships?.[0]?.orgId ||
         personal?.orgId ||
         orgs[0]?.orgId ||
         null;

@@ -3,7 +3,7 @@
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { Muted } from "@/components/ui/typography";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SettingsLoadingSkeleton } from "@/components/shared/loading/DispatcherLoadingSkeletons";
+import { SettingsLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
