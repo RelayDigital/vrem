@@ -164,7 +164,19 @@ export interface Project {
   id: string;
   orgId: string; // tenant boundary
   customerId?: string | null;
-  address: string;
+  address: {
+    latitude?: number;
+    longitude?: number;
+    street_number?: string;
+    street_name?: string;
+    unit_number?: string;
+    postal_code?: string;
+    city?: string;
+    state_or_province?: string;
+    country?: string;
+    unparsed_address?: string;
+    [key: string]: any;
+  };
   notes?: string;
   scheduledTime: Date;
   status: ProjectStatus;
@@ -319,6 +331,7 @@ export interface JobRequest {
   projectManagerId?: string | null;
   editorId?: string | null;
   propertyAddress: string;
+  address?: any;
 
   location: {
     lat: number;

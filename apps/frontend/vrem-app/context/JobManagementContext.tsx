@@ -21,6 +21,7 @@ interface JobManagementContextType {
   assignJob: (jobId: string, technicianId: string, score: number) => void;
   changeJobStatus: (jobId: string, newStatus: ProjectStatus) => void;
   createJob: (job: Partial<Project>) => Promise<Project>;
+  deleteJob: (jobId: string) => Promise<void>;
 
   // Job selection
   selectedJob: JobRequest | null;
@@ -249,6 +250,28 @@ export function JobManagementProvider({
     })();
   }, [updateJob]);
 
+  const deleteJob = useCallback(
+    async (jobId: string): Promise<void> => {
+      try {
+        await api.projects.delete(jobId);
+        setProjects((prev) => prev.filter((p) => p.id !== jobId));
+        setSelectedJob((prev) => (prev?.id === jobId ? null : prev));
+        setShowTaskView(false);
+        setShowTaskDialog(false);
+        setShowRankings(false);
+        toast.success("Job deleted");
+        window.dispatchEvent(
+          new CustomEvent("jobDeleted", { detail: { jobId } })
+        );
+      } catch (error) {
+        console.error("Failed to delete project", error);
+        toast.error("Failed to delete project");
+        throw error;
+      }
+    },
+    []
+  );
+
   const createJob = useCallback(async (job: Partial<Project>): Promise<Project> => {
     const resolvedOrgId = job.orgId || defaultOrganizationId;
     if (!resolvedOrgId) {
@@ -257,7 +280,10 @@ export function JobManagementProvider({
     }
     try {
       const newProject = await api.projects.create({
-        address: job.address || '',
+        address:
+          (job as any).address ||
+          (job as any).propertyAddress ||
+          '',
         scheduledTime: job.scheduledTime || new Date(),
         notes: job.notes,
         customerId: (job as any).customerId,
@@ -376,6 +402,7 @@ export function JobManagementProvider({
         assignJob,
         changeJobStatus,
         createJob,
+        deleteJob,
         selectedJob,
         selectJob,
         toggleJobSelection,

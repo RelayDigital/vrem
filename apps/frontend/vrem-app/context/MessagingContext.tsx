@@ -167,7 +167,7 @@ export function MessagingProvider({
     }));
   }, []);
 
-  const deleteMessage = useCallback((messageId: string) => {
+  const deleteMessage = useCallback(async (messageId: string) => {
     setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
 
     // Update in localStorage
@@ -176,6 +176,13 @@ export function MessagingProvider({
       const allMessages: ChatMessage[] = JSON.parse(storedMessages);
       const updatedMessages = allMessages.filter((msg) => msg.id !== messageId);
       localStorage.setItem('chatMessages', JSON.stringify(updatedMessages));
+    }
+
+    try {
+      await api.messages.delete(messageId);
+    } catch (error) {
+      console.error('Failed to delete message on backend', error);
+      // Keep UI state consistent; optionally refetch later
     }
 
     // Dispatch event

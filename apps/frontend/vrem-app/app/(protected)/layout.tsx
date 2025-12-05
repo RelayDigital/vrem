@@ -374,7 +374,11 @@ function JobCreationProviderWrapper({
   const handleCreateJob = async (job: Partial<JobRequest>): Promise<JobRequest> => {
     // Map JobRequest (View Model) to Project (Domain)
     const projectData: Partial<Project> = {
-      address: job.propertyAddress,
+      address: {
+        unparsed_address: job.propertyAddress || "",
+        latitude: job.location?.lat,
+        longitude: job.location?.lng,
+      },
       scheduledTime: job.scheduledDate && job.scheduledTime
         ? new Date(`${job.scheduledDate}T${job.scheduledTime}`)
         : undefined,

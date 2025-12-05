@@ -63,8 +63,13 @@ export default function BookingPage() {
   }, [user]);
   const createJobRequest = async (job: Partial<JobRequest>) => {
     try {
+        const addressPayload = {
+          unparsed_address: job.propertyAddress || "",
+          latitude: job.location?.lat,
+          longitude: job.location?.lng,
+        };
         const project = await api.projects.create({
-          address: job.propertyAddress || "",
+          address: addressPayload,
           notes: job.requirements,
           scheduledTime:
             job.scheduledDate && job.scheduledTime

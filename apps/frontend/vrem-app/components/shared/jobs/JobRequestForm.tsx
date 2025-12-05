@@ -388,6 +388,9 @@ export function JobRequestForm({
     // Always geocode on submit to ensure address and location are in sync
     let location = formData.location;
     let addressToUse = formData.propertyAddress.trim();
+    let addressPayload: any = {
+      unparsed_address: addressToUse,
+    };
 
     if (formData.propertyAddress.trim()) {
       const trimmedAddress = formData.propertyAddress.trim();
@@ -399,6 +402,12 @@ export function JobRequestForm({
         // Always use the geocoded location and standardized address to ensure they match
         location = { lat: geocodedResult.lat, lng: geocodedResult.lng };
         addressToUse = geocodedResult.placeName; // Use standardized address from Mapbox
+        addressPayload = {
+          ...addressPayload,
+          unparsed_address: geocodedResult.placeName,
+          latitude: geocodedResult.lat,
+          longitude: geocodedResult.lng,
+        };
         toast.success("Address geocoded successfully", { id: "geocoding" });
       } else {
         // If geocoding fails, use existing location if available, otherwise default
@@ -408,6 +417,11 @@ export function JobRequestForm({
             { id: "geocoding" }
           );
           location = { lat: 51.0447, lng: -114.0719 };
+          addressPayload = {
+            ...addressPayload,
+            latitude: location.lat,
+            longitude: location.lng,
+          };
         } else {
           toast.dismiss("geocoding");
           // Keep existing location and address as-is if geocoding fails
@@ -422,6 +436,7 @@ export function JobRequestForm({
         customerId: selectedCustomer?.id,
         propertyAddress: addressToUse, // Use corrected address if geocoded, otherwise use original
         location: location,
+        address: addressPayload,
         scheduledDate: formData.scheduledDate,
         scheduledTime: formData.scheduledTime,
         mediaType: formData.mediaType as (

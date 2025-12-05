@@ -49,6 +49,7 @@ import {
   Link,
   ExternalLink,
   X,
+  ArrowRightToLine,
   MoreHorizontal,
   Bold,
   Italic,
@@ -244,6 +245,9 @@ export function JobTaskView({
   const [connectingService, setConnectingService] = useState<string | null>(
     null
   );
+  const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] =
+    useState(false);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [customers, setCustomers] = useState<OrganizationCustomer[]>([]);
   const [projectManagers, setProjectManagers] = useState<OrganizationMember[]>(
@@ -266,6 +270,19 @@ export function JobTaskView({
       orgRole || ""
     );
   }, [activeMembership]);
+  const canDeleteProject = useMemo(() => {
+    const orgRole = (
+      activeMembership?.role || activeMembership?.orgRole || ""
+    )
+      .toString()
+      .toUpperCase();
+    const isElevated = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(orgRole);
+    const isAgentCreator =
+      orgRole === "AGENT" &&
+      job?.projectManagerId &&
+      job.projectManagerId === currentUserId;
+    return isElevated || isAgentCreator;
+  }, [activeMembership, currentUserId, job?.projectManagerId]);
   const getInitials = (value?: string | null) =>
     value
       ? value
@@ -707,6 +724,20 @@ export function JobTaskView({
       messageEditorElement.removeEventListener("keydown", handleKeyDown);
     };
   }, [messageEditor, handleSend]);
+
+  const handleDeleteProject = useCallback(async () => {
+    if (!job) return;
+    setIsDeletingProject(true);
+    try {
+      await jobManagement.deleteJob(job.id);
+      setDeleteProjectDialogOpen(false);
+      onOpenChange(false);
+    } catch (error) {
+      // Toast handled in context
+    } finally {
+      setIsDeletingProject(false);
+    }
+  }, [job, jobManagement, onOpenChange]);
 
   // Early return must be after all hooks
   if (!job) return null;
@@ -1481,76 +1512,76 @@ export function JobTaskView({
           </ItemDescription>
         </ItemContent>
         <ItemActions className="">
-          {variant === "sheet" && !isMobile && (
-            <>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
               {onFullScreen && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleFullScreen}
-                        className="h-8 w-8"
-                      >
-                        <Maximize2 className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>View in full screen dialog</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    handleFullScreen();
+                  }}
+                  className="cursor-pointer"
+                >
+                  <Maximize2 className="mr-2 h-4 w-4" />
+                  View full screen
+                </DropdownMenuItem>
               )}
               {onOpenInNewPage && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onOpenInNewPage}
-                        className="h-8 w-8"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Open in new page</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </>
-          )}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleCopyLink}
-                  className="h-8 w-8"
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    onOpenInNewPage();
+                  }}
+                  className="cursor-pointer"
                 >
-                  <Link className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Copy link</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          {onStatusChange && job.status !== "delivered" && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleMarkComplete}
-                    className="h-8 w-8"
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Open in new page
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  handleCopyLink();
+                }}
+                className="cursor-pointer"
+              >
+                <Link className="mr-2 h-4 w-4" />
+                Copy link
+              </DropdownMenuItem>
+              {onStatusChange && job.status !== "delivered" && (
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    handleMarkComplete();
+                  }}
+                  className="cursor-pointer"
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Mark as complete
+                </DropdownMenuItem>
+              )}
+              {canDeleteProject && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setDeleteProjectDialogOpen(true);
+                    }}
+                    className="cursor-pointer text-destructive focus:text-destructive"
                   >
-                    <CheckCircle2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Mark as complete</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete job
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -1560,7 +1591,11 @@ export function JobTaskView({
                   onClick={() => onOpenChange(false)}
                   className="h-8 w-8"
                 >
-                  <X className="h-4 w-4" />
+                  {variant === "sheet" ? (
+                    <ArrowRightToLine className="h-4 w-4" />
+                  ) : (
+                    <X className="h-4 w-4" />
+                  )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Close</TooltipContent>
@@ -2881,6 +2916,40 @@ export function JobTaskView({
 
   return (
     <>
+      {/* Delete Project Confirmation Dialog */}
+      <AlertDialog
+        open={deleteProjectDialogOpen}
+        onOpenChange={setDeleteProjectDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete job</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the job and its data. Are you sure
+              you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setDeleteProjectDialogOpen(false)}
+              disabled={isDeletingProject}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteProject}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeletingProject}
+            >
+              {isDeletingProject && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Delete job
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Delete Message Confirmation Dialog */}
       <AlertDialog
         open={deletingMessageId !== null}

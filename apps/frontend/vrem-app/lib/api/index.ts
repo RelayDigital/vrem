@@ -47,16 +47,18 @@ class ApiClient {
 
     // Store location in notes as metadata if location is provided
     let notes = job.requirements || '';
-    if (job.location && job.location.lat !== 51.0447 && job.location.lng !== -114.0719) {
-      // Only store if it's not the default location
-      const locationMetadata = `__LOCATION__:${JSON.stringify(job.location)}__`;
-      notes = notes ? `${locationMetadata} ${notes}` : locationMetadata;
-    }
+    // Legacy note embedding not needed when address has coords; kept for compatibility
+
+    const address = {
+      unparsed_address: job.propertyAddress,
+      latitude: job.location?.lat,
+      longitude: job.location?.lng,
+    };
 
     return {
       id: job.id,
       projectManagerId: job.createdBy,
-      address: job.propertyAddress,
+      address,
       notes: notes,
       scheduledTime,
       status: this.jobStatusToProjectStatus(job.status),
@@ -110,6 +112,37 @@ class ApiClient {
     const parts = [locationNote, notes].filter(Boolean);
     const combined = parts.join(' ').trim();
     return combined || undefined;
+  }
+
+  private buildAddressPayload(payload: any): any {
+    const addressInput =
+      payload?.address ||
+      (payload?.propertyAddress
+        ? { unparsed_address: payload.propertyAddress }
+        : typeof payload?.address === 'string'
+        ? { unparsed_address: payload.address }
+        : {});
+
+    const location =
+      payload?.location ||
+      (payload?.address && payload.address.latitude !== undefined
+        ? {
+            lat: payload.address.latitude,
+            lng: payload.address.longitude,
+          }
+        : undefined);
+
+    if (
+      location &&
+      addressInput &&
+      addressInput.latitude === undefined &&
+      addressInput.longitude === undefined
+    ) {
+      addressInput.latitude = location.lat;
+      addressInput.longitude = location.lng;
+    }
+
+    return addressInput;
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -581,11 +614,8 @@ class ApiClient {
         this.organizations.setActiveOrganization(payload.orgId);
       }
       const dto = {
-        address: payload.address,
-        notes: this.withLocationNotes(
-          payload.notes,
-          (payload as any)?.location
-        ),
+        address: this.buildAddressPayload(payload),
+        notes: payload.notes,
         scheduledTime: payload.scheduledTime?.toISOString() || new Date().toISOString(),
         customerId: payload.customerId,
         projectManagerId: payload.projectManagerId,
@@ -607,11 +637,8 @@ class ApiClient {
         return updated;
       }
       const dto = {
-        address: payload.address,
-        notes: this.withLocationNotes(
-          payload.notes,
-          (payload as any)?.location
-        ),
+        address: this.buildAddressPayload(payload),
+        notes: payload.notes,
         scheduledTime: payload.scheduledTime?.toISOString(),
       };
       const project = await this.request<Project>(`/projects/${id}`, {
@@ -885,6 +912,15 @@ class ApiClient {
     },
   };
 
+  messages = {
+    delete: async (id: string) => {
+      if (USE_MOCK_DATA) {
+        return { success: true };
+      }
+      return this.request(`/messages/${id}`, { method: 'DELETE' });
+    },
+  };
+
   // Helper to extract location from notes if stored as metadata
   private extractLocationFromNotes(notes?: string): { lat: number; lng: number } | null {
     if (!notes) return null;
@@ -903,20 +939,19 @@ class ApiClient {
     return null;
   }
 
-  // Parse "lat,lng" style addresses if backend stores coordinates in address column
-  private parseLocationFromAddress(address?: string): { lat: number; lng: number } | null {
-    if (!address) return null;
-    // Match patterns like "51.0447,-114.0719" or "lat:51.0447, lng:-114.0719"
-    const match = address.match(
-      /(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)/i
-    );
-    if (!match) return null;
-    const lat = parseFloat(match[1]);
-    const lng = parseFloat(match[2]);
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      return { lat, lng };
-    }
-    return null;
+  private buildAddressString(address: any): string {
+    if (!address) return '';
+    const parts = [
+      address.street_number,
+      address.street_name,
+      address.unit_number,
+      address.city,
+      address.state_or_province,
+      address.postal_code,
+      address.country,
+    ].filter(Boolean);
+    if (parts.length) return parts.join(', ');
+    return address.unparsed_address || '';
   }
 
   // Helper to extract requirements from notes (removing location metadata)
@@ -929,13 +964,18 @@ class ApiClient {
   // Helper to map backend Project to frontend JobRequest (View Model)
   public mapProjectToJobCard(project: Project): JobRequest {
     const scheduledDate = project.scheduledTime ? new Date(project.scheduledTime) : new Date();
-    
-    // Try to extract location from notes metadata, fallback to default
+    const addressObj: any = (project as any).address || {};
+
+    // Prefer address latitude/longitude, fallback to notes metadata or default
     const location =
+      (addressObj.latitude !== undefined && addressObj.longitude !== undefined
+        ? { lat: addressObj.latitude, lng: addressObj.longitude }
+        : null) ||
       (project as any)?.location ||
       this.extractLocationFromNotes(project.notes) ||
-      this.parseLocationFromAddress(project.address) ||
       { lat: 51.0447, lng: -114.0719 };
+
+    const propertyAddress = this.buildAddressString(addressObj) || '';
     const requirements = this.extractRequirementsFromNotes(project.notes);
     
     return {
@@ -946,7 +986,7 @@ class ApiClient {
       customerId: project.customerId || undefined,
       projectManagerId: project.projectManagerId || null,
       editorId: project.editorId || null,
-      propertyAddress: project.address || '',
+      propertyAddress: propertyAddress,
       location: location,
       scheduledDate: scheduledDate.toISOString().split('T')[0],
       scheduledTime: scheduledDate.toTimeString().substring(0, 5),
