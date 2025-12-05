@@ -77,26 +77,34 @@ export class MessagesService {
     return message;
   }
 
-  // maybe don't need it yet if at all
-  // async deleteMessage(messageId: string, currentUser: { id: string; role: Role }) {
-  //   const message = await this.prisma.message.findUnique({
-  //     where: { id: messageId },
-  //   });
+  async deleteMessage(
+    id: string,
+    currentUser: { id: string; accountType: UserAccountType },
+  ) {
+    const message = await this.prisma.message.findUnique({
+      where: { id },
+    });
 
-  //   if (!message) throw new NotFoundException('Message not found');
+    if (!message) throw new NotFoundException('Message not found');
 
-  //   const isOwner = message.userId === currentUser.id;
-  //   const canModerate =
-  //     currentUser.role === Role.COMPANY || currentUser.role === Role.COMPANY;
+    const canAccess = await this.userHasAccessToProject(
+      currentUser.id,
+      currentUser.accountType,
+      message.projectId,
+    );
 
-  //   if (!isOwner && !canModerate) {
-  //     throw new ForbiddenException('You are not allowed to delete this message');
-  //   }
+    const isOwner = message.userId === currentUser.id;
+    const canModerate =
+      currentUser.accountType === UserAccountType.COMPANY;
 
-  //   await this.prisma.message.delete({
-  //     where: { id: messageId },
-  //   });
+    if (!canAccess || (!isOwner && !canModerate)) {
+      throw new ForbiddenException('You are not allowed to delete this message');
+    }
 
-  //   return { success: true };
-  // }
+    await this.prisma.message.delete({
+      where: { id },
+    });
+
+    return { success: true };
+  }
 }

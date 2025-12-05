@@ -41,12 +41,11 @@ export class MessagesController {
     return this.messagesService.getMessageById(id);
   }
 
-  // maybe dont need it yet
-  // @Delete(':id')
-  // async deleteMessage(
-  //   @Param('id') id: string,
-  //   @CurrentUser() user: CurrentUserType,
-  // ) {
-  //   return this.messagesService.deleteMessage(id, user);
-  // }
+  @Delete(':id')
+  async deleteMessage(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserType,
+  ) {
+    return this.messagesService.deleteMessage(id, user);
+  }
 }

@@ -6,6 +6,7 @@ import { AssignProjectDto } from './dto/assign-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { CronofyService } from '../cronofy/cronofy.service';
+import { Prisma } from '@prisma/client';
 @Injectable()
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
@@ -26,6 +27,87 @@ export class ProjectsService {
 
   return project;
 }
+
+  private async geocodeAddress(unparsed: string) {
+    const token =
+      process.env.MAPBOX_TOKEN ||
+      process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
+      '';
+    if (!token || !unparsed) return null;
+
+    try {
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+        unparsed,
+      )}.json?access_token=${token}&limit=1`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        this.logger.warn(`Geocoding failed: ${response.statusText}`);
+        return null;
+      }
+      const data = await response.json();
+      const feature = data?.features?.[0];
+      if (!feature?.center || feature.center.length < 2) return null;
+      const [lng, lat] = feature.center;
+
+      const ctx = feature.context || [];
+      const byId = (prefix: string) =>
+        ctx.find((c: any) => (c.id || '').startsWith(prefix));
+
+      return {
+        latitude: lat,
+        longitude: lng,
+        street_number: feature.address || undefined,
+        street_name: feature.text || undefined,
+        postal_code: byId('postcode')?.text || undefined,
+        city:
+          byId('place')?.text ||
+          byId('locality')?.text ||
+          byId('district')?.text ||
+          undefined,
+        state_or_province:
+          byId('region')?.short_code ||
+          byId('region')?.text ||
+          undefined,
+        country: byId('country')?.short_code || undefined,
+        unparsed_address: feature.place_name || unparsed,
+      };
+    } catch (error) {
+      this.logger.error('Geocoding error', error as any);
+      return null;
+    }
+  }
+
+  private async buildStructuredAddress(
+    addressInput: any,
+    existing?: any,
+  ): Promise<Prisma.InputJsonValue> {
+    let structured: any = {};
+
+    if (typeof addressInput === 'string') {
+      structured = { unparsed_address: addressInput };
+    } else if (addressInput) {
+      structured = { ...addressInput };
+    } else if (existing) {
+      structured = existing;
+    }
+
+    const hasCoords =
+      structured.latitude !== undefined &&
+      structured.longitude !== undefined;
+
+    if (!hasCoords && structured.unparsed_address) {
+      const geocoded = await this.geocodeAddress(structured.unparsed_address);
+      if (geocoded) {
+        structured = { ...structured, ...geocoded };
+      }
+    }
+
+    if (!structured.unparsed_address && typeof addressInput === 'string') {
+      structured.unparsed_address = addressInput;
+    }
+
+    return structured;
+  }
 
   private async ensureCustomerInOrg(customerId: string, orgId: string) {
     const customer = await this.prisma.organizationCustomer.findFirst({
@@ -142,11 +224,13 @@ export class ProjectsService {
       await this.ensureCustomerInOrg(dto.customerId, orgId);
     }
 
+    const address = await this.buildStructuredAddress(dto.address);
+
     return this.prisma.project.create({
       data: {
         orgId,
         customerId: dto.customerId,
-        address: dto.address,
+        address,
         notes: dto.notes,
         scheduledTime: new Date(dto.scheduledTime),
         projectManagerId: dto.projectManagerId,
@@ -353,15 +437,21 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
   }
 
   async update(id: string, dto: UpdateProjectDto, orgId: string) {
-    await this.ensureProjectInOrg(id, orgId)
-  return this.prisma.project.update({
-    where: { id },
-    data: { 
-      ...dto,
-      scheduledTime: dto.scheduledTime ? new Date(dto.scheduledTime) : undefined
-    }
-  });
-}
+    await this.ensureProjectInOrg(id, orgId);
+    const address =
+      dto.address !== undefined
+        ? await this.buildStructuredAddress(dto.address)
+        : undefined;
+
+    return this.prisma.project.update({
+      where: { id },
+      data: {
+        address,
+        notes: dto.notes,
+        scheduledTime: dto.scheduledTime ? new Date(dto.scheduledTime) : undefined,
+      },
+    });
+  }
 
 async findForOrg(orgId: string) {
   return this.prisma.project.findMany({
@@ -372,8 +462,19 @@ async findForOrg(orgId: string) {
 }
 
 
-async remove(id: string, orgId: string) {
-  await this.ensureProjectInOrg(id, orgId)
+async remove(id: string, orgId: string, user: { id: string; accountType: UserAccountType }, membershipRole?: string | null) {
+  const project = await this.ensureProjectInOrg(id, orgId);
+
+  const elevatedOrgRoles = ['OWNER', 'ADMIN', 'PROJECT_MANAGER'];
+  const isElevated = membershipRole && elevatedOrgRoles.includes(membershipRole);
+
+  const isAgentOwner = user.accountType === UserAccountType.AGENT && project.projectManagerId === user.id;
+  const isCompany = user.accountType === UserAccountType.COMPANY && isElevated;
+
+  if (!(isAgentOwner || isCompany)) {
+    throw new ForbiddenException('You are not allowed to delete this project');
+  }
+
   return this.prisma.project.delete({ where: { id }});
 }
 

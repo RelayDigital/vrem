@@ -1,4 +1,4 @@
-import { PrismaClient, OrgRole, UserAccountType } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
 
@@ -7,14 +7,21 @@ const TEST_ORG_NAME = 'VX Test Org';
 // Test users to seed
 const TEST_USERS: Array<{
   email: string;
-  accountType: UserAccountType;
-  orgRole: OrgRole;
+  accountType: 'COMPANY' | 'PROVIDER';
+  orgRole:
+    | 'OWNER'
+    | 'ADMIN'
+    | 'PROJECT_MANAGER'
+    | 'TECHNICIAN'
+    | 'EDITOR';
 }> = [
-  { email: 'owner@example.com', accountType: UserAccountType.COMPANY, orgRole: OrgRole.OWNER }, // only global company-level user
-  { email: 'editor@example.com', accountType: UserAccountType.PROVIDER, orgRole: OrgRole.EDITOR },
-  { email: 'projectmanager@example.com', accountType: UserAccountType.PROVIDER, orgRole: OrgRole.PROJECT_MANAGER },
-  { email: 'technician@example.com', accountType: UserAccountType.PROVIDER, orgRole: OrgRole.TECHNICIAN },
-  { email: 'admin@example.com', accountType: UserAccountType.PROVIDER, orgRole: OrgRole.ADMIN },
+  { email: 'owner@example.com', accountType: 'COMPANY', orgRole: 'OWNER' }, // only global company-level user
+  { email: 'editor@example.com', accountType: 'PROVIDER', orgRole: 'EDITOR' },
+  { email: 'projectmanager@example.com', accountType: 'PROVIDER', orgRole: 'PROJECT_MANAGER' },
+  { email: 'technician@example.com', accountType: 'PROVIDER', orgRole: 'TECHNICIAN' },
+  { email: 'admin@example.com', accountType: 'PROVIDER', orgRole: 'ADMIN' },
+  { email: 'technician2@example.com', accountType: 'PROVIDER', orgRole: 'TECHNICIAN' },
+  { email: 'technician3@example.com', accountType: 'PROVIDER', orgRole: 'TECHNICIAN' },
 ];
 
 async function seedTestOrg() {
@@ -24,23 +31,22 @@ async function seedTestOrg() {
     console.log('🌱 Starting test organization seed...');
 
     // Find or create the test organization
-    let testOrg = await prisma.organization.findFirst({
-      where: { name: TEST_ORG_NAME },
-    });
+    const orgResult = await prisma.$queryRaw<
+      { id: string }[]
+    >`SELECT id FROM "Organization" WHERE name = ${TEST_ORG_NAME} LIMIT 1`;
+    let orgId = orgResult[0]?.id;
 
-    if (!testOrg) {
+    if (!orgId) {
+      orgId = randomUUID();
       console.log(`📦 Creating organization: ${TEST_ORG_NAME}`);
-      testOrg = await prisma.organization.create({
-        data: {
-          id: randomUUID(),
-          name: TEST_ORG_NAME,
-        },
-      });
-      console.log(`✅ Created organization with ID: ${testOrg.id}`);
-    } else {
-      console.log(
-        `✅ Found existing organization: ${testOrg.name} (ID: ${testOrg.id})`,
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "Organization" (id, name, "createdAt") VALUES ($1, $2, NOW())`,
+        orgId,
+        TEST_ORG_NAME,
       );
+      console.log(`✅ Created organization with ID: ${orgId}`);
+    } else {
+      console.log(`✅ Found existing organization: ${TEST_ORG_NAME} (ID: ${orgId})`);
     }
 
     const attachedUsers: string[] = [];
@@ -48,51 +54,63 @@ async function seedTestOrg() {
 
     // Process each test user
     for (const { email, orgRole, accountType } of TEST_USERS) {
-      let user = await prisma.user.findUnique({
-        where: { email },
-      });
+      const userRows = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "User" WHERE email = ${email} LIMIT 1
+      `;
+      let userId = userRows[0]?.id;
 
-      if (!user) {
+      if (!userId) {
         const passwordHash = await bcrypt.hash('password123', 10);
-        user = await prisma.user.create({
-          data: {
-            id: randomUUID(),
-            email,
-            name: email.split('@')[0],
-            password: passwordHash,
-            accountType,
-          },
-        });
+        userId = randomUUID();
+        const name = email.split('@')[0];
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "User" (id, email, name, password, "accountType", "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, $4, $5::"Role", NOW(), NOW())`,
+          userId,
+          email,
+          name,
+          passwordHash,
+          accountType,
+        );
         console.log(`✅ Created user ${email} with accountType ${accountType}`);
       }
 
-      // Upsert OrganizationMember
-      const membership = await prisma.organizationMember.upsert({
-        where: {
-          userId_orgId: {
-            userId: user.id,
-            orgId: testOrg.id,
-          },
-        },
-        update: {
-          role: orgRole,
-        },
-        create: {
-          userId: user.id,
-          orgId: testOrg.id,
-          role: orgRole,
-        },
-      });
+      const membershipRows = await prisma.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "OrganizationMember"
+        WHERE "userId" = ${userId} AND "orgId" = ${orgId}
+        LIMIT 1
+      `;
 
-      console.log(
-        `✅ Attached ${email} as ${orgRole} (membership ID: ${membership.id})`,
-      );
+      if (!membershipRows[0]?.id) {
+        const membershipId = randomUUID();
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "OrganizationMember" (id, "userId", "orgId", role, "createdAt")
+           VALUES ($1, $2, $3, $4::"OrgRole", NOW())`,
+          membershipId,
+          userId,
+          orgId,
+          orgRole,
+        );
+        console.log(
+          `✅ Attached ${email} as ${orgRole} (membership ID: ${membershipId})`,
+        );
+      } else {
+        await prisma.$executeRawUnsafe(
+          `UPDATE "OrganizationMember" SET role = $1::"OrgRole" WHERE id = $2`,
+          orgRole,
+          membershipRows[0].id,
+        );
+        console.log(
+          `✅ Updated ${email} role to ${orgRole} (membership ID: ${membershipRows[0].id})`,
+        );
+      }
+
       attachedUsers.push(email);
     }
 
     // Summary
     console.log('\n📊 Summary:');
-    console.log(`   Organization: ${testOrg.name} (${testOrg.id})`);
+    console.log(`   Organization: ${TEST_ORG_NAME} (${orgId})`);
     console.log(`   Users attached: ${attachedUsers.length}`);
     if (attachedUsers.length > 0) {
       console.log(`   - ${attachedUsers.join('\n   - ')}`);

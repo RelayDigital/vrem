@@ -3,6 +3,10 @@ import { IsOptional, IsString } from 'class-validator';
 export class UpdateOrganizationSettingsDto {
   @IsOptional()
   @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
   legalName?: string;
 
   @IsOptional()

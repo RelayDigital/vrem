@@ -163,6 +163,18 @@ export class OrganizationsService {
     if (dto.timezone !== undefined) updateData.timezone = dto.timezone;
     if (dto.serviceArea !== undefined) updateData.serviceArea = dto.serviceArea;
 
+    // For personal organizations, lock the name to "<User Name>'s Workspace"
+    if (org.type === OrgType.PERSONAL) {
+      const ownerMembership = await this.prisma.organizationMember.findFirst({
+        where: { orgId, role: OrgRole.OWNER },
+        include: { user: true },
+      });
+      const ownerName = ownerMembership?.user?.name || 'User';
+      updateData.name = `${ownerName}'s Workspace`;
+    } else if (dto.name !== undefined) {
+      updateData.name = dto.name;
+    }
+
     return this.prisma.organization.update({
       where: { id: orgId },
       data: updateData,

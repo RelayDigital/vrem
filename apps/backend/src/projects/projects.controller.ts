@@ -151,9 +151,9 @@ export class ProjectsController {
   // REMOVE
   @Delete(':id')
   @UseGuards(OrgMemberGuard)
-  @Roles(UserAccountType.COMPANY, UserAccountType.COMPANY)
-  remove(@Param('id') id: string, @CurrentOrg() org) {
-    return this.projectsService.remove(id, org.id);
+  @Roles(UserAccountType.COMPANY, UserAccountType.COMPANY, UserAccountType.AGENT)
+  remove(@Param('id') id: string, @CurrentOrg() org, @CurrentUser() user, @Req() req) {
+    return this.projectsService.remove(id, org.id, user, req?.membership?.role);
   }
 
   // ASSIGN TECHNICIAN

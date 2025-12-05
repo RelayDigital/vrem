@@ -84,7 +84,7 @@ model Message {
 
 model Project {
   id            String         @id @default(uuid())
-  address       String
+  address       Json
   notes         String?
   scheduledTime DateTime
   status        ProjectStatus  @default(BOOKED)
