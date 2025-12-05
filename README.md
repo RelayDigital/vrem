@@ -1,6 +1,6 @@
 # VREM - Real-Estate Media OS
 
-VREM is a vertically-integrated Real-Estate Media Operating System that unifies scheduling, production workflow, media delivery, collaboration, and analytics for agents, photographers, editors, and project managers. It replaces fragmented tools (e.g. Aryeo, Asana, Slack) with one unified platform.
+VREM is a vertically-integrated Real-Estate Media Operating System that unifies scheduling, production workflow, media delivery, collaboration, and analytics for agents, technicians, editors, and project managers. It replaces fragmented tools (e.g. Aryeo, Asana, Slack) with one unified platform.
 
 ## 🎯 Overview
 
@@ -8,11 +8,11 @@ VREM is a comprehensive, cloud-native platform that manages the complete lifecyc
 
 - **Agents** create shoot orders with real-time calendar slot selection and payment capture
 - **Project Managers** assign technicians/editors and progress jobs through pipeline stages
-- **Photographers/Technicians** capture media and upload raw assets during shoots
+- **Technicians/Technicians** capture media and upload raw assets during shoots
 - **Editors** process and deliver final media to clients
 - **Clients** review, approve, and download media through delivery pages
 
-The platform orchestrates the entire workflow from **Booked → Shooting → Editing → Delivered**, with real-time collaboration, media management, and intelligent photographer matching at every stage.
+The platform orchestrates the entire workflow from **Booked → Shooting → Editing → Delivered**, with real-time collaboration, media management, and intelligent technician matching at every stage.
 
 ## 🏗️ Architecture
 
@@ -56,9 +56,9 @@ The platform consists of:
 - **Advanced Calendar Integration**: Real-time calendar slot selection via Cronofy or similar services
 - **Payment Capture**: Stripe Checkout integration for seamless payment processing
 - **Smart Booking Flow**: Multi-step wizard for creating shoot orders (address, date, package, client)
-- **AI Photographer Matching**: Automatic ranking based on availability, proximity, reliability, skills, and preferred vendor relationships
+- **AI Technician Matching**: Automatic ranking based on availability, proximity, reliability, skills, and preferred vendor relationships
 - **Real-time Address Search**: Mapbox integration for address autocomplete and geocoding
-- **Calendar Sync**: Automatic updates to both agency and photographer calendars upon confirmation
+- **Calendar Sync**: Automatic updates to both agency and technician calendars upon confirmation
 
 ### Pipeline-Driven Workflow
 - **Stage Management**: Progress jobs through stages (Booked → Shooting → Editing → Delivered)
@@ -82,7 +82,7 @@ The platform consists of:
 - **Instant Notifications**: Email/SMS/in-app notifications keep all stakeholders synced
 
 ### Multi-Tenant Enterprise Support
-- **Role-Based Access Control (RBAC)**: Admin, Project Manager, Editor/Technician, Agent, Photographer roles
+- **Role-Based Access Control (RBAC)**: Admin, Project Manager, Editor/Technician, Agent, Technician roles
 - **Row-Based Multi-Tenancy**: Secure data isolation at the database level
 - **Enterprise SSO**: SAML/OIDC support for brokerages (planned)
 - **Custom Branding**: Per-tenant configuration and branding
@@ -91,15 +91,15 @@ The platform consists of:
 
 ### Analytics & Insights
 - **Metrics Dashboard**: Track key performance indicators and analytics
-- **Team Performance**: Monitor photographer reliability, on-time rates, and ratings
+- **Team Performance**: Monitor technician reliability, on-time rates, and ratings
 - **Workflow Analytics**: Track pipeline efficiency and bottleneck identification
 - **Business Intelligence**: Export data for external BI tools and reporting
 
 ### Future: Marketplace Expansion
-- **Automated Matching**: Agents request shoots and are automatically paired with highest-ranked available photographers
+- **Automated Matching**: Agents request shoots and are automatically paired with highest-ranked available technicians
 - **Location-Based Routing**: Intelligent assignment based on location, schedule, and reliability
 - **Stripe Connect Integration**: Standardized payments and payouts for marketplace transactions
-- **Reassignment Logic**: Automatic re-routing if photographer declines or times out
+- **Reassignment Logic**: Automatic re-routing if technician declines or times out
 
 ## 🛠️ Tech Stack
 
@@ -195,7 +195,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 🧠 AI Ranking Algorithm
 
-Photographers are automatically ranked and matched to jobs using a weighted algorithm that considers:
+Technicians are automatically ranked and matched to jobs using a weighted algorithm that considers:
 
 - **Availability** (30%): Must be available on the requested date (calendar sync)
 - **Preferred Relationships** (25%): Preferred vendors get priority in assignments
@@ -203,7 +203,7 @@ Photographers are automatically ranked and matched to jobs using a weighted algo
 - **Distance** (15%): Proximity to job location using Haversine formula
 - **Skill Match** (10%): Expertise in required media types (photography, video, aerial, twilight)
 
-The system automatically assigns the highest-ranked available photographer, with fallback logic for declines or timeouts. Agents can review assigned photographers and request reassignment if needed.
+The system automatically assigns the highest-ranked available technician, with fallback logic for declines or timeouts. Agents can review assigned technicians and request reassignment if needed.
 
 See `apps/frontend/vrem-app/lib/ranking.ts` for implementation details.
 
@@ -212,7 +212,7 @@ See `apps/frontend/vrem-app/lib/ranking.ts` for implementation details.
 VREM manages the complete media production lifecycle through a pipeline-driven workflow:
 
 1. **Booked**: Agent creates shoot order with payment capture and calendar confirmation
-2. **Shooting**: Photographer assigned, captures media, uploads raw assets to S3
+2. **Shooting**: Technician assigned, captures media, uploads raw assets to S3
 3. **Editing**: Editor processes media, uploads final deliverables
 4. **Delivered**: Client receives delivery page with preview and download options
 
@@ -262,12 +262,12 @@ vrem-app/
 │       │   ├── settings/        # Settings (account, personal, product)
 │       │   ├── team/            # Team management
 │       │   └── layout.tsx       # Dispatcher layout
-│       ├── photographer/        # Photographer role pages
+│       ├── technician/        # Technician role pages
 │       │   ├── companies/       # Company applications
 │       │   ├── jobs/            # Job dashboard
 │       │   ├── profile/         # Profile management
-│       │   ├── settings/        # Photographer settings
-│       │   └── layout.tsx       # Photographer layout
+│       │   ├── settings/        # Technician settings
+│       │   └── layout.tsx       # Technician layout
 │       ├── booking/             # Shared booking page
 │       ├── calendar/            # Shared calendar page
 │       ├── dashboard/           # Shared dashboard
@@ -288,17 +288,17 @@ vrem-app/
 │   │   │   ├── steps/           # Booking wizard steps
 │   │   │   └── views/           # Agent views
 │   │   ├── dispatcher/          # Dispatcher/PM features
-│   │   │   ├── DispatcherDashboard.tsx
-│   │   │   ├── DispatcherSidebar.tsx
+│   │   │   ├── CompanyDashboard.tsx
+│   │   │   ├── CompanySidebar.tsx
 │   │   │   ├── AuditLog.tsx
 │   │   │   ├── JobAssignment.tsx
 │   │   │   ├── dialogs/         # Ranking dialogs
 │   │   │   └── views/           # Dashboard, Jobs, Audit, Team, Map views
-│   │   ├── photographer/        # Photographer features
-│   │   │   ├── PhotographerDashboard.tsx
-│   │   │   ├── PhotographerCard.tsx
-│   │   │   ├── PhotographerManagement.tsx
-│   │   │   ├── PhotographerSearch.tsx
+│   │   ├── technician/        # Technician features
+│   │   │   ├── ProviderDashboard.tsx
+│   │   │   ├── ProviderCard.tsx
+│   │   │   ├── ProviderManagement.tsx
+│   │   │   ├── ProviderSearch.tsx
 │   │   │   └── views/           # Companies, Jobs, Profile views
 │   │   ├── calendar/            # Calendar components
 │   │   │   ├── CalendarView.tsx
@@ -334,11 +334,11 @@ vrem-app/
 │   │   │   └── MetricsDashboard.tsx
 │   │   ├── ranking/             # Ranking components
 │   │   │   └── RankingFactors.tsx
-│   │   ├── photographer/        # Photographer components
-│   │   │   ├── FindPhotographerView.tsx
-│   │   │   └── PhotographerRankingsView.tsx
+│   │   ├── technician/        # Technician components
+│   │   │   ├── FindTechnicianView.tsx
+│   │   │   └── TechnicianRankingsView.tsx
 │   │   ├── tables/              # Data tables
-│   │   │   └── PhotographerTable.tsx
+│   │   │   └── TeamTable.tsx
 │   │   ├── settings/            # Settings components
 │   │   │   └── SettingsView.tsx
 │   │   ├── layout/               # Layout components
@@ -734,7 +734,7 @@ VREM replaces fragmented tools (Aryeo, Asana, Slack) with one unified platform, 
 - **Streamlined Workflow**: End-to-end pipeline from booking to delivery
 - **Real-time Collaboration**: Live updates, chat, and media proofing
 - **Enterprise Scale**: Multi-tenant architecture with SSO and custom branding
-- **Future Marketplace**: Automated photographer matching and assignment
+- **Future Marketplace**: Automated technician matching and assignment
 
 The platform is engineered for enterprise scale and reliability, supporting high-availability needs with multi-region deployment and comprehensive monitoring.
 
