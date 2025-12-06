@@ -51,6 +51,11 @@ export default function DashboardPage() {
     if (!user) return null;
     return providers.find((provider) => provider.userId === user.id) || null;
   }, [providers, user]);
+  const activeMembership = memberships.find((m) => m.orgId === organizationId);
+  const roleUpper = (
+    (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+  ).toUpperCase();
+  const canViewCustomerChat = ["OWNER", "ADMIN", "DISPATCHER"].includes(roleUpper);
   const assignedJobs = useMemo(() => {
     if (!user) return [];
     return jobManagement.jobs.filter(
@@ -128,9 +133,11 @@ export default function DashboardPage() {
     if (jobManagement.selectedJob) {
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
       messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
-      messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
+      if (canViewCustomerChat) {
+        messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
+      }
     }
-  }, [jobManagement.selectedJob, messaging]);
+  }, [jobManagement.selectedJob, messaging, canViewCustomerChat]);
 
   useEffect(() => {
     let cancelled = false;

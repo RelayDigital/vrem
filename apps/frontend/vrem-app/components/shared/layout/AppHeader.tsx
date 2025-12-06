@@ -115,6 +115,21 @@ export function AppHeader({
     memberships.some((m) => roles.includes((m as any).orgRole || m.role));
   const canManage = hasOrgRole("OWNER", "ADMIN");
   const isProviderOnly = !canManage && hasOrgRole("TECHNICIAN");
+  const activeMembership = memberships.find(
+    (m) => m.orgId === activeOrganizationId
+  );
+  const activeRole = (
+    (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+  ).toUpperCase();
+  const orgType =
+    activeMembership?.organization?.type ||
+    (activeMembership as any)?.organizationType ||
+    "";
+  const isProjectManager =
+    activeRole === "PROJECT_MANAGER" && orgType !== "PERSONAL";
+  const isEditor =
+    activeRole === "EDITOR" && orgType !== "PERSONAL";
+  const isLimitedRole = isProjectManager || isEditor;
 
   return (
     <>
@@ -216,7 +231,7 @@ export function AppHeader({
                 )}
 
               {/* New Job Button for Owner or Admin */}
-              {!useIsMobile() && showNewJobButton && (
+              {!useIsMobile() && showNewJobButton && !isLimitedRole && (
                 <Button
                   onClick={handleNewJobClick}
                   size="sm"
@@ -235,7 +250,7 @@ export function AppHeader({
                     variant="ghost"
                     className="flex items-center gap-3 h-auto p-0"
                   >
-                    <Avatar className="h-9 w-9 border-2 border-border shadow-sm">
+                    <Avatar className="size-9 border-2 border-border">
                       <AvatarImage src={user?.avatarUrl || ""} />
                       <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                         {user?.name

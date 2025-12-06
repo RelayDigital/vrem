@@ -100,16 +100,22 @@ export default function OrganizationGeneralPage() {
         .filter(Boolean)
         .join(", ");
 
-      let nextLat = lat ? Number(lat) : undefined;
-      let nextLng = lng ? Number(lng) : undefined;
+      let nextLat = lat ? parseFloat(lat) : undefined;
+      let nextLng = lng ? parseFloat(lng) : undefined;
+      const needsGeocode =
+        (!nextLat && nextLat !== 0) || (!nextLng && nextLng !== 0);
 
-      if ((!nextLat || !nextLng) && fullAddress) {
+      if (fullAddress && needsGeocode) {
         const coords = await geocodeAddress(fullAddress);
         if (coords) {
           nextLat = coords.lat;
           nextLng = coords.lng;
           setLat(String(coords.lat));
           setLng(String(coords.lng));
+        } else {
+          toast.error(
+            "Unable to geocode address. Please confirm the address or enter coordinates manually."
+          );
         }
       }
 

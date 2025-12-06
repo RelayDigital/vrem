@@ -23,7 +23,7 @@ import { JobDataBoundary, JobsGridSkeleton } from "@/components/shared/jobs";
 
 export default function JobManagementPage() {
   const router = useRouter();
-  const { user, isLoading } = useRequireRole([
+  const { user, isLoading, organizationId, memberships } = useRequireRole([
     "dispatcher",
     "DISPATCHER",
     "PROJECT_MANAGER",
@@ -31,6 +31,11 @@ export default function JobManagementPage() {
   ]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
+  const activeMembership = memberships.find((m) => m.orgId === organizationId);
+  const roleUpper = (
+    (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+  ).toUpperCase();
+  const canViewCustomerChat = ["OWNER", "ADMIN", "DISPATCHER"].includes(roleUpper);
 
   // Listen for navigation events to open job task view
   useEffect(() => {
@@ -59,9 +64,11 @@ export default function JobManagementPage() {
     if (jobManagement.selectedJob) {
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
       messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
-      messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
+      if (canViewCustomerChat) {
+        messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
+      }
     }
-  }, [jobManagement.selectedJob, messaging]);
+  }, [jobManagement.selectedJob, messaging, canViewCustomerChat]);
 
   if (isLoading) {
     return <JobsLoadingSkeleton />;

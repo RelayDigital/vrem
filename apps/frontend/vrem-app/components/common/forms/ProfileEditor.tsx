@@ -11,7 +11,7 @@ import { Input } from "../../ui/input";
 import { Checkbox } from "../../ui/checkbox";
 import { H2, H3, Small, Muted, Large } from "../../ui/typography";
 import { ProviderProfile } from "../../../types";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, ExternalLink, XCircle } from "lucide-react";
 
 interface ProfileEditorProps {
   provider: ProviderProfile;
@@ -148,7 +148,7 @@ export function ProfileEditor({
           <div className="space-y-6">
             {/* Basic Info */}
             <div className="flex items-start gap-6">
-              <Avatar className="size-24 border-4 border-card shadow-lg">
+              <Avatar className="size-24">
                 <AvatarImage src={provider.avatar} />
                 <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
                   {provider.name
@@ -206,7 +206,8 @@ export function ProfileEditor({
                     asChild
                   >
                     <Link href={organizationSettingsPath}>
-                      Manage in Personal Organization Settings
+                      Workspace Settings
+                      <ExternalLink className="size-4 ml-1" />
                     </Link>
                   </Button>
                 )}

@@ -109,12 +109,12 @@ export function CalendarHeaderToolbar({
             List
           </Button>
         </ButtonGroup>
-        {onCreateJob && (
+        {/* {onCreateJob && (
           <Button size="sm" onClick={onCreateJob} className="ml-2">
             <Plus className="h-4 w-4 mr-1" />
             Add Job
           </Button>
-        )}
+        )} */}
       </div>
     </div>
   );

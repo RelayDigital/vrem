@@ -61,8 +61,9 @@ export function TeamTable({
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const isProjectManager =
-    (currentUserRole || '').toUpperCase() === 'PROJECT_MANAGER';
+  const normalizedRole = (currentUserRole || '').toUpperCase();
+  const isLimitedManager =
+    normalizedRole === 'PROJECT_MANAGER' || normalizedRole === 'EDITOR';
 
   // Filter and sort technicians
   const filteredAndSortedTechnicians = useMemo(() => {
@@ -239,7 +240,7 @@ export function TeamTable({
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Technician</TableHead>
+          <TableHead>Team Member</TableHead>
           <TableHead>Location</TableHead>
           <TableHead>Rating</TableHead>
           <TableHead>Jobs</TableHead>
@@ -254,7 +255,7 @@ export function TeamTable({
         {filteredAndSortedTechnicians.length === 0 ? (
           <TableRow>
             <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
-              No technicians found
+              No team members found
             </TableCell>
           </TableRow>
         ) : (
@@ -346,7 +347,7 @@ export function TeamTable({
               <Select
                 value={technician.role || 'TECHNICIAN'}
                 onValueChange={(val) => {
-                  if (isProjectManager) {
+                  if (isLimitedManager) {
                     return;
                   }
                   if (technician.role === 'OWNER') {
@@ -360,7 +361,7 @@ export function TeamTable({
                   updatingRoleId === technician.id ||
                   (!!currentUserId && technician.id === currentUserId) ||
                   technician.role === 'OWNER' ||
-                  isProjectManager
+                  isLimitedManager
                 }
               >
                 <SelectTrigger className="w-[150px]">
@@ -382,10 +383,12 @@ export function TeamTable({
                   size="icon-sm"
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (isLimitedManager) return;
                     onRemove?.(technician);
                   }}
                   disabled={
                     !onRemove ||
+                    isLimitedManager ||
                     (currentUserId && technician.id === currentUserId) ||
                     (currentUserMemberId && technician.memberId === currentUserMemberId) ||
                     technician.role === 'OWNER' ||

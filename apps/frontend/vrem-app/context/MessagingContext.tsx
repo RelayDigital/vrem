@@ -135,7 +135,7 @@ export function MessagingProvider({
           channel,
           chatType: channel === 'CUSTOMER' ? 'client' : 'team',
           thread: threadId || null,
-          threadId,
+          threadId: threadId || undefined,
           createdAt: new Date(response.createdAt || new Date()),
         };
       }

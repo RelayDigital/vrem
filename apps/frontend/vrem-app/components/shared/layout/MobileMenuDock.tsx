@@ -5,6 +5,7 @@ import { LayoutDashboard, Briefcase, MapPin, Calendar, Plus } from "lucide-react
 import { cn } from "@/components/ui/utils";
 import { useJobCreation } from "@/context/JobCreationContext";
 import { useAuth } from "@/context/auth-context";
+import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 
 interface MenuItem {
   path: string;
@@ -40,6 +41,18 @@ export function MobileMenuDock() {
   const router = useRouter();
   const jobCreation = useJobCreation();
   const { user } = useAuth();
+  const { activeMembership } = useCurrentOrganization();
+  const activeRole = (
+    (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+  ).toUpperCase();
+  const orgType =
+    activeMembership?.organization?.type ||
+    (activeMembership as any)?.organizationType ||
+    "";
+  const isProjectManager =
+    activeRole === "PROJECT_MANAGER" && orgType !== "PERSONAL";
+  const isEditor = activeRole === "EDITOR" && orgType !== "PERSONAL";
+  const isLimitedRole = isProjectManager || isEditor;
 
   const isActive = (path: string) => {
     if (path === "/dashboard") {
@@ -49,6 +62,7 @@ export function MobileMenuDock() {
   };
 
   const handleNewJobClick = () => {
+    if (isLimitedRole) return;
     if (user?.role === 'AGENT') {
       router.push('/booking');
     } else {
@@ -89,14 +103,16 @@ export function MobileMenuDock() {
         })}
 
         {/* Center + button */}
-        <button
-          type="button"
-          className="size-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
-          onClick={handleNewJobClick}
-          aria-label="Create new job"
-        >
-          <Plus className="h-6 w-6" />
-        </button>
+        {!isLimitedRole && (
+          <button
+            type="button"
+            className="size-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center justify-center"
+            onClick={handleNewJobClick}
+            aria-label="Create new job"
+          >
+            <Plus className="h-6 w-6" />
+          </button>
+        )}
 
         {/* Last two menu items */}
         {menuItems.slice(2, 4).map((item) => {
@@ -124,4 +140,3 @@ export function MobileMenuDock() {
     </nav>
   );
 }
-

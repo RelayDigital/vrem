@@ -76,6 +76,8 @@ import {
   Upload,
   Grid3x3,
   Loader2,
+  Navigation,
+  Map as MapIcon,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
@@ -235,8 +237,17 @@ export function JobTaskView({
   const [activeTab, setActiveTab] = useState<
     "description" | "discussion" | "attachments" | "media"
   >("discussion");
+  const orgRoleUpper = (
+    (activeMembership?.role ||
+      (activeMembership as any)?.orgRole ||
+      "") as string
+  ).toUpperCase();
+  const isEditorRole = orgRoleUpper === "EDITOR";
   const [activeChatTab, setActiveChatTab] = useState<"client" | "team">(
     isAgentUser ? "client" : "team"
+  );
+  const canViewCustomerChat = ["OWNER", "ADMIN", "DISPATCHER"].includes(
+    orgRoleUpper
   );
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -275,23 +286,46 @@ export function JobTaskView({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-  const canAssign = useMemo(() => {
-    const orgRole = activeMembership?.role;
-    return ["OWNER", "ADMIN", "DISPATCHER", "PROJECT_MANAGER"].includes(
-      orgRole || ""
+  const isAssignedProjectManager = useMemo(
+    () => job?.projectManagerId === currentUserId,
+    [currentUserId, job?.projectManagerId]
+  );
+
+  const canAssignTeamMembers = useMemo(() => {
+    const orgRole = orgRoleUpper;
+    return (
+      ["OWNER", "ADMIN", "DISPATCHER", "PROJECT_MANAGER"].includes(
+        orgRole || ""
+      ) || isAssignedProjectManager
     );
-  }, [activeMembership]);
+  }, [isAssignedProjectManager, orgRoleUpper]);
+  const canAssignTechnicianOrEditor = canAssignTeamMembers;
+  const canAssignProjectManager = useMemo(() => {
+    const orgRole = orgRoleUpper;
+    return ["OWNER", "ADMIN", "DISPATCHER"].includes(orgRole || "");
+  }, [orgRoleUpper]);
+  const canAssign = canAssignTeamMembers;
+  const canAssignCustomer = useMemo(() => {
+    const orgRole = orgRoleUpper;
+    return ["OWNER", "ADMIN", "DISPATCHER"].includes(orgRole || "");
+  }, [orgRoleUpper]);
   const canDeleteProject = useMemo(() => {
-    const orgRole = (activeMembership?.role || activeMembership?.orgRole || "")
-      .toString()
-      .toUpperCase();
+    const orgRole = orgRoleUpper;
+    if (orgRole === "EDITOR") {
+      return false;
+    }
     const isElevated = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(orgRole);
     const isAgentCreator =
       orgRole === "AGENT" &&
       job?.projectManagerId &&
       job.projectManagerId === currentUserId;
-    return isElevated || isAgentCreator;
-  }, [activeMembership, currentUserId, job?.projectManagerId]);
+    return isElevated || isAgentCreator || isAssignedProjectManager;
+  }, [
+    currentUserId,
+    isAssignedProjectManager,
+    job?.projectManagerId,
+    orgRoleUpper,
+  ]);
   const getInitials = (value?: string | null) =>
     value
       ? value
@@ -373,6 +407,7 @@ export function JobTaskView({
     if (!job?.customerId) return null;
     return customers.find((customer) => customer.id === job.customerId) || null;
   }, [customers, job]);
+
   const assignedProjectManager = useMemo(() => {
     if (!job?.projectManagerId) return null;
     return (
@@ -382,7 +417,8 @@ export function JobTaskView({
           member.user?.id === job.projectManagerId
       ) || null
     );
-  }, [job, projectManagers]);
+  }, [projectManagers, job]);
+
   const assignedEditor = useMemo(() => {
     if (!job?.editorId) return null;
     return (
@@ -392,6 +428,51 @@ export function JobTaskView({
       ) || null
     );
   }, [editors, job]);
+
+  const customerDisplayName =
+    assignedCustomer?.name || job?.clientName || "Unassigned";
+
+  const projectManagerDisplayName =
+    assignedProjectManager?.user?.name ||
+    assignedProjectManager?.personalOrg?.legalName ||
+    assignedProjectManager?.user?.email ||
+    (projectManager as any)?.name ||
+    (projectManager as any)?.fullName ||
+    (projectManager as any)?.email ||
+    (job as any)?.projectManager?.name ||
+    (job as any)?.projectManager?.fullName ||
+    (job as any)?.projectManager?.email ||
+    (job?.projectManagerId ? "Assigned" : "Unassigned");
+
+  const editorDisplayName =
+    assignedEditor?.user?.name ||
+    assignedEditor?.personalOrg?.legalName ||
+    assignedEditor?.user?.email ||
+    (editor as any)?.name ||
+    (editor as any)?.fullName ||
+    (editor as any)?.email ||
+    (job as any)?.editor?.name ||
+    (job as any)?.editor?.fullName ||
+    (job as any)?.editor?.email ||
+    (job?.editorId ? "Assigned" : "Unassigned");
+
+  const projectManagerDisplayAvatar =
+    assignedProjectManager?.user?.avatarUrl ||
+    (projectManager as any)?.avatarUrl ||
+    (job as any)?.projectManager?.avatarUrl ||
+    "";
+
+  const editorDisplayAvatar =
+    assignedEditor?.user?.avatarUrl ||
+    (editor as any)?.avatarUrl ||
+    (job as any)?.editor?.avatarUrl ||
+    "";
+
+  useEffect(() => {
+    if (!canViewCustomerChat && activeChatTab === "client") {
+      setActiveChatTab("team");
+    }
+  }, [activeChatTab, canViewCustomerChat]);
 
   // Media mapping helpers need to be defined before effects
   const mapBackendTypeToCategory = useCallback(
@@ -476,13 +557,16 @@ export function JobTaskView({
       if (!orgId || !open) return;
       api.organizations.setActiveOrganization(orgId);
       try {
+        const customersPromise = canAssignCustomer
+          ? api.customers.list()
+          : Promise.resolve<OrganizationCustomer[]>([]);
         const [techs, custs, members] = await Promise.all([
           fetchOrganizationTechnicians(),
-          api.customers.list(),
+          customersPromise,
           api.organizations.listMembers(),
         ]);
         setTechnicians(techs);
-        setCustomers(custs);
+        setCustomers(canAssignCustomer ? custs : []);
         setProjectManagers(
           members.filter((m) =>
             ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(
@@ -530,7 +614,9 @@ export function JobTaskView({
         if (!cancelled) {
           const mapped = media.map(mapMediaRecordToItem);
           setUploadedMedia(mapped);
-          mapped.forEach((m) => processedMediaKeysRef.current.add(m.key || m.id));
+          mapped.forEach((m) =>
+            processedMediaKeysRef.current.add(m.key || m.id)
+          );
         }
       } catch (error) {
         if (!cancelled) {
@@ -549,10 +635,16 @@ export function JobTaskView({
     return () => {
       cancelled = true;
     };
-  }, [activeOrganizationId, job?.id, job?.organizationId, mapMediaRecordToItem, open]);
+  }, [
+    activeOrganizationId,
+    job?.id,
+    job?.organizationId,
+    mapMediaRecordToItem,
+    open,
+  ]);
 
   const handleAssignCustomerInline = async (customerId: string) => {
-    if (!job || !customerId || !canAssign) return;
+    if (!job || !customerId || !canAssignCustomer) return;
     setLoadingAssignments(true);
     try {
       if (onAssignCustomer) {
@@ -579,7 +671,7 @@ export function JobTaskView({
   };
 
   const handleAssignProjectManagerInline = async (userId: string) => {
-    if (!job || !userId || !canAssign) return;
+    if (!job || !userId || !canAssignProjectManager) return;
     setLoadingAssignments(true);
     try {
       if (onAssignProjectManager) {
@@ -606,7 +698,7 @@ export function JobTaskView({
   };
 
   const handleAssignEditorInline = async (userId: string) => {
-    if (!job || !userId || !canAssign) return;
+    if (!job || !userId || !canAssignTechnicianOrEditor) return;
     setLoadingAssignments(true);
     try {
       if (onAssignEditor) {
@@ -736,7 +828,14 @@ export function JobTaskView({
     setReplyingTo(null);
     setHasEditorContent(false);
     messageEditor.commands.focus();
-  }, [messageEditor, onSendMessage, activeChatTab, replyingTo, isAgentUser, sanitizeMessageHtml]);
+  }, [
+    messageEditor,
+    onSendMessage,
+    activeChatTab,
+    replyingTo,
+    isAgentUser,
+    sanitizeMessageHtml,
+  ]);
 
   const handleEdit = useCallback((message: ChatMessage) => {
     setEditingMessageId(message.id);
@@ -986,7 +1085,8 @@ export function JobTaskView({
     info: any,
     category: MediaCategory
   ) => {
-    if (!info || !info.allEntries || info.allEntries.length === 0 || !job) return;
+    if (!info || !info.allEntries || info.allEntries.length === 0 || !job)
+      return;
 
     const orgId = activeOrganizationId || job.organizationId;
     if (orgId) {
@@ -1022,7 +1122,9 @@ export function JobTaskView({
       setUploadedMedia((prev) => {
         const merged = [...prev];
         createdItems.forEach((item) => {
-          const exists = merged.some((m) => m.id === item.id || m.key === item.key);
+          const exists = merged.some(
+            (m) => m.id === item.id || m.key === item.key
+          );
           if (!exists) merged.push(item);
         });
         return merged;
@@ -1038,47 +1140,14 @@ export function JobTaskView({
   const getMediaByCategory = (category: MediaCategory) => {
     return uploadedMedia.filter((item) => item.type === category);
   };
+
   const hasAnyMedia = useMemo(
     () => uploadedMedia && uploadedMedia.length > 0,
     [uploadedMedia]
   );
+
   const priorityConfig = getPriorityConfig(job?.priority || "standard");
   const statusConfig = getStatusConfig(job?.status || "pending");
-  const customerDisplayName =
-    assignedCustomer?.name || job?.clientName || "Unassigned";
-  const projectManagerDisplay = assignedProjectManager
-    ? {
-        name:
-          assignedProjectManager.user?.name ||
-          assignedProjectManager.personalOrg?.legalName ||
-          "Unassigned",
-        avatar: assignedProjectManager.user?.avatarUrl,
-        userId:
-          assignedProjectManager.user?.id || assignedProjectManager.userId,
-      }
-    : projectManager
-    ? {
-        name: (projectManager as any).name,
-        avatar: (projectManager as any).avatarUrl,
-        userId: (projectManager as any).id,
-      }
-    : null;
-  const editorDisplay = assignedEditor
-    ? {
-        name:
-          assignedEditor.user?.name ||
-          assignedEditor.personalOrg?.legalName ||
-          "Unassigned",
-        avatar: assignedEditor.user?.avatarUrl,
-        userId: assignedEditor.user?.id || assignedEditor.userId,
-      }
-    : editor
-    ? {
-        name: (editor as any).name,
-        avatar: (editor as any).avatarUrl,
-        userId: (editor as any).id,
-      }
-    : null;
 
   const getUploadcareAcceptTypes = (category: MediaCategory) => {
     switch (category) {
@@ -1160,7 +1229,9 @@ export function JobTaskView({
       processedMediaKeysRef.current.add(url);
       setUploadedMedia((prev) => {
         const mapped = mapMediaRecordToItem(mediaRecord);
-        const exists = prev.some((m) => m.id === mapped.id || m.key === mapped.key);
+        const exists = prev.some(
+          (m) => m.id === mapped.id || m.key === mapped.key
+        );
         return exists ? prev : [...prev, mapped];
       });
       toast.success("Media added");
@@ -1362,12 +1433,21 @@ export function JobTaskView({
                     process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY ||
                     "dbf470d49c954f9f6143"
                   }
-                  classNameUploader="uc-light uc-custom"
+                  classNameUploader="uc-light uc-gray"
                   sourceList="local, camera, gdrive, facebook"
                   userAgentIntegration="llm-nextjs"
                   filesViewMode="grid"
+                  useCloudImageEditor={false}
                   accept={getUploadcareAcceptTypes(category)}
-                  onChange={(info) => void handleUploadcareSuccess(info, category)}
+                  onChange={(info) =>
+                    void handleUploadcareSuccess(info, category)
+                  }
+                  onCommonUploadSuccess={(e) =>
+                    console.log(
+                      "Uploaded files URL list",
+                      e.successEntries.map((entry: any) => entry.cdnUrl)
+                    )
+                  }
                 />
               </div>
             </div>
@@ -1390,21 +1470,30 @@ export function JobTaskView({
                 category === "video" ||
                 category === "floor-plan" ||
                 category === "file") && (
-              <div onClick={(e) => e.stopPropagation()}>
-                <FileUploaderRegular
-                  pubkey={
-                    process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY ||
-                    "dbf470d49c954f9f6143"
-                  }
-                  classNameUploader="uc-light uc-custom"
-                  sourceList="local, camera, gdrive, facebook"
-                  userAgentIntegration="llm-nextjs"
-                  filesViewMode="grid"
-                  accept={getUploadcareAcceptTypes(category)}
-                  onChange={(info) => void handleUploadcareSuccess(info, category)}
-                />
-              </div>
-            )}
+                <div onClick={(e) => e.stopPropagation()}>
+                  <FileUploaderRegular
+                    pubkey={
+                      process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY ||
+                      "dbf470d49c954f9f6143"
+                    }
+                    classNameUploader="uc-light uc-gray"
+                    sourceList="local, camera, gdrive, facebook"
+                    userAgentIntegration="llm-nextjs"
+                    filesViewMode="grid"
+                    useCloudImageEditor={false}
+                    accept={getUploadcareAcceptTypes(category)}
+                    onChange={(info) =>
+                      void handleUploadcareSuccess(info, category)
+                    }
+                    onCommonUploadSuccess={(e) =>
+                      console.log(
+                        "Uploaded files URL list",
+                        e.successEntries.map((entry: any) => entry.cdnUrl)
+                      )
+                    }
+                  />
+                </div>
+              )}
             {/* {!uploadsDisabled &&
               (category === "image" ||
                 category === "video" ||
@@ -1506,10 +1595,19 @@ export function JobTaskView({
         (m as any)?.user?.account_type === "AGENT";
       const channel =
         (m as any)?.channel ||
-        (isAgentMessage ? "CUSTOMER" : (m.chatType === "client" ? "CUSTOMER" : "TEAM"));
+        (isAgentMessage
+          ? "CUSTOMER"
+          : m.chatType === "client"
+          ? "CUSTOMER"
+          : "TEAM");
       const chatType: "client" | "team" =
         channel === "CUSTOMER" ? "client" : "team";
-      return { ...m, channel, chatType, thread: (m as any).thread ?? m.threadId ?? null };
+      return {
+        ...m,
+        channel,
+        chatType,
+        thread: (m as any).thread ?? m.threadId ?? null,
+      };
     });
   }, [messages]);
 
@@ -1546,14 +1644,19 @@ export function JobTaskView({
     return roots;
   };
 
-  const clientThreaded = useMemo(() => buildThreads(clientMessages), [clientMessages]);
-  const teamThreaded = useMemo(() => buildThreads(teamMessages), [teamMessages]);
-  const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
+  const clientThreaded = useMemo(
+    () => buildThreads(clientMessages),
+    [clientMessages]
+  );
+  const teamThreaded = useMemo(
+    () => buildThreads(teamMessages),
+    [teamMessages]
+  );
+  const [expandedThreads, setExpandedThreads] = useState<
+    Record<string, boolean>
+  >({});
 
-  const renderMessage = (
-    message: any,
-    depth = 0
-  ) => {
+  const renderMessage = (message: any, depth = 0) => {
     const threadMessages = message.replies || [];
     const isOwnMessage = message.userId === currentUserId;
     const isEditing = editingMessageId === message.id;
@@ -1566,17 +1669,20 @@ export function JobTaskView({
         className={cn("flex gap-2.5 relative", depth > 0 && "mt-3")}
         style={{ marginLeft: depth > 0 ? depth * 16 : 0 }}
       >
+        {/* User Avatar */}
         <Avatar className="h-7 w-7 shrink-0">
           <AvatarImage src={message.userAvatar} alt={message.userName} />
-            <AvatarFallback className="text-xs bg-muted">
-              {message.userName
-                .split(" ")
-                .map((n: string) => n[0])
-                .join("")}
-            </AvatarFallback>
-          </Avatar>
+          <AvatarFallback className="text-xs bg-muted">
+            {message.userName
+              .split(" ")
+              .map((n: string) => n[0])
+              .join("")}
+          </AvatarFallback>
+        </Avatar>
+        {/* Message Content */}
         <div className="flex-1 min-w-0">
           <div className="group">
+            {/* Message Header */}
             <div className="flex items-center gap-1.5 mb-1.5">
               <span className="text-sm font-medium text-foreground">
                 {message.userName}
@@ -1587,6 +1693,7 @@ export function JobTaskView({
               </span>
             </div>
 
+            {/* Message Editor */}
             {isEditing ? (
               <div className="mb-1.5">
                 <div className="bg-muted/50 border border-border rounded-2xl overflow-hidden flex flex-col">
@@ -1621,6 +1728,7 @@ export function JobTaskView({
               />
             )}
 
+            {/* Message Actions */}
             {!isEditing && (
               <div className="flex items-center gap-2.5 mt-1.5">
                 <Button
@@ -1656,6 +1764,8 @@ export function JobTaskView({
               </div>
             )}
           </div>
+
+          {/* Threaded Replies */}
           {threadMessages.length > 0 && (
             <div className="mt-2 space-y-2 relative pl-2">
               <div className="flex items-center gap-2">
@@ -1820,22 +1930,24 @@ export function JobTaskView({
         {/* Chat Type Tabs - Only show when Discussion tab is active */}
         {activeTab === "discussion" && !isAgentUser && (
           <div className="flex items-center gap-6 mb-4">
-            <Button
-              variant="ghost"
-              onClick={() => setActiveChatTab("client")}
-              className={cn(
-                "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
-                activeChatTab === "client"
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              Customer Chat
-              {activeChatTab === "client" && (
-                <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
-              )}
-            </Button>
+            {canViewCustomerChat && (
+              <Button
+                variant="ghost"
+                onClick={() => setActiveChatTab("client")}
+                className={cn(
+                  "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
+                  activeChatTab === "client"
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <MessageSquare className="size-3.5" />
+                Customer Chat
+                {activeChatTab === "client" && (
+                  <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
+                )}
+              </Button>
+            )}
 
             <Button
               variant="ghost"
@@ -1847,7 +1959,7 @@ export function JobTaskView({
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <User className="h-3.5 w-3.5" />
+              <User className="size-3.5" />
               Team Chat
               {!isClient && (
                 <Badge variant="secondary" className="ml-1 text-xs h-4 px-1.5">
@@ -1908,7 +2020,7 @@ export function JobTaskView({
                           (isClient && activeChatTab === "team")
                         }
                       >
-                        <MoreHorizontal className="h-3.5 w-3.5 text-foreground" />
+                        <MoreHorizontal className="size-3.5 text-foreground" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-2" align="start">
@@ -1929,7 +2041,7 @@ export function JobTaskView({
                             (isClient && activeChatTab === "team")
                           }
                         >
-                          <Bold className="h-3.5 w-3.5 text-foreground" />
+                          <Bold className="size-3.5 text-foreground" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -1947,7 +2059,7 @@ export function JobTaskView({
                             (isClient && activeChatTab === "team")
                           }
                         >
-                          <Italic className="h-3.5 w-3.5 text-foreground" />
+                          <Italic className="size-3.5 text-foreground" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -1969,7 +2081,7 @@ export function JobTaskView({
                             (isClient && activeChatTab === "team")
                           }
                         >
-                          <Underline className="h-3.5 w-3.5 text-foreground" />
+                          <Underline className="size-3.5 text-foreground" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -1987,7 +2099,7 @@ export function JobTaskView({
                             (isClient && activeChatTab === "team")
                           }
                         >
-                          <Strikethrough className="h-3.5 w-3.5 text-foreground" />
+                          <Strikethrough className="size-3.5 text-foreground" />
                         </Button>
                         <div className="h-4 w-px bg-border mx-0.5" />
                         <Button
@@ -2010,7 +2122,7 @@ export function JobTaskView({
                             (isClient && activeChatTab === "team")
                           }
                         >
-                          <List className="h-3.5 w-3.5 text-foreground" />
+                          <List className="size-3.5 text-foreground" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -2032,7 +2144,7 @@ export function JobTaskView({
                             (isClient && activeChatTab === "team")
                           }
                         >
-                          <ListOrdered className="h-3.5 w-3.5 text-foreground" />
+                          <ListOrdered className="size-3.5 text-foreground" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -2050,7 +2162,7 @@ export function JobTaskView({
                             (isClient && activeChatTab === "team")
                           }
                         >
-                          <Indent className="h-3.5 w-3.5 text-foreground" />
+                          <Indent className="size-3.5 text-foreground" />
                         </Button>
                         <div className="h-4 w-px bg-border mx-0.5" />
                         <Button
@@ -2073,7 +2185,7 @@ export function JobTaskView({
                             (isClient && activeChatTab === "team")
                           }
                         >
-                          <Code className="h-3.5 w-3.5 text-foreground" />
+                          <Code className="size-3.5 text-foreground" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -2095,7 +2207,7 @@ export function JobTaskView({
                             (isClient && activeChatTab === "team")
                           }
                         >
-                          <Quote className="h-3.5 w-3.5 text-foreground" />
+                          <Quote className="size-3.5 text-foreground" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -2136,7 +2248,7 @@ export function JobTaskView({
                             (isClient && activeChatTab === "team")
                           }
                         >
-                          <LinkIcon className="h-3.5 w-3.5 text-foreground" />
+                          <LinkIcon className="size-3.5 text-foreground" />
                         </Button>
                       </div>
                     </PopoverContent>
@@ -2158,7 +2270,7 @@ export function JobTaskView({
                         !messageEditor || (isClient && activeChatTab === "team")
                       }
                     >
-                      <Bold className="h-3.5 w-3.5 text-foreground" />
+                      <Bold className="size-3.5 text-foreground" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -2175,7 +2287,7 @@ export function JobTaskView({
                         !messageEditor || (isClient && activeChatTab === "team")
                       }
                     >
-                      <Italic className="h-3.5 w-3.5 text-foreground" />
+                      <Italic className="size-3.5 text-foreground" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -2192,7 +2304,7 @@ export function JobTaskView({
                         !messageEditor || (isClient && activeChatTab === "team")
                       }
                     >
-                      <Underline className="h-3.5 w-3.5 text-foreground" />
+                      <Underline className="size-3.5 text-foreground" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -2209,7 +2321,7 @@ export function JobTaskView({
                         !messageEditor || (isClient && activeChatTab === "team")
                       }
                     >
-                      <Strikethrough className="h-3.5 w-3.5 text-foreground" />
+                      <Strikethrough className="size-3.5 text-foreground" />
                     </Button>
                     <div className="h-4 w-px bg-border mx-0.5" />
                     <Button
@@ -2227,7 +2339,7 @@ export function JobTaskView({
                         !messageEditor || (isClient && activeChatTab === "team")
                       }
                     >
-                      <List className="h-3.5 w-3.5 text-foreground" />
+                      <List className="size-3.5 text-foreground" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -2244,7 +2356,7 @@ export function JobTaskView({
                         !messageEditor || (isClient && activeChatTab === "team")
                       }
                     >
-                      <ListOrdered className="h-3.5 w-3.5 text-foreground" />
+                      <ListOrdered className="size-3.5 text-foreground" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -2261,7 +2373,7 @@ export function JobTaskView({
                         !messageEditor || (isClient && activeChatTab === "team")
                       }
                     >
-                      <Indent className="h-3.5 w-3.5 text-foreground" />
+                      <Indent className="size-3.5 text-foreground" />
                     </Button>
                     <div className="h-4 w-px bg-border mx-0.5" />
                     <Button
@@ -2279,7 +2391,7 @@ export function JobTaskView({
                         !messageEditor || (isClient && activeChatTab === "team")
                       }
                     >
-                      <Code className="h-3.5 w-3.5 text-foreground" />
+                      <Code className="size-3.5 text-foreground" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -2296,7 +2408,7 @@ export function JobTaskView({
                         !messageEditor || (isClient && activeChatTab === "team")
                       }
                     >
-                      <Quote className="h-3.5 w-3.5 text-foreground" />
+                      <Quote className="size-3.5 text-foreground" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -2333,7 +2445,7 @@ export function JobTaskView({
                         !messageEditor || (isClient && activeChatTab === "team")
                       }
                     >
-                      <LinkIcon className="h-3.5 w-3.5 text-foreground" />
+                      <LinkIcon className="size-3.5 text-foreground" />
                     </Button>
                   </div>
                 )}
@@ -2424,13 +2536,19 @@ export function JobTaskView({
                       Customer
                     </div>
                     <div className="text-sm text-foreground flex items-center gap-2 flex-wrap">
-                      {customerDisplayName ? (
+                      {customerDisplayName !== "Unassigned" ? (
                         renderAssigneeBadge(customerDisplayName)
                       ) : (
-                        // <Badge variant="outline">Unassigned</Badge>
-                        <></>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Avatar className="h-7 w-7">
+                              <AvatarFallback className="text-xs bg-transparent border-2 border-secondary border-dashed"></AvatarFallback>
+                            </Avatar>
+                          </TooltipTrigger>
+                          <TooltipContent>Unassigned</TooltipContent>
+                        </Tooltip>
                       )}
-                      {canAssign && (
+                      {canAssignCustomer && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -2440,7 +2558,7 @@ export function JobTaskView({
                               disabled={loadingAssignments}
                             >
                               {assignedCustomer ? "Change" : "Assign Customer"}
-                              <ChevronDown className="h-3.5 w-3.5 ml-2" />
+                              <ChevronDown className="size-3.5 ml-2" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent
@@ -2501,22 +2619,22 @@ export function JobTaskView({
                   PM Assigned
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {projectManagerDisplay ? (
+                  {projectManagerDisplayName !== "Unassigned" ? (
                     renderAssigneeBadge(
-                      projectManagerDisplay.name,
-                      projectManagerDisplay.avatar
+                      projectManagerDisplayName,
+                      projectManagerDisplayAvatar
                     )
                   ) : (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Avatar className="h-7 w-7">
-                          <AvatarFallback className="text-xs bg-muted-foreground/20"></AvatarFallback>
+                          <AvatarFallback className="text-xs bg-transparent border-2 border-secondary border-dashed"></AvatarFallback>
                         </Avatar>
                       </TooltipTrigger>
                       <TooltipContent>Unassigned</TooltipContent>
                     </Tooltip>
                   )}
-                  {canAssign && (
+                  {canAssignProjectManager && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -2525,10 +2643,10 @@ export function JobTaskView({
                           className="h-7 rounded-full"
                           disabled={loadingAssignments}
                         >
-                          {projectManagerDisplay
+                          {assignedProjectManager
                             ? "Change"
                             : "Assign Project Manager"}
-                          <ChevronDown className="h-3.5 w-3.5 ml-2" />
+                          <ChevronDown className="size-3.5 ml-2" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
@@ -2549,7 +2667,8 @@ export function JobTaskView({
                           const name =
                             member.user?.name ||
                             member.personalOrg?.legalName ||
-                            "Unassigned";
+                            member.user?.email ||
+                            "Assigned";
                           const avatar = member.user?.avatarUrl;
                           return (
                             <DropdownMenuItem
@@ -2596,51 +2715,50 @@ export function JobTaskView({
                   Tech Assigned
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Technician Assigned */}
                   {technician ? (
-                    <div className="flex items-center gap-2">
-                      <div className="inline-flex items-center gap-2 bg-muted/50 rounded-full px-2.5 py-1.5">
-                        <Avatar className="h-7 w-7">
-                          <AvatarImage
-                            src={technician.avatarUrl}
-                            alt={technician.name}
-                          />
-                          <AvatarFallback className="text-xs bg-muted-foreground/20">
-                            {technician.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm font-medium text-foreground">
-                          {technician.name}
-                        </span>
-                      </div>
-                      {onChangeTechnician &&
-                        (job?.status === "assigned" ||
-                          job?.status === "in_progress") && (
-                          <Button
-                            onClick={onChangeTechnician}
-                            variant="muted"
-                            size="sm"
-                            className="h-7 rounded-full"
-                          >
-                            <Edit className="h-3.5 w-3.5 mr-1.5" />
-                            Change
-                          </Button>
-                        )}
-                    </div>
+                    renderAssigneeBadge(technician.name, technician.avatarUrl)
                   ) : (
-                    onAssignTechnician && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Avatar className="h-7 w-7">
+                          <AvatarFallback className="text-xs bg-transparent border-2 border-secondary border-dashed"></AvatarFallback>
+                        </Avatar>
+                      </TooltipTrigger>
+                      <TooltipContent>Unassigned</TooltipContent>
+                    </Tooltip>
+                  )}
+                  {/* Change Technician */}
+                  {canAssignTechnicianOrEditor &&
+                    technician &&
+                    onChangeTechnician &&
+                    (job?.status === "assigned" ||
+                      job?.status === "in_progress") && (
+                      <Button
+                        onClick={onChangeTechnician}
+                        variant="muted"
+                        size="sm"
+                        className="h-7 rounded-full"
+                      >
+                        <Edit className="size-3.5 mr-1.5" />
+                        Change
+                      </Button>
+                    )}
+
+                  {/* Assign Technician */}
+                  {canAssignTechnicianOrEditor &&
+                    onAssignTechnician &&
+                    !technician && (
                       <Button
                         onClick={onAssignTechnician}
                         variant="muted"
                         size="sm"
                         className="h-7 rounded-full"
                       >
-                        Assign Technician
+                        <span>Assign Technician</span>
+                        <MapIcon className="size-3.5 ml-2" />
                       </Button>
-                    )
-                  )}
+                    )}
                 </div>
 
                 {/* Editor Assigned */}
@@ -2648,22 +2766,19 @@ export function JobTaskView({
                   Editor Assigned
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {editorDisplay ? (
-                    renderAssigneeBadge(
-                      editorDisplay.name,
-                      editorDisplay.avatar
-                    )
+                  {editorDisplayName !== "Unassigned" ? (
+                    renderAssigneeBadge(editorDisplayName, editorDisplayAvatar)
                   ) : (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Avatar className="h-7 w-7">
-                          <AvatarFallback className="text-xs bg-muted-foreground/20"></AvatarFallback>
+                          <AvatarFallback className="text-xs bg-transparent border-2 border-secondary border-dashed"></AvatarFallback>
                         </Avatar>
                       </TooltipTrigger>
                       <TooltipContent>Unassigned</TooltipContent>
                     </Tooltip>
                   )}
-                  {canAssign && (
+                  {canAssignTechnicianOrEditor && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -2672,12 +2787,12 @@ export function JobTaskView({
                           className="h-7 rounded-full"
                           disabled={loadingAssignments}
                         >
-                          {editorDisplay ? (
+                          {assignedEditor ? (
                             "Change"
                           ) : (
                             <>
                               <span>Assign Editor</span>
-                              <ChevronDown className="h-3.5 w-3.5 ml-2" />
+                              <ChevronDown className="size-3.5 ml-2" />
                             </>
                           )}
                         </Button>
@@ -2842,7 +2957,7 @@ export function JobTaskView({
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    <FileText className="h-3.5 w-3.5" />
+                    <FileText className="size-3.5" />
                     <span className="hidden md:block">Description</span>
                     {activeTab === "description" && (
                       <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
@@ -2859,7 +2974,7 @@ export function JobTaskView({
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    <MessageSquare className="h-3.5 w-3.5" />
+                    <MessageSquare className="size-3.5" />
                     <span className="hidden md:block">Discussion</span>
                     {activeTab === "discussion" && (
                       <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
@@ -2876,7 +2991,7 @@ export function JobTaskView({
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    <Paperclip className="h-3.5 w-3.5" />
+                    <Paperclip className="size-3.5" />
                     <span className="hidden md:block">Attachments</span>
                     {activeTab === "attachments" && (
                       <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
@@ -2990,7 +3105,7 @@ export function JobTaskView({
                     {/* Chat Content */}
                     {activeChatTab === "client" ? (
                       <ScrollArea className="flex-1 pr-4 min-h-[400px]">
-                        <div className="">
+                        <div className="space-y-4">
                           {clientMessages.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground text-sm">
                               {isAgentUser
@@ -3006,7 +3121,7 @@ export function JobTaskView({
                       </ScrollArea>
                     ) : (
                       <ScrollArea className="flex-1 pr-4 min-h-[400px]">
-                        <div className="">
+                        <div className="space-y-4">
                           {teamMessages.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground text-sm">
                               No messages in team chat yet
@@ -3039,7 +3154,8 @@ export function JobTaskView({
                 </div>
               ) : isAgentUser && !hasAnyMedia ? (
                 <div className="text-sm text-muted-foreground text-center py-12">
-                  No media has been uploaded yet. You’ll see photos, videos, and files here once they’re added.
+                  No media has been uploaded yet. You’ll see photos, videos, and
+                  files here once they’re added.
                 </div>
               ) : (
                 <Accordion type="multiple" className="w-full space-y-2">
@@ -3207,11 +3323,7 @@ export function JobTaskView({
         </SheetContent>
       </Sheet>
     )
-  ) : (
-    <div className="p-6 text-sm text-muted-foreground">
-      Select a job to view details.
-    </div>
-  );
+  ) : null;
 
   return (
     <>

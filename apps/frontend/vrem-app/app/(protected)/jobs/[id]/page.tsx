@@ -28,6 +28,11 @@ export default function JobDetailPage() {
   const messaging = useMessaging();
   const [loadingJob, setLoadingJob] = useState(true);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const activeMembership = memberships.find((m) => m.orgId === organizationId);
+  const roleUpper = (
+    (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+  ).toUpperCase();
+  const canViewCustomerChat = ["OWNER", "ADMIN", "DISPATCHER"].includes(roleUpper);
   const [, setLoadingTechnicians] = useState(false);
 
   const jobId = params?.id as string;
@@ -72,9 +77,11 @@ export default function JobDetailPage() {
     ) {
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
       messaging.fetchMessages(jobId, "TEAM", orgId);
-      messaging.fetchMessages(jobId, "CUSTOMER", orgId);
+      if (canViewCustomerChat) {
+        messaging.fetchMessages(jobId, "CUSTOMER", orgId);
+      }
     }
-  }, [jobManagement.selectedJob, jobId, messaging]);
+  }, [jobManagement.selectedJob, jobId, messaging, canViewCustomerChat]);
 
   useEffect(() => {
     let cancelled = false;

@@ -1094,7 +1094,23 @@ class ApiClient {
       clientName: project.customer?.name || 'Unassigned',
       customerId: project.customerId || undefined,
       projectManagerId: project.projectManagerId || null,
+      projectManager: project.projectManager
+        ? {
+            id: project.projectManager.id,
+            name: project.projectManager.name,
+            avatarUrl: (project.projectManager as any)?.avatarUrl,
+            email: project.projectManager.email,
+          }
+        : null,
       editorId: project.editorId || null,
+      editor: project.editor
+        ? {
+            id: project.editor.id,
+            name: project.editor.name,
+            avatarUrl: (project.editor as any)?.avatarUrl,
+            email: project.editor.email,
+          }
+        : null,
       propertyAddress: propertyAddress,
       location: location,
       scheduledDate: scheduledDate.toISOString().split('T')[0],

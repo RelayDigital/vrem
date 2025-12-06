@@ -40,6 +40,8 @@ import {
   SelectValue,
 } from "../../ui/select";
 import { Card, CardContent, CardHeader } from "../../ui/card";
+import { getActiveOrgRoleFromMemberships } from "@/hooks/userRoleInfo";
+import { useAuth } from "@/context/auth-context";
 
 interface MapWithSidebarProps {
   jobs: JobRequest[];
@@ -118,6 +120,9 @@ export function MapWithSidebar({
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     null
   );
+
+  const { memberships, activeOrganizationId } = useAuth();
+  const activeOrgRole = getActiveOrgRoleFromMemberships(memberships, activeOrganizationId);
 
   const pendingJobs = jobs.filter((j) => j.status === "pending");
 
@@ -423,7 +428,13 @@ export function MapWithSidebar({
                         job={job}
                         horizontal={true}
                         hideRequirements={true}
-                        onClick={() => handleFindTechnician(job)}
+                        onClick={() => {
+                          if (activeOrgRole !== "EDITOR" && activeOrgRole !== "TECHNICIAN") {
+                            handleFindTechnician(job);
+                          } else {
+                            onSelectJob(job);
+                          }
+                        }}
                         onViewInProjectManagement={
                           onNavigateToJobInProjectManagement
                             ? () => onNavigateToJobInProjectManagement(job)

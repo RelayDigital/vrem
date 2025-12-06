@@ -114,10 +114,13 @@ export function JobManagementProvider({
       const memberRoleUpper = (memberRole || '').toUpperCase();
       const userRoleUpper = (userRole || '').toUpperCase();
       const hasOrgRole = Boolean(memberRoleUpper || userRoleUpper);
+      const isProjectManagerRole =
+        memberRoleUpper === 'PROJECT_MANAGER' || userRoleUpper === 'PROJECT_MANAGER';
       const canViewOrgProjects =
         hasOrgRole &&
         userRoleUpper !== 'AGENT' &&
-        ['DISPATCHER', 'ADMIN', 'OWNER', 'PROJECT_MANAGER', 'EDITOR', 'COMPANY'].includes(
+        !isProjectManagerRole &&
+        ['DISPATCHER', 'ADMIN', 'OWNER', 'EDITOR', 'COMPANY'].includes(
           memberRoleUpper || userRoleUpper
         );
 
@@ -138,6 +141,20 @@ export function JobManagementProvider({
         }
       } else {
         fetchedProjects = await api.projects.listForCurrentUser();
+      }
+      if (isProjectManagerRole) {
+        try {
+          const assigned = await api.projects.listForCurrentUser();
+          const byId = new Map(fetchedProjects.map((p) => [p.id, p]));
+          assigned.forEach((p) => {
+            if (!byId.has(p.id)) {
+              byId.set(p.id, p);
+            }
+          });
+          fetchedProjects = Array.from(byId.values());
+        } catch (err) {
+          console.warn('Failed to fetch assigned projects for project manager', err);
+        }
       }
       // Ensure dates are Date objects
       const projectsWithDates = normalizeProjects(fetchedProjects);

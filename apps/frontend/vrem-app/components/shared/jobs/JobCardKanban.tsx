@@ -37,6 +37,8 @@ import {
 } from "../../ui/hover-card";
 import { cn } from "../../../lib/utils";
 import { H3, P } from "@/components/ui/typography";
+import { getActiveOrgRoleFromMemberships } from "@/hooks/userRoleInfo";
+import { useAuth } from "@/context/auth-context";
 
 interface JobCardKanbanProps {
   job: JobRequest;
@@ -145,6 +147,9 @@ export function JobCardKanban({
 }: JobCardKanbanProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  
+  const { memberships, activeOrganizationId } = useAuth();
+  const activeOrgRole = getActiveOrgRoleFromMemberships(memberships, activeOrganizationId);
 
   const statusConfig = getStatusConfig(job.status);
   const priorityConfig = getPriorityConfig(job.priority);
@@ -318,7 +323,9 @@ export function JobCardKanban({
                 )}
                 {onViewRankings &&
                   (job.status === "pending" || job.status === "assigned") &&
-                  !job.assignedTechnicianId && (
+                  !job.assignedTechnicianId &&
+                  activeOrgRole !== "EDITOR" &&
+                  activeOrgRole !== "TECHNICIAN" && (
                     <DropdownMenuItem
                       onSelect={(e) => {
                         e.preventDefault();
@@ -331,7 +338,9 @@ export function JobCardKanban({
                   )}
                 {onChangeTechnician &&
                   job.assignedTechnicianId &&
-                  (job.status === "assigned" || job.status === "in_progress") && (
+                  (job.status === "assigned" || job.status === "in_progress") &&
+                  activeOrgRole !== "EDITOR" &&
+                  activeOrgRole !== "TECHNICIAN" && (
                     <DropdownMenuItem
                       onSelect={(e) => {
                         e.preventDefault();
@@ -537,7 +546,9 @@ export function JobCardKanban({
         )}
         {onViewRankings &&
           (job.status === "pending" || job.status === "assigned") &&
-          !job.assignedTechnicianId && (
+          !job.assignedTechnicianId &&
+          activeOrgRole !== "EDITOR" &&
+          activeOrgRole !== "TECHNICIAN" && (
             <ContextMenuItem
               className="cursor-pointer"
               onSelect={(e) => {
@@ -555,7 +566,9 @@ export function JobCardKanban({
           )}
         {onChangeTechnician &&
           job.assignedTechnicianId &&
-          (job.status === "assigned" || job.status === "in_progress") && (
+          (job.status === "assigned" || job.status === "in_progress") &&
+          activeOrgRole !== "EDITOR" &&
+          activeOrgRole !== "TECHNICIAN" && (
             <ContextMenuItem
               className="cursor-pointer"
               onSelect={(e) => {

@@ -5,6 +5,7 @@ import { JobRequest, Technician } from '../../../../types';
 import { MapWithSidebar } from '../../../shared/dashboard/MapWithSidebar';
 import { useSidebar } from '../../../ui/sidebar';
 import { useIsMobile } from '../../../ui/use-mobile';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 interface LiveJobMapViewProps {
   jobs: JobRequest[];
@@ -55,8 +56,10 @@ export function LiveJobMapView({
   // When collapsed to icon: 3rem (48px), when expanded: 16rem (256px)
   // On mobile, no offset (sidebar doesn't affect layout)
   const isMobile = useIsMobile();
+  const { activeMembership } = useCurrentOrganization();
+  const orgType = activeMembership?.organization?.type || '';
   const leftOffset =
-    !hasSidebar || isMobile
+    !hasSidebar || orgType === 'PERSONAL' || isMobile
       ? '0'
       : sidebarState === 'collapsed'
       ? '3rem'

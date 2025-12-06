@@ -49,6 +49,12 @@ export default function JobsPage() {
     );
   }, [jobManagement.jobs, user]);
 
+  const activeMembership = memberships.find((m) => m.orgId === organizationId);
+  const roleUpper = (
+    (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+  ).toUpperCase();
+  const canViewCustomerChat = ["OWNER", "ADMIN", "DISPATCHER"].includes(roleUpper);
+
   // Listen for navigation events to open job task view
   useEffect(() => {
     const handleOpenJobTaskView = (event: CustomEvent<{ id: string }>) => {
@@ -76,9 +82,11 @@ export default function JobsPage() {
     if (jobManagement.selectedJob) {
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
       messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
-      messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
+      if (canViewCustomerChat) {
+        messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
+      }
     }
-  }, [jobManagement.selectedJob, messaging]);
+  }, [jobManagement.selectedJob, messaging, canViewCustomerChat]);
 
   useEffect(() => {
     let cancelled = false;

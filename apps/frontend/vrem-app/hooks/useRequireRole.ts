@@ -1,13 +1,19 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AccountType, OrgRole, User } from '@/types';
 import { useAuth } from '@/context/auth-context';
 import { OrganizationMember } from '@/types';
+import {
+  getActiveOrgRoleFromMemberships,
+  getUserDashboardPath,
+  mapMembershipToEffectiveRole,
+} from './userRoleInfo';
 
 interface UseRequireRoleOptions {
   redirectTo?: string;
+  enforceRedirect?: boolean;
 }
 
 interface UseRequireRoleReturn {
@@ -15,6 +21,7 @@ interface UseRequireRoleReturn {
   organizationId: string | null;
   memberships: OrganizationMember[];
   isLoading: boolean;
+  getActiveOrgRole: () => OrgRole | null;
 }
 
 // Map backend role names to frontend role names (for normalization)
@@ -29,23 +36,6 @@ const roleMap: Record<string, OrgRole | AccountType> = {
   TECHNICIAN: 'PROVIDER',
 };
 
-const mapMembershipToEffectiveRole = (
-  membership: any | undefined,
-  fallback: OrgRole | AccountType
-): OrgRole | AccountType => {
-  if (!membership) return fallback;
-  const orgType =
-    membership.organization?.type || membership.organizationType || '';
-  if (orgType === 'PERSONAL') return fallback || 'PROVIDER';
-  const role = (membership.role || '').toUpperCase();
-  if (
-    ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'EDITOR'].includes(role)
-  ) {
-    return 'COMPANY';
-  }
-  return 'PROVIDER';
-};
-
 /**
  * Hook to require a user to have one of the specified roles
  */
@@ -55,6 +45,13 @@ export function useRequireRole(
 ): UseRequireRoleReturn {
   const router = useRouter();
   const { user, isLoading, activeOrganizationId, memberships } = useAuth();
+  const { redirectTo, enforceRedirect } = options;
+
+  const getActiveOrgRole = useCallback(
+    (): OrgRole | null =>
+      getActiveOrgRoleFromMemberships(memberships, activeOrganizationId),
+    [memberships, activeOrganizationId],
+  );
 
   useEffect(() => {
     if (isLoading) return;
@@ -80,21 +77,24 @@ export function useRequireRole(
     const hasAllowedRole = normalizedAllowedRoles.includes(effectiveUserRole);
 
     if (!hasAllowedRole) {
-      if (options.redirectTo) {
-        router.push(options.redirectTo);
-      } else {
-        const getUserDashboardPath = (role: OrgRole | AccountType): string => {
-          if (role === 'COMPANY') return '/dashboard';
-          if (role === 'AGENT') return '/dashboard';
-          if (role === 'PROVIDER') return '/dashboard';
-          return '/';
-        };
+      if (enforceRedirect === false) {
+        return;
+      }
 
+      if (redirectTo) {
+        router.push(redirectTo);
+      } else {
         const dashboardPath = getUserDashboardPath(effectiveUserRole);
         router.push(dashboardPath);
       }
     }
-  }, [user, isLoading, allowedRoles, router, options.redirectTo, memberships, activeOrganizationId]);
+  }, [user, isLoading, allowedRoles, router, redirectTo, enforceRedirect, memberships, activeOrganizationId]);
 
-  return { user, organizationId: activeOrganizationId, memberships, isLoading };
+  return {
+    user,
+    organizationId: activeOrganizationId,
+    memberships,
+    isLoading,
+    getActiveOrgRole,
+  };
 }

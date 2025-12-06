@@ -83,7 +83,9 @@ export function TeamView({
     [currentUserRole, membershipRole]
   );
   const isProjectManager = effectiveCurrentRole === "PROJECT_MANAGER";
-  const canManageTeam = !isProjectManager;
+  const isEditor = effectiveCurrentRole === "EDITOR";
+  const isLimitedRole = isProjectManager || isEditor;
+  const canManageTeam = !isLimitedRole;
 
   const linkOrigin = useMemo(() => {
     if (typeof window !== "undefined") {
@@ -159,7 +161,7 @@ export function TeamView({
 
   const handleSendInvites = async () => {
     if (!canManageTeam) {
-      toast.error("Project managers cannot invite teammates.");
+      toast.error("Project managers and editors cannot invite teammates.");
       return;
     }
     const pending = emailInput.trim();
@@ -258,6 +260,7 @@ export function TeamView({
   };
 
   const handleRemoveTechnician = (technician: Technician) => {
+    if (!canManageTeam) return;
     setTechnicianToRemove(technician);
     setRemoveDialogOpen(true);
   };
@@ -277,7 +280,7 @@ export function TeamView({
     role: Technician["role"]
   ) => {
     if (!canManageTeam) {
-      toast.error("Project managers cannot change roles.");
+      toast.error("Project managers and editors cannot change roles.");
       return;
     }
     if (!technician.memberId) {
@@ -320,7 +323,7 @@ export function TeamView({
 
   const confirmOwnerChange = async () => {
     if (!canManageTeam) {
-      toast.error("Project managers cannot change roles.");
+      toast.error("Project managers and editors cannot change roles.");
       setRoleDialogOpen(false);
       return;
     }
@@ -435,9 +438,6 @@ export function TeamView({
                                 Project Manager
                               </SelectItem>
                               <SelectItem value="EDITOR">Editor</SelectItem>
-                              <SelectItem value="DISPATCHER">
-                                Dispatcher
-                              </SelectItem>
                               <SelectItem value="ADMIN">Admin</SelectItem>
                             </SelectContent>
                           </Select>
@@ -490,14 +490,14 @@ export function TeamView({
               </Dialog>
             )}
           </div>
-          {isProjectManager && (
+          {isLimitedRole && (
             <div className="mb-4 text-sm text-muted-foreground">
-              Project managers can view the roster but cannot invite teammates or change roles.
+              Project managers and editors can view the roster but cannot invite teammates or change roles.
             </div>
           )}
           <ProviderManagement
             technicians={technicianList}
-            onRemove={handleRemoveTechnician}
+            onRemove={canManageTeam ? handleRemoveTechnician : undefined}
             onRoleChange={canManageTeam ? handleRoleChange : undefined}
             updatingRoleId={updatingRoleId}
             currentUserId={currentUserId || undefined}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Sidebar,
@@ -41,11 +41,23 @@ import {
 } from "../../ui/collapsible";
 import { cn } from "../../ui/utils";
 import { OrganizationSwitcher } from "./OrganizationSwitcher";
+import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 
 export function CompanySidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { state } = useSidebar();
+  const { activeMembership } = useCurrentOrganization();
+  const orgRole = (
+    (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+  ).toUpperCase();
+  const orgType =
+    activeMembership?.organization?.type ||
+    (activeMembership as any)?.organizationType ||
+    "";
+  const isProjectManager =
+    orgRole === "PROJECT_MANAGER" && orgType !== "PERSONAL";
+  const isEditor = orgRole === "EDITOR" && orgType !== "PERSONAL";
+  const isLimitedRole = isProjectManager || isEditor;
 
   // Determine if a route is active
   // For submenu items, use exact matching to avoid highlighting multiple items
@@ -187,6 +199,25 @@ export function CompanySidebar() {
       ],
     },
   ];
+  const filteredMenuItems = menuItems
+    .filter(
+      (item) =>
+        !(
+          isLimitedRole &&
+          (item.label === "Customers" || item.label === "Audit Log")
+        )
+    )
+    .map((item) => {
+      if (!item.submenu) return item;
+      const filteredSubmenu = isLimitedRole
+        ? item.submenu.filter(
+            (subItem) =>
+              subItem.label !== "Organization" && subItem.label !== "Product"
+          )
+        : item.submenu;
+      return { ...item, submenu: filteredSubmenu };
+    })
+    .filter((item) => !(item.submenu && item.submenu.length === 0));
 
   return (
     <Sidebar
@@ -203,7 +234,7 @@ export function CompanySidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => {
+              {filteredMenuItems.map((item) => {
                 const Icon = item.icon;
                 const hasSubmenu = item.submenu && item.submenu.length > 0;
                 const isItemActive = isActive(item.path);

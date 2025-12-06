@@ -101,8 +101,18 @@ function LayoutContent({
   const userForUi = { ...user, accountType: effectiveAccountType, role: effectiveAccountType };
   const shouldShowSidebar =
     (effectiveAccountType || '').toUpperCase() === 'COMPANY';
-  // Determine if user can create jobs (company only)
-  const canCreateJobs = shouldShowSidebar;
+  const activeRole = (
+    (activeMembership?.role || (activeMembership as any)?.orgRole || '') as string
+  ).toUpperCase();
+  const activeOrgType =
+    activeMembership?.organization?.type ||
+    (activeMembership as any)?.organizationType ||
+    '';
+  const isProjectManager =
+    activeRole === 'PROJECT_MANAGER' && activeOrgType !== 'PERSONAL';
+  const isEditor = activeRole === 'EDITOR' && activeOrgType !== 'PERSONAL';
+  // Determine if user can create jobs (company only, excluding project managers)
+  const canCreateJobs = shouldShowSidebar && !isProjectManager && !isEditor;
 
   const jobFormContent = (
     <>
@@ -119,7 +129,7 @@ function LayoutContent({
       <SidebarProvider>
         {/* Header */}
         <div className="fixed top-0 left-0 right-0 z-50">
-          <AppHeader user={userForUi} showNewJobButton={true} />
+          <AppHeader user={userForUi} showNewJobButton={canCreateJobs} />
         </div>
 
         {/* Sidebar */}
@@ -136,35 +146,36 @@ function LayoutContent({
         <MobileMenuDock />
 
         {/* Job Creation - Drawer on mobile, Dialog on desktop */}
-        {isMobile ? (
-          <Drawer open={jobCreation.isOpen} onOpenChange={(open) => {
-            if (!open) {
-              jobCreation.closeJobCreationDialog();
-            }
-          }}>
-            <DrawerContent className="">
-              <DrawerHeader className="sr-only">
-                <DrawerTitle>Create New Job</DrawerTitle>
-              </DrawerHeader>
-              <div className="overflow-y-auto px-4 pb-4">
+        {canCreateJobs &&
+          (isMobile ? (
+            <Drawer open={jobCreation.isOpen} onOpenChange={(open) => {
+              if (!open) {
+                jobCreation.closeJobCreationDialog();
+              }
+            }}>
+              <DrawerContent className="">
+                <DrawerHeader className="sr-only">
+                  <DrawerTitle>Create New Job</DrawerTitle>
+                </DrawerHeader>
+                <div className="overflow-y-auto px-4 pb-4">
+                  {jobFormContent}
+                </div>
+              </DrawerContent>
+            </Drawer>
+          ) : (
+            <Dialog open={jobCreation.isOpen} onOpenChange={(open) => {
+              if (!open) {
+                jobCreation.closeJobCreationDialog();
+              }
+            }}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New Job</DialogTitle>
+                </DialogHeader>
                 {jobFormContent}
-              </div>
-            </DrawerContent>
-          </Drawer>
-        ) : (
-          <Dialog open={jobCreation.isOpen} onOpenChange={(open) => {
-            if (!open) {
-              jobCreation.closeJobCreationDialog();
-            }
-          }}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Create New Job</DialogTitle>
-              </DialogHeader>
-              {jobFormContent}
-            </DialogContent>
-          </Dialog>
-        )}
+              </DialogContent>
+            </Dialog>
+          ))}
 
         {/* Rankings Dialog - For admin roles */}
         <RankingsDialog

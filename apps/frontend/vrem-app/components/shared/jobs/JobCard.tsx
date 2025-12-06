@@ -24,6 +24,9 @@ import { format } from "date-fns";
 import { cn } from "../../../lib/utils";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { P } from "@/components/ui/typography";
+import { useRequireRole } from "@/hooks/useRequireRole";
+import { useAuth } from "@/context/auth-context";
+import { getActiveOrgRoleFromMemberships } from "@/hooks/userRoleInfo";
 
 interface JobCardProps {
   job: JobRequest;
@@ -124,10 +127,13 @@ export function JobCard({
     }
   };
 
+  const { memberships, activeOrganizationId } = useAuth();
+  const activeOrgRole = getActiveOrgRoleFromMemberships(memberships, activeOrganizationId);
+
+
   const priorityConfig = getPriorityConfig(job.priority);
   const statusConfig = getStatusConfig(job.status);
   const PriorityIcon = priorityConfig.icon;
-  const isAgentUser = (currentUserAccountType || "").toUpperCase() === "AGENT";
 
   // Format date - parse as local date to avoid timezone shifts
   let formattedDate = job.scheduledDate;
@@ -359,9 +365,9 @@ export function JobCard({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={isAgentUser ? { y: -2 } : {}}
+      whileHover={{ y: -2 }}
       transition={{ duration: 0.2 }}
-      className={cn("h-full", isAgentUser ? "cursor-pointer!" : "")}
+      className={cn("h-full cursor-pointer!")}
     >
       <Card
         className={cn(
@@ -470,42 +476,49 @@ export function JobCard({
           </div>
 
           {/* Technician Profile Overlay or Find Technician Button */}
-          <div className="flex z-10 self-center w-full">
-            {technician ? (
-              <div className="flex items-center gap-3 pl-1 pr-3 py-1 backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200 rounded-full max-w-[80%] mx-auto h-auto">
-                <Avatar className="size-8">
-                  <AvatarImage src={technician.avatar} alt={technician.name} />
-                  <AvatarFallback className="bg-muted-foreground/20 text-foreground text-xs">
-                    {technician.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                  <div className="inline-flex items-center gap-1.5">
-                    <span className="text-sm font-semibold leading-[1.4] text-foreground truncate">
-                      {technician.name}
-                    </span>
-                    <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+          {activeOrgRole !== "EDITOR" && activeOrgRole !== "TECHNICIAN" && (
+              <div className="flex z-10 self-center w-full">
+                {technician ? (
+                  <div className="flex items-center gap-3 pl-1 pr-3 py-1 backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200 rounded-full max-w-[80%] mx-auto h-auto">
+                    <Avatar className="size-8">
+                      <AvatarImage
+                        src={technician.avatar}
+                        alt={technician.name}
+                      />
+                      <AvatarFallback className="bg-muted-foreground/20 text-foreground text-xs">
+                        {technician.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                      <div className="inline-flex items-center gap-1.5">
+                        <span className="text-sm font-semibold leading-[1.4] text-foreground truncate">
+                          {technician.name}
+                        </span>
+                        <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  onViewRankings && (
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onViewRankings();
+                      }}
+                      className="w-full h-auto max-w-[80%] mx-auto px-4 py-2.5 bg-primary text-primary-foreground rounded-3xl shadow-lg hover:bg-primary/90 border-0"
+                    >
+                      <span className="text-sm font-semibold">
+                        Find Technician
+                      </span>
+                      <ArrowRight className="size-4 ml-2" />
+                    </Button>
+                  )
+                )}
               </div>
-            ) : (
-              onViewRankings && (
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onViewRankings();
-                  }}
-                  className="w-full h-auto max-w-[80%] mx-auto px-4 py-2.5 bg-primary text-primary-foreground rounded-3xl shadow-lg hover:bg-primary/90 border-0"
-                >
-                  <span className="text-sm font-semibold">Find Technician</span>
-                  <ArrowRight className="size-4 ml-2" />
-                </Button>
-              )
             )}
-          </div>
         </CardHeader>
 
         {/* Details Section */}

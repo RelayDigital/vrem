@@ -60,9 +60,16 @@ export default function CalendarPage() {
     if (jobManagement.selectedJob) {
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
       messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
-      messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
+      const activeMembership = memberships.find((m) => m.orgId === organizationId);
+      const roleUpper = (
+        (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+      ).toUpperCase();
+      const canViewCustomerChat = ["OWNER", "ADMIN", "DISPATCHER"].includes(roleUpper);
+      if (canViewCustomerChat) {
+        messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
+      }
     }
-  }, [jobManagement.selectedJob, messaging]);
+  }, [jobManagement.selectedJob, messaging, memberships, organizationId]);
 
   if (isLoading) {
     return <CalendarLoadingSkeleton />;
@@ -77,7 +84,14 @@ export default function CalendarPage() {
   const isPersonalOrg =
     activeMembership?.organization?.type === "PERSONAL" ||
     (activeMembership as any)?.organizationType === "PERSONAL";
-  const canCreateJobs = isDispatcherRole(effectiveRole);
+  const activeRole = (
+    (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+  ).toUpperCase();
+  const isProjectManager =
+    activeRole === "PROJECT_MANAGER" && !isPersonalOrg;
+  const isEditor = activeRole === "EDITOR" && !isPersonalOrg;
+  const canCreateJobs =
+    isDispatcherRole(effectiveRole) && !isProjectManager && !isEditor;
   const canSeeTechnicians = isDispatcherRole(effectiveRole) && !isPersonalOrg;
 
   useEffect(() => {

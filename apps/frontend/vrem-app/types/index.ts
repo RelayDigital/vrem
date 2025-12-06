@@ -340,7 +340,9 @@ export interface JobRequest {
   clientName: string;
   customerId?: string;
   projectManagerId?: string | null;
+  projectManager?: Pick<User, "id" | "name" | "avatarUrl" | "email"> | null;
   editorId?: string | null;
+  editor?: Pick<User, "id" | "name" | "avatarUrl" | "email"> | null;
   propertyAddress: string;
   address?: any;
 

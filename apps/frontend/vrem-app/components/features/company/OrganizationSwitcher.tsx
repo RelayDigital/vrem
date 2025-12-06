@@ -82,6 +82,23 @@ export function OrganizationSwitcher({
     [memberships, activeOrganizationId]
   );
 
+  const canManageActiveOrg = useMemo(() => {
+    if (!activeMembership?.organization) return false;
+
+    const orgType = activeMembership.organization.type;
+    const role = activeMembership.orgRole || (activeMembership as any).role || "";
+
+    if (orgType === "COMPANY") {
+      return role === "OWNER" || role === "ADMIN";
+    }
+
+    if (orgType === "PERSONAL") {
+      return role === "OWNER";
+    }
+
+    return false;
+  }, [activeMembership]);
+
   const selectOrg = (orgId: string | null) => {
     setActiveOrganization(orgId);
     // Navigate to dashboard after switching organization
@@ -215,15 +232,10 @@ export function OrganizationSwitcher({
           )}
 
           {/* Manage organization */}
-          {memberships.some(
-            (m) =>
-              m.organization?.type === "COMPANY" &&
-              ["OWNER", "ADMIN"].includes(m.orgRole || (m as any).role || "")
-          ) && (
+          {canManageActiveOrg && (
             <DropdownMenuItem onClick={goToManage}>
               <Settings className="size-4 mr-2" />
-              {memberships.find((m) => m.orgId === activeOrganizationId)
-                ?.organization?.type === "COMPANY"
+              {activeMembership?.organization?.type === "COMPANY"
                 ? "Company settings"
                 : "Workspace settings"}
             </DropdownMenuItem>
