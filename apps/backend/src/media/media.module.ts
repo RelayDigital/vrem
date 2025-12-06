@@ -6,5 +6,6 @@ import { PrismaService } from '../prisma/prisma.service';
 @Module({
   controllers: [MediaController],
   providers: [MediaService, PrismaService],
+  exports: [MediaService],
 })
 export class MediaModule {}

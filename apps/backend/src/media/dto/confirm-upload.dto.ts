@@ -1,19 +1,7 @@
-import { IsEnum, IsNumber, IsString } from 'class-validator';
-import { MediaType } from '@prisma/client';
+import { IsString } from 'class-validator';
+import { CreateProjectMediaDto } from './create-project-media.dto';
 
-export class ConfirmUploadDto {
+export class ConfirmUploadDto extends CreateProjectMediaDto {
   @IsString()
   projectId: string;
-
-  @IsString()
-  key: string;
-
-  @IsString()
-  filename: string;
-
-  @IsNumber()
-  size: number;
-
-  @IsEnum(MediaType)
-  type: MediaType;
 }

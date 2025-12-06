@@ -512,7 +512,13 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
 async findForOrg(orgId: string) {
   return this.prisma.project.findMany({
     where: { orgId },
-    include: { projectManager: true, technician: true, editor: true, customer: true },
+    include: {
+      projectManager: true,
+      technician: true,
+      editor: true,
+      customer: true,
+      media: true,
+    },
     orderBy: { createdAt: 'desc' },
   });
 }

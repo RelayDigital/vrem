@@ -3,9 +3,10 @@ import { ProjectsService } from './projects.service';
 import { ProjectsController } from './projects.controller';
 import { PrismaService } from '../prisma/prisma.service';
 import { CronofyModule } from '../cronofy/cronofy.module';
+import { MediaModule } from '../media/media.module';
 
 @Module({
-  imports: [CronofyModule],
+  imports: [CronofyModule, MediaModule],
   providers: [ProjectsService, PrismaService],
   controllers: [ProjectsController],
 })

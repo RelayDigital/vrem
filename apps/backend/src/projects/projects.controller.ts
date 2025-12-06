@@ -15,7 +15,7 @@ import { ProjectsService } from './projects.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { UserAccountType } from '@prisma/client';
+import { UserAccountType, ProjectChatChannel } from '@prisma/client';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { AssignProjectDto } from './dto/assign-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -24,12 +24,16 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { UpdateProjectStatusDto } from './dto/update-project-status.dto';
 import { CurrentOrg } from '../organizations/current-org.decorator';
 import { OrgMemberGuard } from '../organizations/org-member.guard';
-import { ProjectChatChannel } from '@prisma/client';
+import { MediaService } from '../media/media.service';
+import { CreateProjectMediaDto } from '../media/dto/create-project-media.dto';
 
 @Controller('projects')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly mediaService: MediaService,
+  ) {}
 
   // GET all projects in this organization
   @Get()
@@ -37,6 +41,68 @@ export class ProjectsController {
   @Roles(UserAccountType.COMPANY)
   getProjects(@CurrentOrg() org) {
     return this.projectsService.findForOrg(org.id);
+  }
+
+  // MEDIA: list all media for a project scoped to org
+  @Get(':projectId/media')
+  @UseGuards(OrgMemberGuard)
+  @Roles(
+    UserAccountType.AGENT,
+    UserAccountType.PROVIDER,
+    UserAccountType.COMPANY,
+  )
+  getProjectMedia(
+    @Param('projectId') projectId: string,
+    @CurrentOrg() org,
+  ) {
+    if (!org?.id) {
+      throw new ForbiddenException('Organization ID is required to access project media');
+    }
+    return this.mediaService.getMediaForProject(projectId, org.id);
+  }
+
+  // MEDIA: create media entry for a project
+  @Post(':projectId/media')
+  @UseGuards(OrgMemberGuard)
+  @Roles(
+    UserAccountType.AGENT,
+    UserAccountType.PROVIDER,
+    UserAccountType.COMPANY,
+  )
+  addProjectMedia(
+    @Param('projectId') projectId: string,
+    @Body() dto: CreateProjectMediaDto,
+    @CurrentOrg() org,
+  ) {
+    if (!org?.id) {
+      throw new ForbiddenException('Organization ID is required to add media');
+    }
+    return this.mediaService.createMediaForProject(
+      {
+        ...dto,
+        projectId,
+      },
+      org.id,
+    );
+  }
+
+  // MEDIA: delete media entry from a project
+  @Delete(':projectId/media/:mediaId')
+  @UseGuards(OrgMemberGuard)
+  @Roles(
+    UserAccountType.AGENT,
+    UserAccountType.PROVIDER,
+    UserAccountType.COMPANY,
+  )
+  deleteProjectMedia(
+    @Param('projectId') projectId: string,
+    @Param('mediaId') mediaId: string,
+    @CurrentOrg() org,
+  ) {
+    if (!org?.id) {
+      throw new ForbiddenException('Organization ID is required to delete media');
+    }
+    return this.mediaService.deleteMedia(mediaId, projectId, org.id);
   }
 
   // GET only user's projects for this org
