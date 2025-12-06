@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ProjectStatus, UserAccountType } from '@prisma/client';
+import { ProjectStatus, UserAccountType, ProjectChatChannel } from '@prisma/client';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { AssignProjectDto } from './dto/assign-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -77,36 +77,69 @@ export class ProjectsService {
     }
   }
 
-  private async buildStructuredAddress(
-    addressInput: any,
+  private async resolveAddress(
+    dto: Partial<CreateProjectDto | UpdateProjectDto>,
     existing?: any,
-  ): Promise<Prisma.InputJsonValue> {
-    let structured: any = {};
+  ) {
+    const merged: any = {
+      addressLine1: existing?.addressLine1,
+      addressLine2: existing?.addressLine2,
+      city: existing?.city,
+      region: existing?.region,
+      postalCode: existing?.postalCode,
+      countryCode: existing?.countryCode,
+      lat: existing?.lat,
+      lng: existing?.lng,
+    };
 
-    if (typeof addressInput === 'string') {
-      structured = { unparsed_address: addressInput };
-    } else if (addressInput) {
-      structured = { ...addressInput };
-    } else if (existing) {
-      structured = existing;
-    }
+    const apply = (key: keyof typeof merged, value: any) => {
+      if (value !== undefined) {
+        merged[key] = value;
+      }
+    };
 
-    const hasCoords =
-      structured.latitude !== undefined &&
-      structured.longitude !== undefined;
+    apply('addressLine1', dto.addressLine1);
+    apply('addressLine2', dto.addressLine2);
+    apply('city', dto.city);
+    apply('region', dto.region);
+    apply('postalCode', dto.postalCode);
+    apply('countryCode', dto.countryCode);
+    apply('lat', dto.lat);
+    apply('lng', dto.lng);
 
-    if (!hasCoords && structured.unparsed_address) {
-      const geocoded = await this.geocodeAddress(structured.unparsed_address);
+    const addressString = [
+      merged.addressLine1,
+      merged.addressLine2,
+      merged.city,
+      merged.region,
+      merged.postalCode,
+      merged.countryCode,
+    ]
+      .filter(Boolean)
+      .join(', ');
+
+    const needsCoords =
+      (merged.lat === undefined || merged.lng === undefined) && !!addressString;
+
+    if (needsCoords) {
+      const geocoded = await this.geocodeAddress(addressString);
       if (geocoded) {
-        structured = { ...structured, ...geocoded };
+        merged.lat = geocoded.latitude ?? merged.lat;
+        merged.lng = geocoded.longitude ?? merged.lng;
+        merged.addressLine1 =
+          merged.addressLine1 ||
+          [geocoded.street_number, geocoded.street_name]
+            .filter(Boolean)
+            .join(' ') ||
+          merged.addressLine1;
+        merged.city = merged.city || geocoded.city;
+        merged.region = merged.region || geocoded.state_or_province;
+        merged.postalCode = merged.postalCode || geocoded.postal_code;
+        merged.countryCode = merged.countryCode || geocoded.country;
       }
     }
 
-    if (!structured.unparsed_address && typeof addressInput === 'string') {
-      structured.unparsed_address = addressInput;
-    }
-
-    return structured;
+    return merged;
   }
 
   private async ensureCustomerInOrg(customerId: string, orgId: string) {
@@ -142,27 +175,24 @@ export class ProjectsService {
     this.logger.log(`findForUser called with userId: ${userId}, role: ${accountType}, orgId: ${orgId || 'null'}`);
 
     try {
-    if (accountType === UserAccountType.AGENT) {
-      const whereClause: any = { projectManagerId: userId };
-      if (orgId) {
-        whereClause.orgId = orgId;
-      }
-
-      this.logger.log(`Querying projects for AGENT: projectManagerId=${userId}, orgId=${orgId || 'any'}`);
-      const result = await this.prisma.project.findMany({
-        where: whereClause,
-        include: {
-          media: true,
-          customer: true,
-          messages: {
-            include: { user: true },
+      if (accountType === UserAccountType.AGENT) {
+        const whereClause: any = {
+          customer: { userId },
+        };
+        this.logger.log(
+          `Querying projects for AGENT via customer.userId=${userId}, orgId=${orgId || 'any'}`,
+        );
+        const result = await this.prisma.project.findMany({
+          where: whereClause,
+          include: {
+            media: true,
+            customer: true,
           },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      this.logger.log(`Found ${result.length} projects for AGENT`);
-      return result;
-    }
+          orderBy: { createdAt: 'desc' },
+        });
+        this.logger.log(`Found ${result.length} projects for AGENT`);
+        return result;
+      }
 
     if (accountType === UserAccountType.PROVIDER) {
         if (!orgId) {
@@ -224,13 +254,20 @@ export class ProjectsService {
       await this.ensureCustomerInOrg(dto.customerId, orgId);
     }
 
-    const address = await this.buildStructuredAddress(dto.address);
+    const address = await this.resolveAddress(dto);
 
     return this.prisma.project.create({
       data: {
         orgId,
         customerId: dto.customerId,
-        address,
+        addressLine1: address.addressLine1,
+        addressLine2: address.addressLine2,
+        city: address.city,
+        region: address.region,
+        postalCode: address.postalCode,
+        countryCode: address.countryCode,
+        lat: address.lat,
+        lng: address.lng,
         notes: dto.notes,
         scheduledTime: new Date(dto.scheduledTime),
         projectManagerId: dto.projectManagerId,
@@ -407,18 +444,29 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
     membershipRole?: string | null,
   ) {
     // Use findFirst instead of findUnique since orgId is not unique
+    const where: any = { id };
+    // Only enforce org boundary for company/provider roles
+    if (accountType !== UserAccountType.AGENT) {
+      where.orgId = orgId;
+    }
+
+    const include: Prisma.ProjectInclude = {
+      technician: true,
+      editor: true,
+      projectManager: true,
+      media: true,
+      customer: true,
+    };
+
+    if (accountType !== UserAccountType.AGENT) {
+      include.messages = {
+        include: { user: true },
+      };
+    }
+
     const project = await this.prisma.project.findFirst({
-      where: { id, orgId },
-      include: {
-        technician: true,
-        editor: true,
-        projectManager: true,
-        media: true,
-        customer: true,
-        messages: {
-          include: { user: true },
-        },
-      }
+      where,
+      include,
     });
 
     if (!project) return null;
@@ -430,7 +478,10 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
 
     if (accountType === UserAccountType.COMPANY) return project;
 
-    if (accountType === UserAccountType.AGENT && project.projectManagerId !== userId) return null;
+    if (accountType === UserAccountType.AGENT) {
+      const isAttached = project.customer?.userId === userId;
+      return isAttached ? project : null;
+    }
     if (accountType === UserAccountType.PROVIDER && project.technicianId !== userId) return null;
 
     return project;
@@ -438,15 +489,20 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
 
   async update(id: string, dto: UpdateProjectDto, orgId: string) {
     await this.ensureProjectInOrg(id, orgId);
-    const address =
-      dto.address !== undefined
-        ? await this.buildStructuredAddress(dto.address)
-        : undefined;
+    const existing = await this.prisma.project.findUnique({ where: { id } });
+    const address = await this.resolveAddress(dto, existing);
 
     return this.prisma.project.update({
       where: { id },
       data: {
-        address,
+        addressLine1: address.addressLine1,
+        addressLine2: address.addressLine2,
+        city: address.city,
+        region: address.region,
+        postalCode: address.postalCode,
+        countryCode: address.countryCode,
+        lat: address.lat,
+        lng: address.lng,
         notes: dto.notes,
         scheduledTime: dto.scheduledTime ? new Date(dto.scheduledTime) : undefined,
       },
@@ -478,116 +534,142 @@ async remove(id: string, orgId: string, user: { id: string; accountType: UserAcc
   return this.prisma.project.delete({ where: { id }});
 }
 
-// Fetch messages for a project (only if user belongs to it or is PM/Admin)
-async getMessages(
-  projectId: string,
-  user: { id: string; accountType: UserAccountType },
-  orgId: string,
-  membershipRole?: string | null
-) {
-  // Ensure the project is in the org
-  const project = await this.prisma.project.findFirst({
-    where: {
-      id: projectId,
-      orgId: orgId,
-    },
-    include: {
-      technician: true,
-      editor: true
-    }
-  });
-
-  if (!project) {
-    throw new ForbiddenException('Project does not belong to your organization');
-  }
-
-  // Ensure the user has permission to see it
-  const elevatedOrgRoles = ['OWNER', 'ADMIN', 'PROJECT_MANAGER'];
-  if (membershipRole && elevatedOrgRoles.includes(membershipRole)) {
-    return this.prisma.message.findMany({
-      where: { projectId },
-      orderBy: { timestamp: 'asc' },
-      include: { user: true },
-    });
-  }
-
-  if (user.accountType === UserAccountType.AGENT && project.projectManagerId !== user.id) {
-    throw new ForbiddenException('Not allowed');
-  }
-  if (user.accountType === UserAccountType.PROVIDER && project.technicianId !== user.id) {
-    throw new ForbiddenException('Not allowed');
-  }
-
-  // PM / Admin automatically allowed
-
-  return this.prisma.message.findMany({
-    where: { projectId },
-    orderBy: { timestamp: 'asc' },
-    include: { user: true },
-  });
-}
-
-
-
-// Post a new message
-async addMessage(
-  projectId: string,
-  dto: CreateMessageDto,
-  user: { id: string; accountType: UserAccountType },
-  orgId: string,
-  membershipRole?: string | null
-) {
-  // Ensure project belongs to this org
-  const project = await this.prisma.project.findFirst({
-    where: { id: projectId, orgId },
-    include: {
+  // Fetch messages for a project (only if user belongs to it or is allowed)
+  async getMessages(
+    projectId: string,
+    user: { id: string; accountType: UserAccountType },
+    orgId: string,
+    membershipRole?: string | null,
+    channel: ProjectChatChannel = ProjectChatChannel.TEAM,
+  ) {
+    const include = {
       technician: true,
       editor: true,
+      customer: true,
+      projectManager: true,
+    };
+
+    // Agents may not be org members; fetch by id only for them
+    const project = await this.prisma.project.findFirst({
+      where:
+        user.accountType === UserAccountType.AGENT
+          ? { id: projectId }
+          : { id: projectId, orgId },
+      include,
+    });
+
+    if (!project) {
+      throw new ForbiddenException('Project does not belong to your organization');
     }
-  });
 
-  if (!project) {
-    throw new ForbiddenException("Project does not belong to your organization");
-  }
+    const elevatedOrgRoles = ['OWNER', 'ADMIN', 'PROJECT_MANAGER'];
+    const isElevated = membershipRole && elevatedOrgRoles.includes(membershipRole);
 
-  // Permission checks
-  const elevatedOrgRoles = ['OWNER', 'ADMIN', 'PROJECT_MANAGER'];
-  const isElevated = membershipRole && elevatedOrgRoles.includes(membershipRole);
+    if (isElevated || user.accountType === UserAccountType.COMPANY) {
+      return this.prisma.message.findMany({
+        where: { projectId, channel },
+        orderBy: { timestamp: 'asc' },
+        include: { user: true },
+      });
+    }
 
-  if (!isElevated) {
-    if (
-      user.accountType === UserAccountType.AGENT &&
-      project.projectManagerId !== user.id
-    ) {
-      throw new ForbiddenException("Not allowed");
+    if (user.accountType === UserAccountType.AGENT) {
+      const isAttached = project.customer?.userId === user.id;
+      if (!isAttached) {
+        throw new ForbiddenException('Not allowed');
+      }
+      return this.prisma.message.findMany({
+        where: { projectId, channel },
+        orderBy: { timestamp: 'asc' },
+        include: { user: true },
+      });
     }
 
     if (
       user.accountType === UserAccountType.PROVIDER &&
       project.technicianId !== user.id
     ) {
-      throw new ForbiddenException("Not allowed");
+      throw new ForbiddenException('Not allowed');
     }
 
-    if (user.accountType === UserAccountType.COMPANY) {
-      // allowed
-    } else if (
-      user.accountType !== UserAccountType.AGENT &&
-      user.accountType !== UserAccountType.PROVIDER
-    ) {
-      throw new ForbiddenException("Not allowed");
-    }
+    return this.prisma.message.findMany({
+      where: { projectId, channel },
+      orderBy: { timestamp: 'asc' },
+      include: { user: true },
+    });
   }
 
-  return this.prisma.message.create({
-    data: {
-      projectId,
-      userId: user.id,
-      content: dto.content,
-    },
-    include: { user: true },
-  });
-}
+
+
+  // Post a new message
+  async addMessage(
+    projectId: string,
+    dto: CreateMessageDto,
+    user: { id: string; accountType: UserAccountType },
+    orgId: string,
+    membershipRole?: string | null
+  ) {
+    const project = await this.prisma.project.findFirst({
+      where:
+        user.accountType === UserAccountType.AGENT
+          ? { id: projectId }
+          : { id: projectId, orgId },
+      include: {
+        technician: true,
+        editor: true,
+        customer: true,
+        projectManager: true,
+      },
+    });
+
+    if (!project) {
+      throw new ForbiddenException('Project does not belong to your organization');
+    }
+
+    const elevatedOrgRoles = ['OWNER', 'ADMIN', 'PROJECT_MANAGER'];
+    const isElevated = membershipRole && elevatedOrgRoles.includes(membershipRole);
+
+    const channel = dto.channel || ProjectChatChannel.TEAM;
+    const thread = dto.thread || null;
+
+    if (thread) {
+      const parent = await this.prisma.message.findFirst({
+        where: { id: thread, projectId, channel },
+      });
+      if (!parent) {
+        throw new ForbiddenException('Parent message not found for this project/channel');
+      }
+    }
+
+    if (!isElevated) {
+      if (user.accountType === UserAccountType.AGENT) {
+        const isAttached = project.customer?.userId === user.id;
+        if (!isAttached) {
+          throw new ForbiddenException('Not allowed');
+        }
+      } else if (
+        user.accountType === UserAccountType.PROVIDER &&
+        project.technicianId !== user.id
+      ) {
+        throw new ForbiddenException('Not allowed');
+      } else if (user.accountType === UserAccountType.COMPANY) {
+        // allowed
+      } else {
+        throw new ForbiddenException('Not allowed');
+      }
+    }
+
+    return this.prisma.message.create({
+      data: {
+        projectId,
+        userId: user.id,
+        content: dto.content,
+        channel,
+        thread,
+      },
+      include: { user: true },
+    });
+  }
 
 
   

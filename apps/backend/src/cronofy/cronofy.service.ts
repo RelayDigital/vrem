@@ -18,7 +18,7 @@ export class CronofyService {
   async createEvent(project, technician) {
     const payload = {
       event_id: project.id,
-      summary: `Shoot: ${project.address}`,
+      summary: `Shoot: ${[project.addressLine1, project.city].filter(Boolean).join(', ')}`,
       start: project.scheduledTime,
       end: new Date(project.scheduledTime.getTime() + 60 * 60 * 1000),
       calendar_id: technician.calendarId,
@@ -42,7 +42,7 @@ export class CronofyService {
   async updateEvent(project, event) {
     const payload = {
       event_id: event.cronofyEventId,
-      summary: `Shoot: ${project.address}`,
+      summary: `Shoot: ${[project.addressLine1, project.city].filter(Boolean).join(', ')}`,
       start: project.scheduledTime,
       end: new Date(project.scheduledTime.getTime() + 60 * 60 * 1000),
       calendar_id: event.calendarId,

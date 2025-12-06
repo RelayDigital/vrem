@@ -5,15 +5,36 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto } from './dto/send-message.dto';
-import { UserAccountType } from '@prisma/client';
+import { ProjectChatChannel, UserAccountType } from '@prisma/client';
 
 @Injectable()
 export class MessagesService {
   constructor(private prisma: PrismaService) {}
 
-  async userHasAccessToProject(userId: string, accountType: UserAccountType, projectId: string) {
-    // Dispatchers get full access
+  async userHasAccessToProject(args: {
+    userId: string;
+    accountType?: string;
+    projectId: string;
+  }) {
+    const { userId, projectId } = args;
+    const roleUpper = (args.accountType || '').toUpperCase();
+    const accountType =
+      roleUpper === 'AGENT'
+        ? UserAccountType.AGENT
+        : ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'DISPATCHER', 'COMPANY'].includes(
+            roleUpper,
+          )
+        ? UserAccountType.COMPANY
+        : ['PROVIDER', 'TECHNICIAN', 'EDITOR'].includes(roleUpper)
+        ? UserAccountType.PROVIDER
+        : UserAccountType.PROVIDER; // default to provider for unknown roles
+
+    // Dispatchers/Company get full access
     if (accountType === UserAccountType.COMPANY) {
+      return true;
+    }
+    // Providers (technicians/editors) can send/receive; backend does not distinguish roles beyond account type
+    if (accountType === UserAccountType.PROVIDER) {
       return true;
     }
 
@@ -23,10 +44,18 @@ export class MessagesService {
         technicianId: true,
         editorId: true,
         projectManagerId: true,
+        customer: { select: { userId: true } },
       },
     });
 
     if (!project) return false;
+
+    if (
+      accountType === UserAccountType.AGENT &&
+      project.customer?.userId === userId
+    ) {
+      return true;
+    }
 
     return (
       project.projectManagerId === userId ||
@@ -43,11 +72,31 @@ export class MessagesService {
 
     if (!project) throw new NotFoundException('Project not found');
 
+    const channel: ProjectChatChannel =
+      dto.channel ||
+      (dto as any)?.channel ||
+      ((dto as any)?.chatType === 'CUSTOMER'
+        ? ProjectChatChannel.CUSTOMER
+        : ProjectChatChannel.TEAM);
+
+    const thread = dto.thread || null;
+
+    if (thread) {
+      const parent = await this.prisma.message.findFirst({
+        where: { id: thread, projectId: dto.projectId, channel },
+      });
+      if (!parent) {
+        throw new ForbiddenException('Parent message not found for this project/channel');
+      }
+    }
+
     const message = await this.prisma.message.create({
       data: {
         projectId: dto.projectId,
         userId,
         content: dto.content,
+        channel,
+        thread,
       },
       include: {
         user: true,
@@ -87,11 +136,11 @@ export class MessagesService {
 
     if (!message) throw new NotFoundException('Message not found');
 
-    const canAccess = await this.userHasAccessToProject(
-      currentUser.id,
-      currentUser.accountType,
-      message.projectId,
-    );
+    const canAccess = await this.userHasAccessToProject({
+      userId: currentUser.id,
+      accountType: currentUser.accountType,
+      projectId: message.projectId,
+    });
 
     const isOwner = message.userId === currentUser.id;
     const canModerate =

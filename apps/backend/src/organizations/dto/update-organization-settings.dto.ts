@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsNumber } from 'class-validator';
 
 export class UpdateOrganizationSettingsDto {
   @IsOptional()
@@ -52,6 +52,14 @@ export class UpdateOrganizationSettingsDto {
   @IsOptional()
   @IsString()
   countryCode?: string;
+
+  @IsOptional()
+  @IsNumber()
+  lat?: number;
+
+  @IsOptional()
+  @IsNumber()
+  lng?: number;
 
   @IsOptional()
   @IsString()

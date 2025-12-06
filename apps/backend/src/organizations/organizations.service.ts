@@ -8,7 +8,13 @@ import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto';
-import { OrgRole, UserAccountType, OrgType, OrganizationMember, Prisma } from '@prisma/client';
+import {
+  OrgRole,
+  UserAccountType,
+  OrgType,
+  OrganizationMember,
+  Prisma,
+} from '@prisma/client';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -152,6 +158,8 @@ export class OrganizationsService {
     if (dto.phone !== undefined) updateData.phone = dto.phone;
     if (dto.primaryEmail !== undefined)
       updateData.primaryEmail = dto.primaryEmail;
+    if (dto.timezone !== undefined) updateData.timezone = dto.timezone;
+    if (dto.serviceArea !== undefined) updateData.serviceArea = dto.serviceArea;
     if (dto.addressLine1 !== undefined)
       updateData.addressLine1 = dto.addressLine1;
     if (dto.addressLine2 !== undefined)
@@ -160,8 +168,8 @@ export class OrganizationsService {
     if (dto.region !== undefined) updateData.region = dto.region;
     if (dto.postalCode !== undefined) updateData.postalCode = dto.postalCode;
     if (dto.countryCode !== undefined) updateData.countryCode = dto.countryCode;
-    if (dto.timezone !== undefined) updateData.timezone = dto.timezone;
-    if (dto.serviceArea !== undefined) updateData.serviceArea = dto.serviceArea;
+    if (dto.lat !== undefined) updateData.lat = dto.lat;
+    if (dto.lng !== undefined) updateData.lng = dto.lng;
 
     // For personal organizations, lock the name to "<User Name>'s Workspace"
     if (org.type === OrgType.PERSONAL) {
@@ -175,10 +183,12 @@ export class OrganizationsService {
       updateData.name = dto.name;
     }
 
-    return this.prisma.organization.update({
+    const updated = await this.prisma.organization.update({
       where: { id: orgId },
       data: updateData,
     });
+
+    return updated;
   }
 
   async listOrganizationMembers(orgId: string) {

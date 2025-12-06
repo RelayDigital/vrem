@@ -38,7 +38,7 @@ export class InquiriesService {
     const project = await this.prisma.project.create({
       data: {
         orgId,
-        address: inquiry.address || '',
+        addressLine1: inquiry.address || null,
         notes: inquiry.message || '',
         scheduledTime: new Date(), // placeholder - updated later
       },

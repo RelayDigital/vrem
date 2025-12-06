@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  Query,
   UseGuards,
   Body,
   Patch,
@@ -23,6 +24,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { UpdateProjectStatusDto } from './dto/update-project-status.dto';
 import { CurrentOrg } from '../organizations/current-org.decorator';
 import { OrgMemberGuard } from '../organizations/org-member.guard';
+import { ProjectChatChannel } from '@prisma/client';
 
 @Controller('projects')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -39,7 +41,6 @@ export class ProjectsController {
 
   // GET only user's projects for this org
   @Get('mine')
-  @UseGuards(OrgMemberGuard)
   findMine(@CurrentUser() user, @CurrentOrg() org, @Req() req: any) {
     // For agents, org might be null if they're not org members
     // They can still access their projects by agentId
@@ -62,12 +63,22 @@ export class ProjectsController {
     @CurrentUser() user,
     @CurrentOrg() org,
     @Req() req,
+    @Query('channel') channel?: ProjectChatChannel,
   ) {
+    const requested =
+      typeof channel === 'string'
+        ? (channel as string).toUpperCase()
+        : channel;
+    const effectiveChannel =
+      requested === ProjectChatChannel.CUSTOMER
+        ? ProjectChatChannel.CUSTOMER
+        : ProjectChatChannel.TEAM;
     return this.projectsService.getMessages(
       id,
       user,
       org.id,
       req?.membership?.role,
+      effectiveChannel,
     );
   }
 
@@ -82,9 +93,20 @@ export class ProjectsController {
     @CurrentOrg() org,
     @Req() req,
   ) {
+    const normalizedChannel =
+      typeof dto.channel === 'string'
+        ? (dto.channel as string).toUpperCase()
+        : dto.channel;
+    const effectiveDto = {
+      ...dto,
+      channel:
+        normalizedChannel === ProjectChatChannel.CUSTOMER
+          ? ProjectChatChannel.CUSTOMER
+          : ProjectChatChannel.TEAM,
+    };
     return this.projectsService.addMessage(
       id,
-      dto,
+      effectiveDto,
       user,
       org.id,
       req?.membership?.role,

@@ -1,30 +1,13 @@
-import { IsString, IsOptional, IsDateString, ValidateNested, IsObject, IsNumber } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsDateString, IsNumber } from 'class-validator';
 
-class AddressDto {
+export class CreateProjectDto {
   @IsOptional()
-  @IsNumber()
-  latitude?: number;
-
-  @IsOptional()
-  @IsNumber()
-  longitude?: number;
+  @IsString()
+  addressLine1?: string;
 
   @IsOptional()
   @IsString()
-  street_number?: string;
-
-  @IsOptional()
-  @IsString()
-  street_name?: string;
-
-  @IsOptional()
-  @IsString()
-  unit_number?: string;
-
-  @IsOptional()
-  @IsString()
-  postal_code?: string;
+  addressLine2?: string;
 
   @IsOptional()
   @IsString()
@@ -32,22 +15,23 @@ class AddressDto {
 
   @IsOptional()
   @IsString()
-  state_or_province?: string;
+  region?: string;
 
   @IsOptional()
   @IsString()
-  country?: string;
+  postalCode?: string;
 
   @IsOptional()
   @IsString()
-  unparsed_address?: string;
-}
+  countryCode?: string;
 
-export class CreateProjectDto {
-  @ValidateNested()
-  @Type(() => AddressDto)
-  @IsObject()
-  address: AddressDto | Record<string, any> | string;
+  @IsOptional()
+  @IsNumber()
+  lat?: number;
+
+  @IsOptional()
+  @IsNumber()
+  lng?: number;
 
   @IsOptional()
   @IsString()

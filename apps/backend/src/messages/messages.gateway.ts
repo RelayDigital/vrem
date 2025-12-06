@@ -37,10 +37,28 @@ export class MessagesGateway
     try {
       const payload = this.jwtService.verify(token); // ← USE JWT SERVICE
 
+      const rawRole =
+        payload.accountType ||
+        payload.account_type ||
+        payload.role ||
+        payload.account_type;
+      const roleUpper = (rawRole || '').toUpperCase();
+      const accountType =
+        roleUpper === 'AGENT'
+          ? 'AGENT'
+          : ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'DISPATCHER', 'COMPANY'].includes(
+              roleUpper,
+            )
+          ? 'COMPANY'
+          : ['TECHNICIAN', 'PROVIDER', 'EDITOR'].includes(roleUpper)
+          ? 'PROVIDER'
+          : 'PROVIDER'; // default to provider for unrecognized roles
+
       client.data.user = {
         id: payload.sub,
         email: payload.email,
         role: payload.role,
+        accountType,
         name: payload.name,
       };
     } catch (e) {
@@ -57,11 +75,11 @@ export class MessagesGateway
   ) {
     const user = client.data.user;
 
-    const allowed = await this.messagesService.userHasAccessToProject(
-      user.id,
-      user.accountType,
-      data.projectId,
-    );
+    const allowed = await this.messagesService.userHasAccessToProject({
+      userId: user.id,
+      accountType: (user.accountType || user.role) as any,
+      projectId: data.projectId,
+    });
 
     if (!allowed) {
       return { error: 'Access denied' };
@@ -75,24 +93,31 @@ export class MessagesGateway
 
   @SubscribeMessage('sendMessage')
   async handleSendMessage(
-    @MessageBody() data: { projectId: string; content: string },
+    @MessageBody() data: { projectId: string; content: string; channel?: string; thread?: string | null },
     @ConnectedSocket() client: Socket,
   ) {
     const user = client.data.user;
 
-    const allowed = await this.messagesService.userHasAccessToProject(
-      user.id,
-      user.accountType,
-      data.projectId,
-    );
+    const allowed = await this.messagesService.userHasAccessToProject({
+      userId: user.id,
+      accountType: (user.accountType || user.role) as any,
+      projectId: data.projectId,
+    });
 
     if (!allowed) {
       return { error: 'Access denied' };
     }
 
+    const channel =
+      data.channel && data.channel.toUpperCase() === 'CUSTOMER'
+        ? 'CUSTOMER'
+        : 'TEAM';
+
     const message = await this.messagesService.sendMessage(user.id, {
       projectId: data.projectId,
       content: data.content,
+      channel: channel as any,
+      thread: data.thread,
     });
 
     const room = `project:${data.projectId}`;

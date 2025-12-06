@@ -8,36 +8,38 @@ datasource db {
 }
 
 model User {
-  id             String               @id @default(uuid())
-  email          String               @unique
-  name           String
-  password       String
-  accountType    UserAccountType      @default(AGENT)
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
-  messages       Message[]
-  organizations  OrganizationMember[]
-  editorProjects Project[]            @relation("EditorProjects")
-  techProjects   Project[]            @relation("TechProjects")
-  managerProjects Project[]           @relation("ManagerProjects")
-  customers      OrganizationCustomer[]
+  id              String                 @id @default(uuid())
+  email           String                 @unique
+  name            String
+  password        String
+  accountType     UserAccountType        @default(AGENT)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  messages        Message[]
+  organizations   OrganizationMember[]
+  editorProjects  Project[]              @relation("EditorProjects")
+  techProjects    Project[]              @relation("TechProjects")
+  managerProjects Project[]              @relation("ManagerProjects")
+  customers       OrganizationCustomer[]
 }
 
 model Organization {
-  id           String               @id
+  id           String                 @id
   name         String
-  createdAt    DateTime             @default(now())
-  type         OrgType              @default(COMPANY)
+  createdAt    DateTime               @default(now())
+  type         OrgType                @default(COMPANY)
   addressLine1 String?
   addressLine2 String?
   city         String?
+  region       String?
+  postalCode   String?
   countryCode  String?
+  lat          Float?
+  lng          Float?
   legalName    String?
   logoUrl      String?
   phone        String?
-  postalCode   String?
   primaryEmail String?
-  region       String?
   serviceArea  Json?
   slug         String?
   timezone     String?
@@ -73,48 +75,62 @@ model Media {
 }
 
 model Message {
-  id        String   @id @default(uuid())
+  id        String             @id @default(uuid())
   projectId String
   userId    String
   content   String
-  timestamp DateTime @default(now())
-  project   Project  @relation(fields: [projectId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  timestamp DateTime           @default(now())
+  channel   ProjectChatChannel @default(TEAM)
+  thread    String?
+  project   Project            @relation(fields: [projectId], references: [id])
+  user      User               @relation(fields: [userId], references: [id])
+}
+
+enum ProjectChatChannel {
+  TEAM
+  CUSTOMER
 }
 
 model Project {
-  id            String         @id @default(uuid())
-  address       Json
-  notes         String?
-  scheduledTime DateTime
-  status        ProjectStatus  @default(BOOKED)
-  technicianId  String?
-  editorId      String?
+  id               String                @id @default(uuid())
+  addressLine1     String?
+  addressLine2     String?
+  city             String?
+  region           String?
+  postalCode       String?
+  countryCode      String?
+  lat              Float?
+  lng              Float?
+  notes            String?
+  scheduledTime    DateTime
+  status           ProjectStatus         @default(BOOKED)
+  technicianId     String?
+  editorId         String?
   projectManagerId String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  orgId         String
-  customerId    String?
-  calendarEvent CalendarEvent?
-  media         Media[]
-  messages      Message[]
-  editor        User?          @relation("EditorProjects", fields: [editorId], references: [id])
-  organization  Organization   @relation(fields: [orgId], references: [id])
-  technician    User?          @relation("TechProjects", fields: [technicianId], references: [id])
-  projectManager User?         @relation("ManagerProjects", fields: [projectManagerId], references: [id])
-  customer      OrganizationCustomer? @relation(fields: [customerId], references: [id])
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  orgId            String
+  customerId       String?
+  calendarEvent    CalendarEvent?
+  media            Media[]
+  messages         Message[]
+  editor           User?                 @relation("EditorProjects", fields: [editorId], references: [id])
+  organization     Organization          @relation(fields: [orgId], references: [id])
+  technician       User?                 @relation("TechProjects", fields: [technicianId], references: [id])
+  projectManager   User?                 @relation("ManagerProjects", fields: [projectManagerId], references: [id])
+  customer         OrganizationCustomer? @relation(fields: [customerId], references: [id])
 }
 
 model OrganizationCustomer {
-  id        String        @id @default(uuid())
+  id        String   @id @default(uuid())
   orgId     String
   name      String
   email     String?
   phone     String?
   notes     String?
   userId    String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   organization Organization @relation(fields: [orgId], references: [id])
   user         User?        @relation(fields: [userId], references: [id])
