@@ -39,7 +39,12 @@ export class ProjectsController {
   @Get()
   @UseGuards(OrgMemberGuard)
   @Roles(UserAccountType.COMPANY)
-  getProjects(@CurrentOrg() org) {
+  getProjects(@CurrentOrg() org, @Req() req) {
+    const membershipRole = req?.membership?.role || org?.membership?.role || null;
+    const elevated = ['OWNER', 'ADMIN'].includes(membershipRole);
+    if (!elevated) {
+      throw new ForbiddenException('You are not allowed to view all projects for this organization');
+    }
     return this.projectsService.findForOrg(org.id);
   }
 
@@ -107,17 +112,18 @@ export class ProjectsController {
 
   // GET only user's projects for this org
   @Get('mine')
+  @UseGuards(OrgMemberGuard)
   findMine(@CurrentUser() user, @CurrentOrg() org, @Req() req: any) {
     // For agents, org might be null if they're not org members
     // They can still access their projects by agentId
     const orgId = org?.id || null;
-    const membershipRole = req?.membership?.role;
+    const membershipRole = req?.membership?.role || org?.membership?.role || null;
     const effectiveRole =
       membershipRole &&
       (membershipRole === 'ADMIN' || membershipRole === 'OWNER')
         ? UserAccountType.COMPANY
         : user.accountType;
-    return this.projectsService.findForUser(user.id, effectiveRole, orgId);
+    return this.projectsService.findForUser(user.id, effectiveRole, orgId, membershipRole);
   }
 
   // GET messages for a project
@@ -291,7 +297,7 @@ export class ProjectsController {
     @Req() req,
   ) {
     const membershipRole = req?.membership?.role;
-    const allowed = ['OWNER', 'ADMIN', 'PROJECT_MANAGER'];
+    const allowed = ['OWNER', 'ADMIN'];
     if (!allowed.includes(membershipRole)) {
       throw new ForbiddenException('You are not allowed to assign project managers for this organization');
     }

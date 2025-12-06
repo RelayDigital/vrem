@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ProjectStatus, UserAccountType, ProjectChatChannel } from '@prisma/client';
+import { ProjectStatus, UserAccountType, ProjectChatChannel, OrgRole } from '@prisma/client';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { AssignProjectDto } from './dto/assign-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -15,6 +15,36 @@ export class ProjectsService {
     private prisma: PrismaService,
     private cronofy: CronofyService
   ) {}
+
+  private isElevatedOrgRole(role?: OrgRole | null) {
+    return role === OrgRole.OWNER || role === OrgRole.ADMIN;
+  }
+
+  private async resolveMembershipRole(
+    userId: string,
+    orgId: string | null,
+    providedRole?: OrgRole | null,
+  ): Promise<OrgRole | null> {
+    if (providedRole) {
+      return providedRole;
+    }
+    if (!orgId) {
+      return null;
+    }
+    const membership = await this.prisma.organizationMember.findFirst({
+      where: { userId, orgId },
+      select: { role: true },
+    });
+    return membership?.role || null;
+  }
+
+  private isUserAttachedToProject(project: any, userId: string) {
+    return (
+      project?.technicianId === userId ||
+      project?.editorId === userId ||
+      project?.projectManagerId === userId
+    );
+  }
 
   private async ensureProjectInOrg(projectId: string, orgId: string) {
   const project = await this.prisma.project.findFirst({
@@ -171,10 +201,18 @@ export class ProjectsService {
   }
 
   // Get projects for logged-in user
-  async findForUser(userId: string, accountType: UserAccountType, orgId: string | null) {
+  async findForUser(
+    userId: string,
+    accountType: UserAccountType,
+    orgId: string | null,
+    membershipRole?: OrgRole | null,
+  ) {
     this.logger.log(`findForUser called with userId: ${userId}, role: ${accountType}, orgId: ${orgId || 'null'}`);
 
     try {
+      const resolvedRole = await this.resolveMembershipRole(userId, orgId, membershipRole || null);
+      const isElevated = this.isElevatedOrgRole(resolvedRole);
+
       if (accountType === UserAccountType.AGENT) {
         const whereClause: any = {
           customer: { userId },
@@ -194,47 +232,75 @@ export class ProjectsService {
         return result;
       }
 
-    if (accountType === UserAccountType.PROVIDER) {
+      if (accountType === UserAccountType.PROVIDER) {
+          if (!orgId) {
+            throw new ForbiddenException('Organization ID required for technicians');
+          }
+          const whereClause = isElevated
+            ? { orgId }
+            : {
+                orgId,
+                OR: [
+                  { technicianId: userId },
+                  { editorId: userId },
+                  { projectManagerId: userId },
+                ],
+              };
+          this.logger.log(
+            `Querying projects for PROVIDER: userId=${userId}, orgId=${orgId}, elevated=${isElevated}`,
+          );
+          const result = await this.prisma.project.findMany({
+        where: whereClause,
+            include: { 
+              media: true, 
+              customer: true,
+              technician: true,
+              editor: true,
+              projectManager: true,
+              messages: {
+                include: { user: true },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+          this.logger.log(`Found ${result.length} projects for PROVIDER`);
+          return result;
+    }
+
+      if (accountType === UserAccountType.COMPANY) {
         if (!orgId) {
-          throw new ForbiddenException('Organization ID required for technicians');
+          throw new ForbiddenException('Organization ID required for dispatchers');
         }
-        this.logger.log(`Querying projects for PROVIDER: technicianId=${userId}, orgId=${orgId}`);
+        const whereClause = isElevated
+          ? { orgId }
+          : {
+              orgId,
+              OR: [
+                { technicianId: userId },
+                { editorId: userId },
+                { projectManagerId: userId },
+              ],
+            };
+        this.logger.log(
+          `Querying projects for COMPANY: orgId=${orgId}, elevated=${isElevated}, userId=${userId}`,
+        );
         const result = await this.prisma.project.findMany({
-      where: { technicianId: userId, orgId },
-          include: { 
-            media: true, 
+          where: whereClause,
+          include: {
+            media: true,
             customer: true,
+            technician: true,
+            editor: true,
+            projectManager: true,
             messages: {
               include: { user: true },
             },
           },
+          orderBy: { createdAt: 'desc' },
         });
-        this.logger.log(`Found ${result.length} projects for PROVIDER`);
+        this.logger.log(`Found ${result.length} projects for COMPANY`);
         return result;
-  }
-
-    if (accountType === UserAccountType.COMPANY) {
-      if (!orgId) {
-        throw new ForbiddenException('Organization ID required for dispatchers');
       }
-      this.logger.log(`Querying projects for COMPANY: orgId=${orgId}`);
-      const result = await this.prisma.project.findMany({
-        where: { orgId },
-        include: {
-          media: true,
-          customer: true,
-          technician: true,
-          editor: true,
-          projectManager: true,
-          messages: {
-            include: { user: true },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      this.logger.log(`Found ${result.length} projects for COMPANY`);
-      return result;
-    }
 
       return [];
     } catch (error: any) {
@@ -441,7 +507,7 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
     userId: string,
     accountType: UserAccountType,
     orgId: string,
-    membershipRole?: string | null,
+    membershipRole?: OrgRole | null,
   ) {
     // Use findFirst instead of findUnique since orgId is not unique
     const where: any = { id };
@@ -471,20 +537,28 @@ private async setProjectStatus(projectId: string, status: ProjectStatus) {
 
     if (!project) return null;
 
-    const elevatedOrgRoles = ['OWNER', 'ADMIN', 'PROJECT_MANAGER'];
-    if (membershipRole && elevatedOrgRoles.includes(membershipRole)) {
+    const resolvedRole = await this.resolveMembershipRole(userId, orgId, membershipRole || null);
+    const isElevated = this.isElevatedOrgRole(resolvedRole);
+    const isAttached = this.isUserAttachedToProject(project, userId);
+
+    if (isElevated) {
       return project;
     }
-
-    if (accountType === UserAccountType.COMPANY) return project;
 
     if (accountType === UserAccountType.AGENT) {
       const isAttached = project.customer?.userId === userId;
       return isAttached ? project : null;
     }
-    if (accountType === UserAccountType.PROVIDER && project.technicianId !== userId) return null;
 
-    return project;
+    if (accountType === UserAccountType.COMPANY) {
+      return isAttached ? project : null;
+    }
+
+    if (accountType === UserAccountType.PROVIDER) {
+      return isAttached ? project : null;
+    }
+
+    return null;
   }
 
   async update(id: string, dto: UpdateProjectDto, orgId: string) {
@@ -593,7 +667,11 @@ async remove(id: string, orgId: string, user: { id: string; accountType: UserAcc
 
     if (
       user.accountType === UserAccountType.PROVIDER &&
-      project.technicianId !== user.id
+      ![
+        project.technicianId,
+        project.projectManagerId,
+        project.editorId,
+      ].includes(user.id)
     ) {
       throw new ForbiddenException('Not allowed');
     }
