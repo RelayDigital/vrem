@@ -166,12 +166,13 @@ interface JobTaskViewProps {
   currentUserId: string;
   currentUserName: string;
   currentUserAvatar?: string;
+  currentUserAccountType?: string;
   isClient?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSendMessage?: (
     content: string,
-    chatType: "client" | "team",
+    channel: "TEAM" | "CUSTOMER",
     threadId?: string
   ) => void;
   onEditMessage?: (messageId: string, content: string) => void;
@@ -199,6 +200,7 @@ export function JobTaskView({
   isClient = false,
   open,
   onOpenChange,
+  currentUserAccountType,
   onSendMessage,
   onEditMessage,
   onDeleteMessage,
@@ -214,10 +216,13 @@ export function JobTaskView({
 }: JobTaskViewProps) {
   const { activeOrganizationId, activeMembership } = useCurrentOrganization();
   const jobManagement = useJobManagement();
+  const isAgentUser = (currentUserAccountType || "").toUpperCase() === "AGENT";
   const [activeTab, setActiveTab] = useState<
     "description" | "discussion" | "attachments" | "media"
   >("discussion");
-  const [activeChatTab, setActiveChatTab] = useState<"client" | "team">("team");
+  const [activeChatTab, setActiveChatTab] = useState<"client" | "team">(
+    isAgentUser ? "client" : "team"
+  );
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
@@ -245,8 +250,7 @@ export function JobTaskView({
   const [connectingService, setConnectingService] = useState<string | null>(
     null
   );
-  const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] =
-    useState(false);
+  const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] = useState(false);
   const [isDeletingProject, setIsDeletingProject] = useState(false);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [customers, setCustomers] = useState<OrganizationCustomer[]>([]);
@@ -271,9 +275,7 @@ export function JobTaskView({
     );
   }, [activeMembership]);
   const canDeleteProject = useMemo(() => {
-    const orgRole = (
-      activeMembership?.role || activeMembership?.orgRole || ""
-    )
+    const orgRole = (activeMembership?.role || activeMembership?.orgRole || "")
       .toString()
       .toUpperCase();
     const isElevated = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(orgRole);
@@ -605,20 +607,31 @@ export function JobTaskView({
     };
   }, [messageEditor]);
 
+  const sanitizeMessageHtml = useCallback((html: string) => {
+    if (!html) return html;
+    let cleaned = html.trim();
+    // Remove trailing empty paragraphs or <p><br></p>
+    cleaned = cleaned.replace(/(<p><br\s*\/?><\/p>\s*)+$/gi, "");
+    cleaned = cleaned.replace(/(<p>\s*<\/p>\s*)+$/gi, "");
+    return cleaned;
+  }, []);
+
   const handleSend = useCallback(() => {
     if (!messageEditor || !onSendMessage) return;
 
-    const htmlContent = messageEditor.getHTML();
+    const htmlContent = sanitizeMessageHtml(messageEditor.getHTML());
     const textContent = messageEditor.getText().trim();
 
     if (!textContent) return;
 
-    onSendMessage(htmlContent, activeChatTab, replyingTo?.id);
+    const effectiveChatTab = isAgentUser ? "client" : activeChatTab;
+    const channel = effectiveChatTab === "client" ? "CUSTOMER" : "TEAM";
+    onSendMessage(htmlContent, channel, replyingTo?.id);
     messageEditor.commands.clearContent();
     setReplyingTo(null);
     setHasEditorContent(false);
     messageEditor.commands.focus();
-  }, [messageEditor, onSendMessage, activeChatTab, replyingTo]);
+  }, [messageEditor, onSendMessage, activeChatTab, replyingTo, isAgentUser, sanitizeMessageHtml]);
 
   const handleEdit = useCallback((message: ChatMessage) => {
     setEditingMessageId(message.id);
@@ -672,7 +685,7 @@ export function JobTaskView({
   const handleSaveEdit = useCallback(() => {
     if (!editMessageEditor || !editingMessageId || !onEditMessage) return;
 
-    const htmlContent = editMessageEditor.getHTML();
+    const htmlContent = sanitizeMessageHtml(editMessageEditor.getHTML());
     const textContent = editMessageEditor.getText().trim();
 
     if (!textContent) {
@@ -683,7 +696,7 @@ export function JobTaskView({
     onEditMessage(editingMessageId, htmlContent);
     setEditingMessageId(null);
     editMessageEditor.commands.clearContent();
-  }, [editMessageEditor, editingMessageId, onEditMessage]);
+  }, [editMessageEditor, editingMessageId, onEditMessage, sanitizeMessageHtml]);
 
   const handleCancelEdit = useCallback(() => {
     setEditingMessageId(null);
@@ -738,45 +751,6 @@ export function JobTaskView({
       setIsDeletingProject(false);
     }
   }, [job, jobManagement, onOpenChange]);
-
-  // Early return must be after all hooks
-  if (!job) return null;
-
-  const customerDisplayName =
-    assignedCustomer?.name || job.clientName || "Unassigned";
-  const projectManagerDisplay = assignedProjectManager
-    ? {
-        name:
-          assignedProjectManager.user?.name ||
-          assignedProjectManager.personalOrg?.legalName ||
-          "Unassigned",
-        avatar: assignedProjectManager.user?.avatarUrl,
-        userId:
-          assignedProjectManager.user?.id || assignedProjectManager.userId,
-      }
-    : projectManager
-    ? {
-        name: (projectManager as any).name,
-        avatar: (projectManager as any).avatarUrl,
-        userId: (projectManager as any).id,
-      }
-    : null;
-  const editorDisplay = assignedEditor
-    ? {
-        name:
-          assignedEditor.user?.name ||
-          assignedEditor.personalOrg?.legalName ||
-          "Unassigned",
-        avatar: assignedEditor.user?.avatarUrl,
-        userId: assignedEditor.user?.id || assignedEditor.userId,
-      }
-    : editor
-    ? {
-        name: (editor as any).name,
-        avatar: (editor as any).avatarUrl,
-        userId: (editor as any).id,
-      }
-    : null;
 
   const getMediaIcon = (type: string) => {
     switch (type) {
@@ -867,9 +841,6 @@ export function JobTaskView({
     }
   };
 
-  const priorityConfig = getPriorityConfig(job.priority);
-  const statusConfig = getStatusConfig(job.status);
-
   const handleCopyLink = () => {
     if (!job) return;
 
@@ -935,6 +906,47 @@ export function JobTaskView({
   ) => {
     return uploadedMedia.filter((item) => item.type === category);
   };
+  const hasAnyMedia = useMemo(
+    () => uploadedMedia && uploadedMedia.length > 0,
+    [uploadedMedia]
+  );
+  const priorityConfig = getPriorityConfig(job?.priority || "standard");
+  const statusConfig = getStatusConfig(job?.status || "pending");
+  const customerDisplayName =
+    assignedCustomer?.name || job?.clientName || "Unassigned";
+  const projectManagerDisplay = assignedProjectManager
+    ? {
+        name:
+          assignedProjectManager.user?.name ||
+          assignedProjectManager.personalOrg?.legalName ||
+          "Unassigned",
+        avatar: assignedProjectManager.user?.avatarUrl,
+        userId:
+          assignedProjectManager.user?.id || assignedProjectManager.userId,
+      }
+    : projectManager
+    ? {
+        name: (projectManager as any).name,
+        avatar: (projectManager as any).avatarUrl,
+        userId: (projectManager as any).id,
+      }
+    : null;
+  const editorDisplay = assignedEditor
+    ? {
+        name:
+          assignedEditor.user?.name ||
+          assignedEditor.personalOrg?.legalName ||
+          "Unassigned",
+        avatar: assignedEditor.user?.avatarUrl,
+        userId: assignedEditor.user?.id || assignedEditor.userId,
+      }
+    : editor
+    ? {
+        name: (editor as any).name,
+        avatar: (editor as any).avatarUrl,
+        userId: (editor as any).id,
+      }
+    : null;
 
   const getUploadcareAcceptTypes = (
     category: "image" | "video" | "floor-plan" | "file"
@@ -1051,6 +1063,10 @@ export function JobTaskView({
     inputRef: React.RefObject<HTMLInputElement | null>
   ) => {
     const categoryMedia = getMediaByCategory(category);
+    if (isAgentUser && categoryMedia.length === 0) {
+      return null;
+    }
+    const uploadsDisabled = isAgentUser;
     const isDragging = draggingCategory === category;
     const categoryName =
       category === "floor-plan"
@@ -1073,22 +1089,25 @@ export function JobTaskView({
                     value={threeDUrl}
                     onChange={(e) => setThreeDUrl(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                      if (e.key === "Enter" && !uploadsDisabled) {
                         handleUrlUpload(threeDUrl, "3d-content");
                       }
                     }}
+                    disabled={uploadsDisabled}
                     className="flex-1"
                   />
                   <Button
                     onClick={() => handleUrlUpload(threeDUrl, "3d-content")}
-                    disabled={!threeDUrl.trim()}
+                    disabled={!threeDUrl.trim() || uploadsDisabled}
                   >
                     <Link className="h-4 w-4 mr-2" />
                     Add URL
                   </Button>
                 </div>
                 <P className="text-xs text-muted-foreground">
-                  Enter a URL to a 3D model file (GLB, GLTF, OBJ, FBX, etc.)
+                  {uploadsDisabled
+                    ? "Media uploads are not available for agent accounts. You’ll see shared media here once it’s added."
+                    : "Enter a URL to a 3D model file (GLB, GLTF, OBJ, FBX, etc.)"}
                 </P>
               </div>
             </div>
@@ -1106,15 +1125,16 @@ export function JobTaskView({
                     value={threeDUrl}
                     onChange={(e) => setThreeDUrl(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                      if (e.key === "Enter" && !uploadsDisabled) {
                         handleUrlUpload(threeDUrl, "3d-content");
                       }
                     }}
+                    disabled={uploadsDisabled}
                     className="w-[300px]"
                   />
                   <Button
                     onClick={() => handleUrlUpload(threeDUrl, "3d-content")}
-                    disabled={!threeDUrl.trim()}
+                    disabled={!threeDUrl.trim() || uploadsDisabled}
                     variant="outline"
                     size="sm"
                   >
@@ -1168,7 +1188,11 @@ export function JobTaskView({
     }
 
     if (categoryMedia.length === 0) {
-      // Show upload area when empty
+      // Show upload area when empty (non-agents only)
+      if (uploadsDisabled) {
+        return null;
+      }
+
       return (
         <div className="py-4 space-y-4">
           {(category === "image" ||
@@ -1205,10 +1229,11 @@ export function JobTaskView({
             {categoryMedia.length === 1 ? "item" : "items"}
           </P>
           <div className="flex items-center gap-2 flex-wrap">
-            {(category === "image" ||
-              category === "video" ||
-              category === "floor-plan" ||
-              category === "file") && (
+            {!uploadsDisabled &&
+              (category === "image" ||
+                category === "video" ||
+                category === "floor-plan" ||
+                category === "file") && (
               <div onClick={(e) => e.stopPropagation()}>
                 <FileUploaderRegular
                   pubkey={
@@ -1224,10 +1249,11 @@ export function JobTaskView({
                 />
               </div>
             )}
-            {(category === "image" ||
-              category === "video" ||
-              category === "floor-plan" ||
-              category === "file") && (
+            {!uploadsDisabled &&
+              (category === "image" ||
+                category === "video" ||
+                category === "floor-plan" ||
+                category === "file") && (
               <ButtonGroup orientation="horizontal">
                 <Button
                   variant="outline"
@@ -1316,76 +1342,83 @@ export function JobTaskView({
     );
   };
 
+  // Normalize chatType: treat agent messages as customer chat regardless of backend value
+  const visibleMessages = useMemo(() => {
+    return messages.map((m) => {
+      const isAgentMessage =
+        (m as any)?.user?.accountType === "AGENT" ||
+        (m as any)?.user?.account_type === "AGENT";
+      const channel =
+        (m as any)?.channel ||
+        (isAgentMessage ? "CUSTOMER" : (m.chatType === "client" ? "CUSTOMER" : "TEAM"));
+      const chatType: "client" | "team" =
+        channel === "CUSTOMER" ? "client" : "team";
+      return { ...m, channel, chatType, thread: (m as any).thread ?? m.threadId ?? null };
+    });
+  }, [messages]);
+
   // Filter messages by chat type
-  const clientMessages = messages.filter((m) => m.chatType === "client");
-  const teamMessages = messages.filter((m) => m.chatType === "team");
+  const clientMessages = visibleMessages.filter((m) => m.chatType === "client");
+  const teamMessages = visibleMessages.filter((m) => m.chatType === "team");
 
-  // Helper function to process messages for a given chat type
-  const processMessages = (messageList: ChatMessage[]) => {
-    const threadMap = new Map<string, ChatMessage[]>();
-    const rootMessages: ChatMessage[] = [];
-    const messageIds = new Set(messageList.map((m) => m.id));
+  const buildThreads = (messageList: ChatMessage[]) => {
+    const byId = new Map<string, any>();
+    const roots: any[] = [];
 
-    messageList.forEach((message) => {
-      if (message.threadId) {
-        // Check if parent message exists
-        if (messageIds.has(message.threadId)) {
-          // Parent exists, add to thread map
-          if (!threadMap.has(message.threadId)) {
-            threadMap.set(message.threadId, []);
-          }
-          threadMap.get(message.threadId)!.push(message);
-        } else {
-          // Parent doesn't exist (orphaned reply), show as root message
-          rootMessages.push(message);
-        }
+    messageList.forEach((m) => {
+      byId.set(m.id, { ...m, replies: [] as any[] });
+    });
+
+    byId.forEach((node) => {
+      if (node.thread && byId.has(node.thread)) {
+        byId.get(node.thread).replies.push(node);
       } else {
-        rootMessages.push(message);
+        roots.push(node);
       }
     });
 
-    // Sort messages by date
-    const sortedRootMessages = [...rootMessages].sort(
-      (a, b) =>
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
-
-    return { sortedRootMessages, threadMap };
+    const sortByDate = (arr: any[]) =>
+      arr.sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+    const sortTree = (arr: any[]) => {
+      sortByDate(arr);
+      arr.forEach((n) => sortTree(n.replies));
+    };
+    sortTree(roots);
+    return roots;
   };
 
-  const clientProcessed = processMessages(clientMessages);
-  const teamProcessed = processMessages(teamMessages);
+  const clientThreaded = useMemo(() => buildThreads(clientMessages), [clientMessages]);
+  const teamThreaded = useMemo(() => buildThreads(teamMessages), [teamMessages]);
+  const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
 
   const renderMessage = (
-    message: ChatMessage,
-    isThread = false,
-    threadMap?: Map<string, ChatMessage[]>
+    message: any,
+    depth = 0
   ) => {
-    const threadMessages = threadMap?.get(message.id) || [];
+    const threadMessages = message.replies || [];
     const isOwnMessage = message.userId === currentUserId;
     const isEditing = editingMessageId === message.id;
+    const isCollapsed =
+      expandedThreads[message.id] === false && threadMessages.length > 0;
 
     return (
       <div
         key={message.id}
-        className={cn("flex gap-2.5 relative", isThread && "ml-8 mt-3")}
+        className={cn("flex gap-2.5 relative", depth > 0 && "mt-3")}
+        style={{ marginLeft: depth > 0 ? depth * 16 : 0 }}
       >
-        {/* Thread line indicator for replies */}
-        {isThread && (
-          <div
-            className="absolute left-[-20px] top-0 w-px bg-border"
-            style={{ height: "100%" }}
-          />
-        )}
         <Avatar className="h-7 w-7 shrink-0">
           <AvatarImage src={message.userAvatar} alt={message.userName} />
-          <AvatarFallback className="text-xs bg-muted">
-            {message.userName
-              .split(" ")
-              .map((n) => n[0])
-              .join("")}
-          </AvatarFallback>
-        </Avatar>
+            <AvatarFallback className="text-xs bg-muted">
+              {message.userName
+                .split(" ")
+                .map((n: string) => n[0])
+                .join("")}
+            </AvatarFallback>
+          </Avatar>
         <div className="flex-1 min-w-0">
           <div className="group">
             <div className="flex items-center gap-1.5 mb-1.5">
@@ -1469,18 +1502,32 @@ export function JobTaskView({
           </div>
           {threadMessages.length > 0 && (
             <div className="mt-2 space-y-2 relative pl-2">
-              {/* Vertical line connecting replies to parent */}
-              <div
-                className="absolute left-0 top-0 w-px bg-border"
-                style={{ height: "100%" }}
-              />
-              {threadMessages
-                .sort(
-                  (a, b) =>
-                    new Date(a.createdAt).getTime() -
-                    new Date(b.createdAt).getTime()
-                )
-                .map((threadMsg) => renderMessage(threadMsg, true, threadMap))}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-border" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs text-muted-foreground"
+                  onClick={() =>
+                    setExpandedThreads((prev) => ({
+                      ...prev,
+                      [message.id]: isCollapsed ? true : false,
+                    }))
+                  }
+                >
+                  {isCollapsed
+                    ? `Show replies (${threadMessages.length})`
+                    : "Hide replies"}
+                </Button>
+              </div>
+              {!isCollapsed &&
+                threadMessages
+                  .sort(
+                    (a: any, b: any) =>
+                      new Date(a.createdAt).getTime() -
+                      new Date(b.createdAt).getTime()
+                  )
+                  .map((threadMsg: any) => renderMessage(threadMsg, depth + 1))}
             </div>
           )}
         </div>
@@ -1506,10 +1553,12 @@ export function JobTaskView({
           <MapPin className="size-6" />
         </ItemMedia>
         <ItemContent className="">
-          <ItemTitle className="">{job.propertyAddress}</ItemTitle>
-          <ItemDescription className="">
-            Client: {job.clientName}
-          </ItemDescription>
+          <ItemTitle className="">{job?.propertyAddress || "Job"}</ItemTitle>
+          {!isAgentUser && job?.clientName && (
+            <ItemDescription className="">
+              Client: {job.clientName}
+            </ItemDescription>
+          )}
         </ItemContent>
         <ItemActions className="">
           <DropdownMenu>
@@ -1553,7 +1602,7 @@ export function JobTaskView({
                 <Link className="mr-2 h-4 w-4" />
                 Copy link
               </DropdownMenuItem>
-              {onStatusChange && job.status !== "delivered" && (
+              {onStatusChange && job?.status !== "delivered" && (
                 <DropdownMenuItem
                   onSelect={(e) => {
                     e.preventDefault();
@@ -1613,8 +1662,8 @@ export function JobTaskView({
     const footerContent = (
       <>
         {/* Chat Type Tabs - Only show when Discussion tab is active */}
-        {activeTab === "discussion" && (
-          <div className="flex items-center gap-6 pt-2 mb-4">
+        {activeTab === "discussion" && !isAgentUser && (
+          <div className="flex items-center gap-6 mb-4">
             <Button
               variant="ghost"
               onClick={() => setActiveChatTab("client")}
@@ -1626,11 +1675,12 @@ export function JobTaskView({
               )}
             >
               <MessageSquare className="h-3.5 w-3.5" />
-              Client Chat
+              Customer Chat
               {activeChatTab === "client" && (
                 <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
               )}
             </Button>
+
             <Button
               variant="ghost"
               onClick={() => setActiveChatTab("team")}
@@ -1655,7 +1705,7 @@ export function JobTaskView({
           </div>
         )}
         {replyingTo && (
-          <div className="flex items-center justify-between bg-muted p-3 rounded-lg text-sm">
+          <div className="flex items-center justify-between bg-muted p-3 rounded-lg text-sm mb-sm">
             <span className="text-muted-foreground">
               Replying to {replyingTo.userName}
             </span>
@@ -1669,8 +1719,8 @@ export function JobTaskView({
             </Button>
           </div>
         )}
+        {/* Editor with Avatar */}
         <div className="flex flex-col gap-0">
-          {/* Editor with Avatar */}
           <div className="flex items-start gap-3">
             <Avatar className="h-8 w-8 shrink-0">
               <AvatarImage src={currentUserAvatar} alt={currentUserName} />
@@ -2208,81 +2258,87 @@ export function JobTaskView({
                   Address
                 </div>
                 <div className="text-sm font-medium text-foreground">
-                  {job.propertyAddress}
+                  {job?.propertyAddress || "—"}
                 </div>
 
                 {/* Customer */}
-                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-                  Customer
-                </div>
-                <div className="text-sm text-foreground flex items-center gap-2 flex-wrap">
-                  {customerDisplayName ? (
-                    renderAssigneeBadge(customerDisplayName)
-                  ) : (
-                    // <Badge variant="outline">Unassigned</Badge>
-                    <></>
-                  )}
-                  {canAssign && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="muted"
-                          size="sm"
-                          className="h-7 rounded-full"
-                          disabled={loadingAssignments}
-                        >
-                          {assignedCustomer ? "Change" : "Assign Customer"}
-                          <ChevronDown className="h-3.5 w-3.5 ml-2" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="start"
-                        className="w-72 max-h-[300px] overflow-y-auto p-0"
-                      >
-                        <div className="px-2 py-2 sticky top-0 bg-background z-10">
-                          <Input
-                            placeholder="Search customers..."
-                            value={customerSearch}
-                            onChange={(e) => setCustomerSearch(e.target.value)}
-                            autoFocus
-                          />
-                        </div>
-                        <DropdownMenuSeparator className="mb-0" />
-                        {filteredCustomers.map((customer) => (
-                          <DropdownMenuItem
-                            key={customer.id}
-                            onSelect={(event) => {
-                              event.preventDefault();
-                              handleAssignCustomerInline(customer.id);
-                            }}
-                            className="flex items-center gap-2"
+                {!isAgentUser && (
+                  <>
+                    <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                      Customer
+                    </div>
+                    <div className="text-sm text-foreground flex items-center gap-2 flex-wrap">
+                      {customerDisplayName ? (
+                        renderAssigneeBadge(customerDisplayName)
+                      ) : (
+                        // <Badge variant="outline">Unassigned</Badge>
+                        <></>
+                      )}
+                      {canAssign && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="muted"
+                              size="sm"
+                              className="h-7 rounded-full"
+                              disabled={loadingAssignments}
+                            >
+                              {assignedCustomer ? "Change" : "Assign Customer"}
+                              <ChevronDown className="h-3.5 w-3.5 ml-2" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="start"
+                            className="w-72 max-h-[300px] overflow-y-auto p-0"
                           >
-                            <Avatar className="h-8 w-8">
-                              <AvatarFallback className="text-xs bg-muted">
-                                {getInitials(customer.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">
-                                {customer.name}
-                              </span>
-                              {customer.email && (
-                                <span className="text-xs text-muted-foreground">
-                                  {customer.email}
-                                </span>
-                              )}
+                            <div className="px-2 py-2 sticky top-0 bg-background z-10">
+                              <Input
+                                placeholder="Search customers..."
+                                value={customerSearch}
+                                onChange={(e) =>
+                                  setCustomerSearch(e.target.value)
+                                }
+                                autoFocus
+                              />
                             </div>
-                          </DropdownMenuItem>
-                        ))}
-                        {filteredCustomers.length === 0 && (
-                          <DropdownMenuItem disabled>
-                            No customers found
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
+                            <DropdownMenuSeparator className="mb-0" />
+                            {filteredCustomers.map((customer) => (
+                              <DropdownMenuItem
+                                key={customer.id}
+                                onSelect={(event) => {
+                                  event.preventDefault();
+                                  handleAssignCustomerInline(customer.id);
+                                }}
+                                className="flex items-center gap-2"
+                              >
+                                <Avatar className="h-8 w-8">
+                                  <AvatarFallback className="text-xs bg-muted">
+                                    {getInitials(customer.name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium">
+                                    {customer.name}
+                                  </span>
+                                  {customer.email && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {customer.email}
+                                    </span>
+                                  )}
+                                </div>
+                              </DropdownMenuItem>
+                            ))}
+                            {filteredCustomers.length === 0 && (
+                              <DropdownMenuItem disabled>
+                                No customers found
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 {/* Project Manager Assigned */}
                 <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
@@ -2295,8 +2351,14 @@ export function JobTaskView({
                       projectManagerDisplay.avatar
                     )
                   ) : (
-                    // <Badge variant="outline">Unassigned</Badge>
-                    <></>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Avatar className="h-7 w-7">
+                          <AvatarFallback className="text-xs bg-muted-foreground/20"></AvatarFallback>
+                        </Avatar>
+                      </TooltipTrigger>
+                      <TooltipContent>Unassigned</TooltipContent>
+                    </Tooltip>
                   )}
                   {canAssign && (
                     <DropdownMenu>
@@ -2436,8 +2498,14 @@ export function JobTaskView({
                       editorDisplay.avatar
                     )
                   ) : (
-                    // <Badge variant="outline">Unassigned</Badge>
-                    <></>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Avatar className="h-7 w-7">
+                          <AvatarFallback className="text-xs bg-muted-foreground/20"></AvatarFallback>
+                        </Avatar>
+                      </TooltipTrigger>
+                      <TooltipContent>Unassigned</TooltipContent>
+                    </Tooltip>
                   )}
                   {canAssign && (
                     <DropdownMenu>
@@ -2448,8 +2516,14 @@ export function JobTaskView({
                           className="h-7 rounded-full"
                           disabled={loadingAssignments}
                         >
-                          {editorDisplay ? "Change" : <><span>Assign Editor</span><ChevronDown className="h-3.5 w-3.5 ml-2" /></>}
-                          
+                          {editorDisplay ? (
+                            "Change"
+                          ) : (
+                            <>
+                              <span>Assign Editor</span>
+                              <ChevronDown className="h-3.5 w-3.5 ml-2" />
+                            </>
+                          )}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
@@ -2514,10 +2588,12 @@ export function JobTaskView({
 
                 {/* Schedule Date */}
                 <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-                  Schedule date
+                  Schedule Date
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {format(new Date(job.scheduledDate), "d MMMM yyyy")}
+                  {job?.scheduledDate
+                    ? format(new Date(job.scheduledDate), "d MMMM yyyy")
+                    : "Not scheduled"}
                 </div>
 
                 {/* Status */}
@@ -2552,7 +2628,7 @@ export function JobTaskView({
                   Tags
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {job.mediaType.map((type, index) => {
+                  {(job?.mediaType || []).map((type, index) => {
                     const Icon = getMediaIcon(type);
 
                     return (
@@ -2578,7 +2654,7 @@ export function JobTaskView({
                 </div>
 
                 {/* Created By */}
-                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                {/* <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
                   Created by
                 </div>
                 <div className="inline-flex items-center gap-2">
@@ -2593,7 +2669,7 @@ export function JobTaskView({
                   <span className="text-sm font-medium text-foreground">
                     {currentUserName}
                   </span>
-                </div>
+                </div> */}
               </div>
 
               {/* Tab Navigation */}
@@ -2661,7 +2737,7 @@ export function JobTaskView({
                       <H4 className="text-sm font-semibold text-muted-foreground mb-2">
                         Location
                       </H4>
-                      <P className="text-sm">{job.propertyAddress}</P>
+                      <P className="text-sm">{job?.propertyAddress || "—"}</P>
                     </div>
                     <Separator />
                     <div className="grid grid-cols-2 gap-4">
@@ -2671,14 +2747,16 @@ export function JobTaskView({
                           Date
                         </H4>
                         <P className="text-sm">
-                          {(() => {
-                            // Parse date string as local date to avoid timezone shifts
-                            const [year, month, day] = job.scheduledDate
-                              .split("-")
-                              .map(Number);
-                            const date = new Date(year, month - 1, day);
-                            return format(date, "MMM d, yyyy");
-                          })()}
+                          {job?.scheduledDate
+                            ? (() => {
+                                // Parse date string as local date to avoid timezone shifts
+                                const [year, month, day] = job.scheduledDate
+                                  .split("-")
+                                  .map(Number);
+                                const date = new Date(year, month - 1, day);
+                                return format(date, "MMM d, yyyy");
+                              })()
+                            : "Not scheduled"}
                         </P>
                       </div>
                       <div>
@@ -2687,7 +2765,7 @@ export function JobTaskView({
                           Time
                         </H4>
                         <P className="text-sm">
-                          {job.scheduledTime && job.estimatedDuration
+                          {job?.scheduledTime && job?.estimatedDuration
                             ? (() => {
                                 const duration = job.estimatedDuration || 60;
                                 // Parse scheduled date and time in local timezone
@@ -2731,11 +2809,11 @@ export function JobTaskView({
                                   "h:mm a"
                                 )} ${timeZoneName}`;
                               })()
-                            : job.scheduledTime || "Not scheduled"}
+                            : job?.scheduledTime || "Not scheduled"}
                         </P>
                       </div>
                     </div>
-                    {job.requirements && (
+                    {job?.requirements && (
                       <>
                         <Separator />
                         <div>
@@ -2759,15 +2837,13 @@ export function JobTaskView({
                         <div className="">
                           {clientMessages.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground text-sm">
-                              No messages in client chat yet
+                              {isAgentUser
+                                ? "No messages yet"
+                                : "No messages in customer chat yet"}
                             </div>
                           ) : (
-                            clientProcessed.sortedRootMessages.map((message) =>
-                              renderMessage(
-                                message,
-                                false,
-                                clientProcessed.threadMap
-                              )
+                            clientThreaded.map((message: any) =>
+                              renderMessage(message, 0)
                             )
                           )}
                         </div>
@@ -2780,12 +2856,8 @@ export function JobTaskView({
                               No messages in team chat yet
                             </div>
                           ) : (
-                            teamProcessed.sortedRootMessages.map((message) =>
-                              renderMessage(
-                                message,
-                                false,
-                                teamProcessed.threadMap
-                              )
+                            teamThreaded.map((message: any) =>
+                              renderMessage(message, 0)
                             )
                           )}
                         </div>
@@ -2804,114 +2876,180 @@ export function JobTaskView({
           </TabsContent>
           <TabsContent value="media" className="mt-0">
             <div className="py-6">
-              <Accordion type="multiple" className="w-full space-y-2">
-                {/* Images Section */}
-                <AccordionItem
-                  value="images"
-                  className="border rounded-lg px-4"
-                >
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-medium">Images</span>
-                      {getMediaByCategory("image").length > 0 && (
-                        <Badge variant="secondary" className="ml-2">
-                          {getMediaByCategory("image").length}
-                        </Badge>
-                      )}
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    {renderMediaCategory("image", imageInputRef)}
-                  </AccordionContent>
-                </AccordionItem>
+              {isAgentUser && !hasAnyMedia ? (
+                <div className="text-sm text-muted-foreground text-center py-12">
+                  No media has been uploaded yet. You’ll see photos, videos, and files here once they’re added.
+                </div>
+              ) : (
+                <Accordion type="multiple" className="w-full space-y-2">
+                  {/* Images Section */}
+                  {(!isAgentUser || getMediaByCategory("image").length > 0) && (
+                    <AccordionItem
+                      value="images"
+                      className="border rounded-lg px-4"
+                    >
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-3">
+                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                          <span className="font-medium">Images</span>
+                          {getMediaByCategory("image").length > 0 && (
+                            <Badge variant="secondary" className="ml-2">
+                              {getMediaByCategory("image").length}
+                            </Badge>
+                          )}
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        {renderMediaCategory("image", imageInputRef)}
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
 
-                {/* Videos Section */}
-                <AccordionItem
-                  value="videos"
-                  className="border rounded-lg px-4"
-                >
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      <Video className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-medium">Videos</span>
-                      {getMediaByCategory("video").length > 0 && (
-                        <Badge variant="secondary" className="ml-2">
-                          {getMediaByCategory("video").length}
-                        </Badge>
-                      )}
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    {renderMediaCategory("video", videoInputRef)}
-                  </AccordionContent>
-                </AccordionItem>
+                  {/* Videos Section */}
+                  {(!isAgentUser || getMediaByCategory("video").length > 0) && (
+                    <AccordionItem
+                      value="videos"
+                      className="border rounded-lg px-4"
+                    >
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-3">
+                          <Video className="h-5 w-5 text-muted-foreground" />
+                          <span className="font-medium">Videos</span>
+                          {getMediaByCategory("video").length > 0 && (
+                            <Badge variant="secondary" className="ml-2">
+                              {getMediaByCategory("video").length}
+                            </Badge>
+                          )}
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        {renderMediaCategory("video", videoInputRef)}
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
 
-                {/* Floor Plans Section */}
-                <AccordionItem
-                  value="floor-plans"
-                  className="border rounded-lg px-4"
-                >
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-medium">Floor Plans</span>
-                      {getMediaByCategory("floor-plan").length > 0 && (
-                        <Badge variant="secondary" className="ml-2">
-                          {getMediaByCategory("floor-plan").length}
-                        </Badge>
-                      )}
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    {renderMediaCategory("floor-plan", floorPlanInputRef)}
-                  </AccordionContent>
-                </AccordionItem>
+                  {/* Floor Plans Section */}
+                  {(!isAgentUser ||
+                    getMediaByCategory("floor-plan").length > 0) && (
+                    <AccordionItem
+                      value="floor-plans"
+                      className="border rounded-lg px-4"
+                    >
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <span className="font-medium">Floor Plans</span>
+                          {getMediaByCategory("floor-plan").length > 0 && (
+                            <Badge variant="secondary" className="ml-2">
+                              {getMediaByCategory("floor-plan").length}
+                            </Badge>
+                          )}
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        {renderMediaCategory("floor-plan", floorPlanInputRef)}
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
 
-                {/* 3D Content Section */}
-                <AccordionItem
-                  value="3d-content"
-                  className="border rounded-lg px-4"
-                >
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      <Box className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-medium">3D Content</span>
-                      {getMediaByCategory("3d-content").length > 0 && (
-                        <Badge variant="secondary" className="ml-2">
-                          {getMediaByCategory("3d-content").length}
-                        </Badge>
-                      )}
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    {renderMediaCategory("3d-content", fileInputRef)}
-                  </AccordionContent>
-                </AccordionItem>
+                  {/* 3D Content Section */}
+                  {(!isAgentUser ||
+                    getMediaByCategory("3d-content").length > 0) && (
+                    <AccordionItem
+                      value="3d-content"
+                      className="border rounded-lg px-4"
+                    >
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-3">
+                          <Box className="h-5 w-5 text-muted-foreground" />
+                          <span className="font-medium">3D Content</span>
+                          {getMediaByCategory("3d-content").length > 0 && (
+                            <Badge variant="secondary" className="ml-2">
+                              {getMediaByCategory("3d-content").length}
+                            </Badge>
+                          )}
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        {renderMediaCategory("3d-content", fileInputRef)}
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
 
-                {/* Files Section */}
-                <AccordionItem value="files" className="border rounded-lg px-4">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-3">
-                      <File className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-medium">Files</span>
-                      {getMediaByCategory("file").length > 0 && (
-                        <Badge variant="secondary" className="ml-2">
-                          {getMediaByCategory("file").length}
-                        </Badge>
-                      )}
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    {renderMediaCategory("file", fileInputRef)}
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+                  {/* Files Section */}
+                  {(!isAgentUser || getMediaByCategory("file").length > 0) && (
+                    <AccordionItem
+                      value="files"
+                      className="border rounded-lg px-4"
+                    >
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center gap-3">
+                          <File className="h-5 w-5 text-muted-foreground" />
+                          <span className="font-medium">Files</span>
+                          {getMediaByCategory("file").length > 0 && (
+                            <Badge variant="secondary" className="ml-2">
+                              {getMediaByCategory("file").length}
+                            </Badge>
+                          )}
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        {renderMediaCategory("file", fileInputRef)}
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
+                </Accordion>
+              )}
             </div>
           </TabsContent>
         </Tabs>
       </div>
     </>
+  );
+
+  const mainContent = job ? (
+    variant === "page" ? (
+      <div className="size-full flex flex-col overflow-hidden h-[calc(100vh-var(--header-h))]">
+        <div className="border-b flex-shrink-0">{renderHeader(SheetTitle)}</div>
+        <div className="flex-1 overflow-hidden">{renderContent()}</div>
+        {activeTab === "discussion" && (
+          <div className="flex-shrink-0">{renderFooter(() => null)}</div>
+        )}
+      </div>
+    ) : variant === "dialog" ? (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="md:min-w-[90vw] min-w-[calc(100vw-1rem)] md:max-w-[90vw] md:h-[90vh] h-[calc(100vh-1rem)] md:max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col [&>button]:hidden">
+          <DialogTitle className="sr-only">
+            {job.propertyAddress} - {job.clientName}
+          </DialogTitle>
+          <DialogHeader className="border-b">
+            {renderHeader(DialogTitle)}
+          </DialogHeader>
+          {renderContent()}
+          {activeTab === "discussion" && renderFooter(DialogFooter)}
+        </DialogContent>
+      </Dialog>
+    ) : (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-[40vw] md:min-w-[600px] flex flex-col p-0 gap-0"
+        >
+          <SheetTitle className="sr-only">
+            {job.propertyAddress} - {job.clientName}
+          </SheetTitle>
+          <SheetHeader className="border-b">
+            {renderHeader(SheetTitle)}
+          </SheetHeader>
+          {renderContent()}
+          {activeTab === "discussion" && renderFooter(SheetFooter)}
+        </SheetContent>
+      </Sheet>
+    )
+  ) : (
+    <div className="p-6 text-sm text-muted-foreground">
+      Select a job to view details.
+    </div>
   );
 
   return (
@@ -3014,46 +3152,7 @@ export function JobTaskView({
         </AlertDialogContent>
       </AlertDialog>
 
-      {variant === "page" ? (
-        <div className="size-full flex flex-col overflow-hidden h-[calc(100vh-var(--header-h))]">
-          <div className="border-b flex-shrink-0">
-            {renderHeader(SheetTitle)}
-          </div>
-          <div className="flex-1 overflow-hidden">{renderContent()}</div>
-          {activeTab === "discussion" && (
-            <div className="flex-shrink-0">{renderFooter(() => null)}</div>
-          )}
-        </div>
-      ) : variant === "dialog" ? (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-          <DialogContent className="md:min-w-[90vw] min-w-[calc(100vw-1rem)] md:max-w-[90vw] md:h-[90vh] h-[calc(100vh-1rem)] md:max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col [&>button]:hidden">
-            <DialogTitle className="sr-only">
-              {job.propertyAddress} - {job.clientName}
-            </DialogTitle>
-            <DialogHeader className="border-b">
-              {renderHeader(DialogTitle)}
-            </DialogHeader>
-            {renderContent()}
-            {activeTab === "discussion" && renderFooter(DialogFooter)}
-          </DialogContent>
-        </Dialog>
-      ) : (
-        <Sheet open={open} onOpenChange={onOpenChange}>
-          <SheetContent
-            side="right"
-            className="w-full sm:max-w-[40vw] md:min-w-[600px] flex flex-col p-0 gap-0"
-          >
-            <SheetTitle className="sr-only">
-              {job.propertyAddress} - {job.clientName}
-            </SheetTitle>
-            <SheetHeader className="border-b">
-              {renderHeader(SheetTitle)}
-            </SheetHeader>
-            {renderContent()}
-            {activeTab === "discussion" && renderFooter(SheetFooter)}
-          </SheetContent>
-        </Sheet>
-      )}
+      {mainContent}
     </>
   );
 }

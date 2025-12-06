@@ -13,7 +13,7 @@ export function buildAddressString(
     personalOrg.addressLine2,
     personalOrg.city,
     personalOrg.region,
-    personalOrg.postalCode, 
+    personalOrg.postalCode,
     personalOrg.countryCode,
   ].filter(Boolean);
   return parts.join(", ");
@@ -51,7 +51,9 @@ export async function mapMemberToTechnician(
   const personalOrg = member.personalOrg;
   const addressString = buildAddressString(personalOrg);
 
-  let coords = DEFAULT_COORDINATES;
+  let coords = personalOrg?.lat !== undefined && personalOrg?.lng !== undefined
+    ? { lat: personalOrg.lat, lng: personalOrg.lng }
+    : DEFAULT_COORDINATES;
 
   if (addressString) {
     const cached = addressGeocodeCache.get(addressString);

@@ -8,7 +8,7 @@ import {
   TableRow,
 } from '../../ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
-import { Search, ArrowUpDown, Mail, Briefcase, Pencil, Trash } from 'lucide-react';
+import { Search, ArrowUpDown, Mail, Briefcase, Pencil, Trash, DoorOpen } from 'lucide-react';
 import { Input } from '../../ui/input';
 import {
   Select,
@@ -374,22 +374,33 @@ export function CustomersTable({
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete?.(customer);
-                      }}
-                      disabled={
-                        !onDelete ||
-                        deletingId === customer.id ||
-                        deletingId === 'bulk' ||
-                        isDeleting
-                      }
-                    >
-                      <Trash className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete?.(customer);
+                          }}
+                          disabled={
+                            !onDelete ||
+                            deletingId === customer.id ||
+                            deletingId === 'bulk' ||
+                            isDeleting
+                          }
+                        >
+                          {customer.userId ? (
+                            <DoorOpen className="h-4 w-4 text-destructive" />
+                          ) : (
+                            <Trash className="h-4 w-4 text-destructive" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {customer.userId ? 'Remove from organization' : 'Delete customer'}
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </TableCell>
               </TableRow>

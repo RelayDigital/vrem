@@ -28,6 +28,7 @@ import { Loader2 } from "lucide-react";
 import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { geocodeAddress } from "@/lib/technicians";
 
 export default function OrganizationGeneralPage() {
   const {
@@ -50,6 +51,8 @@ export default function OrganizationGeneralPage() {
   const [region, setRegion] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [countryCode, setCountryCode] = useState("");
+  const [lat, setLat] = useState("");
+  const [lng, setLng] = useState("");
   const [timezone, setTimezone] = useState("");
 
   // Initialize form from organization data
@@ -66,6 +69,18 @@ export default function OrganizationGeneralPage() {
       setRegion((organization as any).region || "");
       setPostalCode((organization as any).postalCode || "");
       setCountryCode((organization as any).countryCode || "");
+      setLat(
+        (organization as any).lat !== undefined &&
+          (organization as any).lat !== null
+          ? String((organization as any).lat)
+          : ""
+      );
+      setLng(
+        (organization as any).lng !== undefined &&
+          (organization as any).lng !== null
+          ? String((organization as any).lng)
+          : ""
+      );
       setTimezone((organization as any).timezone || "");
     }
   }, [organization]);
@@ -74,6 +89,30 @@ export default function OrganizationGeneralPage() {
     e.preventDefault();
 
     try {
+      const fullAddress = [
+        addressLine1,
+        addressLine2,
+        city,
+        region,
+        postalCode,
+        countryCode,
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      let nextLat = lat ? Number(lat) : undefined;
+      let nextLng = lng ? Number(lng) : undefined;
+
+      if ((!nextLat || !nextLng) && fullAddress) {
+        const coords = await geocodeAddress(fullAddress);
+        if (coords) {
+          nextLat = coords.lat;
+          nextLng = coords.lng;
+          setLat(String(coords.lat));
+          setLng(String(coords.lng));
+        }
+      }
+
       await save({
         name: displayName,
         legalName: legalName || undefined,
@@ -86,6 +125,8 @@ export default function OrganizationGeneralPage() {
         region: region || undefined,
         postalCode: postalCode || undefined,
         countryCode: countryCode || undefined,
+        lat: nextLat,
+        lng: nextLng,
         timezone: timezone || undefined,
       } as any);
       toast.success("Organization settings saved successfully");
@@ -261,34 +302,56 @@ export default function OrganizationGeneralPage() {
             </div>
           </div>
 
-          {/* Postal Code */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="postalCode">Postal Code</Label>
-              <Input
-                id="postalCode"
-                value={postalCode}
-                onChange={(e) => setPostalCode(e.target.value)}
-                placeholder="T2P 1J4"
-              />
-            </div>
-
-            {/* Country Code */}
-            <div className="space-y-2">
-              <Label htmlFor="countryCode">Country Code</Label>
-              <Input
-                id="countryCode"
-                value={countryCode}
-                onChange={(e) => setCountryCode(e.target.value)}
-                placeholder="CA"
-              />
-            </div>
+        {/* Postal Code */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="postalCode">Postal Code</Label>
+            <Input
+              id="postalCode"
+              value={postalCode}
+              onChange={(e) => setPostalCode(e.target.value)}
+              placeholder="T2P 1J4"
+            />
           </div>
 
-          {/* Timezone */}
+          {/* Country Code */}
           <div className="space-y-2">
-            <Label htmlFor="timezone">Timezone</Label>
-            <Select value={timezone} onValueChange={setTimezone}>
+            <Label htmlFor="countryCode">Country Code</Label>
+            <Input
+              id="countryCode"
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+              placeholder="CA"
+            />
+          </div>
+        </div>
+
+        {/* Coordinates */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="lat">Latitude (optional)</Label>
+            <Input
+              id="lat"
+              value={lat}
+              onChange={(e) => setLat(e.target.value)}
+              placeholder="51.0447"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="lng">Longitude (optional)</Label>
+            <Input
+              id="lng"
+              value={lng}
+              onChange={(e) => setLng(e.target.value)}
+              placeholder="-114.0719"
+            />
+          </div>
+        </div>
+
+        {/* Timezone */}
+        <div className="space-y-2">
+          <Label htmlFor="timezone">Timezone</Label>
+          <Select value={timezone} onValueChange={setTimezone}>
               <SelectTrigger id="timezone">
                 <SelectValue placeholder="Select timezone" />
               </SelectTrigger>

@@ -73,10 +73,15 @@ class ChatSocket {
     });
   }
 
-  async sendMessage(projectId: string, content: string): Promise<ChatMessage> {
+  async sendMessage(
+    projectId: string,
+    content: string,
+    channel: 'TEAM' | 'CUSTOMER' = 'TEAM',
+    thread?: string | null,
+  ): Promise<ChatMessage> {
     if (!this.socket) this.connect();
     return new Promise((resolve, reject) => {
-      this.socket?.emit('sendMessage', { projectId, content }, (resp: any) => {
+      this.socket?.emit('sendMessage', { projectId, content, channel, thread }, (resp: any) => {
         if (resp?.error) {
           reject(new Error(resp.error));
         } else {
@@ -101,6 +106,12 @@ class ChatSocket {
 
   private mapIncomingMessage(msg: any): ChatMessage | null {
     if (!msg) return null;
+    const channel =
+      (msg.channel as 'TEAM' | 'CUSTOMER') ||
+      (msg.user?.accountType === 'AGENT' ||
+      msg.user?.account_type === 'AGENT'
+        ? 'CUSTOMER'
+        : 'TEAM');
     return {
       id: msg.id,
       jobId: msg.projectId,
@@ -109,7 +120,10 @@ class ChatSocket {
       userAvatar: msg.user?.avatar,
       content: msg.content,
       createdAt: new Date(msg.timestamp || msg.createdAt || new Date()),
-      chatType: 'team',
+      channel,
+      thread: msg.thread ?? null,
+      threadId: msg.thread ?? null,
+      chatType: channel === 'CUSTOMER' ? 'client' : 'team',
     };
   }
 }

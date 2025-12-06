@@ -30,6 +30,7 @@ export default function CalendarPage() {
   const messaging = useMessaging();
   const jobCreation = useJobCreation();
   const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [loadingTechnicians, setLoadingTechnicians] = useState(false);
 
   // Filter jobs based on role
   const displayJobs = useMemo(() => {
@@ -57,10 +58,9 @@ export default function CalendarPage() {
   // Fetch messages when selected job changes
   useEffect(() => {
     if (jobManagement.selectedJob) {
-      messaging.fetchMessages(
-        jobManagement.selectedJob.id,
-        (jobManagement.selectedJob as any)?.organizationId
-      );
+      const orgId = (jobManagement.selectedJob as any)?.organizationId;
+      messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+      messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
     }
   }, [jobManagement.selectedJob, messaging]);
 
@@ -85,17 +85,26 @@ export default function CalendarPage() {
     const loadTechs = async () => {
       if (!canSeeTechnicians) {
         setTechnicians([]);
+        setLoadingTechnicians(false);
         return;
       }
+      setLoadingTechnicians(true);
       try {
         const techs = await fetchOrganizationTechnicians();
+        const technicianOnly = techs.filter(
+          (member) => (member.role || "").toUpperCase() === "TECHNICIAN"
+        );
         if (!cancelled) {
-          setTechnicians(techs);
+          setTechnicians(technicianOnly);
         }
       } catch (error) {
         console.error("Failed to load technicians for calendar", error);
         if (!cancelled) {
           setTechnicians([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingTechnicians(false);
         }
       }
     };
@@ -149,6 +158,7 @@ export default function CalendarPage() {
           canSeeTechnicians={canSeeTechnicians}
           jobs={displayJobs}
           technicians={technicians}
+          techniciansLoading={loadingTechnicians}
           onJobClick={handleJobClick}
           onCreateJob={canCreateJobs ? handleCreateJob : undefined}
         />
@@ -168,11 +178,11 @@ export default function CalendarPage() {
         isClient={false}
         open={jobManagement.showTaskView}
         onOpenChange={handleTaskViewClose}
-        onSendMessage={(content, chatType, threadId) =>
+        onSendMessage={(content, channel, threadId) =>
           messaging.sendMessage(
             jobManagement.selectedJob?.id || "",
             content,
-            chatType,
+            channel,
             threadId
           )
         }
@@ -206,11 +216,11 @@ export default function CalendarPage() {
         isClient={false}
         open={jobManagement.showTaskDialog}
         onOpenChange={handleTaskDialogClose}
-        onSendMessage={(content, chatType, threadId) =>
+        onSendMessage={(content, channel, threadId) =>
           messaging.sendMessage(
             jobManagement.selectedJob?.id || "",
             content,
-            chatType,
+            channel,
             threadId
           )
         }

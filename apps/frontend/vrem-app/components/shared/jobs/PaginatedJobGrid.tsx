@@ -40,6 +40,7 @@ interface PaginatedJobGridProps<T> {
   items: T[];
   renderItem: (item: T, index?: number, viewMode?: 'grid' | 'list') => React.ReactNode;
   renderTableRow?: (item: T, index?: number) => React.ReactNode;
+  onItemClick?: (item: T) => void;
   searchPlaceholder?: string;
   searchFields?: (item: T) => string;
   filterOptions?: FilterOption[];
@@ -59,6 +60,7 @@ export function PaginatedJobGrid<T>({
   items,
   renderItem,
   renderTableRow,
+  onItemClick,
   searchPlaceholder = 'Search...',
   searchFields,
   filterOptions = [],
@@ -304,9 +306,14 @@ export function PaginatedJobGrid<T>({
           {viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {paginatedItems.map((item, index) => (
-              <div key={index} className="h-full flex">
-                  <div className="w-full">{renderItem(item, startIndex + index, 'grid')}</div>
-                </div>
+              <div
+                key={index}
+                className="h-full flex"
+                onClick={() => onItemClick?.(item)}
+                role={onItemClick ? 'button' : undefined}
+              >
+                <div className="w-full">{renderItem(item, startIndex + index, 'grid')}</div>
+              </div>
               ))}
             </div>
           ) : renderTableRow ? (
@@ -325,7 +332,11 @@ export function PaginatedJobGrid<T>({
               </TableHeader>
               <TableBody>
                 {paginatedItems.map((item, index) => (
-                  <TableRow key={index}>
+                  <TableRow
+                    key={index}
+                    onClick={() => onItemClick?.(item)}
+                    className={onItemClick ? 'cursor-pointer' : undefined}
+                  >
                     {renderTableRow(item, startIndex + index)}
                   </TableRow>
                 ))}
@@ -334,7 +345,12 @@ export function PaginatedJobGrid<T>({
           ) : (
             <div className="space-y-3">
               {paginatedItems.map((item, index) => (
-                <div key={index} className="w-full">
+                <div
+                  key={index}
+                  className="w-full"
+                  onClick={() => onItemClick?.(item)}
+                  role={onItemClick ? 'button' : undefined}
+                >
                   {renderItem(item, startIndex + index, 'list')}
               </div>
             ))}
@@ -412,4 +428,3 @@ export function PaginatedJobGrid<T>({
     </div>
   );
 }
-

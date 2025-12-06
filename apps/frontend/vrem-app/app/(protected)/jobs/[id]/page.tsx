@@ -18,12 +18,11 @@ export default function JobDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isLoading, organizationId, memberships } = useRequireRole([
-    "dispatcher",
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "DISPATCHER",
     "PROJECT_MANAGER",
+    "COMPANY",
   ]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
@@ -32,6 +31,10 @@ export default function JobDetailPage() {
   const [, setLoadingTechnicians] = useState(false);
 
   const jobId = params?.id as string;
+  const userRole = getEffectiveOrgRole(user, memberships, organizationId);
+  const isAgent =
+    (user?.accountType || "").toUpperCase() === "AGENT" ||
+    userRole === "AGENT";
 
   // Load job by ID
   useEffect(() => {
@@ -63,11 +66,13 @@ export default function JobDetailPage() {
 
   // Fetch messages when job is loaded
   useEffect(() => {
-    if (jobManagement.selectedJob && jobManagement.selectedJob.id === jobId) {
-      messaging.fetchMessages(
-        jobId,
-        (jobManagement.selectedJob as any)?.organizationId
-      );
+    if (
+      jobManagement.selectedJob &&
+      jobManagement.selectedJob.id === jobId
+    ) {
+      const orgId = (jobManagement.selectedJob as any)?.organizationId;
+      messaging.fetchMessages(jobId, "TEAM", orgId);
+      messaging.fetchMessages(jobId, "CUSTOMER", orgId);
     }
   }, [jobManagement.selectedJob, jobId, messaging]);
 
@@ -125,10 +130,9 @@ export default function JobDetailPage() {
       } as any)
     : undefined;
 
-  const userRole = getEffectiveOrgRole(user, memberships, organizationId);
   const hasAccess =
+    isAgent ||
     userRole === "COMPANY" ||
-    selectedJob?.assignedTechnicianId === user.id ||
     selectedJob?.assignedTechnicianId === user.id ||
     selectedJob?.createdBy === user.id;
 
@@ -148,7 +152,7 @@ export default function JobDetailPage() {
   };
 
   return (
-    <div className="size-full overflow-x-hidden p-6 space-y-4">
+    <div className="size-full overflow-x-hidden space-y-4">
       {isJobLoading && (
         <div className="space-y-4">
           <Skeleton className="h-6 w-32" />
@@ -189,6 +193,7 @@ export default function JobDetailPage() {
           messages={messaging.getMessagesForJob(selectedJob.id)}
           currentUserId={user?.id || "current-user-id"}
           currentUserName={user?.name || "Current User"}
+          currentUserAccountType={user?.accountType}
           isClient={false}
           open={true}
           onOpenChange={(open) => {
@@ -196,8 +201,8 @@ export default function JobDetailPage() {
               router.push("/jobs/all-jobs");
             }
           }}
-          onSendMessage={(content, chatType, threadId) =>
-            messaging.sendMessage(selectedJob.id, content, chatType, threadId)
+          onSendMessage={(content, channel, threadId) =>
+            messaging.sendMessage(selectedJob.id, content, channel, threadId)
           }
           onEditMessage={(messageId, content) =>
             messaging.editMessage(messageId, content)

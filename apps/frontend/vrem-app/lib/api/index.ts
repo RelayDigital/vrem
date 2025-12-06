@@ -20,8 +20,39 @@ class ApiClient {
   }
 
   private normalizeProject(project: any): Project {
+    const legacyAddress = project.address || {};
+    const address = {
+      ...legacyAddress,
+      street_name:
+        legacyAddress.street_name ??
+        project.addressLine1 ??
+        legacyAddress.unparsed_address,
+      unit_number: legacyAddress.unit_number ?? project.addressLine2,
+      postal_code: legacyAddress.postal_code ?? project.postalCode,
+      city: legacyAddress.city ?? project.city,
+      state_or_province: legacyAddress.state_or_province ?? project.region,
+      country: legacyAddress.country ?? project.countryCode,
+      latitude: legacyAddress.latitude ?? project.lat,
+      longitude: legacyAddress.longitude ?? project.lng,
+      unparsed_address:
+        legacyAddress.unparsed_address ||
+        [
+          project.addressLine1,
+          project.addressLine2,
+          project.city,
+          project.region,
+          project.postalCode,
+          project.countryCode,
+        ]
+          .filter(Boolean)
+          .join(', '),
+    };
+
     return {
       ...project,
+      address,
+      lat: address.latitude ?? undefined,
+      lng: address.longitude ?? undefined,
       createdAt: new Date(project.createdAt),
       updatedAt: new Date(project.updatedAt),
       scheduledTime: new Date(project.scheduledTime),
@@ -59,6 +90,13 @@ class ApiClient {
       id: job.id,
       projectManagerId: job.createdBy,
       address,
+      addressLine1: job.propertyAddress,
+      city: undefined,
+      region: undefined,
+      postalCode: undefined,
+      countryCode: undefined,
+      lat: job.location?.lat,
+      lng: job.location?.lng,
       notes: notes,
       scheduledTime,
       status: this.jobStatusToProjectStatus(job.status),
@@ -114,35 +152,37 @@ class ApiClient {
     return combined || undefined;
   }
 
-  private buildAddressPayload(payload: any): any {
-    const addressInput =
-      payload?.address ||
-      (payload?.propertyAddress
-        ? { unparsed_address: payload.propertyAddress }
-        : typeof payload?.address === 'string'
-        ? { unparsed_address: payload.address }
-        : {});
+  private buildAddressFields(payload: any): any {
+    const address = typeof payload?.address === 'object' ? payload.address : {};
+    const location = payload?.location;
 
-    const location =
-      payload?.location ||
-      (payload?.address && payload.address.latitude !== undefined
-        ? {
-            lat: payload.address.latitude,
-            lng: payload.address.longitude,
-          }
-        : undefined);
+    const addressLine1 =
+      payload?.addressLine1 ||
+      (typeof payload?.propertyAddress === 'string'
+        ? payload.propertyAddress
+        : undefined) ||
+      (typeof payload?.address === 'string' ? payload.address : undefined) ||
+      address.street_name;
 
-    if (
-      location &&
-      addressInput &&
-      addressInput.latitude === undefined &&
-      addressInput.longitude === undefined
-    ) {
-      addressInput.latitude = location.lat;
-      addressInput.longitude = location.lng;
-    }
-
-    return addressInput;
+    return {
+      addressLine1:
+        typeof addressLine1 === 'string' ? addressLine1 : undefined,
+      addressLine2: payload?.addressLine2 || address.unit_number,
+      city: payload?.city || address.city,
+      region: payload?.region || address.state_or_province,
+      postalCode: payload?.postalCode || address.postal_code,
+      countryCode: payload?.countryCode || address.country,
+      lat:
+        payload?.lat ??
+        address.latitude ??
+        location?.lat ??
+        (typeof address.latitude === 'number' ? address.latitude : undefined),
+      lng:
+        payload?.lng ??
+        address.longitude ??
+        location?.lng ??
+        (typeof address.longitude === 'number' ? address.longitude : undefined),
+    };
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -357,6 +397,12 @@ class ApiClient {
         return memberships.map((m) => ({
           ...m,
           createdAt: new Date(m.createdAt),
+          organization: {
+            ...m.organization,
+            createdAt: m.organization?.createdAt
+              ? new Date(m.organization.createdAt)
+              : undefined,
+          },
         }));
       } catch (err) {
         // Backend may not expose organizations; fall back to empty
@@ -614,7 +660,7 @@ class ApiClient {
         this.organizations.setActiveOrganization(payload.orgId);
       }
       const dto = {
-        address: this.buildAddressPayload(payload),
+        ...this.buildAddressFields(payload),
         notes: payload.notes,
         scheduledTime: payload.scheduledTime?.toISOString() || new Date().toISOString(),
         customerId: payload.customerId,
@@ -637,7 +683,7 @@ class ApiClient {
         return updated;
       }
       const dto = {
-        address: this.buildAddressPayload(payload),
+        ...this.buildAddressFields(payload),
         notes: payload.notes,
         scheduledTime: payload.scheduledTime?.toISOString(),
       };
@@ -863,13 +909,15 @@ class ApiClient {
   };
 
   chat = {
-    getMessages: async (jobId: string) => {
+    getMessages: async (jobId: string, channel: 'TEAM' | 'CUSTOMER' = 'TEAM') => {
       if (USE_MOCK_DATA) {
         await new Promise(resolve => setTimeout(resolve, 500));
         return []; // Return empty array for mock chat
       }
       // Use ProjectsController endpoint
-      const messages = await this.request<any[]>(`/projects/${jobId}/messages`);
+      const messages = await this.request<any[]>(
+        `/projects/${jobId}/messages?channel=${channel}`,
+      );
       
       // Map backend message format to frontend ChatMessage
       return messages.map(msg => ({
@@ -880,10 +928,18 @@ class ApiClient {
         userAvatar: msg.user?.avatar,
         content: msg.content,
         createdAt: msg.timestamp || msg.createdAt, // Handle both potential field names
-        chatType: 'team', // Default to team chat as backend doesn't seem to distinguish yet
+        channel: msg.channel || 'TEAM',
+        thread: msg.thread ?? msg.threadId ?? null,
+        threadId: msg.thread ?? msg.threadId ?? null,
+        chatType: (msg.channel || 'TEAM') === 'CUSTOMER' ? 'client' : 'team',
       }));
     },
-    sendMessage: async (jobId: string, content: string) => {
+    sendMessage: async (
+      jobId: string,
+      content: string,
+      channel: 'TEAM' | 'CUSTOMER' = 'TEAM',
+      thread?: string | null,
+    ) => {
       if (USE_MOCK_DATA) {
         await new Promise(resolve => setTimeout(resolve, 500));
         return {
@@ -896,7 +952,7 @@ class ApiClient {
       // Use ProjectsController endpoint
       const msg = await this.request<any>(`/projects/${jobId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, channel, thread }),
       });
       
       return {
@@ -907,7 +963,10 @@ class ApiClient {
         userAvatar: msg.user?.avatar,
         content: msg.content,
         createdAt: msg.timestamp || msg.createdAt,
-        chatType: 'team',
+        channel: msg.channel || channel,
+        thread: msg.thread ?? thread ?? null,
+        threadId: msg.thread ?? thread ?? null,
+        chatType: (msg.channel || channel) === 'CUSTOMER' ? 'client' : 'team',
       };
     },
   };
@@ -965,6 +1024,13 @@ class ApiClient {
   public mapProjectToJobCard(project: Project): JobRequest {
     const scheduledDate = project.scheduledTime ? new Date(project.scheduledTime) : new Date();
     const addressObj: any = (project as any).address || {};
+    // Fallback to flat fields if address is missing coords
+    if (!addressObj.latitude && project.lat !== undefined) {
+      addressObj.latitude = project.lat;
+    }
+    if (!addressObj.longitude && project.lng !== undefined) {
+      addressObj.longitude = project.lng;
+    }
 
     // Prefer address latitude/longitude, fallback to notes metadata or default
     const location =

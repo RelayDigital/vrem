@@ -126,10 +126,9 @@ export default function DashboardPage() {
   // Fetch messages when selected job changes
   useEffect(() => {
     if (jobManagement.selectedJob) {
-      messaging.fetchMessages(
-        jobManagement.selectedJob.id,
-        (jobManagement.selectedJob as any)?.organizationId
-      );
+      const orgId = (jobManagement.selectedJob as any)?.organizationId;
+      messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+      messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
     }
   }, [jobManagement.selectedJob, messaging]);
 
@@ -336,11 +335,11 @@ export default function DashboardPage() {
           isClient={false}
           open={jobManagement.showTaskView}
           onOpenChange={handleTaskViewClose}
-          onSendMessage={(content, chatType, threadId) =>
+          onSendMessage={(content, channel, threadId) =>
             messaging.sendMessage(
               jobManagement.selectedJob?.id || "",
               content,
-              chatType,
+              channel,
               threadId
             )
           }
@@ -370,11 +369,11 @@ export default function DashboardPage() {
           isClient={false}
           open={jobManagement.showTaskDialog}
           onOpenChange={handleTaskDialogClose}
-          onSendMessage={(content, chatType, threadId) =>
+          onSendMessage={(content, channel, threadId) =>
             messaging.sendMessage(
               jobManagement.selectedJob?.id || "",
               content,
-              chatType,
+              channel,
               threadId
             )
           }
@@ -453,11 +452,11 @@ export default function DashboardPage() {
           isClient={false}
           open={jobManagement.showTaskView}
           onOpenChange={handleTaskViewClose}
-          onSendMessage={(content, chatType, threadId) =>
+          onSendMessage={(content, channel, threadId) =>
             messaging.sendMessage(
               jobManagement.selectedJob?.id || "",
               content,
-              chatType,
+              channel,
               threadId
             )
           }
@@ -502,11 +501,11 @@ export default function DashboardPage() {
           isClient={false}
           open={jobManagement.showTaskDialog}
           onOpenChange={handleTaskDialogClose}
-          onSendMessage={(content, chatType, threadId) =>
+          onSendMessage={(content, channel, threadId) =>
             messaging.sendMessage(
               jobManagement.selectedJob?.id || "",
               content,
-              chatType,
+              channel,
               threadId
             )
           }

@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Loader2 } from "lucide-react";
 import {
   CalendarFilters,
   TechnicianColor,
@@ -33,6 +34,7 @@ interface CalendarRightSidebarProps {
   filters: CalendarFilters;
   onFiltersChange: (filters: CalendarFilters) => void;
   technicians: Technician[];
+  techniciansLoading?: boolean;
   technicianColors: TechnicianColor[];
   territories: string[];
   timezone: string;
@@ -47,6 +49,7 @@ export function CalendarRightSidebar({
   filters,
   onFiltersChange,
   technicians,
+  techniciansLoading = false,
   technicianColors,
   territories,
   timezone,
@@ -317,10 +320,17 @@ export function CalendarRightSidebar({
               size="sm"
               onClick={handleShowAllTechnicians}
               className="h-6 text-xs"
+              disabled={techniciansLoading || technicians.length === 0}
             >
               {showAllTechnicians ? "Hide All" : "Show All"}
             </Button>
           </div>
+          {techniciansLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading technicians...
+            </div>
+          )}
           <div className="space-y-2">
             {technicians.map((technician) => {
               const color = getTechnicianColor(technician.id);

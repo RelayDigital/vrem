@@ -28,6 +28,7 @@ import { P } from "@/components/ui/typography";
 interface JobCardProps {
   job: JobRequest;
   technician?: Technician;
+  currentUserAccountType?: string;
   onViewRankings?: () => void;
   onClick?: () => void;
   onViewInProjectManagement?: () => void;
@@ -39,6 +40,7 @@ interface JobCardProps {
 export function JobCard({
   job,
   technician,
+  currentUserAccountType,
   onViewRankings,
   onClick,
   onViewInProjectManagement,
@@ -125,12 +127,13 @@ export function JobCard({
   const priorityConfig = getPriorityConfig(job.priority);
   const statusConfig = getStatusConfig(job.status);
   const PriorityIcon = priorityConfig.icon;
+  const isAgentUser = (currentUserAccountType || "").toUpperCase() === "AGENT";
 
   // Format date - parse as local date to avoid timezone shifts
   let formattedDate = job.scheduledDate;
   try {
     // Parse date string (YYYY-MM-DD) as local date, not UTC
-    const [year, month, day] = job.scheduledDate.split('-').map(Number);
+    const [year, month, day] = job.scheduledDate.split("-").map(Number);
     const date = new Date(year, month - 1, day);
     if (!isNaN(date.getTime())) {
       formattedDate = format(date, "MMM d, yyyy");
@@ -356,18 +359,17 @@ export function JobCard({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      // whileHover={{ y: -2 }}
+      whileHover={isAgentUser ? { y: -2 } : {}}
       transition={{ duration: 0.2 }}
-      className="h-full"
+      className={cn("h-full", isAgentUser ? "cursor-pointer!" : "")}
     >
       <Card
         className={cn(
           "group relative flex flex-col bg-card rounded-md border-none overflow-hidden transition-all duration-200 size-full",
-          "hover:shadow-xs",
+          "hover:shadow-xs"
           // selected
           //   ? "border-primary ring-2 ring-primary/20"
           //   : "",
-          onClick ? "cursor-pointer" : ""
         )}
         onClick={onClick}
       >
@@ -472,10 +474,7 @@ export function JobCard({
             {technician ? (
               <div className="flex items-center gap-3 pl-1 pr-3 py-1 backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200 rounded-full max-w-[80%] mx-auto h-auto">
                 <Avatar className="size-8">
-                  <AvatarImage
-                    src={technician.avatar}
-                    alt={technician.name}
-                  />
+                  <AvatarImage src={technician.avatar} alt={technician.name} />
                   <AvatarFallback className="bg-muted-foreground/20 text-foreground text-xs">
                     {technician.name
                       .split(" ")
@@ -501,9 +500,7 @@ export function JobCard({
                   }}
                   className="w-full h-auto max-w-[80%] mx-auto px-4 py-2.5 bg-primary text-primary-foreground rounded-3xl shadow-lg hover:bg-primary/90 border-0"
                 >
-                  <span className="text-sm font-semibold">
-                    Find Technician
-                  </span>
+                  <span className="text-sm font-semibold">Find Technician</span>
                   <ArrowRight className="size-4 ml-2" />
                 </Button>
               )

@@ -1,3 +1,5 @@
+export type ProjectChatChannel = 'TEAM' | 'CUSTOMER';
+
 export interface ChatMessage {
   id: string;
   jobId: string;
@@ -7,14 +9,15 @@ export interface ChatMessage {
   content: string;
   createdAt: Date;
   threadId?: string; // For threaded replies
+  thread?: string | null;
   mentions?: string[]; // User IDs mentioned in the message
-  chatType: 'client' | 'team'; // Which chat this message belongs to
+  channel: ProjectChatChannel;
+  chatType?: 'client' | 'team'; // Deprecated; use channel instead
 }
 
 export interface ChatThread {
   id: string;
   jobId: string;
   messages: ChatMessage[];
-  chatType: 'client' | 'team';
+  channel: ProjectChatChannel;
 }
-

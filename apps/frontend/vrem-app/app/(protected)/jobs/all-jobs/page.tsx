@@ -36,6 +36,8 @@ export default function JobsPage() {
   ]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
+  const isAgent =
+    (user?.accountType || "").toUpperCase() === "AGENT";
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [, setLoadingTechnicians] = useState(false);
   const assignedJobs = useMemo(() => {
@@ -72,10 +74,9 @@ export default function JobsPage() {
   // Fetch messages when selected job changes
   useEffect(() => {
     if (jobManagement.selectedJob) {
-      messaging.fetchMessages(
-        jobManagement.selectedJob.id,
-        (jobManagement.selectedJob as any)?.organizationId
-      );
+      const orgId = (jobManagement.selectedJob as any)?.organizationId;
+      messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+      messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
     }
   }, [jobManagement.selectedJob, messaging]);
 
@@ -193,17 +194,18 @@ export default function JobsPage() {
           }
           currentUserId={user?.id || "current-user-id"}
           currentUserName={user?.name || "Current User"}
+          currentUserAccountType={user?.accountType}
           isClient={false}
-          open={jobManagement.showTaskView}
-          onOpenChange={handleTaskViewClose}
-          onSendMessage={(content, chatType, threadId) =>
-            messaging.sendMessage(
-              jobManagement.selectedJob?.id || "",
-              content,
-              chatType,
-              threadId
-            )
-          }
+        open={jobManagement.showTaskView}
+        onOpenChange={handleTaskViewClose}
+        onSendMessage={(content, channel, threadId) =>
+          messaging.sendMessage(
+            jobManagement.selectedJob?.id || "",
+            content,
+            channel,
+            threadId
+          )
+        }
           onEditMessage={(messageId, content) =>
             messaging.editMessage(messageId, content)
           }
@@ -234,17 +236,18 @@ export default function JobsPage() {
           }
           currentUserId={user?.id || "current-user-id"}
           currentUserName={user?.name || "Current User"}
+          currentUserAccountType={user?.accountType}
           isClient={false}
-          open={jobManagement.showTaskDialog}
-          onOpenChange={handleTaskDialogClose}
-          onSendMessage={(content, chatType, threadId) =>
-            messaging.sendMessage(
-              jobManagement.selectedJob?.id || "",
-              content,
-              chatType,
-              threadId
-            )
-          }
+        open={jobManagement.showTaskDialog}
+        onOpenChange={handleTaskDialogClose}
+        onSendMessage={(content, channel, threadId) =>
+          messaging.sendMessage(
+            jobManagement.selectedJob?.id || "",
+            content,
+            channel,
+            threadId
+          )
+        }
           onEditMessage={(messageId, content) =>
             messaging.editMessage(messageId, content)
           }

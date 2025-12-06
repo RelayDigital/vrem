@@ -92,10 +92,13 @@ export function JobManagementProvider({
 
   // Set active org header when provided
   useEffect(() => {
-    if (defaultOrganizationId) {
+    // Agents may not belong to an org; ensure we don't carry a stale org header
+    if (userRole && userRole.toUpperCase() === 'AGENT') {
+      api.organizations.setActiveOrganization(null);
+    } else if (defaultOrganizationId) {
       api.organizations.setActiveOrganization(defaultOrganizationId);
     }
-  }, [defaultOrganizationId]);
+  }, [defaultOrganizationId, userRole]);
 
   // Load jobs from API when org/user context is ready
   const fetchJobs = useCallback(async () => {
@@ -103,30 +106,35 @@ export function JobManagementProvider({
     setJobsError(null);
 
     const activeOrgId = api.organizations.getActiveOrganization();
-    if (!activeOrgId && defaultOrganizationId) {
+    if (!activeOrgId && defaultOrganizationId && userRole?.toUpperCase() !== 'AGENT') {
       api.organizations.setActiveOrganization(defaultOrganizationId);
     }
 
     try {
       const memberRoleUpper = (memberRole || '').toUpperCase();
-      const hasOrgRole = Boolean(memberRoleUpper);
-      const canViewOrgProjects = hasOrgRole
-        ? ['DISPATCHER', 'ADMIN', 'OWNER', 'PROJECT_MANAGER', 'EDITOR'].includes(memberRoleUpper)
-        : false;
+      const userRoleUpper = (userRole || '').toUpperCase();
+      const hasOrgRole = Boolean(memberRoleUpper || userRoleUpper);
+      const canViewOrgProjects =
+        hasOrgRole &&
+        userRoleUpper !== 'AGENT' &&
+        ['DISPATCHER', 'ADMIN', 'OWNER', 'PROJECT_MANAGER', 'EDITOR', 'COMPANY'].includes(
+          memberRoleUpper || userRoleUpper
+        );
 
       let fetchedProjects: Project[] = [];
       if (canViewOrgProjects) {
         try {
           fetchedProjects = await api.projects.listForOrg();
         } catch (err: any) {
-          // If org-scoped fetch fails (e.g., not a member of the selected org), fallback to user-scoped fetch
           const message = err?.message || '';
           const isForbidden =
             message.includes('403') || message.toLowerCase().includes('forbidden');
           if (!isForbidden) {
-            throw err;
+            // If no org header or other issue, fallback for agents/others
+            fetchedProjects = await api.projects.listForCurrentUser();
+          } else {
+            fetchedProjects = await api.projects.listForCurrentUser();
           }
-          fetchedProjects = await api.projects.listForCurrentUser();
         }
       } else {
         fetchedProjects = await api.projects.listForCurrentUser();
@@ -141,7 +149,7 @@ export function JobManagementProvider({
     } finally {
       setIsLoadingJobs(false);
     }
-  }, [defaultOrganizationId, normalizeProjects]);
+  }, [defaultOrganizationId, memberRole, normalizeProjects, userRole]);
 
   useEffect(() => {
     fetchJobs();

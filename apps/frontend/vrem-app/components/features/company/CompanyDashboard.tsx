@@ -125,7 +125,7 @@ export function CompanyDashboard({
 
   const handleSendMessage = (
     content: string,
-    chatType: "client" | "team",
+    channel: "TEAM" | "CUSTOMER",
     threadId?: string
   ) => {
     if (!selectedJob) return;
@@ -138,7 +138,8 @@ export function CompanyDashboard({
       content,
       createdAt: new Date(),
       threadId,
-      chatType,
+      channel,
+      chatType: channel === "CUSTOMER" ? "client" : "team",
     };
 
     setChatMessages((prev) => [...prev, newMessage]);

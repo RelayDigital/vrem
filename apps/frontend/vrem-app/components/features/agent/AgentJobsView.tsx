@@ -27,6 +27,8 @@ import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../../ui/tooltip";
 import { H2, P } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { useRequireRole } from "@/hooks/useRequireRole";
 
 interface AgentJobsViewProps {
   jobs: JobRequest[];
@@ -41,10 +43,20 @@ export function AgentJobsView({
   organizationId,
   onNewJobClick,
 }: AgentJobsViewProps) {
+  const { user } = useRequireRole([
+    "AGENT",
+    "TECHNICIAN",
+    "EDITOR",
+    "PROJECT_MANAGER",
+    "COMPANY",
+  ]);
+  const router = useRouter();
   // Use technicians if provided, fallback to technicians for backwards compatibility
   const effectiveTechnicians = technicians || technicians || [];
-  // Filter jobs for this agent's organization
-  const myJobs = jobs.filter((job) => job.organizationId === organizationId);
+  // Filter by org when known; otherwise include all jobs returned for this agent
+  const myJobs = organizationId
+    ? jobs.filter((job) => job.organizationId === organizationId)
+    : jobs;
 
   const pendingJobs = myJobs.filter((j) => j.status === "pending");
   const assignedJobs = myJobs.filter((j) => j.status === "assigned");
@@ -64,6 +76,10 @@ export function AgentJobsView({
       default:
         return Camera;
     }
+  };
+
+  const handleJobClick = (job: JobRequest) => {
+    router.push(`/jobs/${job.id}`);
   };
 
   const getPriorityConfig = (priority: string) => {
@@ -257,6 +273,7 @@ export function AgentJobsView({
                     { label: "Rush", value: "rush" },
                     { label: "Standard", value: "standard" },
                   ]}
+                  onItemClick={handleJobClick}
                   onFilterChange={(value) =>
                     myJobs.filter(
                       (j) => value === "all" || j.priority === value
@@ -273,6 +290,7 @@ export function AgentJobsView({
                         key={job.id}
                         job={job}
                         technician={technician}
+                        currentUserAccountType={user?.accountType}
                       />
                     );
                   }}
@@ -301,6 +319,7 @@ export function AgentJobsView({
                     { label: "Rush", value: "rush" },
                     { label: "Standard", value: "standard" },
                   ]}
+                  onItemClick={handleJobClick}
                   onFilterChange={(value) =>
                     pendingJobs.filter(
                       (j) => value === "all" || j.priority === value
@@ -317,6 +336,7 @@ export function AgentJobsView({
                         key={job.id}
                         job={job}
                         technician={technician}
+                        currentUserAccountType={user?.accountType}
                       />
                     );
                   }}
@@ -341,6 +361,7 @@ export function AgentJobsView({
                     { label: "Rush", value: "rush" },
                     { label: "Standard", value: "standard" },
                   ]}
+                  onItemClick={handleJobClick}
                   onFilterChange={(value) =>
                     assignedJobs.filter(
                       (j) => value === "all" || j.priority === value
@@ -357,6 +378,7 @@ export function AgentJobsView({
                         key={job.id}
                         job={job}
                         technician={technician}
+                        currentUserAccountType={user?.accountType}
                       />
                     );
                   }}
@@ -381,6 +403,7 @@ export function AgentJobsView({
                     { label: "Rush", value: "rush" },
                     { label: "Standard", value: "standard" },
                   ]}
+                  onItemClick={handleJobClick}
                   onFilterChange={(value) =>
                     inProgressJobs.filter(
                       (j) => value === "all" || j.priority === value
@@ -397,6 +420,7 @@ export function AgentJobsView({
                         key={job.id}
                         job={job}
                         technician={technician}
+                        currentUserAccountType={user?.accountType}
                       />
                     );
                   }}
@@ -421,6 +445,7 @@ export function AgentJobsView({
                     { label: "Rush", value: "rush" },
                     { label: "Standard", value: "standard" },
                   ]}
+                  onItemClick={handleJobClick}
                   onFilterChange={(value) =>
                     completedJobs.filter(
                       (j) => value === "all" || j.priority === value

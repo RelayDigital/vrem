@@ -10,13 +10,13 @@ interface MessagingContextType {
   // Message state
   messages: ChatMessage[];
   getMessagesForJob: (jobId: string) => ChatMessage[];
-  fetchMessages: (jobId: string, orgId?: string) => Promise<void>;
+  fetchMessages: (jobId: string, channel?: 'TEAM' | 'CUSTOMER', orgId?: string) => Promise<void>;
 
   // Message handlers
   sendMessage: (
     jobId: string,
     content: string,
-    chatType: 'client' | 'team',
+    channel: 'TEAM' | 'CUSTOMER',
     threadId?: string
   ) => void;
   editMessage: (messageId: string, content: string) => void;
@@ -75,21 +75,23 @@ export function MessagingProvider({
     return messages.filter((msg) => msg.jobId === jobId);
   }, [messages]);
 
-  const fetchMessages = useCallback(async (jobId: string, orgId?: string) => {
+  const fetchMessages = useCallback(async (jobId: string, channel: 'TEAM' | 'CUSTOMER' = 'TEAM', orgId?: string) => {
     try {
       if (orgId) {
         api.organizations.setActiveOrganization(orgId);
       }
-      const fetchedMessages = await api.chat.getMessages(jobId);
+      const fetchedMessages = await api.chat.getMessages(jobId, channel);
       // Convert date strings to Date objects if needed
       const processedMessages = fetchedMessages.map((msg: any) => ({
         ...msg,
         createdAt: new Date(msg.createdAt),
+        channel: msg.channel || channel,
+        chatType: (msg.channel || channel) === 'CUSTOMER' ? 'client' : 'team',
       }));
 
       setMessages((prev) => {
-        // Remove existing messages for this job to avoid duplicates
-        const otherMessages = prev.filter((msg) => msg.jobId !== jobId);
+        // Remove existing messages for this job+channel to avoid duplicates
+        const otherMessages = prev.filter((msg) => !(msg.jobId === jobId && (msg as any).channel === channel));
         return [...otherMessages, ...processedMessages];
       });
 
@@ -108,8 +110,8 @@ export function MessagingProvider({
   const sendMessage = useCallback(async (
     jobId: string,
     content: string,
-    chatType: 'client' | 'team',
-    threadId?: string
+    channel: 'TEAM' | 'CUSTOMER',
+    threadId?: string | null
   ) => {
     if (!currentUserId || !currentUserName) {
       console.warn('Cannot send message: user info not set');
@@ -120,9 +122,9 @@ export function MessagingProvider({
       let newMessage: ChatMessage | null = null;
 
       if (connected) {
-        newMessage = await chatSocket.sendMessage(jobId, content);
+        newMessage = await chatSocket.sendMessage(jobId, content, channel, threadId);
       } else {
-        const response = await api.chat.sendMessage(jobId, content);
+        const response = await api.chat.sendMessage(jobId, content, channel, threadId);
         newMessage = {
           ...response,
           jobId,
@@ -130,7 +132,9 @@ export function MessagingProvider({
           userName: currentUserName,
           userAvatar: currentUserAvatar,
           content,
-          chatType,
+          channel,
+          chatType: channel === 'CUSTOMER' ? 'client' : 'team',
+          thread: threadId || null,
           threadId,
           createdAt: new Date(response.createdAt || new Date()),
         };

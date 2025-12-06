@@ -42,6 +42,7 @@ interface CalendarViewProps {
   canSeeTechnicians?: boolean;
   jobs?: JobRequest[];
   technicians?: Technician[];
+  techniciansLoading?: boolean;
   onJobClick?: (job: JobRequest) => void;
   onCreateJob?: (initialValues?: {
     scheduledDate?: string;
@@ -54,6 +55,7 @@ export function CalendarView({
   canSeeTechnicians = false,
   jobs = [],
   technicians = [],
+  techniciansLoading = false,
   onJobClick,
   onCreateJob,
 }: CalendarViewProps) {
@@ -250,6 +252,7 @@ export function CalendarView({
       filters={filters}
       onFiltersChange={setFilters}
       technicians={effectiveTechnicians}
+      techniciansLoading={techniciansLoading}
       technicianColors={technicianColors}
       territories={territories}
       timezone={timezone}

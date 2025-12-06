@@ -61,6 +61,8 @@ export function TeamTable({
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const isProjectManager =
+    (currentUserRole || '').toUpperCase() === 'PROJECT_MANAGER';
 
   // Filter and sort technicians
   const filteredAndSortedTechnicians = useMemo(() => {
@@ -344,6 +346,9 @@ export function TeamTable({
               <Select
                 value={technician.role || 'TECHNICIAN'}
                 onValueChange={(val) => {
+                  if (isProjectManager) {
+                    return;
+                  }
                   if (technician.role === 'OWNER') {
                     // Prevent changing owner role via dropdown
                     return;
@@ -354,7 +359,8 @@ export function TeamTable({
                   !onRoleChange ||
                   updatingRoleId === technician.id ||
                   (!!currentUserId && technician.id === currentUserId) ||
-                  technician.role === 'OWNER'
+                  technician.role === 'OWNER' ||
+                  isProjectManager
                 }
               >
                 <SelectTrigger className="w-[150px]">

@@ -54,7 +54,6 @@ export interface Organization {
   name: string;
   type: OrgType; // PERSONAL | TEAM | COMPANY
   createdAt: Date;
-
   // Optional metadata / branding / geography
   avatar?: string;
   description?: string;
@@ -75,6 +74,8 @@ export interface Organization {
   region?: string;
   postalCode?: string;
   countryCode?: string;
+  lat?: number;
+  lng?: number;
   timezone?: string;
   serviceArea?: any;
 }
@@ -156,6 +157,8 @@ export interface Message {
   userId: string;
   content: string;
   timestamp: Date;
+  channel: 'TEAM' | 'CUSTOMER';
+  thread?: string | null;
 
   user?: User;
 }
@@ -164,7 +167,7 @@ export interface Project {
   id: string;
   orgId: string; // tenant boundary
   customerId?: string | null;
-  address: {
+  address?: {
     latitude?: number;
     longitude?: number;
     street_number?: string;
@@ -177,6 +180,14 @@ export interface Project {
     unparsed_address?: string;
     [key: string]: any;
   };
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  region?: string;
+  postalCode?: string;
+  countryCode?: string;
+  lat?: number;
+  lng?: number;
   notes?: string;
   scheduledTime: Date;
   status: ProjectStatus;

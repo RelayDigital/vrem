@@ -152,7 +152,7 @@ export function JobChat({
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="client" className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
-            Client Chat
+            Customer Chat
           </TabsTrigger>
           <TabsTrigger value="team" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
@@ -166,7 +166,7 @@ export function JobChat({
             <div className="py-4">
               {clientMessages.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground text-sm">
-                  No messages in client chat yet
+                  No messages in customer chat yet
                 </div>
               ) : (
                 sortedRootMessages.map((message) => renderMessage(message))

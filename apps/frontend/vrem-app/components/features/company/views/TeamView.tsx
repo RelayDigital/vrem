@@ -47,7 +47,7 @@ export function TeamView({
   const [emailInput, setEmailInput] = useState("");
   const [isInviting, setIsInviting] = useState(false);
   const [magicLink, setMagicLink] = useState("https://app.vrem.io/invite/team");
-  const { activeOrganizationId } = useCurrentOrganization();
+  const { activeOrganizationId, activeMembership } = useCurrentOrganization();
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [technicianToRemove, setTechnicianToRemove] =
     useState<Technician | null>(null);
@@ -71,6 +71,19 @@ export function TeamView({
   );
   const [inviteRole, setInviteRole] =
     useState<Technician["role"]>("TECHNICIAN");
+  const membershipRole = useMemo(
+    () =>
+      ((activeMembership?.role ||
+        (activeMembership as any)?.orgRole ||
+        "") as string).toUpperCase(),
+    [activeMembership]
+  );
+  const effectiveCurrentRole = useMemo(
+    () => ((currentUserRole || membershipRole || "") as string).toUpperCase(),
+    [currentUserRole, membershipRole]
+  );
+  const isProjectManager = effectiveCurrentRole === "PROJECT_MANAGER";
+  const canManageTeam = !isProjectManager;
 
   const linkOrigin = useMemo(() => {
     if (typeof window !== "undefined") {
@@ -145,6 +158,10 @@ export function TeamView({
   };
 
   const handleSendInvites = async () => {
+    if (!canManageTeam) {
+      toast.error("Project managers cannot invite teammates.");
+      return;
+    }
     const pending = emailInput.trim();
     const emails = [...inviteEmails, ...(pending ? [pending] : [])];
 
@@ -232,6 +249,7 @@ export function TeamView({
   );
 
   const openDialogAndFocusInput = (open: boolean) => {
+    if (!canManageTeam) return;
     setInviteOpen(open);
     if (!open) {
       setInviteEmails([]);
@@ -258,6 +276,10 @@ export function TeamView({
     technician: Technician,
     role: Technician["role"]
   ) => {
+    if (!canManageTeam) {
+      toast.error("Project managers cannot change roles.");
+      return;
+    }
     if (!technician.memberId) {
       toast.error("Unable to update role: missing member id");
       return;
@@ -297,6 +319,11 @@ export function TeamView({
   };
 
   const confirmOwnerChange = async () => {
+    if (!canManageTeam) {
+      toast.error("Project managers cannot change roles.");
+      setRoleDialogOpen(false);
+      return;
+    }
     if (!pendingTechnician || !pendingRole || !pendingTechnician.memberId) {
       setRoleDialogOpen(false);
       return;
@@ -332,139 +359,146 @@ export function TeamView({
         <div className="@container w-full mt-md mb-md">
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-4xl mb-xs">Team</H2>
-            <Dialog open={inviteOpen} onOpenChange={openDialogAndFocusInput}>
-              <DialogTrigger asChild>
-                <Button variant="default" className="px-0">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Invite Teammate
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl w-full flex flex-col">
-                <DialogHeader className="space-y-1.5">
-                  <DialogTitle className="text-xl">
-                    Invite people to your team
-                  </DialogTitle>
-                  <DialogDescription className="text-sm text-muted-foreground">
-                    Send email invites or share a magic link to bring teammates
-                    on board.
-                  </DialogDescription>
-                </DialogHeader>
+            {canManageTeam && (
+              <Dialog open={inviteOpen} onOpenChange={openDialogAndFocusInput}>
+                <DialogTrigger asChild>
+                  <Button variant="default" className="px-0">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Invite Teammate
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl w-full flex flex-col">
+                  <DialogHeader className="space-y-1.5">
+                    <DialogTitle className="text-xl">
+                      Invite people to your team
+                    </DialogTitle>
+                    <DialogDescription className="text-sm text-muted-foreground">
+                      Send email invites or share a magic link to bring teammates
+                      on board.
+                    </DialogDescription>
+                  </DialogHeader>
 
-                <div className="space-y-5 w-full">
-                  <div className="space-y-3">
-                    <div className="text-sm font-semibold">
-                      Invite teammates
-                    </div>
-                    <div className="flex gap-2 flex-col">
-                      <div className="flex flex-1 gap-2 overflow-x-scroll scrollbar-hide max-w-full">
-                        {inviteEmails.map((email) => (
-                          <Badge
-                            key={email}
-                            variant="secondary"
-                            className="flex items-center gap-1"
-                          >
-                            {email}
-                            <Button
-                              variant="mutedFlat"
-                              className="p-0 w-auto ml-0.5 cursor-pointer"
-                              onClick={() => handleRemoveEmail(email)}
-                              aria-label={`Remove ${email}`}
-                              size="icon-sm"
+                  <div className="space-y-5 w-full">
+                    <div className="space-y-3">
+                      <div className="text-sm font-semibold">
+                        Invite teammates
+                      </div>
+                      <div className="flex gap-2 flex-col">
+                        <div className="flex flex-1 gap-2 overflow-x-scroll scrollbar-hide max-w-full">
+                          {inviteEmails.map((email) => (
+                            <Badge
+                              key={email}
+                              variant="secondary"
+                              className="flex items-center gap-1"
                             >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </Badge>
-                        ))}
+                              {email}
+                              <Button
+                                variant="mutedFlat"
+                                className="p-0 w-auto ml-0.5 cursor-pointer"
+                                onClick={() => handleRemoveEmail(email)}
+                                aria-label={`Remove ${email}`}
+                                size="icon-sm"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </Badge>
+                          ))}
+                        </div>
+
+                        <div className="flex flex-1 flex-col gap-0 sm:flex-row">
+                          <Input
+                            placeholder="Enter emails (comma separated)"
+                            value={emailInput}
+                            onChange={(e) =>
+                              handleEmailInputChange(e.target.value)
+                            }
+                            onKeyDown={handleEmailKeyDown}
+                            className="flex-1"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+                          <Select
+                            value={inviteRole}
+                            onValueChange={(value) =>
+                              setInviteRole(value as Technician["role"])
+                            }
+                          >
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="Role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="TECHNICIAN">
+                                Technician
+                              </SelectItem>
+                              <SelectItem value="PROJECT_MANAGER">
+                                Project Manager
+                              </SelectItem>
+                              <SelectItem value="EDITOR">Editor</SelectItem>
+                              <SelectItem value="DISPATCHER">
+                                Dispatcher
+                              </SelectItem>
+                              <SelectItem value="ADMIN">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            onClick={handleSendInvites}
+                            disabled={isInviting}
+                            className="sm:w-auto w-full flex-1"
+                          >
+                            {isInviting ? "Sending..." : "Invite"}
+                          </Button>
+                        </div>
                       </div>
 
-                      <div className="flex flex-1 flex-col gap-0 sm:flex-row">
-                        <Input
-                          placeholder="Enter emails (comma separated)"
-                          value={emailInput}
-                          onChange={(e) =>
-                            handleEmailInputChange(e.target.value)
-                          }
-                          onKeyDown={handleEmailKeyDown}
-                          className="flex-1"
-                          autoFocus
-                        />
+                      <div className="space-y-2 max-h-64 overflow-auto">
+                        {technicianList.length === 0 ? (
+                          <div className="text-sm text-muted-foreground">
+                            No team members yet. Invite someone to get started.
+                          </div>
+                        ) : (
+                          technicianList.map(renderTechnicianRow)
+                        )}
                       </div>
-                      <div className="flex flex-1 flex-col gap-2 sm:flex-row">
-                        <Select
-                          value={inviteRole}
-                          onValueChange={(value) =>
-                            setInviteRole(value as Technician["role"])
-                          }
-                        >
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="TECHNICIAN">
-                              Technician
-                            </SelectItem>
-                            <SelectItem value="PROJECT_MANAGER">
-                              Project Manager
-                            </SelectItem>
-                            <SelectItem value="EDITOR">Editor</SelectItem>
-                            <SelectItem value="DISPATCHER">
-                              Dispatcher
-                            </SelectItem>
-                            <SelectItem value="ADMIN">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm font-semibold">
+                        <span>Invite via magic link</span>
                         <Button
-                          onClick={handleSendInvites}
-                          disabled={isInviting}
-                          className="sm:w-auto w-full flex-1"
+                          variant="ghost"
+                          size="sm"
+                          className="gap-2"
+                          onClick={handleResetMagicLink}
                         >
-                          {isInviting ? "Sending..." : "Invite"}
+                          Reset
+                        </Button>
+                      </div>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Input readOnly value={magicLink} className="flex-1" />
+                        <Button
+                          variant="default"
+                          className="sm:w-auto w-full"
+                          onClick={handleCopyMagicLink}
+                        >
+                          Copy
                         </Button>
                       </div>
                     </div>
-
-                    <div className="space-y-2 max-h-64 overflow-auto">
-                      {technicianList.length === 0 ? (
-                        <div className="text-sm text-muted-foreground">
-                          No team members yet. Invite someone to get started.
-                        </div>
-                      ) : (
-                        technicianList.map(renderTechnicianRow)
-                      )}
-                    </div>
                   </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm font-semibold">
-                      <span>Invite via magic link</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-2"
-                        onClick={handleResetMagicLink}
-                      >
-                        Reset
-                      </Button>
-                    </div>
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <Input readOnly value={magicLink} className="flex-1" />
-                      <Button
-                        variant="default"
-                        className="sm:w-auto w-full"
-                        onClick={handleCopyMagicLink}
-                      >
-                        Copy
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
+          {isProjectManager && (
+            <div className="mb-4 text-sm text-muted-foreground">
+              Project managers can view the roster but cannot invite teammates or change roles.
+            </div>
+          )}
           <ProviderManagement
             technicians={technicianList}
             onRemove={handleRemoveTechnician}
-            onRoleChange={handleRoleChange}
+            onRoleChange={canManageTeam ? handleRoleChange : undefined}
             updatingRoleId={updatingRoleId}
             currentUserId={currentUserId || undefined}
             currentUserMemberId={currentUserMemberId || undefined}
@@ -508,7 +542,7 @@ export function TeamView({
         </DialogContent>
       </Dialog>
       <RoleChangeDialog
-        open={roleDialogOpen}
+        open={canManageTeam && roleDialogOpen}
         onOpenChange={(open) => {
           setRoleDialogOpen(open);
           if (!open) {

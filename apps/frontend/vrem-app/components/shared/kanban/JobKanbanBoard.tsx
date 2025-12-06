@@ -152,7 +152,7 @@ export function JobKanbanBoard({
             <KanbanBoard
               key={column.id}
               id={column.id}
-              className="relative shrink-0 w-[350px]"
+              className="relative shrink-0 md:max-w-[350px] shadow-none"
             >
               <KanbanHeader className="flex items-center justify-between p-4 border-b shrink-0">
                 <div className="flex items-center gap-2">

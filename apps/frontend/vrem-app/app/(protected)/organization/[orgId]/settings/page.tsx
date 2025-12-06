@@ -62,6 +62,7 @@ import { AccessDenied } from "@/components/common/AccessDenied";
 import { useRoleGuard } from "@/hooks/useRoleGuard";
 import { api } from "@/lib/api";
 import { Organization } from "@/types";
+import { geocodeAddress } from "@/lib/technicians";
 
 interface ServiceArea {
   id: string;
@@ -107,6 +108,8 @@ export default function OrganizationSettingsPage() {
   const [stateProvince, setStateProvince] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [country, setCountry] = useState("");
+  const [lat, setLat] = useState("");
+  const [lng, setLng] = useState("");
   const [timezone, setTimezone] = useState("America/Edmonton");
   const [serviceAreas, setServiceAreas] = useState<ServiceArea[]>([]);
   const [primaryEmail, setPrimaryEmail] = useState("");
@@ -135,6 +138,18 @@ export default function OrganizationSettingsPage() {
       setStateProvince((organization as any).region || "");
       setPostalCode((organization as any).postalCode || "");
       setCountry((organization as any).countryCode || "");
+      setLat(
+        (organization as any).lat !== undefined &&
+          (organization as any).lat !== null
+          ? String((organization as any).lat)
+          : ""
+      );
+      setLng(
+        (organization as any).lng !== undefined &&
+          (organization as any).lng !== null
+          ? String((organization as any).lng)
+          : ""
+      );
       setTimezone((organization as any).timezone || "America/Edmonton");
       // Contact fields
       setPrimaryEmail((organization as any).primaryEmail || "");
@@ -196,6 +211,30 @@ export default function OrganizationSettingsPage() {
 
   const handleSave = async () => {
     try {
+      const fullAddress = [
+        streetAddress,
+        (organization as any)?.addressLine2,
+        city,
+        stateProvince,
+        postalCode,
+        country,
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      let nextLat = lat ? Number(lat) : undefined;
+      let nextLng = lng ? Number(lng) : undefined;
+
+      if ((!nextLat || !nextLng) && fullAddress) {
+        const coords = await geocodeAddress(fullAddress);
+        if (coords) {
+          nextLat = coords.lat;
+          nextLng = coords.lng;
+          setLat(String(coords.lat));
+          setLng(String(coords.lng));
+        }
+      }
+
       const updated = await save({
         name: companyName,
         legalName: (organization as any)?.legalName || undefined,
@@ -208,6 +247,8 @@ export default function OrganizationSettingsPage() {
         region: stateProvince || undefined,
         postalCode: postalCode || undefined,
         countryCode: country || undefined,
+        lat: nextLat,
+        lng: nextLng,
         timezone: timezone || undefined,
         // Keep existing fields that aren't in the basic profile
         type: companyType || (organization as any)?.type || undefined,
@@ -242,6 +283,18 @@ export default function OrganizationSettingsPage() {
       setStateProvince((organization as any).region || "");
       setPostalCode((organization as any).postalCode || "");
       setCountry((organization as any).countryCode || "");
+      setLat(
+        (organization as any).lat !== undefined &&
+          (organization as any).lat !== null
+          ? String((organization as any).lat)
+          : ""
+      );
+      setLng(
+        (organization as any).lng !== undefined &&
+          (organization as any).lng !== null
+          ? String((organization as any).lng)
+          : ""
+      );
       setTimezone((organization as any).timezone || "America/Edmonton");
       setPrimaryEmail((organization as any).primaryEmail || "");
       setPhoneNumber((organization as any).phone || "");

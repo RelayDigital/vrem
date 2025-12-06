@@ -188,7 +188,7 @@ export function OrganizationSwitcher({
                     </span>
                     {!isPersonal && (
                       <Badge variant="muted" className="truncate">
-                        {m.orgRole || (m as any).role || "Member"}
+                        {m.role?.replaceAll("_", " ") || "Member"}
                       </Badge>
                     )}
                   </div>
