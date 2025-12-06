@@ -372,6 +372,7 @@ export interface JobRequest {
   assignedAt?: Date;
   completedAt?: Date;
   propertyImage?: string;
+  media?: Media[];
 }
 
 export interface JobDetails {

@@ -817,20 +817,63 @@ class ApiClient {
   };
 
   media = {
-    getForProject: async (projectId: string): Promise<Media[]> => {
+    listForProject: async (projectId: string): Promise<Media[]> => {
       if (USE_MOCK_DATA) {
         return [];
       }
-      return this.request<Media[]>(`/media/project/${projectId}`);
+      const media = await this.request<Media[]>(`/projects/${projectId}/media`);
+      return media.map((item) => ({
+        ...item,
+        createdAt: new Date(item.createdAt),
+      }));
     },
-    confirmUpload: async (payload: { key: string; projectId: string; filename: string; size: number; type: string; cdnUrl?: string; }) => {
-      return this.request(`/media/confirm-upload`, {
+    addToProject: async (
+      projectId: string,
+      payload: {
+        key: string;
+        cdnUrl?: string;
+        filename: string;
+        size: number;
+        type: string;
+      }
+    ): Promise<Media> => {
+      if (USE_MOCK_DATA) {
+        return {
+          id: `media-${Date.now()}`,
+          projectId,
+          key: payload.key,
+          cdnUrl: payload.cdnUrl,
+          filename: payload.filename,
+          size: payload.size,
+          type: payload.type as any,
+          createdAt: new Date(),
+        };
+      }
+      const media = await this.request<Media>(`/projects/${projectId}/media`, {
         method: 'POST',
         body: JSON.stringify(payload),
       });
+      return { ...media, createdAt: new Date(media.createdAt) };
     },
-    delete: async (id: string) => {
+    deleteFromProject: async (projectId: string, mediaId: string) => {
       if (USE_MOCK_DATA) return;
+      return this.request(`/projects/${projectId}/media/${mediaId}`, { method: 'DELETE' });
+    },
+    // Legacy aliases to avoid breaking older call sites
+    getForProject: async (projectId: string) => this.media.listForProject(projectId),
+    confirmUpload: async (payload: { key: string; projectId: string; filename: string; size: number; type: string; cdnUrl?: string; }) =>
+      this.media.addToProject(payload.projectId, {
+        key: payload.key,
+        cdnUrl: payload.cdnUrl,
+        filename: payload.filename,
+        size: payload.size,
+        type: payload.type,
+      }),
+    delete: async (id: string, projectId?: string) => {
+      if (USE_MOCK_DATA) return;
+      if (projectId) {
+        return this.media.deleteFromProject(projectId, id);
+      }
       return this.request(`/media/${id}`, { method: 'DELETE' });
     },
   };
@@ -1066,6 +1109,7 @@ class ApiClient {
       createdAt: new Date(project.createdAt),
       assignedAt: project.technicianId ? new Date(project.updatedAt) : undefined,
       propertyImage: 'https://images.unsplash.com/photo-1706808849780-7a04fbac83ef?w=800', // Default image
+      media: project.media || [],
     };
   }
 

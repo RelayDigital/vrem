@@ -11,6 +11,8 @@ import {
   OrganizationMember,
   Technician,
   OrganizationCustomer,
+  Media,
+  MediaType,
 } from "../../../types";
 import { ChatMessage } from "../../../types/chat";
 import {
@@ -154,6 +156,19 @@ import { fetchOrganizationTechnicians } from "@/lib/technicians";
 import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 import { useJobManagement } from "@/context/JobManagementContext";
 
+type MediaCategory = "image" | "video" | "floor-plan" | "3d-content" | "file";
+
+type MediaItem = {
+  id: string;
+  name: string;
+  type: MediaCategory;
+  url: string;
+  thumbnail?: string;
+  size: number;
+  uploadedAt: Date;
+  key?: string;
+};
+
 interface JobTaskViewProps {
   job: JobRequest | null;
   technician?: OrganizationMember["user"] & {
@@ -230,17 +245,8 @@ export function JobTaskView({
   );
   const [hasEditorContent, setHasEditorContent] = useState(false);
   const [hasEditEditorContent, setHasEditEditorContent] = useState(false);
-  const [uploadedMedia, setUploadedMedia] = useState<
-    Array<{
-      id: string;
-      name: string;
-      type: "image" | "video" | "floor-plan" | "3d-content" | "file";
-      url: string;
-      thumbnail?: string;
-      size: number;
-      uploadedAt: Date;
-    }>
-  >([]);
+  const [uploadedMedia, setUploadedMedia] = useState<MediaItem[]>([]);
+  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
   const [draggingCategory, setDraggingCategory] = useState<string | null>(null);
   const [threeDUrl, setThreeDUrl] = useState<string>("");
   const [cloudStorageDialog, setCloudStorageDialog] = useState<{
@@ -258,6 +264,7 @@ export function JobTaskView({
     []
   );
   const [editors, setEditors] = useState<OrganizationMember[]>([]);
+  const processedMediaKeysRef = useRef<Set<string>>(new Set());
   const [customerSearch, setCustomerSearch] = useState("");
   const [pmSearch, setPmSearch] = useState("");
   const [editorSearch, setEditorSearch] = useState("");
@@ -386,6 +393,55 @@ export function JobTaskView({
     );
   }, [editors, job]);
 
+  // Media mapping helpers need to be defined before effects
+  const mapBackendTypeToCategory = useCallback(
+    (type: string): MediaCategory => {
+      switch ((type || "").toUpperCase()) {
+        case MediaType.VIDEO:
+          return "video";
+        case MediaType.FLOORPLAN:
+          return "floor-plan";
+        case MediaType.DOCUMENT:
+          return "file";
+        case MediaType.PHOTO:
+        default:
+          return "image";
+      }
+    },
+    []
+  );
+
+  const mapCategoryToBackendType = useCallback(
+    (category: MediaCategory): MediaType => {
+      switch (category) {
+        case "video":
+          return MediaType.VIDEO;
+        case "floor-plan":
+          return MediaType.FLOORPLAN;
+        case "file":
+        case "3d-content":
+          return MediaType.DOCUMENT;
+        case "image":
+        default:
+          return MediaType.PHOTO;
+      }
+    },
+    []
+  );
+
+  const mapMediaRecordToItem = useCallback(
+    (media: Media): MediaItem => ({
+      id: media.id,
+      name: media.filename,
+      type: mapBackendTypeToCategory(media.type),
+      url: media.cdnUrl || media.key,
+      size: media.size,
+      uploadedAt: new Date(media.createdAt),
+      key: media.key,
+    }),
+    [mapBackendTypeToCategory]
+  );
+
   const messageEditor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -445,6 +501,55 @@ export function JobTaskView({
     };
     void loadData();
   }, [activeOrganizationId, job?.organizationId, open]);
+
+  useEffect(() => {
+    if (job?.media && job.media.length > 0) {
+      const mapped = job.media.map(mapMediaRecordToItem);
+      setUploadedMedia(mapped);
+      mapped.forEach((m) => processedMediaKeysRef.current.add(m.key || m.id));
+    } else if (job?.id) {
+      setUploadedMedia([]);
+      processedMediaKeysRef.current.clear();
+    } else {
+      setUploadedMedia([]);
+      processedMediaKeysRef.current.clear();
+    }
+  }, [job?.id, job?.media, mapMediaRecordToItem]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadProjectMedia = async () => {
+      if (!job?.id || !open) return;
+      const orgId = activeOrganizationId || job?.organizationId;
+      if (orgId) {
+        api.organizations.setActiveOrganization(orgId);
+      }
+      setIsLoadingMedia(true);
+      try {
+        const media = await api.media.listForProject(job.id);
+        if (!cancelled) {
+          const mapped = media.map(mapMediaRecordToItem);
+          setUploadedMedia(mapped);
+          mapped.forEach((m) => processedMediaKeysRef.current.add(m.key || m.id));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to load media for project", error);
+          toast.error("Failed to load media for this project");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingMedia(false);
+        }
+      }
+    };
+
+    void loadProjectMedia();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeOrganizationId, job?.id, job?.organizationId, mapMediaRecordToItem, open]);
 
   const handleAssignCustomerInline = async (customerId: string) => {
     if (!job || !customerId || !canAssign) return;
@@ -862,10 +967,7 @@ export function JobTaskView({
     }
   };
 
-  // Media management functions
-  const getMediaTypeIcon = (
-    type: "image" | "video" | "floor-plan" | "3d-content" | "file"
-  ) => {
+  const getMediaTypeIcon = (type: MediaCategory) => {
     switch (type) {
       case "image":
         return <ImageIcon className="size-10 text-muted-foreground" />;
@@ -880,30 +982,60 @@ export function JobTaskView({
     }
   };
 
-  const handleUploadcareSuccess = (
+  const handleUploadcareSuccess = async (
     info: any,
-    category: "image" | "video" | "floor-plan" | "file"
+    category: MediaCategory
   ) => {
-    // info.allEntries is an array of OutputFileEntry
-    if (!info || !info.allEntries || info.allEntries.length === 0) return;
+    if (!info || !info.allEntries || info.allEntries.length === 0 || !job) return;
 
-    const newMediaItems = info.allEntries.map((entry: any, index: number) => ({
-      id:
-        entry.uuid ||
-        `${Date.now()}-${index}-${Math.random().toString(36).substring(2, 11)}`,
-      name: entry.name,
-      type: category,
-      url: entry.cdnUrl,
-      size: entry.size,
-      uploadedAt: new Date(),
-    }));
+    const orgId = activeOrganizationId || job.organizationId;
+    if (orgId) {
+      api.organizations.setActiveOrganization(orgId);
+    }
 
-    setUploadedMedia((prev: any[]) => [...prev, ...newMediaItems]);
+    const createdItems: MediaItem[] = [];
+
+    for (const entry of info.allEntries) {
+      const payload = {
+        key: entry.uuid || entry.fileId || entry.cdnUrl,
+        cdnUrl: entry.cdnUrl,
+        filename: entry.name,
+        size: entry.size,
+        type: mapCategoryToBackendType(category),
+      };
+
+      if (!payload.key || processedMediaKeysRef.current.has(payload.key)) {
+        continue;
+      }
+
+      try {
+        const mediaRecord = await api.media.addToProject(job.id, payload);
+        createdItems.push(mapMediaRecordToItem(mediaRecord));
+        processedMediaKeysRef.current.add(payload.key);
+      } catch (error) {
+        console.error("Failed to register media upload", error);
+        toast.error(`Failed to save ${entry?.name || "upload"}`);
+      }
+    }
+
+    if (createdItems.length > 0) {
+      setUploadedMedia((prev) => {
+        const merged = [...prev];
+        createdItems.forEach((item) => {
+          const exists = merged.some((m) => m.id === item.id || m.key === item.key);
+          if (!exists) merged.push(item);
+        });
+        return merged;
+      });
+      toast.success(
+        `${createdItems.length} media item${
+          createdItems.length > 1 ? "s" : ""
+        } added`
+      );
+    }
   };
 
-  const getMediaByCategory = (
-    category: "image" | "video" | "floor-plan" | "3d-content" | "file"
-  ) => {
+  const getMediaByCategory = (category: MediaCategory) => {
     return uploadedMedia.filter((item) => item.type === category);
   };
   const hasAnyMedia = useMemo(
@@ -948,9 +1080,7 @@ export function JobTaskView({
       }
     : null;
 
-  const getUploadcareAcceptTypes = (
-    category: "image" | "video" | "floor-plan" | "file"
-  ) => {
+  const getUploadcareAcceptTypes = (category: MediaCategory) => {
     switch (category) {
       case "image":
         return "image/*";
@@ -965,31 +1095,39 @@ export function JobTaskView({
     }
   };
 
-  const handleViewMedia = (item: {
-    id: string;
-    name: string;
-    type: "image" | "video" | "floor-plan" | "3d-content" | "file";
-    url: string;
-  }) => {
+  const handleViewMedia = (item: MediaItem) => {
     // Open media in new window or modal
     window.open(item.url, "_blank");
   };
 
-  const handleDeleteMedia = (id: string) => {
-    setUploadedMedia((prev) => {
-      const item = prev.find((m) => m.id === id);
-      if (item) {
-        // Only revoke object URLs (blob URLs), not regular URLs
-        if (item.url.startsWith("blob:")) {
+  const handleDeleteMedia = async (id: string) => {
+    if (!job) return;
+    const orgId = activeOrganizationId || job.organizationId;
+    if (orgId) {
+      api.organizations.setActiveOrganization(orgId);
+    }
+    try {
+      await api.media.deleteFromProject(job.id, id);
+      setUploadedMedia((prev) => {
+        const item = prev.find((m) => m.id === id);
+        if (item && item.url.startsWith("blob:")) {
           URL.revokeObjectURL(item.url);
         }
-      }
-      return prev.filter((m) => m.id !== id);
-    });
+        const filtered = prev.filter((m) => m.id !== id);
+        if (item?.key) {
+          processedMediaKeysRef.current.delete(item.key);
+        }
+        return filtered;
+      });
+      toast.success("Media deleted");
+    } catch (error) {
+      console.error("Failed to delete media", error);
+      toast.error("Failed to delete media");
+    }
   };
 
-  const handleUrlUpload = (url: string, category: "3d-content") => {
-    if (!url.trim()) return;
+  const handleUrlUpload = async (url: string, category: "3d-content") => {
+    if (!url.trim() || !job) return;
 
     // Validate URL
     try {
@@ -999,26 +1137,44 @@ export function JobTaskView({
       return;
     }
 
-    const id = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     const urlParts = url.split("/");
     const fileName = urlParts[urlParts.length - 1] || "3D Model";
 
-    const newMedia = {
-      id,
-      name: fileName,
-      type: category,
-      url,
-      size: 0,
-      uploadedAt: new Date(),
-    };
-
-    setUploadedMedia((prev) => [...prev, newMedia]);
-    setThreeDUrl("");
+    try {
+      const orgId = activeOrganizationId || job.organizationId;
+      if (orgId) {
+        api.organizations.setActiveOrganization(orgId);
+      }
+      if (processedMediaKeysRef.current.has(url)) {
+        toast.success("Media already added");
+        setThreeDUrl("");
+        return;
+      }
+      const mediaRecord = await api.media.addToProject(job.id, {
+        key: url,
+        cdnUrl: url,
+        filename: fileName,
+        size: 0,
+        type: mapCategoryToBackendType(category),
+      });
+      processedMediaKeysRef.current.add(url);
+      setUploadedMedia((prev) => {
+        const mapped = mapMediaRecordToItem(mediaRecord);
+        const exists = prev.some((m) => m.id === mapped.id || m.key === mapped.key);
+        return exists ? prev : [...prev, mapped];
+      });
+      toast.success("Media added");
+    } catch (error) {
+      console.error("Failed to save media URL", error);
+      toast.error("Failed to save media URL");
+    } finally {
+      setThreeDUrl("");
+    }
   };
 
   const handleCloudStorage = (
     service: "google-drive" | "dropbox" | "onedrive",
-    category: "image" | "video" | "floor-plan" | "file"
+    category: MediaCategory
   ) => {
     // This would integrate with the respective cloud storage APIs
     // For now, we'll show a placeholder implementation
@@ -1059,7 +1215,7 @@ export function JobTaskView({
   };
 
   const renderMediaCategory = (
-    category: "image" | "video" | "floor-plan" | "3d-content" | "file",
+    category: MediaCategory,
     inputRef: React.RefObject<HTMLInputElement | null>
   ) => {
     const categoryMedia = getMediaByCategory(category);
@@ -1211,7 +1367,7 @@ export function JobTaskView({
                   userAgentIntegration="llm-nextjs"
                   filesViewMode="grid"
                   accept={getUploadcareAcceptTypes(category)}
-                  onChange={(info) => handleUploadcareSuccess(info, category)}
+                  onChange={(info) => void handleUploadcareSuccess(info, category)}
                 />
               </div>
             </div>
@@ -1245,11 +1401,11 @@ export function JobTaskView({
                   userAgentIntegration="llm-nextjs"
                   filesViewMode="grid"
                   accept={getUploadcareAcceptTypes(category)}
-                  onChange={(info) => handleUploadcareSuccess(info, category)}
+                  onChange={(info) => void handleUploadcareSuccess(info, category)}
                 />
               </div>
             )}
-            {!uploadsDisabled &&
+            {/* {!uploadsDisabled &&
               (category === "image" ||
                 category === "video" ||
                 category === "floor-plan" ||
@@ -1283,7 +1439,7 @@ export function JobTaskView({
                   OneDrive
                 </Button>
               </ButtonGroup>
-            )}
+            )} */}
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -2876,7 +3032,12 @@ export function JobTaskView({
           </TabsContent>
           <TabsContent value="media" className="mt-0">
             <div className="py-6">
-              {isAgentUser && !hasAnyMedia ? (
+              {isLoadingMedia ? (
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-12">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading media...
+                </div>
+              ) : isAgentUser && !hasAnyMedia ? (
                 <div className="text-sm text-muted-foreground text-center py-12">
                   No media has been uploaded yet. You’ll see photos, videos, and files here once they’re added.
                 </div>
