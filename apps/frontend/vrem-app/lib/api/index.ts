@@ -1,4 +1,4 @@
-import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse } from '@/types';
+import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization } from '@/types';
 import {
   currentUser,
   jobRequests,
@@ -361,6 +361,24 @@ class ApiClient {
         return currentUser;
       }
       return this.request<User>('/auth/me');
+    },
+  };
+
+  // Me API - User-specific endpoints
+  me = {
+    /**
+     * Get all COMPANY organizations where the current user is a customer.
+     * Used by agents to select which provider org should fulfill their order.
+     */
+    customerOrganizations: async (): Promise<CustomerOrganization[]> => {
+      if (USE_MOCK_DATA) {
+        return [];
+      }
+      const orgs = await this.request<any[]>('/me/customer-organizations');
+      return orgs.map((org) => ({
+        ...org,
+        createdAt: new Date(org.createdAt),
+      }));
     },
   };
 
@@ -1150,6 +1168,9 @@ class ApiClient {
   // Orders API - Create Order system
   orders = {
     create: async (payload: {
+      // Agent flow: provider org to create order for
+      providerOrgId?: string;
+      // Company flow: customer info
       customerId?: string;
       newCustomer?: {
         name: string;
@@ -1184,7 +1205,7 @@ class ApiClient {
         return {
           project: {
             id: `proj-${Date.now()}`,
-            orgId: 'org-mock',
+            orgId: payload.providerOrgId || 'org-mock',
             addressLine1: payload.addressLine1,
             scheduledTime: new Date(payload.scheduledTime),
             status: ProjectStatus.BOOKED,

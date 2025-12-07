@@ -2,6 +2,20 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrgRole, OrgType } from '@prisma/client';
 
+export interface CustomerOrganization {
+  orgId: string;
+  orgName: string;
+  orgType: OrgType;
+  logoUrl?: string;
+  city?: string;
+  region?: string;
+  countryCode?: string;
+  primaryEmail?: string;
+  websiteUrl?: string;
+  customerId: string;
+  createdAt: Date;
+}
+
 @Injectable()
 export class OnboardingService {
   constructor(private prisma: PrismaService) {}
@@ -109,5 +123,40 @@ export class OnboardingService {
       showJoinOrgCTA: true,
       message: 'You are not part of any organization yet.',
     };
+  }
+
+  /**
+   * Get all COMPANY organizations where the user is registered as a customer.
+   * Used by agents to select which provider org should fulfill their order.
+   */
+  async getCustomerOrganizations(userId: string): Promise<CustomerOrganization[]> {
+    const customerRelations = await this.prisma.organizationCustomer.findMany({
+      where: {
+        userId: userId,
+        organization: {
+          type: OrgType.COMPANY,
+        },
+      },
+      include: {
+        organization: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return customerRelations.map((relation) => ({
+      orgId: relation.organization.id,
+      orgName: relation.organization.name,
+      orgType: relation.organization.type,
+      logoUrl: relation.organization.logoUrl || undefined,
+      city: relation.organization.city || undefined,
+      region: relation.organization.region || undefined,
+      countryCode: relation.organization.countryCode || undefined,
+      primaryEmail: relation.organization.primaryEmail || undefined,
+      websiteUrl: relation.organization.websiteUrl || undefined,
+      customerId: relation.id,
+      createdAt: relation.createdAt,
+    }));
   }
 }

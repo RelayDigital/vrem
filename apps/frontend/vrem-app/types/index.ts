@@ -104,6 +104,24 @@ export interface OrganizationCustomer {
   updatedAt: Date;
 }
 
+/**
+ * Represents a COMPANY organization where the current user is a customer.
+ * Used by agents to select which provider org should fulfill their order.
+ */
+export interface CustomerOrganization {
+  orgId: string;
+  orgName: string;
+  orgType: OrgType;
+  logoUrl?: string;
+  city?: string;
+  region?: string;
+  countryCode?: string;
+  primaryEmail?: string;
+  websiteUrl?: string;
+  customerId: string;
+  createdAt: Date;
+}
+
 // =============================
 // Vendor & applications
 // =============================

@@ -7,8 +7,20 @@ import { MapPin, Search, Sparkles, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { P } from '@/components/ui/typography';
 
+export interface AddressComponents {
+  addressLine1: string;
+  city?: string;
+  region?: string;
+  postalCode?: string;
+  countryCode?: string;
+}
+
 interface AddressSearchProps {
-  onAddressSelect: (address: string, location: { lat: number; lng: number }) => void;
+  onAddressSelect: (
+    address: string,
+    location: { lat: number; lng: number },
+    addressComponents?: AddressComponents
+  ) => void;
 }
 
 interface MapboxFeature {
@@ -95,6 +107,62 @@ export function AddressSearch({ onAddressSelect }: AddressSearchProps) {
     return () => clearTimeout(timeoutId);
   }, [query]);
 
+  /**
+   * Parse Mapbox feature context to extract address components.
+   * Mapbox context array contains items like:
+   * - postcode.xxx (postal code)
+   * - place.xxx (city)
+   * - region.xxx (state/province)
+   * - country.xxx (country)
+   */
+  const parseAddressComponents = useCallback((feature: MapboxFeature): AddressComponents => {
+    const context = feature.context || [];
+    
+    // Extract the street address (feature.text is the street number + name for address types)
+    // feature.properties.address contains the street number if separate
+    const streetNumber = feature.properties?.address || '';
+    const streetName = feature.text || '';
+    const addressLine1 = streetNumber 
+      ? `${streetNumber} ${streetName}`.trim()
+      : streetName || feature.place_name.split(',')[0] || '';
+    
+    // Parse context for city, region, postal code, country
+    let city: string | undefined;
+    let region: string | undefined;
+    let postalCode: string | undefined;
+    let countryCode: string | undefined;
+    
+    for (const item of context) {
+      const idType = item.id.split('.')[0];
+      
+      switch (idType) {
+        case 'place':
+        case 'locality':
+          city = item.text;
+          break;
+        case 'region':
+          // short_code for region is like "CA-AB" or "US-NY"
+          region = item.short_code?.split('-')[1] || item.text;
+          break;
+        case 'postcode':
+          postalCode = item.text;
+          break;
+        case 'country':
+          // short_code for country is like "ca" or "us"
+          countryCode = item.short_code?.toUpperCase() || item.text;
+          break;
+      }
+    }
+    
+    return {
+      addressLine1,
+      city,
+      region,
+      postalCode,
+      countryCode,
+    };
+  }, []);
+
   const handlePlaceSelect = useCallback(
     async (feature: MapboxFeature) => {
       setQuery(feature.place_name);
@@ -103,9 +171,13 @@ export function AddressSearch({ onAddressSelect }: AddressSearchProps) {
 
       // Mapbox returns coordinates as [lng, lat], we need [lat, lng]
       const [lng, lat] = feature.center;
-      onAddressSelect(feature.place_name, { lat, lng });
+      
+      // Parse address components from Mapbox feature
+      const addressComponents = parseAddressComponents(feature);
+      
+      onAddressSelect(feature.place_name, { lat, lng }, addressComponents);
     },
-    [onAddressSelect]
+    [onAddressSelect, parseAddressComponents]
   );
 
   // Extract main text and secondary text from Mapbox feature
@@ -137,6 +209,10 @@ export function AddressSearch({ onAddressSelect }: AddressSearchProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setIsFocused(true)}
+            onBlur={() => {
+              // Delay to allow click on dropdown items to register
+              setTimeout(() => setIsFocused(false), 150);
+            }}
             placeholder="Enter property address..."
             className="h-16 pl-16 pr-6 text-lg rounded-2xl transition-all md:rounded-3xl"
             variant="muted"

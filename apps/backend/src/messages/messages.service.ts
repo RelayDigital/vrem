@@ -40,6 +40,7 @@ export class MessagesService {
    * 
    * - EDITOR/TECHNICIAN cannot access customer chat
    * - EDITOR/TECHNICIAN can only access team chat for projects they're assigned to
+   * - AGENT customers can access customer chat for projects they're linked to
    */
   async userHasAccessToProject(
     user: AuthenticatedUser,
@@ -48,7 +49,13 @@ export class MessagesService {
   ) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      include: { organization: true, technician: true, editor: true, projectManager: true },
+      include: { 
+        organization: true, 
+        technician: true, 
+        editor: true, 
+        projectManager: true,
+        customer: true, // Required for isLinkedCustomer check
+      },
     });
 
     if (!project || !project.organization) return false;
@@ -63,13 +70,8 @@ export class MessagesService {
       membership,
     });
 
-    // Check read access based on channel
-    // EDITOR/TECHNICIAN cannot read customer chat
-    if (channel === 'customer') {
-      return this.authorization.canReadCustomerChat(ctx, project as any, user);
-    }
-
-    return this.authorization.canReadTeamChat(ctx, project as any, user);
+    // Use canPostMessage which handles both read/write and agent customer access
+    return this.authorization.canPostMessage(ctx, project as any, channel, user);
   }
 
   /**
@@ -83,7 +85,13 @@ export class MessagesService {
   ) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      include: { organization: true, technician: true, editor: true, projectManager: true },
+      include: { 
+        organization: true, 
+        technician: true, 
+        editor: true, 
+        projectManager: true,
+        customer: true, // Required for isLinkedCustomer check
+      },
     });
 
     if (!project || !project.organization) return false;

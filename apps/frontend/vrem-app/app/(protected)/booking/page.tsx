@@ -3,8 +3,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
-import { AgentBookingFlow } from "@/components/features/agent/AgentBookingFlow";
-import { JobRequest, Technician, Organization } from "@/types";
+import { AgentBookingFlow, AgentJobData } from "@/components/features/agent/AgentBookingFlow";
+import { Technician, Organization } from "@/types";
 import { toast } from "sonner";
 import { DashboardLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
@@ -67,9 +67,15 @@ export default function BookingPage() {
     return [];
   }, []);
 
-  const handleJobCreate = async (job: Partial<JobRequest>) => {
-    if (!user || !organizationId) {
+  const handleJobCreate = async (job: AgentJobData) => {
+    if (!user) {
       toast.error("Unable to create order. Please try again.");
+      return;
+    }
+
+    // Agent flow requires a provider org
+    if (!job.providerOrgId) {
+      toast.error("Please select a service provider.");
       return;
     }
 
@@ -79,24 +85,29 @@ export default function BookingPage() {
         ? new Date(`${job.scheduledDate}T${job.scheduledTime}`).toISOString()
         : new Date().toISOString();
 
-      // Create the order via API - use address as addressLine1
+      // Create the order via API with providerOrgId for agent flow
       const result = await api.orders.create({
-        addressLine1: job.propertyAddress || "",
+        // Agent flow: specify the provider org
+        providerOrgId: job.providerOrgId,
+        // Address - use parsed components from Mapbox, fallback to full address string
+        addressLine1: job.addressLine1 || job.propertyAddress || "",
+        city: job.city,
+        region: job.region,
+        postalCode: job.postalCode,
+        countryCode: job.countryCode,
         lat: job.location?.lat,
         lng: job.location?.lng,
+        // Scheduling
         scheduledTime,
+        estimatedDuration: job.estimatedDuration || 120,
+        // Service details
         mediaTypes: job.mediaType || [],
         priority: job.priority || "standard",
-        estimatedDuration: job.estimatedDuration || 120,
         notes: job.requirements || "",
-        // Create a new customer with the client name
-        newCustomer: {
-          name: job.clientName || user.name || "Agent Booking",
-        },
-        projectManagerId: user.id,
       });
 
-      toast.success("Order created successfully!");
+      const providerName = job.providerName || "the provider";
+      toast.success(`Order created for ${providerName}. The job is now pending assignment.`);
       router.push(`/jobs/${result.project.id}`);
     } catch (error) {
       console.error("Failed to create order:", error);

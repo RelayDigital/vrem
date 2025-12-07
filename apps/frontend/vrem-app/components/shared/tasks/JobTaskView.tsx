@@ -161,7 +161,7 @@ import {
   canEditProject,
   canDeleteProject as canDeleteProjectFn,
   canChangeProjectCustomer,
-  canWriteCustomerChat,
+  canWriteCustomerChat as canWriteCustomerChatFn,
   canReadCustomerChat,
   isAdmin,
   EffectiveOrgRole,
@@ -363,13 +363,17 @@ export function JobTaskView({
     return canDeleteProjectFn(effectiveOrgRole);
   }, [effectiveOrgRole]);
 
-  // Permission: Can write to customer chat (OWNER/ADMIN or assigned PM)
+  // Permission: Can write to customer chat (OWNER/ADMIN, assigned PM, or linked agent customer)
   const canWriteToCustomerChat = useMemo(() => {
     const projectForPermission = job ? {
       projectManagerId: job.projectManagerId ?? null,
+      customerId: job.customerId ?? null,
     } : null;
-    return canWriteCustomerChat(effectiveOrgRole, projectForPermission, currentUserId);
-  }, [effectiveOrgRole, job?.projectManagerId, currentUserId]);
+    return canWriteCustomerChatFn(effectiveOrgRole, projectForPermission, currentUserId, {
+      userAccountType: currentUserAccountType,
+      customerUserId: job?.customer?.userId,
+    });
+  }, [effectiveOrgRole, job?.projectManagerId, job?.customerId, job?.customer?.userId, currentUserId, currentUserAccountType]);
   const getInitials = (value?: string | null) =>
     value
       ? value

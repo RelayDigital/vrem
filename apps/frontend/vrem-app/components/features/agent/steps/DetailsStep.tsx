@@ -37,6 +37,8 @@ interface DetailsStepProps {
   onJobDetailsChange: (details: JobDetails) => void;
   onBack: () => void;
   onNext: () => void;
+  // Optional: provider name when in agent flow
+  selectedProviderName?: string;
 }
 
 export function DetailsStep({
@@ -45,7 +47,11 @@ export function DetailsStep({
   onJobDetailsChange,
   onBack,
   onNext,
+  selectedProviderName,
 }: DetailsStepProps) {
+  // Determine if we're in agent flow (provider already selected)
+  const isAgentFlow = !!selectedProviderName;
+
   return (
     <motion.div
       key="details"
@@ -59,13 +65,22 @@ export function DetailsStep({
         style={{ maxWidth: "896px", marginLeft: "auto", marginRight: "auto" }}
       >
         {/* Progress */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+          {isAgentFlow && (
+            <>
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              <span>Provider selected</span>
+              <ArrowRight className="h-4 w-4 mx-2" />
+            </>
+          )}
           <CheckCircle2 className="h-5 w-5 text-green-500" />
           <span>Address selected</span>
           <ArrowRight className="h-4 w-4 mx-2" />
-          <span className="text-primary">Job details</span>
+          <span className="text-primary font-medium">Job details</span>
           <ArrowRight className="h-4 w-4 mx-2" />
-          <span className="text-muted-foreground/60">Find technician</span>
+          <span className="text-muted-foreground/60">
+            {isAgentFlow ? 'Confirm order' : 'Find technician'}
+          </span>
         </div>
 
         {/* Selected Address */}
@@ -400,7 +415,7 @@ export function DetailsStep({
               Back
             </Button>
             <Button onClick={onNext} className="flex-1 bg-primary">
-              Find Technician
+              {isAgentFlow ? 'Review Order' : 'Find Technician'}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>

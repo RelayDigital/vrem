@@ -1,13 +1,25 @@
 import { H1, P } from '@/components/ui/typography';
-import { AddressSearch } from '../../../shared/search';
+import { Button } from '@/components/ui/button';
+import { AddressSearch, AddressComponents } from '../../../shared/search';
 import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { MapPin, ArrowLeft } from 'lucide-react';
 
 interface AddressStepProps {
-  onAddressSelect: (address: string, location: { lat: number; lng: number }) => void;
+  onAddressSelect: (
+    address: string,
+    location: { lat: number; lng: number },
+    addressComponents?: AddressComponents
+  ) => void;
+  // Optional: provider name when in agent flow
+  selectedProviderName?: string;
+  // Optional: back handler
+  onBack?: () => void;
 }
 
-export function AddressStep({ onAddressSelect }: AddressStepProps) {
+export function AddressStep({ onAddressSelect, selectedProviderName, onBack }: AddressStepProps) {
+  // Determine if we're in agent flow (provider already selected)
+  const isAgentFlow = !!selectedProviderName;
+
   return (
     <motion.div
       key="address"
@@ -24,8 +36,8 @@ export function AddressStep({ onAddressSelect }: AddressStepProps) {
           className="text-center space-y-3"
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-full text-foreground/90 text-sm mb-2">
-            <Sparkles className="h-4 w-4" />
-            <span>AI-Powered Technician Matching</span>
+            <MapPin className="h-4 w-4" />
+            <span>{isAgentFlow ? `Booking with ${selectedProviderName}` : 'Property Location'}</span>
           </div>
           <H1 className="text-4xl md:text-5xl font-bold text-foreground">
             Where's the property?
@@ -43,7 +55,19 @@ export function AddressStep({ onAddressSelect }: AddressStepProps) {
           <AddressSearch onAddressSelect={onAddressSelect} />
         </motion.div>
 
-        {/* Removed map preview for cleaner booking flow */}
+        {onBack && (
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="flex justify-center"
+          >
+            <Button variant="ghost" onClick={onBack} className="text-muted-foreground">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          </motion.div>
+        )}
       </div>
     </motion.div>
   );

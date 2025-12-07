@@ -220,12 +220,28 @@ export function canReadCustomerChat(orgRole: EffectiveOrgRole | null): boolean {
  * - OWNER/ADMIN: Can write to any project's customer chat
  * - PROJECT_MANAGER: Can write ONLY to customer chat on projects they manage
  * - TECHNICIAN/EDITOR: Cannot write to customer chat
+ * - AGENT (customer): Can write to customer chat on projects where they are the linked customer
  */
 export function canWriteCustomerChat(
   orgRole: EffectiveOrgRole | null,
-  project: Pick<Project, 'projectManagerId'> | null,
+  project: Pick<Project, 'projectManagerId'> & { customerId?: string | null } | null,
   userId: string | null,
+  options?: {
+    /** User's account type */
+    userAccountType?: string;
+    /** The customer's userId (from OrganizationCustomer.userId) */
+    customerUserId?: string | null;
+  },
 ): boolean {
+  // AGENT customers can write to customer chat on their linked projects
+  if (
+    options?.userAccountType === 'AGENT' &&
+    options?.customerUserId &&
+    options.customerUserId === userId
+  ) {
+    return true;
+  }
+
   if (!orgRole || orgRole === 'NONE' || !project) return false;
 
   // OWNER and ADMIN can write to any customer chat

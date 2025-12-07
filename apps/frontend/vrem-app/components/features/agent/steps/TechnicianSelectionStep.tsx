@@ -12,10 +12,12 @@ import {
   CheckCircle2,
   Search as SearchIcon,
   Sparkles,
+  Building2,
+  Send,
 } from 'lucide-react';
-import { TechnicianRanking } from '../../../../types';
+import { TechnicianRanking, CustomerOrganization } from '../../../../types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { P } from '@/components/ui/typography';
+import { P, H2 } from '@/components/ui/typography';
 
 interface TechnicianSelectionStepProps {
   selectedAddress: string;
@@ -32,6 +34,8 @@ interface TechnicianSelectionStepProps {
   onToggleSearch: () => void;
   onTechnicianSelect: (technicianId: string) => void;
   onBack: () => void;
+  // Agent flow: pre-selected provider
+  selectedProvider?: CustomerOrganization | null;
 }
 
 export function TechnicianSelectionStep({
@@ -45,8 +49,13 @@ export function TechnicianSelectionStep({
   onToggleSearch,
   onTechnicianSelect,
   onBack,
+  selectedProvider,
 }: TechnicianSelectionStepProps) {
   const effectiveTechnicians = technicians || [];
+  
+  // Agent flow: provider is pre-selected, show confirmation UI
+  const isAgentFlow = !!selectedProvider;
+
   return (
     <motion.div
       key="technician"
@@ -55,16 +64,25 @@ export function TechnicianSelectionStep({
       exit={{ opacity: 0, x: -100 }}
       className="container mx-auto p-6 h-full"
     >
-      <div className="container mx-auto space-y-6">
+      <div className="container mx-auto space-y-6" style={{ maxWidth: '896px' }}>
         {/* Progress */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+          {isAgentFlow && (
+            <>
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              <span>Provider selected</span>
+              <ArrowRight className="h-4 w-4 mx-2" />
+            </>
+          )}
           <CheckCircle2 className="h-5 w-5 text-green-500" />
           <span>Address selected</span>
           <ArrowRight className="h-4 w-4 mx-2" />
           <CheckCircle2 className="h-5 w-5 text-green-500" />
-          <span>Details complete</span>
+          <span>Job details</span>
           <ArrowRight className="h-4 w-4 mx-2" />
-          <span className="text-primary">Choose technician</span>
+          <span className="text-primary font-medium">
+            {isAgentFlow ? 'Confirm order' : 'Choose technician'}
+          </span>
         </div>
 
         {/* Job Summary */}
@@ -75,7 +93,17 @@ export function TechnicianSelectionStep({
               Edit
             </Button>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 p-0">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-0">
+            {/* Provider (for agent flow) */}
+            {selectedProvider && (
+              <div className="flex items-start gap-3">
+                <Building2 className="h-5 w-5 text-muted-foreground/60 mt-0.5" />
+                <div>
+                  <div className="text-xs text-muted-foreground/80">Provider</div>
+                  <div className="text-sm text-foreground font-medium">{selectedProvider.orgName}</div>
+                </div>
+              </div>
+            )}
             {/* Location */}
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 text-muted-foreground/60 mt-0.5" />
@@ -99,7 +127,7 @@ export function TechnicianSelectionStep({
               <Camera className="h-5 w-5 text-muted-foreground/60 mt-0.5" />
               <div>
                 <div className="text-xs text-muted-foreground/80">Media Types</div>
-                <div className="flex gap-1 mt-1">
+                <div className="flex gap-1 mt-1 flex-wrap">
                   {jobDetails.mediaTypes.map((type) => (
                     <Badge key={type} variant="outline">
                       {type}
@@ -111,74 +139,116 @@ export function TechnicianSelectionStep({
           </CardContent>
         </Card>
 
-        {/* AI Matching Banner with Search Option */}
-        <Card className="bg-primary rounded-2xl p-6! text-primary-foreground gap-0">
-          
-          <CardHeader className="flex items-center justify-between mb-2 p-0">
-            <div className="flex items-center gap-3">
-              <Sparkles className="h-6 w-6" />
-              <h3 className="text-xl">AI-Matched Technicians</h3>
+        {/* Agent Flow: Confirmation UI */}
+        {isAgentFlow ? (
+          <>
+            {/* Provider Confirmation Banner */}
+            <Card className="bg-primary rounded-2xl p-6 text-primary-foreground gap-0">
+              <CardHeader className="flex items-center justify-between mb-2 p-0">
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-6 w-6" />
+                  <h3 className="text-xl">Ready to Submit</h3>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <P className="text-primary-foreground/80">
+                  Your order will be sent to <strong>{selectedProvider.orgName}</strong> for fulfillment. 
+                  They will assign a technician and confirm your booking.
+                </P>
+              </CardContent>
+            </Card>
+
+            {/* Confirm Button */}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={onBack}
+                className="min-w-[200px]"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Details
+              </Button>
+              <Button
+                onClick={() => onTechnicianSelect('confirm')}
+                className="min-w-[200px] bg-primary"
+                size="lg"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Submit Order
+              </Button>
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onToggleSearch}
-              className="bg-card/20 hover:bg-card/30 text-primary-foreground border-white/30"
-            >
-              <SearchIcon className="h-4 w-4 mr-2" />
-              Search Specific
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0!">
-          <P className="text-secondary">
-            {showProviderSearch
-              ? 'Search for a specific technician or your preferred media company'
-              : 'We\'ve ranked technicians based on availability, proximity, reliability, and your preferred vendors'}
-          </P>
-          </CardContent>
-        </Card>
+          </>
+        ) : (
+          <>
+            {/* Original Flow: AI Matching Banner with Search Option */}
+            <Card className="bg-primary rounded-2xl p-6 text-primary-foreground gap-0">
+              <CardHeader className="flex items-center justify-between mb-2 p-0">
+                <div className="flex items-center gap-3">
+                  <Sparkles className="h-6 w-6" />
+                  <h3 className="text-xl">AI-Matched Technicians</h3>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onToggleSearch}
+                  className="bg-card/20 hover:bg-card/30 text-primary-foreground border-white/30"
+                >
+                  <SearchIcon className="h-4 w-4 mr-2" />
+                  Search Specific
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                <P className="text-primary-foreground/80">
+                  {showProviderSearch
+                    ? 'Search for a specific technician or your preferred media company'
+                    : "We've ranked technicians based on availability, proximity, reliability, and your preferred vendors"}
+                </P>
+              </CardContent>
+            </Card>
 
-        {/* Technician Search or AI Ranking */}
-        {showProviderSearch ? (
-          <div className="bg-card rounded-2xl border-2 border-border p-6 shadow-sm">
-            <ProviderSearch
-              technicians={effectiveTechnicians}
-              companies={companies}
-              preferredVendors={preferredVendors}
-              onSelect={onTechnicianSelect}
-            />
-          </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {rankings.map((ranking, index) => {
-                // Handle both legacy TechnicianRanking (technician) and ProviderRanking (provider)
-                const technician =
-                  (ranking as any).provider || (ranking as any).technician;
-                if (!technician) return null;
-                return (
-                <ProviderCard
-                    key={technician.id}
-                    technician={technician}
-                  ranking={ranking.factors}
-                score={ranking.score}
-                recommended={ranking.recommended && index === 0}
-                  onAssign={() => onTechnicianSelect(technician.id)}
-              />
-              );
-            })}
-          </div>
+            {/* Technician Search or AI Ranking */}
+            {showProviderSearch ? (
+              <div className="bg-card rounded-2xl border-2 border-border p-6 shadow-sm">
+                <ProviderSearch
+                  technicians={effectiveTechnicians}
+                  companies={companies}
+                  preferredVendors={preferredVendors}
+                  onSelect={onTechnicianSelect}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {rankings.map((ranking, index) => {
+                  // Handle both legacy TechnicianRanking (technician) and ProviderRanking (provider)
+                  const technician =
+                    (ranking as any).provider || (ranking as any).technician;
+                  if (!technician) return null;
+                  return (
+                    <ProviderCard
+                      key={technician.id}
+                      technician={technician}
+                      ranking={ranking.factors}
+                      score={ranking.score}
+                      recommended={ranking.recommended && index === 0}
+                      onAssign={() => onTechnicianSelect(technician.id)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={onBack}
+                className="min-w-[200px]"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Details
+              </Button>
+            </div>
+          </>
         )}
-
-        <div className="flex justify-center pt-4">
-          <Button
-            variant="outline"
-            onClick={onBack}
-            className="min-w-[200px]"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Details
-          </Button>
-        </div>
       </div>
     </motion.div>
   );

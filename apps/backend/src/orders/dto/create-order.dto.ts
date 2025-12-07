@@ -35,7 +35,14 @@ export enum OrderPriority {
 }
 
 export class CreateOrderDto {
-  // Customer - one of these required
+  // Provider organization (for agent flow)
+  // When set, the order is created for this COMPANY org and the agent becomes the customer
+  @IsOptional()
+  @IsString()
+  providerOrgId?: string;
+
+  // Customer - one of these required (for company internal flow)
+  // When providerOrgId is set, these are ignored as the agent becomes the customer
   @IsOptional()
   @IsString()
   customerId?: string;

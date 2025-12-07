@@ -26,8 +26,131 @@ export class OrdersService {
   /**
    * Creates a complete order: Customer (if new) + Project + CalendarEvent
    * All operations happen in a single transaction for atomicity.
+   *
+   * Two flows:
+   * 1. Agent flow (providerOrgId set): Agent creates order for a COMPANY org where they are a customer
+   * 2. Company flow (no providerOrgId): Company creates order internally with customer info
    */
   async createOrder(
+    ctx: OrgContext,
+    user: AuthenticatedUser,
+    dto: CreateOrderDto,
+  ): Promise<OrderResult> {
+    // Determine if this is an agent flow (ordering from a provider)
+    const isAgentFlow = !!dto.providerOrgId;
+
+    if (isAgentFlow) {
+      return this.createAgentOrder(user, dto);
+    }
+
+    // Standard company flow
+    return this.createCompanyOrder(ctx, user, dto);
+  }
+
+  /**
+   * Agent flow: Create an order for a COMPANY org where the agent is a customer.
+   * The project is created under the provider org, with the agent as the customer.
+   */
+  private async createAgentOrder(
+    user: AuthenticatedUser,
+    dto: CreateOrderDto,
+  ): Promise<OrderResult> {
+    // Validate providerOrgId is provided
+    if (!dto.providerOrgId) {
+      throw new BadRequestException('providerOrgId is required for agent orders');
+    }
+
+    // Validate the provider org exists and is a COMPANY
+    const providerOrg = await this.prisma.organization.findUnique({
+      where: { id: dto.providerOrgId },
+    });
+
+    if (!providerOrg) {
+      throw new ForbiddenException('Provider organization not found');
+    }
+
+    if (providerOrg.type !== OrgType.COMPANY) {
+      throw new ForbiddenException('Provider organization must be a COMPANY');
+    }
+
+    // Validate the user is a customer of this provider org
+    const customerRelation = await this.prisma.organizationCustomer.findFirst({
+      where: {
+        orgId: dto.providerOrgId,
+        userId: user.id,
+      },
+    });
+
+    if (!customerRelation) {
+      throw new ForbiddenException(
+        'You are not registered as a customer of this organization',
+      );
+    }
+
+    // Validate media types
+    if (!dto.mediaTypes || dto.mediaTypes.length === 0) {
+      throw new BadRequestException('At least one media type must be selected');
+    }
+
+    // Geocode address if lat/lng not provided
+    const addressData = await this.resolveAddress(dto);
+
+    // Execute transaction
+    return this.prisma.$transaction(async (tx) => {
+      // Create project under the provider org with the agent as customer
+      const project = await tx.project.create({
+        data: {
+          orgId: dto.providerOrgId!,
+          customerId: customerRelation.id,
+          addressLine1: addressData.addressLine1,
+          addressLine2: addressData.addressLine2,
+          city: addressData.city,
+          region: addressData.region,
+          postalCode: addressData.postalCode,
+          countryCode: addressData.countryCode,
+          lat: addressData.lat,
+          lng: addressData.lng,
+          notes: this.buildNotes(dto),
+          scheduledTime: new Date(dto.scheduledTime),
+          // No technician assigned - pending for company to assign
+          technicianId: null,
+          editorId: null,
+          // No project manager assigned - company will assign
+          projectManagerId: null,
+        },
+        include: {
+          customer: true,
+          technician: true,
+          editor: true,
+          projectManager: true,
+        },
+      });
+
+      // Fetch the complete project
+      const completeProject = await tx.project.findUnique({
+        where: { id: project.id },
+        include: {
+          customer: true,
+          calendarEvent: true,
+          technician: true,
+          editor: true,
+          projectManager: true,
+        },
+      });
+
+      return {
+        project: completeProject!,
+        customer: customerRelation,
+        calendarEvent: null,
+        isNewCustomer: false,
+      };
+    });
+  }
+
+  /**
+   * Company flow: Create an order within the company's own org context.
+   */
+  private async createCompanyOrder(
     ctx: OrgContext,
     user: AuthenticatedUser,
     dto: CreateOrderDto,
