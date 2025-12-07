@@ -36,9 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   const normalizeUser = (u: any): User => {
+    // accountType is always one of: AGENT, PROVIDER, COMPANY
+    // Normalize to uppercase and default to PROVIDER if missing
     const normalizedType = (u.accountType || "").toUpperCase();
-    const accountType =
-      normalizedType === "TECHNICIAN" ? "PROVIDER" : u.accountType;
+    const accountType = 
+      normalizedType === "AGENT" ? "AGENT" :
+      normalizedType === "PROVIDER" ? "PROVIDER" :
+      normalizedType === "COMPANY" ? "COMPANY" :
+      "PROVIDER"; // Default to PROVIDER if unknown/empty
     return {
       ...u,
       accountType,

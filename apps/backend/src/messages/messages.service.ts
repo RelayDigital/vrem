@@ -34,6 +34,10 @@ export class MessagesService {
     return project;
   }
 
+  /**
+   * Check if user has access to a project's messages.
+   * Used for WebSocket/real-time message subscriptions.
+   */
   async userHasAccessToProject(
     user: AuthenticatedUser,
     projectId: string,
@@ -56,11 +60,43 @@ export class MessagesService {
       membership,
     });
 
+    // All org members can READ both channels
+    // For WRITE access to customer chat, check canWriteCustomerChat
     if (channel === 'customer') {
-      return this.authorization.canPostMessage(ctx, project as any, 'customer', user);
+      // For subscription purposes, check read access (all org members can read)
+      return this.authorization.canReadCustomerChat(ctx, project as any);
     }
 
-    return this.authorization.canViewProject(ctx, project as any);
+    return this.authorization.canReadTeamChat(ctx, project as any);
+  }
+
+  /**
+   * Check if user can write to a specific channel.
+   * Used for WebSocket/real-time message sending validation.
+   */
+  async userCanWriteToChannel(
+    user: AuthenticatedUser,
+    projectId: string,
+    channel: 'team' | 'customer',
+  ) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { organization: true, technician: true, editor: true, projectManager: true },
+    });
+
+    if (!project || !project.organization) return false;
+
+    const membership = await this.prisma.organizationMember.findFirst({
+      where: { userId: user.id, orgId: project.orgId },
+    });
+
+    const ctx = buildOrgContext({
+      user,
+      org: project.organization,
+      membership,
+    });
+
+    return this.authorization.canPostMessage(ctx, project as any, channel, user);
   }
 
   async sendMessage(ctx: OrgContext, user: AuthenticatedUser, dto: SendMessageDto) {
@@ -146,24 +182,39 @@ export class MessagesService {
     channel?: ProjectChatChannel,
   ) {
     const project = await this.loadProject(projectId, ctx);
+    
     if (!this.authorization.canViewProject(ctx, project)) {
       throw new ForbiddenException('You are not allowed to view messages');
     }
 
-    const canViewCustomer = this.authorization.canPostMessage(
-      ctx,
-      project,
-      'customer',
-      user,
-    );
-    const channels =
-      channel === ProjectChatChannel.CUSTOMER && canViewCustomer
-        ? [ProjectChatChannel.CUSTOMER]
-        : channel === ProjectChatChannel.TEAM
-        ? [ProjectChatChannel.TEAM]
-        : canViewCustomer
-        ? [ProjectChatChannel.TEAM, ProjectChatChannel.CUSTOMER]
-        : [ProjectChatChannel.TEAM];
+    // All org members can READ both team and customer chat
+    // Determine which channels to return based on request and read permissions
+    const canReadTeam = this.authorization.canReadTeamChat(ctx, project);
+    const canReadCustomer = this.authorization.canReadCustomerChat(ctx, project);
+
+    let channels: ProjectChatChannel[] = [];
+    
+    if (channel === ProjectChatChannel.CUSTOMER) {
+      if (canReadCustomer) {
+        channels = [ProjectChatChannel.CUSTOMER];
+      } else {
+        throw new ForbiddenException('You are not allowed to view customer chat');
+      }
+    } else if (channel === ProjectChatChannel.TEAM) {
+      if (canReadTeam) {
+        channels = [ProjectChatChannel.TEAM];
+      } else {
+        throw new ForbiddenException('You are not allowed to view team chat');
+      }
+    } else {
+      // No specific channel requested - return all readable channels
+      if (canReadTeam) channels.push(ProjectChatChannel.TEAM);
+      if (canReadCustomer) channels.push(ProjectChatChannel.CUSTOMER);
+    }
+
+    if (channels.length === 0) {
+      return [];
+    }
 
     return this.prisma.message.findMany({
       where: { projectId, channel: { in: channels } },
@@ -182,15 +233,22 @@ export class MessagesService {
 
     if (!message) throw new NotFoundException('Message not found');
     const project = await this.loadProject(message.projectId, ctx);
+    
     if (!this.authorization.canViewProject(ctx, project)) {
       throw new ForbiddenException('You are not allowed to view this message');
     }
-    if (
-      message.channel === ProjectChatChannel.CUSTOMER &&
-      !this.authorization.canPostMessage(ctx, project, 'customer', user)
-    ) {
-      throw new ForbiddenException('You are not allowed to view this message');
+    
+    // Check read permission based on channel
+    if (message.channel === ProjectChatChannel.CUSTOMER) {
+      if (!this.authorization.canReadCustomerChat(ctx, project)) {
+        throw new ForbiddenException('You are not allowed to view this message');
+      }
+    } else {
+      if (!this.authorization.canReadTeamChat(ctx, project)) {
+        throw new ForbiddenException('You are not allowed to view this message');
+      }
     }
+    
     return message;
   }
 
@@ -212,14 +270,21 @@ export class MessagesService {
     }
 
     const isOwner = message.userId === currentUser.id;
-    const canModerate = this.authorization.canManageProject(ctx, project);
-    if (
-      message.channel === ProjectChatChannel.CUSTOMER &&
-      !this.authorization.canPostMessage(ctx, project, 'customer', currentUser)
-    ) {
-      throw new ForbiddenException('You are not allowed to delete this message');
+    // Use canEditProject for moderation rights (respects PM assignment)
+    const canModerate = this.authorization.canEditProject(ctx, project, currentUser);
+    
+    // Check write permission for the channel
+    if (message.channel === ProjectChatChannel.CUSTOMER) {
+      if (!this.authorization.canWriteCustomerChat(ctx, project, currentUser)) {
+        throw new ForbiddenException('You are not allowed to delete this message');
+      }
+    } else {
+      if (!this.authorization.canWriteTeamChat(ctx, project)) {
+        throw new ForbiddenException('You are not allowed to delete this message');
+      }
     }
 
+    // Must be message owner or have moderation rights
     if (!isOwner && !canModerate) {
       throw new ForbiddenException('You are not allowed to delete this message');
     }

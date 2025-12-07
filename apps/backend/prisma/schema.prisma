@@ -180,6 +180,7 @@ enum OrgRole {
   TECHNICIAN
   EDITOR
   PROJECT_MANAGER
+  AGENT
 }
 
 enum OrgType {

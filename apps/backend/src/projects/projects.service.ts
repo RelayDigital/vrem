@@ -16,6 +16,7 @@ import { AssignProjectDto } from './dto/assign-project.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+
 @Injectable()
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
@@ -26,6 +27,10 @@ export class ProjectsService {
     private authorization: AuthorizationService,
   ) {}
 
+  /**
+   * Check if user has a manager-level role that can view all projects.
+   * Used for determining project list visibility.
+   */
   private isManagerRole(ctx: OrgContext) {
     return (
       ctx.effectiveRole === 'PERSONAL_OWNER' ||
@@ -177,6 +182,7 @@ export class ProjectsService {
 
     return customer;
   }
+
   private async ensureUserExists(id: string) {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
@@ -199,6 +205,10 @@ export class ProjectsService {
     return include;
   }
 
+  // =============================
+  // Project listing
+  // =============================
+
   async findForUser(ctx: OrgContext, user: AuthenticatedUser) {
     if (ctx.effectiveRole === 'NONE') {
       throw new ForbiddenException('You are not a member of this organization');
@@ -208,6 +218,7 @@ export class ProjectsService {
       const orgId = ctx.org.id;
       const include = this.projectInclude(true);
 
+      // Manager roles (OWNER, ADMIN, PROJECT_MANAGER) see all org projects
       if (this.isManagerRole(ctx)) {
         return this.prisma.project.findMany({
           where: { orgId },
@@ -216,6 +227,7 @@ export class ProjectsService {
         });
       }
 
+      // TECHNICIAN sees only their assigned projects
       if (ctx.effectiveRole === 'TECHNICIAN') {
         return this.prisma.project.findMany({
           where: { orgId, technicianId: user.id },
@@ -224,6 +236,7 @@ export class ProjectsService {
         });
       }
 
+      // EDITOR sees only their assigned projects
       if (ctx.effectiveRole === 'EDITOR') {
         return this.prisma.project.findMany({
           where: { orgId, editorId: user.id },
@@ -232,6 +245,7 @@ export class ProjectsService {
         });
       }
 
+      // Fallback: return projects where user is project manager
       return this.prisma.project.findMany({
         where: { orgId, projectManagerId: user.id },
         include,
@@ -261,6 +275,10 @@ export class ProjectsService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  // =============================
+  // Project CRUD
+  // =============================
 
   async create(ctx: OrgContext, dto: CreateProjectDto) {
     if (!this.isManagerRole(ctx)) {
@@ -312,126 +330,11 @@ export class ProjectsService {
     return project;
   }
 
-  async assign(projectId: string, dto: AssignProjectDto, ctx: OrgContext) {
-    const project = await this.ensureProjectInOrg(projectId, ctx);
-    if (!this.authorization.canManageProject(ctx, project)) {
-      throw new ForbiddenException('You cannot manage this project');
-    }
-
-    return this.prisma.project.update({
-      where: { id: projectId },
-      data: {
-        technicianId: dto.technicianId,
-        editorId: dto.editorId,
-      },
-    });
-  }
-
-  async assignTechnician(
-    projectId: string,
-    technicianId: string,
-    ctx: OrgContext,
-  ) {
-    const project = await this.ensureProjectInOrg(projectId, ctx);
-    if (!this.authorization.canManageProject(ctx, project)) {
-      throw new ForbiddenException('You cannot manage this project');
-    }
-
-    const technician = await this.ensureUserExists(technicianId);
-
-    const updated = await this.prisma.project.update({
-      where: { id: projectId },
-      data: { technicianId },
-      include: this.projectInclude(true),
-    });
-
-    if (project.scheduledTime && process.env.CRONOFY_ACCESS_TOKEN) {
-      await this.cronofy.createEvent(updated, technician);
-    }
-
-    return updated;
-  }
-
-  async assignCustomer(
-    projectId: string,
-    customerId: string,
-    ctx: OrgContext,
-  ) {
-    const project = await this.ensureProjectInOrg(projectId, ctx);
-    if (!this.authorization.canManageProject(ctx, project)) {
-      throw new ForbiddenException('You cannot manage this project');
-    }
-
-    await this.ensureCustomerInOrg(customerId, ctx);
-
-    return this.prisma.project.update({
-      where: { id: projectId },
-      data: { customerId },
-      include: this.projectInclude(true),
-    });
-  }
-
-  async assignEditor(projectId: string, editorId: string, ctx: OrgContext) {
-    const project = await this.ensureProjectInOrg(projectId, ctx);
-    if (!this.authorization.canManageProject(ctx, project)) {
-      throw new ForbiddenException('You cannot manage this project');
-    }
-
-    await this.ensureUserExists(editorId);
-
-    return this.prisma.project.update({
-      where: { id: projectId },
-      data: { editorId },
-    });
-  }
-
-  async assignProjectManager(
-    projectId: string,
-    projectManagerId: string,
-    ctx: OrgContext,
-  ) {
-    const project = await this.ensureProjectInOrg(projectId, ctx);
-    if (!this.authorization.canManageProject(ctx, project)) {
-      throw new ForbiddenException('You cannot manage this project');
-    }
-
-    await this.ensureUserExists(projectManagerId);
-
-    return this.prisma.project.update({
-      where: { id: projectId },
-      data: { projectManagerId },
-    });
-  }
-
-  async scheduleProject(
-    projectId: string,
-    scheduled: Date,
-    ctx: OrgContext,
-  ) {
-    const project = await this.ensureProjectInOrg(projectId, ctx);
-    if (!this.authorization.canManageProject(ctx, project)) {
-      throw new ForbiddenException('You cannot manage this project');
-    }
-
-    const updated = await this.prisma.project.update({
-      where: { id: projectId },
-      data: { scheduledTime: scheduled },
-    });
-
-    const event = await this.prisma.calendarEvent.findUnique({
-      where: { projectId },
-    });
-
-    if (event && process.env.CRONOFY_ACCESS_TOKEN) {
-      await this.cronofy.updateEvent(updated, event);
-    }
-
-    return updated;
-  }
-
-  async update(id: string, dto: UpdateProjectDto, ctx: OrgContext) {
+  async update(id: string, dto: UpdateProjectDto, ctx: OrgContext, user: AuthenticatedUser) {
     const project = await this.ensureProjectInOrg(id, ctx);
-    if (!this.authorization.canManageProject(ctx, project)) {
+    
+    // Use canEditProject which enforces PM assignment check
+    if (!this.authorization.canEditProject(ctx, project, user)) {
       throw new ForbiddenException('You cannot update this project');
     }
 
@@ -459,12 +362,158 @@ export class ProjectsService {
 
   async remove(id: string, ctx: OrgContext) {
     const project = await this.ensureProjectInOrg(id, ctx);
-    if (!this.authorization.canManageProject(ctx, project)) {
+    
+    // Use canDeleteProject - only OWNER/ADMIN can delete, never PM
+    if (!this.authorization.canDeleteProject(ctx, project)) {
       throw new ForbiddenException('You cannot delete this project');
     }
 
     return this.prisma.project.delete({ where: { id } });
   }
+
+  // =============================
+  // Project assignments
+  // =============================
+
+  async assign(projectId: string, dto: AssignProjectDto, ctx: OrgContext, user: AuthenticatedUser) {
+    const project = await this.ensureProjectInOrg(projectId, ctx);
+    
+    // Use canEditProject which enforces PM assignment check
+    if (!this.authorization.canEditProject(ctx, project, user)) {
+      throw new ForbiddenException('You cannot manage this project');
+    }
+
+    return this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        technicianId: dto.technicianId,
+        editorId: dto.editorId,
+      },
+    });
+  }
+
+  async assignTechnician(
+    projectId: string,
+    technicianId: string,
+    ctx: OrgContext,
+    user: AuthenticatedUser,
+  ) {
+    const project = await this.ensureProjectInOrg(projectId, ctx);
+    
+    // Use canEditProject which enforces PM assignment check
+    if (!this.authorization.canEditProject(ctx, project, user)) {
+      throw new ForbiddenException('You cannot manage this project');
+    }
+
+    const technician = await this.ensureUserExists(technicianId);
+
+    const updated = await this.prisma.project.update({
+      where: { id: projectId },
+      data: { technicianId },
+      include: this.projectInclude(true),
+    });
+
+    if (project.scheduledTime && process.env.CRONOFY_ACCESS_TOKEN) {
+      await this.cronofy.createEvent(updated, technician);
+    }
+
+    return updated;
+  }
+
+  async assignCustomer(
+    projectId: string,
+    customerId: string,
+    ctx: OrgContext,
+  ) {
+    const project = await this.ensureProjectInOrg(projectId, ctx);
+    
+    // Use canChangeProjectCustomer - only OWNER/ADMIN can change customer
+    if (!this.authorization.canChangeProjectCustomer(ctx, project)) {
+      throw new ForbiddenException('You cannot change the customer on this project');
+    }
+
+    await this.ensureCustomerInOrg(customerId, ctx);
+
+    return this.prisma.project.update({
+      where: { id: projectId },
+      data: { customerId },
+      include: this.projectInclude(true),
+    });
+  }
+
+  async assignEditor(projectId: string, editorId: string, ctx: OrgContext, user: AuthenticatedUser) {
+    const project = await this.ensureProjectInOrg(projectId, ctx);
+    
+    // Use canEditProject which enforces PM assignment check
+    if (!this.authorization.canEditProject(ctx, project, user)) {
+      throw new ForbiddenException('You cannot manage this project');
+    }
+
+    await this.ensureUserExists(editorId);
+
+    return this.prisma.project.update({
+      where: { id: projectId },
+      data: { editorId },
+    });
+  }
+
+  async assignProjectManager(
+    projectId: string,
+    projectManagerId: string,
+    ctx: OrgContext,
+    user: AuthenticatedUser,
+  ) {
+    const project = await this.ensureProjectInOrg(projectId, ctx);
+    
+    // Use canEditProject which enforces PM assignment check
+    if (!this.authorization.canEditProject(ctx, project, user)) {
+      throw new ForbiddenException('You cannot manage this project');
+    }
+
+    await this.ensureUserExists(projectManagerId);
+
+    return this.prisma.project.update({
+      where: { id: projectId },
+      data: { projectManagerId },
+    });
+  }
+
+  // =============================
+  // Project scheduling
+  // =============================
+
+  async scheduleProject(
+    projectId: string,
+    scheduled: Date,
+    ctx: OrgContext,
+    user: AuthenticatedUser,
+  ) {
+    const project = await this.ensureProjectInOrg(projectId, ctx);
+    
+    // Use canEditProject which enforces PM assignment check
+    if (!this.authorization.canEditProject(ctx, project, user)) {
+      throw new ForbiddenException('You cannot manage this project');
+    }
+
+    const updated = await this.prisma.project.update({
+      where: { id: projectId },
+      data: { scheduledTime: scheduled },
+    });
+
+    const event = await this.prisma.calendarEvent.findUnique({
+      where: { projectId },
+    });
+
+    if (event && process.env.CRONOFY_ACCESS_TOKEN) {
+      await this.cronofy.updateEvent(updated, event);
+    }
+
+    return updated;
+  }
+
+  // =============================
+  // Project status
+  // =============================
 
   async updateStatus(
     projectId: string,
@@ -475,10 +524,12 @@ export class ProjectsService {
     const project = await this.ensureProjectInOrg(projectId, ctx);
     const current = project.status;
 
-    if (this.authorization.canManageProject(ctx, project)) {
+    // Users who can edit the project can change status freely
+    if (this.authorization.canEditProject(ctx, project, user)) {
       return this.setProjectStatus(projectId, newStatus);
     }
 
+    // TECHNICIAN/EDITOR can only make limited status transitions on their assigned projects
     if (!this.authorization.canUpdateOwnWorkOnProject(ctx, project, user)) {
       throw new ForbiddenException('You do not have permission');
     }
@@ -503,6 +554,10 @@ export class ProjectsService {
     });
   }
 
+  // =============================
+  // Project messaging
+  // =============================
+
   async getMessages(
     projectId: string,
     ctx: OrgContext,
@@ -520,13 +575,16 @@ export class ProjectsService {
       throw new ForbiddenException('Not allowed');
     }
 
-    const normalizedChannel =
-      channel === ProjectChatChannel.CUSTOMER ? 'customer' : 'team';
-    if (
-      normalizedChannel === 'customer' &&
-      !this.authorization.canPostMessage(ctx, project, 'customer', user)
-    ) {
-      throw new ForbiddenException('Not allowed to view this channel');
+    // All org members can READ both team and customer chat
+    // Check read permission based on channel
+    if (channel === ProjectChatChannel.CUSTOMER) {
+      if (!this.authorization.canReadCustomerChat(ctx, project)) {
+        throw new ForbiddenException('Not allowed to view this channel');
+      }
+    } else {
+      if (!this.authorization.canReadTeamChat(ctx, project)) {
+        throw new ForbiddenException('Not allowed to view this channel');
+      }
     }
 
     return this.prisma.message.findMany({

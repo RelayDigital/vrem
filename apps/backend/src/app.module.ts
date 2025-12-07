@@ -11,6 +11,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { ActiveOrgMiddleware } from './organizations/active-org.middleware';
 import { CustomersModule } from './customers/customers.module';
+import { OrdersModule } from './orders/orders.module';
 import { OrgRolesGuard } from './auth/org-roles.guard';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { Reflector } from '@nestjs/core';
@@ -28,6 +29,7 @@ import { PrismaModule } from './prisma/prisma.module';
     DashboardModule,
     OrganizationsModule,
     CustomersModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService, ActiveOrgMiddleware, OrgRolesGuard, JwtAuthGuard, Reflector],

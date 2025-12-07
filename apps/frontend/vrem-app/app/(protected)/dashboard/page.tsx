@@ -17,15 +17,14 @@ import {
 import { DashboardLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
-import { useJobCreation } from "@/context/JobCreationContext";
 import { useDispatcherNavigation } from "@/context/DispatcherNavigationContext";
 import { JobDataBoundary } from "@/components/shared/jobs";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
-import { fetchOrganizationTechnicians } from "@/lib/technicians";
-import { getEffectiveOrgRole, isCompanyRole } from "@/lib/roles";
+import { fetchOrganizationTechnicians, geocodeAddress } from "@/lib/technicians";
+import { getUIContext } from "@/lib/roles";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -36,12 +35,127 @@ export default function DashboardPage() {
     "EDITOR",
     "PROJECT_MANAGER",
   ]);
-  const jobCreation = useJobCreation();
   const messaging = useMessaging();
   const jobManagement = useJobManagement();
   const navigation = useDispatcherNavigation();
   const [providers, setProviders] = useState<ProviderProfile[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(false);
+  const [orgGeocodedCoords, setOrgGeocodedCoords] = useState<{ lat: number; lng: number } | null>(null);
+  
+  // Build UIContext for role-based rendering
+  const uiContext = useMemo(() => {
+    return getUIContext(user, memberships, organizationId);
+  }, [user, memberships, organizationId]);
+  
+  // Get active org details for self-marker
+  const activeMembership = memberships.find((m) => m.orgId === organizationId);
+  const activeOrg = activeMembership?.organization;
+  const isPersonalOrg = activeOrg?.type === "PERSONAL" || (activeMembership as any)?.organizationType === "PERSONAL";
+  const isProviderAccount = (user?.accountType || "").toUpperCase() === "PROVIDER";
+  
+  // Parse org location
+  const orgLatRaw = (activeOrg as any)?.lat;
+  const orgLngRaw = (activeOrg as any)?.lng;
+  const orgLat = typeof orgLatRaw === "string" ? parseFloat(orgLatRaw) : orgLatRaw;
+  const orgLng = typeof orgLngRaw === "string" ? parseFloat(orgLngRaw) : orgLngRaw;
+  const hasOrgLocation = typeof orgLat === "number" && !Number.isNaN(orgLat) && typeof orgLng === "number" && !Number.isNaN(orgLng);
+  
+  // Geocode org address if lat/lng not set
+  useEffect(() => {
+    const tryGeocode = async () => {
+      if (hasOrgLocation || !activeOrg) return;
+      const addressParts = [
+        (activeOrg as any)?.addressLine1,
+        (activeOrg as any)?.addressLine2,
+        (activeOrg as any)?.city,
+        (activeOrg as any)?.region,
+        (activeOrg as any)?.postalCode,
+        (activeOrg as any)?.countryCode,
+      ].filter(Boolean);
+      if (!addressParts.length) return;
+      const addressString = addressParts.join(", ");
+      try {
+        const coords = await geocodeAddress(addressString);
+        if (coords) {
+          setOrgGeocodedCoords(coords);
+        }
+      } catch (error) {
+        console.error("Failed to geocode org address for dashboard", error);
+      }
+    };
+    void tryGeocode();
+  }, [activeOrg, hasOrgLocation]);
+  
+  // Create selfTechnician for PERSONAL org providers
+  const selfTechnician: Technician | null = useMemo(() => {
+    if (!user || !isPersonalOrg || !isProviderAccount || (!hasOrgLocation && !orgGeocodedCoords)) {
+      return null;
+    }
+    return {
+      id: user.id,
+      userId: user.id,
+      orgMemberId: activeMembership?.id || user.id,
+      orgId: organizationId || activeMembership?.orgId || activeOrg?.id || user.organizationId || "",
+      memberId: activeMembership?.id,
+      organizationId: activeOrg?.id,
+      role: "TECHNICIAN",
+      name: user.name || "Me",
+      email: user.email || "",
+      phone: (activeOrg as any)?.phone || "",
+      isIndependent: true,
+      companyId: undefined,
+      companyName: undefined,
+      homeLocation: {
+        lat: (hasOrgLocation ? orgLat : orgGeocodedCoords?.lat) as number,
+        lng: (hasOrgLocation ? orgLng : orgGeocodedCoords?.lng) as number,
+        address: {
+          street: (activeOrg as any)?.addressLine1 || "",
+          city: (activeOrg as any)?.city || "",
+          stateProvince: (activeOrg as any)?.region || "",
+          country: (activeOrg as any)?.countryCode || "",
+          postalCode: (activeOrg as any)?.postalCode || "",
+        },
+      },
+      availability: [],
+      reliability: {
+        totalJobs: 0,
+        noShows: 0,
+        lateDeliveries: 0,
+        onTimeRate: 0,
+        averageDeliveryTime: 0,
+      },
+      skills: {
+        residential: 0,
+        commercial: 0,
+        aerial: 0,
+        twilight: 0,
+        video: 0,
+      },
+      rating: {
+        overall: 0,
+        count: 0,
+        recent: [],
+      },
+      preferredClients: [],
+      status: "active",
+      createdAt: new Date(),
+      avatar: user.avatarUrl,
+      bio: "",
+      services: {
+        photography: true,
+        video: false,
+        aerial: false,
+        floorplan: false,
+        measurement: false,
+        twilight: false,
+        editing: false,
+        virtualStaging: false,
+      },
+      portfolio: [],
+      certifications: [],
+    };
+  }, [user, isPersonalOrg, isProviderAccount, hasOrgLocation, orgGeocodedCoords, activeMembership, organizationId, activeOrg, orgLat, orgLng]);
+
   const technicians = useMemo(
     () => providers.filter((p) => p.role === "TECHNICIAN"),
     [providers]
@@ -50,19 +164,18 @@ export default function DashboardPage() {
     if (!user) return null;
     return providers.find((provider) => provider.userId === user.id) || null;
   }, [providers, user]);
-  const activeMembership = memberships.find((m) => m.orgId === organizationId);
   const roleUpper = (
     (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
   ).toUpperCase();
   const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
+  
   const assignedJobs = useMemo(() => {
     if (!user) return [];
     return jobManagement.jobs.filter(
-      (job) =>
-        job.assignedTechnicianId === user.id ||
-        job.assignedTechnicianId === user.id
+      (job) => job.assignedTechnicianId === user.id
     );
   }, [jobManagement.jobs, user]);
+  
   const assignedJobStats = useMemo(() => {
     const upcomingJobs = assignedJobs.filter(
       (job) => job.status === "assigned" || job.status === "pending"
@@ -81,8 +194,8 @@ export default function DashboardPage() {
     };
   }, [assignedJobs, providerProfile]);
 
-  const effectiveRole = getEffectiveOrgRole(user, memberships, organizationId);
-  const shouldFetchMetrics = isCompanyRole(effectiveRole);
+  // Only fetch metrics for company orgs
+  const shouldFetchMetrics = uiContext?.showSidebar ?? false;
 
   const {
     metrics,
@@ -255,7 +368,7 @@ export default function DashboardPage() {
     return <DashboardLoadingSkeleton />;
   }
 
-  if (!user) {
+  if (!user || !uiContext) {
     return null; // Redirect handled by hook
   }
 
@@ -263,141 +376,34 @@ export default function DashboardPage() {
     return <DashboardLoadingSkeleton />;
   }
 
-  // Role-based rendering
-  const userRole = effectiveRole;
+  // Role-based rendering using UIContext
+  const { showSidebar, accountType, orgType, isElevatedRole } = uiContext;
 
-  // Company/Admin/Project Manager/Editor: Use CompanyDashboardView
-  if (isCompanyRole(userRole)) {
-    const displayMetrics = metrics ?? emptyMetrics;
-    const handleViewRankings = jobManagement.openRankings;
-    const handleJobAssign = jobManagement.assignJob;
-    const handleJobSelect = jobManagement.toggleJobSelection;
-    const handleJobClick = jobManagement.openTaskView;
-    const handleFullScreen = jobManagement.openTaskDialog;
-    const handleTaskDialogClose = jobManagement.handleTaskDialogClose;
-    const handleOpenInNewPage = () => {
-      if (jobManagement.selectedJob) {
-        router.push(`/jobs/${jobManagement.selectedJob.id}`);
-      }
-    };
-    const handleTaskViewClose = jobManagement.handleTaskViewClose;
-    const handleNavigateToJobsView = navigation.navigateToJobsView;
-    const handleNavigateToMapView = navigation.navigateToMapView;
-    const handleNavigateToCalendarView = navigation.navigateToCalendarView;
-    const handleNavigateToJobInProjectManagement = (job: JobRequest) => {
-      jobManagement.selectJob(job);
-      navigation.navigateToJobInProjectManagement(job);
-    };
+  // AGENT in PERSONAL or TEAM org: Show AgentJobsView (job cards with tabs)
+  if (accountType === "AGENT" && !showSidebar) {
+    // Filter to only jobs where the agent is the project manager, creator, or customer
+    const agentJobs = jobManagement.jobCards.filter(
+      (job) =>
+        job.projectManagerId === user.id ||
+        job.createdBy === user.id ||
+        job.customerId === user.id
+    );
 
     return (
-      <div className="size-full overflow-x-hidden space-y-6">
-        {metricsError && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Unable to load metrics</AlertTitle>
-            <AlertDescription className="flex items-center justify-between gap-4">
-              <span>{metricsError.message}</span>
-              <Button variant="secondary" size="sm" onClick={refetchMetrics}>
-                Retry
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <JobDataBoundary fallback={<DashboardLoadingSkeleton />}>
-          {metricsLoading && !metrics ? (
-            <DashboardLoadingSkeleton />
-          ) : (
-            <CompanyDashboardView
-              jobs={jobManagement.jobs}
-              technicians={technicians}
-              metrics={displayMetrics}
-              selectedJob={jobManagement.selectedJob}
-              onViewRankings={handleViewRankings}
-              onSelectJob={handleJobSelect}
-              onNavigateToJobsView={handleNavigateToJobsView}
-              onNavigateToMapView={handleNavigateToMapView}
-              onNavigateToCalendarView={handleNavigateToCalendarView}
-              onNavigateToJobInProjectManagement={
-                handleNavigateToJobInProjectManagement
-              }
-              onJobAssign={handleJobAssign}
-              onJobClick={handleJobClick}
-            />
-          )}
-        </JobDataBoundary>
-
-        {/* Job Task View - Sheet */}
-        <JobTaskView
-          job={jobManagement.selectedJob}
-          // technician={undefined}
-          messages={
-            jobManagement.selectedJob
-              ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
-              : []
-          }
-          currentUserId={user?.id || "current-user-id"}
-          currentUserName={user?.name || "Current User"}
-          isClient={false}
-          open={jobManagement.showTaskView}
-          onOpenChange={handleTaskViewClose}
-          onSendMessage={(content, channel, threadId) =>
-            messaging.sendMessage(
-              jobManagement.selectedJob?.id || "",
-              content,
-              channel,
-              threadId
-            )
-          }
-          onEditMessage={(messageId, content) =>
-            messaging.editMessage(messageId, content)
-          }
-          onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
-          onStatusChange={() => {}}
-          onAssignTechnician={jobManagement.handleAssignTechnician}
-          onChangeTechnician={jobManagement.handleChangeTechnician}
-          variant="sheet"
-          onFullScreen={handleFullScreen}
-          onOpenInNewPage={handleOpenInNewPage}
-        />
-
-        {/* Job Task View - Dialog (Full Screen) */}
-        <JobTaskView
-          job={jobManagement.selectedJob}
-          // technician={undefined}
-          messages={
-            jobManagement.selectedJob
-              ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
-              : []
-          }
-          currentUserId={user?.id || "current-user-id"}
-          currentUserName={user?.name || "Current User"}
-          isClient={false}
-          open={jobManagement.showTaskDialog}
-          onOpenChange={handleTaskDialogClose}
-          onSendMessage={(content, channel, threadId) =>
-            messaging.sendMessage(
-              jobManagement.selectedJob?.id || "",
-              content,
-              channel,
-              threadId
-            )
-          }
-          onEditMessage={(messageId, content) =>
-            messaging.editMessage(messageId, content)
-          }
-          onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
-          onStatusChange={() => {}}
-          onAssignTechnician={jobManagement.handleAssignTechnician}
-          onChangeTechnician={jobManagement.handleChangeTechnician}
-          variant="dialog"
+      <div className="size-full overflow-x-hidden">
+        <AgentJobsView
+          jobs={agentJobs}
+          technicians={technicians}
+          organizationId={user.organizationId || ""}
+          onNewJobClick={() => router.push("/booking")}
         />
       </div>
     );
   }
 
-  // Technician/Technician: Use ProviderDashboardView
-  if (userRole === "TECHNICIAN") {
+  // PROVIDER in PERSONAL org OR non-elevated role (TECHNICIAN/EDITOR) in COMPANY org:
+  // Show ProviderDashboardView with their assigned jobs only
+  if ((accountType === "PROVIDER" || accountType === "COMPANY") && !showSidebar) {
     const handleJobClick = jobManagement.openTaskView;
     const handleJobSelect = jobManagement.toggleJobSelection;
     const handleFullScreen = jobManagement.openTaskDialog;
@@ -409,16 +415,9 @@ export default function DashboardPage() {
     };
     const handleTaskViewClose = jobManagement.handleTaskViewClose;
 
-    // Navigation handlers
-    const handleNavigateToJobsView = () => {
-      router.push("/jobs/all-jobs");
-    };
-    const handleNavigateToMapView = () => {
-      router.push("/map");
-    };
-    const handleNavigateToCalendarView = () => {
-      router.push("/calendar");
-    };
+    const handleNavigateToJobsView = () => router.push("/jobs/all-jobs");
+    const handleNavigateToMapView = () => router.push("/map");
+    const handleNavigateToCalendarView = () => router.push("/calendar");
     const handleNavigateToJobInProjectManagement = (job: JobRequest) => {
       jobManagement.selectJob(job);
       router.push(`/jobs/${job.id}`);
@@ -426,7 +425,6 @@ export default function DashboardPage() {
 
     return (
       <div className="size-full overflow-x-hidden space-y-6">
-        {/* Provider Dashboard View */}
         <JobDataBoundary fallback={<DashboardLoadingSkeleton />}>
           <ProviderDashboardView
             jobs={assignedJobs}
@@ -437,11 +435,10 @@ export default function DashboardPage() {
             onNavigateToJobsView={handleNavigateToJobsView}
             onNavigateToMapView={handleNavigateToMapView}
             onNavigateToCalendarView={handleNavigateToCalendarView}
-            onNavigateToJobInProjectManagement={
-              handleNavigateToJobInProjectManagement
-            }
+            onNavigateToJobInProjectManagement={handleNavigateToJobInProjectManagement}
             onJobClick={handleJobClick}
             currentUserId={user?.id}
+            selfTechnicianOverride={selfTechnician}
           />
         </JobDataBoundary>
 
@@ -496,7 +493,6 @@ export default function DashboardPage() {
         {/* Job Task View - Dialog (Full Screen) */}
         <JobTaskView
           job={jobManagement.selectedJob}
-          // technician={undefined}
           messages={
             jobManagement.selectedJob
               ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
@@ -543,23 +539,133 @@ export default function DashboardPage() {
     );
   }
 
-  // Agent: Use AgentJobsView (their dashboard is essentially the jobs list)
-  if (userRole === "AGENT") {
-    const technicianList = technicians;
+  // COMPANY org: Show CompanyDashboardView (with sidebar)
+  if (showSidebar) {
+    const displayMetrics = metrics ?? emptyMetrics;
+    const handleViewRankings = jobManagement.openRankings;
+    const handleJobAssign = jobManagement.assignJob;
+    const handleJobSelect = jobManagement.toggleJobSelection;
+    const handleJobClick = jobManagement.openTaskView;
+    const handleFullScreen = jobManagement.openTaskDialog;
+    const handleTaskDialogClose = jobManagement.handleTaskDialogClose;
+    const handleOpenInNewPage = () => {
+      if (jobManagement.selectedJob) {
+        router.push(`/jobs/${jobManagement.selectedJob.id}`);
+      }
+    };
+    const handleTaskViewClose = jobManagement.handleTaskViewClose;
+    const handleNavigateToJobsView = navigation.navigateToJobsView;
+    const handleNavigateToMapView = navigation.navigateToMapView;
+    const handleNavigateToCalendarView = navigation.navigateToCalendarView;
+    const handleNavigateToJobInProjectManagement = (job: JobRequest) => {
+      jobManagement.selectJob(job);
+      navigation.navigateToJobInProjectManagement(job);
+    };
 
     return (
-      <div className="size-full overflow-x-hidden">
-        <AgentJobsView
-          jobs={jobManagement.jobCards}
-          technicians={technicianList}
-          organizationId={user.organizationId || ""}
-          onNewJobClick={() => router.push("/booking")}
+      <div className="size-full overflow-x-hidden space-y-6">
+        {metricsError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Unable to load metrics</AlertTitle>
+            <AlertDescription className="flex items-center justify-between gap-4">
+              <span>{metricsError.message}</span>
+              <Button variant="secondary" size="sm" onClick={refetchMetrics}>
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <JobDataBoundary fallback={<DashboardLoadingSkeleton />}>
+          {metricsLoading && !metrics ? (
+            <DashboardLoadingSkeleton />
+          ) : (
+            <CompanyDashboardView
+              jobs={jobManagement.jobs}
+              technicians={technicians}
+              metrics={displayMetrics}
+              selectedJob={jobManagement.selectedJob}
+              onViewRankings={handleViewRankings}
+              onSelectJob={handleJobSelect}
+              onNavigateToJobsView={handleNavigateToJobsView}
+              onNavigateToMapView={handleNavigateToMapView}
+              onNavigateToCalendarView={handleNavigateToCalendarView}
+              onNavigateToJobInProjectManagement={handleNavigateToJobInProjectManagement}
+              onJobAssign={handleJobAssign}
+              onJobClick={handleJobClick}
+            />
+          )}
+        </JobDataBoundary>
+
+        {/* Job Task View - Sheet */}
+        <JobTaskView
+          job={jobManagement.selectedJob}
+          messages={
+            jobManagement.selectedJob
+              ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
+              : []
+          }
+          currentUserId={user?.id || "current-user-id"}
+          currentUserName={user?.name || "Current User"}
+          isClient={false}
+          open={jobManagement.showTaskView}
+          onOpenChange={handleTaskViewClose}
+          onSendMessage={(content, channel, threadId) =>
+            messaging.sendMessage(
+              jobManagement.selectedJob?.id || "",
+              content,
+              channel,
+              threadId
+            )
+          }
+          onEditMessage={(messageId, content) =>
+            messaging.editMessage(messageId, content)
+          }
+          onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
+          onStatusChange={() => {}}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
+          variant="sheet"
+          onFullScreen={handleFullScreen}
+          onOpenInNewPage={handleOpenInNewPage}
+        />
+
+        {/* Job Task View - Dialog (Full Screen) */}
+        <JobTaskView
+          job={jobManagement.selectedJob}
+          messages={
+            jobManagement.selectedJob
+              ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
+              : []
+          }
+          currentUserId={user?.id || "current-user-id"}
+          currentUserName={user?.name || "Current User"}
+          isClient={false}
+          open={jobManagement.showTaskDialog}
+          onOpenChange={handleTaskDialogClose}
+          onSendMessage={(content, channel, threadId) =>
+            messaging.sendMessage(
+              jobManagement.selectedJob?.id || "",
+              content,
+              channel,
+              threadId
+            )
+          }
+          onEditMessage={(messageId, content) =>
+            messaging.editMessage(messageId, content)
+          }
+          onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
+          onStatusChange={() => {}}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
+          variant="dialog"
         />
       </div>
     );
   }
 
-  // Fallback: Show minimal dashboard for unknown roles
+  // Fallback: Show minimal dashboard for unknown contexts
   return (
     <div className="size-full overflow-x-hidden p-6">
       <h1 className="text-2xl font-bold mb-4">Dashboard</h1>

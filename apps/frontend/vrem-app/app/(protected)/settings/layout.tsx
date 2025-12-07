@@ -31,12 +31,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { toEffectiveRole } from "@/lib/roles";
+import { getUIContext } from "@/lib/roles";
 
 interface SettingsSection {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  /** Hide this entire section for agents in PERSONAL orgs */
+  hideForAgentPersonal?: boolean;
   items: {
     id: string;
     label: string;
@@ -64,6 +66,7 @@ const settingsSections: SettingsSection[] = [
     id: "organization",
     label: "Organization",
     icon: Building2,
+    hideForAgentPersonal: true, // Agents in PERSONAL orgs don't manage organizations
     items: [
       {
         id: "general",
@@ -95,6 +98,7 @@ const settingsSections: SettingsSection[] = [
     id: "product",
     label: "Product",
     icon: Package,
+    hideForAgentPersonal: true, // Agents in PERSONAL orgs don't manage products
     items: [
       {
         id: "features",
@@ -135,6 +139,7 @@ const settingsSections: SettingsSection[] = [
         id: "api-keys",
         label: "API Keys",
         path: "/settings/security/api-keys",
+        roles: ["OWNER", "ADMIN"], // API keys are for company admins
       },
       { id: "2fa", label: "2FA", path: "/settings/security/2fa" },
     ],
@@ -181,25 +186,6 @@ const settingsSections: SettingsSection[] = [
   },
 ];
 
-const deriveRoleFromMembership = (
-  membership: any,
-  fallback: string | undefined
-): "COMPANY" | "TECHNICIAN" | "AGENT" => {
-  if (!membership) return toEffectiveRole(fallback);
-  const orgType =
-    membership.organization?.type ||
-    (membership as any)?.organizationType ||
-    "";
-  if (orgType === "PERSONAL") return "COMPANY";
-  const roleUpper = (
-    membership.role ||
-    (membership as any)?.orgRole ||
-    fallback ||
-    ""
-  ).toUpperCase();
-  return toEffectiveRole(roleUpper);
-};
-
 export default function SettingsLayout({
   children,
 }: {
@@ -207,6 +193,14 @@ export default function SettingsLayout({
 }) {
   const pathname = usePathname();
   const { user, memberships, activeOrganizationId } = useAuth();
+  
+  // Get UI context for role-based filtering
+  const uiContext = useMemo(() => {
+    return getUIContext(user, memberships, activeOrganizationId);
+  }, [user, memberships, activeOrganizationId]);
+  
+  // Check if user is an agent in a personal org
+  const isAgentInPersonalOrg = uiContext?.accountType === 'AGENT' && uiContext?.orgType === 'PERSONAL';
 
   // Determine which section is active
   const getActiveSection = () => {
@@ -247,18 +241,27 @@ export default function SettingsLayout({
 
   const isItemAllowed = (item: SettingsSection["items"][0]) => {
     if (!item.roles) return true; // Available to all
-    if (!user) return false;
-    const membership = memberships.find(
-      (m) => m.orgId === activeOrganizationId
-    );
-    const effectiveRole =
-      deriveRoleFromMembership(membership, user.accountType) ||
-      user.accountType;
-    const normalizedRoles = item.roles.map((role) => toEffectiveRole(role));
-    return normalizedRoles.includes(toEffectiveRole(effectiveRole));
+    if (!user || !uiContext) return false;
+    
+    // For company orgs, check if user has the required role
+    if (uiContext.showSidebar) {
+      const roleUpper = (uiContext.orgRole || '').toString().toUpperCase();
+      return item.roles.some(r => r.toUpperCase() === roleUpper);
+    }
+    
+    // For personal/team orgs, agents don't have org-level permissions
+    return false;
   };
 
   const filteredSections = settingsSections
+    // First, filter out sections that should be hidden for agents in personal orgs
+    .filter((section) => {
+      if (section.hideForAgentPersonal && isAgentInPersonalOrg) {
+        return false;
+      }
+      return true;
+    })
+    // Then filter items within each section
     .map((section) => ({
       ...section,
       items: section.items.filter(isItemAllowed),

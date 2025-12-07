@@ -377,18 +377,25 @@ export default function JobsPage() {
     );
   }
 
-  // Agent: Use AgentJobsView
+  // Agent: Use AgentJobsView - filtered to only their orders
   if (userRole === "AGENT") {
     const technicianList = technicians;
+    // Filter to only jobs where the agent is the project manager or creator
+    const agentJobs = jobManagement.jobCards.filter(
+      (job) =>
+        job.projectManagerId === user.id ||
+        job.createdBy === user.id ||
+        job.customerId === user.id
+    );
 
     return (
       <div className="size-full overflow-x-hidden">
         <JobDataBoundary fallback={<JobsGridSkeleton />}>
           <AgentJobsView
-            jobs={jobManagement.jobCards}
+            jobs={agentJobs}
             technicians={technicianList}
             organizationId={user.organizationId || ""}
-            onNewJobClick={() => router.push("/booking")}
+            onNewJobClick={() => router.push("/orders/new")}
           />
         </JobDataBoundary>
       </div>

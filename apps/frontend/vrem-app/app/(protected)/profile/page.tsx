@@ -7,13 +7,21 @@ import { ProviderProfile } from "@/types";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
+import { getUIContext } from "@/lib/roles";
+import { AgentProfileView } from "@/components/features/agent/AgentProfileView";
 
 export default function ProfilePage() {
   const { user, memberships, organizationId, isLoading } = useRequireRole([
+    "AGENT",
     "PROVIDER",
     "TECHNICIAN",
     "COMPANY",
   ]);
+
+  // Get UI context to determine user type
+  const uiContext = useMemo(() => {
+    return getUIContext(user, memberships, organizationId);
+  }, [user, memberships, organizationId]);
 
   const personalOrgMembership = useMemo(
     () =>
@@ -185,6 +193,37 @@ export default function ProfilePage() {
     );
   }
 
+  // Show agent-specific profile for agents
+  if (uiContext?.accountType === "AGENT") {
+    return (
+      <div className="size-full overflow-x-hidden space-y-6">
+        <AgentProfileView
+          user={user!}
+          onSave={async (updates) => {
+            // Handle agent profile updates
+            if (personalOrgId && updates.phone) {
+              try {
+                await api.organizations.updateSettings(personalOrgId, {
+                  phone: updates.phone,
+                } as any);
+                toast.success("Profile updated");
+              } catch (error) {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : "Failed to update profile"
+                );
+              }
+            } else {
+              toast.success("Profile updated");
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Show provider profile for providers/technicians
   return (
     <div className="size-full overflow-x-hidden space-y-6">
       <ProfileEditor

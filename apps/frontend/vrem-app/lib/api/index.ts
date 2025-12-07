@@ -802,13 +802,6 @@ class ApiClient {
     },
   };
 
-  availability = {
-    // Backend availability endpoints not implemented yet (Cronofy todo)
-    check: async (_params: Record<string, any>) => {
-      throw new Error('Availability endpoints are not implemented on the backend.');
-    },
-  };
-
   payments = {
     // Payment/Stripe endpoints not implemented yet
     initiateProjectPayment: async (_projectId: string, _payload?: Record<string, any>) => {
@@ -1141,6 +1134,125 @@ class ApiClient {
         };
       }
       throw new Error('Analytics endpoints are not implemented on the backend.');
+    },
+  };
+
+  // Orders API - Create Order system
+  orders = {
+    create: async (payload: {
+      customerId?: string;
+      newCustomer?: {
+        name: string;
+        email?: string;
+        phone?: string;
+        notes?: string;
+      };
+      addressLine1: string;
+      addressLine2?: string;
+      city?: string;
+      region?: string;
+      postalCode?: string;
+      countryCode?: string;
+      lat?: number;
+      lng?: number;
+      scheduledTime: string;
+      estimatedDuration?: number;
+      mediaTypes: string[];
+      priority: 'standard' | 'rush' | 'urgent';
+      notes?: string;
+      technicianId?: string;
+      editorId?: string;
+      projectManagerId?: string;
+    }): Promise<{
+      project: Project;
+      customer: any;
+      calendarEvent: any;
+      isNewCustomer: boolean;
+    }> => {
+      if (USE_MOCK_DATA) {
+        const now = new Date();
+        return {
+          project: {
+            id: `proj-${Date.now()}`,
+            orgId: 'org-mock',
+            addressLine1: payload.addressLine1,
+            scheduledTime: new Date(payload.scheduledTime),
+            status: ProjectStatus.BOOKED,
+            createdAt: now,
+            updatedAt: now,
+          } as Project,
+          customer: payload.customerId ? { id: payload.customerId } : payload.newCustomer,
+          calendarEvent: null,
+          isNewCustomer: !payload.customerId,
+        };
+      }
+      const result = await this.request<any>('/orders/create', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return {
+        ...result,
+        project: this.normalizeProject(result.project),
+      };
+    },
+
+    list: async (): Promise<Project[]> => {
+      if (USE_MOCK_DATA) {
+        return [];
+      }
+      const orders = await this.request<any[]>('/orders');
+      return orders.map((o) => this.normalizeProject(o));
+    },
+  };
+
+  // Availability API - Check technician availability
+  availability = {
+    check: async (params: {
+      startDate: string;
+      endDate: string;
+      technicianIds?: string[];
+      duration?: number;
+    }): Promise<{
+      technicianId: string;
+      technicianName: string;
+      slots: { start: Date; end: Date; available: boolean }[];
+    }[]> => {
+      if (USE_MOCK_DATA) {
+        return [];
+      }
+      const query = new URLSearchParams({
+        startDate: params.startDate,
+        endDate: params.endDate,
+        duration: (params.duration || 60).toString(),
+      });
+      if (params.technicianIds && params.technicianIds.length > 0) {
+        query.append('technicianIds', params.technicianIds.join(','));
+      }
+      const data = await this.request<any[]>(`/availability?${query}`);
+      return data.map((t) => ({
+        ...t,
+        slots: t.slots.map((s: any) => ({
+          ...s,
+          start: new Date(s.start),
+          end: new Date(s.end),
+        })),
+      }));
+    },
+
+    checkSlot: async (params: {
+      technicianId: string;
+      scheduledTime: string;
+      duration?: number;
+    }): Promise<{ available: boolean }> => {
+      if (USE_MOCK_DATA) {
+        return { available: true };
+      }
+      const query = new URLSearchParams({
+        technicianId: params.technicianId,
+        scheduledTime: params.scheduledTime,
+        duration: (params.duration || 60).toString(),
+      });
+      return this.request<{ available: boolean }>(`/availability/check?${query}`);
     },
   };
 

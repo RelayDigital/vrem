@@ -86,7 +86,7 @@ export class ProjectsController {
   @Get(':id/messages')
   getMessages(
     @Param('id') id: string,
-    @CurrentUser() user,
+    @CurrentUser() user: AuthenticatedUser,
     @Req() req,
     @Query('channel') channel?: ProjectChatChannel,
   ) {
@@ -107,7 +107,7 @@ export class ProjectsController {
   addMessage(
     @Param('id') id: string,
     @Body() dto: CreateMessageDto,
-    @CurrentUser() user,
+    @CurrentUser() user: AuthenticatedUser,
     @Req() req,
   ) {
     const ctx = req.orgContext as OrgContext;
@@ -134,7 +134,7 @@ export class ProjectsController {
 
   // GET one project scoped to org
   @Get(':id')
-  findOne(@Param('id') id: string, @Req() req, @CurrentUser() user) {
+  findOne(@Param('id') id: string, @Req() req, @CurrentUser() user: AuthenticatedUser) {
     const ctx = req.orgContext as OrgContext;
     return this.projectsService.findOneForUser(id, ctx, user);
   }
@@ -145,16 +145,22 @@ export class ProjectsController {
     @Param('id') id: string,
     @Body() dto: AssignProjectDto,
     @Req() req,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     const ctx = req.orgContext as OrgContext;
-    return this.projectsService.assign(id, dto, ctx);
+    return this.projectsService.assign(id, dto, ctx, user);
   }
 
   // UPDATE project
   @Patch(':id')
-  updateProject(@Param('id') id: string, @Body() dto: UpdateProjectDto, @Req() req) {
+  updateProject(
+    @Param('id') id: string,
+    @Body() dto: UpdateProjectDto,
+    @Req() req,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     const ctx = req.orgContext as OrgContext;
-    return this.projectsService.update(id, dto, ctx);
+    return this.projectsService.update(id, dto, ctx, user);
   }
 
   // REMOVE
@@ -170,12 +176,13 @@ export class ProjectsController {
     @Param('id') id: string,
     @Body('technicianId') technicianId: string,
     @Req() req,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     const ctx = req.orgContext as OrgContext;
-    return this.projectsService.assignTechnician(id, technicianId, ctx);
+    return this.projectsService.assignTechnician(id, technicianId, ctx, user);
   }
 
-  // ASSIGN CUSTOMER
+  // ASSIGN CUSTOMER - Note: Only OWNER/ADMIN can change customer (not PM)
   @Patch(':id/assign-customer')
   assignCustomer(
     @Param('id') id: string,
@@ -192,9 +199,10 @@ export class ProjectsController {
     @Param('id') id: string,
     @Body('projectManagerId') projectManagerId: string,
     @Req() req,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     const ctx = req.orgContext as OrgContext;
-    return this.projectsService.assignProjectManager(id, projectManagerId, ctx);
+    return this.projectsService.assignProjectManager(id, projectManagerId, ctx, user);
   }
 
   // ASSIGN EDITOR
@@ -203,9 +211,10 @@ export class ProjectsController {
     @Param('id') id: string,
     @Body('editorId') editorId: string,
     @Req() req,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     const ctx = req.orgContext as OrgContext;
-    return this.projectsService.assignEditor(id, editorId, ctx);
+    return this.projectsService.assignEditor(id, editorId, ctx, user);
   }
 
   // SCHEDULE
@@ -214,16 +223,17 @@ export class ProjectsController {
     @Param('id') id: string,
     @Body('scheduledTime') scheduledTime: string,
     @Req() req,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     const ctx = req.orgContext as OrgContext;
-    return this.projectsService.scheduleProject(id, new Date(scheduledTime), ctx);
+    return this.projectsService.scheduleProject(id, new Date(scheduledTime), ctx, user);
   }
 
   // STATUS UPDATES
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,
-    @CurrentUser() user,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateProjectStatusDto,
     @Req() req,
   ) {

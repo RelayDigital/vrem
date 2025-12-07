@@ -157,6 +157,14 @@ import { api } from "@/lib/api";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
 import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 import { useJobManagement } from "@/context/JobManagementContext";
+import {
+  canEditProject,
+  canDeleteProject as canDeleteProjectFn,
+  canChangeProjectCustomer,
+  canWriteCustomerChat,
+  isAdmin,
+  EffectiveOrgRole,
+} from "@/lib/permissions";
 
 type MediaCategory = "image" | "video" | "floor-plan" | "3d-content" | "file";
 
@@ -243,12 +251,19 @@ export function JobTaskView({
       "") as string
   ).toUpperCase();
   const isEditorRole = orgRoleUpper === "EDITOR";
+  
+  // Get effective role for permission checks - must be defined before canViewCustomerChat
+  const effectiveOrgRole = useMemo((): EffectiveOrgRole => {
+    if (!orgRoleUpper || orgRoleUpper === '') return 'NONE';
+    // Check if it's a personal org (handled by org type, but we use PERSONAL_OWNER role)
+    return orgRoleUpper as EffectiveOrgRole;
+  }, [orgRoleUpper]);
+  
   const [activeChatTab, setActiveChatTab] = useState<"client" | "team">(
     isAgentUser ? "client" : "team"
   );
-  const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(
-    orgRoleUpper
-  );
+  // All org members can READ customer chat, but only some can WRITE
+  const canViewCustomerChat = effectiveOrgRole !== 'NONE';
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
@@ -286,46 +301,51 @@ export function JobTaskView({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+
+  // Check if user is the assigned project manager for THIS project
   const isAssignedProjectManager = useMemo(
     () => job?.projectManagerId === currentUserId,
     [currentUserId, job?.projectManagerId]
   );
 
-  const canAssignTeamMembers = useMemo(() => {
-    const orgRole = orgRoleUpper;
-    return (
-      ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(
-        orgRole || ""
-      ) || isAssignedProjectManager
-    );
-  }, [isAssignedProjectManager, orgRoleUpper]);
-  const canAssignTechnicianOrEditor = canAssignTeamMembers;
+  // Permission: Can edit this project (assign tech/editor, change schedule, status, notes)
+  // OWNER/ADMIN can edit any project, PROJECT_MANAGER can only edit their assigned projects
+  const canEditThisProject = useMemo(() => {
+    const projectForPermission = job ? {
+      projectManagerId: job.projectManagerId ?? null,
+    } : null;
+    return canEditProject(effectiveOrgRole, projectForPermission, currentUserId);
+  }, [effectiveOrgRole, job?.projectManagerId, currentUserId]);
+
+  // Permission: Can assign technician/editor to this project
+  const canAssignTechnicianOrEditor = canEditThisProject;
+  
+  // Permission: Can assign project manager (only OWNER/ADMIN)
   const canAssignProjectManager = useMemo(() => {
-    const orgRole = orgRoleUpper;
-    return ["OWNER", "ADMIN"].includes(orgRole || "");
-  }, [orgRoleUpper]);
-  const canAssign = canAssignTeamMembers;
+    return isAdmin(effectiveOrgRole);
+  }, [effectiveOrgRole]);
+  
+  // Permission: Can assign team members (same as edit)
+  const canAssignTeamMembers = canEditThisProject;
+  const canAssign = canEditThisProject;
+  
+  // Permission: Can change customer on this project (only OWNER/ADMIN)
   const canAssignCustomer = useMemo(() => {
-    const orgRole = orgRoleUpper;
-    return ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(orgRole || "");
-  }, [orgRoleUpper]);
+    return canChangeProjectCustomer(effectiveOrgRole);
+  }, [effectiveOrgRole]);
+  
+  // Permission: Can delete this project (only OWNER/ADMIN, never PROJECT_MANAGER)
   const canDeleteProject = useMemo(() => {
-    const orgRole = orgRoleUpper;
-    if (orgRole === "EDITOR") {
-      return false;
-    }
-    const isElevated = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(orgRole);
-    const isAgentCreator =
-      orgRole === "AGENT" &&
-      job?.projectManagerId &&
-      job.projectManagerId === currentUserId;
-    return isElevated || isAgentCreator || isAssignedProjectManager;
-  }, [
-    currentUserId,
-    isAssignedProjectManager,
-    job?.projectManagerId,
-    orgRoleUpper,
-  ]);
+    return canDeleteProjectFn(effectiveOrgRole);
+  }, [effectiveOrgRole]);
+
+  // Permission: Can write to customer chat (OWNER/ADMIN or assigned PM)
+  const canWriteToCustomerChat = useMemo(() => {
+    const projectForPermission = job ? {
+      projectManagerId: job.projectManagerId ?? null,
+    } : null;
+    return canWriteCustomerChat(effectiveOrgRole, projectForPermission, currentUserId);
+  }, [effectiveOrgRole, job?.projectManagerId, currentUserId]);
   const getInitials = (value?: string | null) =>
     value
       ? value
@@ -823,6 +843,13 @@ export function JobTaskView({
 
     const effectiveChatTab = isAgentUser ? "client" : activeChatTab;
     const channel = effectiveChatTab === "client" ? "CUSTOMER" : "TEAM";
+    
+    // Check write permission for customer chat
+    if (channel === "CUSTOMER" && !canWriteToCustomerChat) {
+      toast.error("You don't have permission to send messages in customer chat");
+      return;
+    }
+    
     onSendMessage(htmlContent, channel, replyingTo?.id);
     messageEditor.commands.clearContent();
     setReplyingTo(null);
@@ -835,6 +862,7 @@ export function JobTaskView({
     replyingTo,
     isAgentUser,
     sanitizeMessageHtml,
+    canWriteToCustomerChat,
   ]);
 
   const handleEdit = useCallback((message: ChatMessage) => {
@@ -2451,17 +2479,29 @@ export function JobTaskView({
                 )}
 
                 {/* Comment Button */}
-                <Button
-                  onClick={handleSend}
-                  disabled={
-                    !messageEditor ||
-                    !hasEditorContent ||
-                    (isClient && activeChatTab === "team")
-                  }
-                  className="h-[34px] px-[18px] rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="text-sm font-medium">Comment</span>
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        onClick={handleSend}
+                        disabled={
+                          !messageEditor ||
+                          !hasEditorContent ||
+                          (isClient && activeChatTab === "team") ||
+                          (activeChatTab === "client" && !canWriteToCustomerChat)
+                        }
+                        className="h-[34px] px-[18px] rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="text-sm font-medium">Comment</span>
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {activeChatTab === "client" && !canWriteToCustomerChat && (
+                    <TooltipContent>
+                      <p>You can only write to customer chat on projects you manage</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               </div>
             </div>
           </div>

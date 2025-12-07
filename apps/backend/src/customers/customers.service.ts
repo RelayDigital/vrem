@@ -12,20 +12,30 @@ export class CustomersService {
     private authorization: AuthorizationService,
   ) {}
 
+  /**
+   * Ensure user can manage customers (create/edit/delete).
+   * Only OWNER and ADMIN can manage customers at the CRM level.
+   * PROJECT_MANAGER is intentionally excluded - customer data is commercial, not operational.
+   */
   private ensureCanManage(ctx: OrgContext, user: AuthenticatedUser) {
-    const allowed = [
-      'PERSONAL_OWNER',
-      'OWNER',
-      'ADMIN',
-      'PROJECT_MANAGER',
-    ];
-    if (!allowed.includes(ctx.effectiveRole)) {
+    if (!this.authorization.canManageCustomers(ctx, user)) {
       throw new ForbiddenException('You are not allowed to manage customers');
     }
   }
 
+  /**
+   * Ensure user can view customers (read-only access).
+   * OWNER, ADMIN, and PROJECT_MANAGER can view customers for project context.
+   */
+  private ensureCanView(ctx: OrgContext, user: AuthenticatedUser) {
+    if (!this.authorization.canViewCustomers(ctx, user)) {
+      throw new ForbiddenException('You are not allowed to view customers');
+    }
+  }
+
   async listForOrg(ctx: OrgContext, user: AuthenticatedUser, search?: string) {
-    this.ensureCanManage(ctx, user);
+    // PROJECT_MANAGER can view customers for project context, but not edit them
+    this.ensureCanView(ctx, user);
     const orgId = ctx.org.id;
     const customers = await this.prisma.organizationCustomer.findMany({
       where: {
@@ -75,16 +85,17 @@ export class CustomersService {
   }
 
   async create(ctx: OrgContext, user: AuthenticatedUser, dto: CreateCustomerDto) {
+    // Only OWNER/ADMIN can create customers
     this.ensureCanManage(ctx, user);
     const orgId = ctx.org.id;
     // Optional: ensure linked agent user exists
     let linkedUserName: string | undefined;
     if (dto.userId) {
-      const user = await this.prisma.user.findUnique({ where: { id: dto.userId } });
-      if (!user) {
+      const linkedUser = await this.prisma.user.findUnique({ where: { id: dto.userId } });
+      if (!linkedUser) {
         throw new NotFoundException('Linked user not found');
       }
-      linkedUserName = user.name;
+      linkedUserName = linkedUser.name;
     }
 
     // If an agent is linked, always use their name; otherwise, fall back to provided name/email
@@ -111,6 +122,7 @@ export class CustomersService {
   }
 
   async update(ctx: OrgContext, user: AuthenticatedUser, customerId: string, dto: UpdateCustomerDto) {
+    // Only OWNER/ADMIN can update customers
     this.ensureCanManage(ctx, user);
     const orgId = ctx.org.id;
     await this.ensureCustomerInOrg(customerId, orgId);
@@ -127,6 +139,7 @@ export class CustomersService {
   }
 
   async delete(ctx: OrgContext, user: AuthenticatedUser, customerId: string) {
+    // Only OWNER/ADMIN can delete customers
     this.ensureCanManage(ctx, user);
     await this.ensureCustomerInOrg(customerId, ctx.org.id);
     await this.prisma.organizationCustomer.delete({ where: { id: customerId } });

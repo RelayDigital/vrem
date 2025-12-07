@@ -1,52 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
-import { api } from "@/lib/api";
-import { AgentBookingFlow } from "@/components/features/agent";
-import { useRequireRole } from "@/hooks/useRequireRole";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { JobRequest, Organization, Provider } from "@/types";
+import { useRequireRole } from "@/hooks/useRequireRole";
+import { AgentBookingFlow } from "@/components/features/agent/AgentBookingFlow";
+import { JobRequest, Technician, Organization } from "@/types";
+import { toast } from "sonner";
+import { DashboardLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
+import { api } from "@/lib/api";
 
 export default function BookingPage() {
+  const router = useRouter();
   const { user, isLoading, organizationId, memberships } = useRequireRole([
     "AGENT",
     "COMPANY",
   ]);
-  const router = useRouter();
-  const [technicians, setTechnicians] = useState<Provider[]>([]);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [preferredVendors, setPreferredVendors] = useState<string[]>([]);
-  const [, setLoadingData] = useState(false);
 
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [companies, setCompanies] = useState<Organization[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  // Fetch technicians and companies for the booking flow
   useEffect(() => {
     let cancelled = false;
 
     const loadData = async () => {
       if (!user) return;
+
       setLoadingData(true);
       try {
-        api.organizations.setActiveOrganization(user.organizationId || null);
-        const [techs, memberships] = await Promise.all([
-          fetchOrganizationTechnicians(),
-          api.organizations.listMine(),
-        ]);
-
+        // Fetch available technicians
+        const techs = await fetchOrganizationTechnicians();
         if (!cancelled) {
           setTechnicians(techs);
-          const orgs = memberships
-            .map((membership) => membership.organization)
-            .filter((org): org is Organization => Boolean(org));
-          setOrganizations(orgs);
-          setPreferredVendors([]); // Placeholder until preferred vendors API exists
+        }
+
+        // Fetch companies (organizations that can fulfill orders)
+        // For now, use empty array - this can be expanded later
+        if (!cancelled) {
+          setCompanies([]);
         }
       } catch (error) {
         console.error("Failed to load booking data:", error);
         if (!cancelled) {
           setTechnicians([]);
-          setOrganizations([]);
-          setPreferredVendors([]);
+          setCompanies([]);
         }
       } finally {
         if (!cancelled) {
@@ -61,38 +60,58 @@ export default function BookingPage() {
       cancelled = true;
     };
   }, [user]);
-  const createJobRequest = async (job: Partial<JobRequest>) => {
+
+  // Get preferred vendors (could be from user preferences or org settings)
+  const preferredVendors = useMemo(() => {
+    // For now, return empty array - can be populated from user/org settings
+    return [];
+  }, []);
+
+  const handleJobCreate = async (job: Partial<JobRequest>) => {
+    if (!user || !organizationId) {
+      toast.error("Unable to create order. Please try again.");
+      return;
+    }
+
     try {
-        const addressPayload = {
-          unparsed_address: job.propertyAddress || "",
-          latitude: job.location?.lat,
-          longitude: job.location?.lng,
-        };
-        const project = await api.projects.create({
-          address: addressPayload,
-          notes: job.requirements,
-          scheduledTime:
-            job.scheduledDate && job.scheduledTime
-            ? new Date(`${job.scheduledDate}T${job.scheduledTime}`)
-            : new Date(),
-          projectManagerId: user?.id,
-          orgId: user?.organizationId || undefined,
-        });
-      toast.success("Booking created");
-      return api.mapProjectToJobCard(project);
+      // Build scheduled time ISO string from date and time
+      const scheduledTime = job.scheduledDate && job.scheduledTime
+        ? new Date(`${job.scheduledDate}T${job.scheduledTime}`).toISOString()
+        : new Date().toISOString();
+
+      // Create the order via API - use address as addressLine1
+      const result = await api.orders.create({
+        addressLine1: job.propertyAddress || "",
+        lat: job.location?.lat,
+        lng: job.location?.lng,
+        scheduledTime,
+        mediaTypes: job.mediaType || [],
+        priority: job.priority || "standard",
+        estimatedDuration: job.estimatedDuration || 120,
+        notes: job.requirements || "",
+        // Create a new customer with the client name
+        newCustomer: {
+          name: job.clientName || user.name || "Agent Booking",
+        },
+        projectManagerId: user.id,
+      });
+
+      toast.success("Order created successfully!");
+      router.push(`/jobs/${result.project.id}`);
     } catch (error) {
-      console.error("Failed to create booking", error);
-      toast.error("Failed to create booking");
-      throw error;
+      console.error("Failed to create order:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create order"
+      );
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        Loading...
-      </div>
-    );
+  const handleCancel = () => {
+    router.push("/dashboard");
+  };
+
+  if (isLoading || loadingData) {
+    return <DashboardLoadingSkeleton />;
   }
 
   if (!user) {
@@ -100,18 +119,14 @@ export default function BookingPage() {
   }
 
   return (
-    <div className="w-full overflow-x-hidden min-h-[calc(100vh-var(--header-h))]">
+    <div className="size-full overflow-x-hidden">
       <AgentBookingFlow
         technicians={technicians}
-        companies={organizations}
+        companies={companies}
         preferredVendors={preferredVendors}
-        onJobCreate={(job) => {
-          createJobRequest(job)
-            .then(() => router.push("/jobs"))
-            .catch(() => {});
-        }}
+        onJobCreate={handleJobCreate}
         isAuthenticated={true}
-        onLoginRequired={() => {}}
+        onCancel={handleCancel}
       />
     </div>
   );

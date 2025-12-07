@@ -15,35 +15,12 @@ import { JobRequestForm } from '@/components/shared/jobs';
 import { RankingsDialog } from '@/components/features/company/dialogs';
 import { BackendHealthAlert } from '@/components/shared/BackendHealthAlert';
 import { useIsMobile } from '@/components/ui/use-mobile';
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/api';
-import { JobRequest, OrganizationMember, Project, TechnicianProfile } from '@/types';
+import { JobRequest, OrganizationMember, Project, TechnicianProfile, User } from '@/types';
 import { USE_MOCK_DATA } from '@/lib/utils';
 import { fetchOrganizationTechnicians } from '@/lib/technicians';
-
-const deriveAccountTypeFromMembership = (
-  membership: any,
-  fallback: string | undefined
-) => {
-  const normalizedFallback =
-    (fallback || '').toUpperCase() === 'COMPANY' ? 'COMPANY' : fallback;
-  if (!membership) return normalizedFallback;
-  const orgType =
-    membership?.organization?.type ||
-    membership?.organizationType ||
-    '';
-  if (orgType === 'PERSONAL') return normalizedFallback || 'PROVIDER';
-  const roleUpper = (membership.role || '').toUpperCase();
-  if (
-    ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'EDITOR'].includes(
-      roleUpper
-    )
-  ) {
-    return 'COMPANY';
-  }
-  if (roleUpper === 'AGENT') return 'AGENT';
-  return 'PROVIDER';
-};
+import { getUIContext, UIContext } from '@/lib/roles';
 
 // Layout content component that renders header, sidebar, and dialogs
 function LayoutContent({
@@ -51,11 +28,13 @@ function LayoutContent({
   user,
   memberships,
   activeOrgId,
+  uiContext,
 }: {
   children: ReactNode;
-  user: any;
-  memberships: any[];
+  user: User;
+  memberships: OrganizationMember[];
   activeOrgId: string | null;
+  uiContext: UIContext;
 }) {
   const jobCreation = useJobCreation();
   const jobManagement = useJobManagement();
@@ -92,68 +71,59 @@ function LayoutContent({
     };
   }, [activeOrgId]);
 
-  // Determine if user should see sidebar (company or elevated membership only)
-  const activeMembership = memberships.find((m: any) => m?.orgId === activeOrgId);
-  const effectiveAccountType = deriveAccountTypeFromMembership(
-    activeMembership,
-    user.accountType
-  );
-  const userForUi = { ...user, accountType: effectiveAccountType, role: effectiveAccountType };
-  const shouldShowSidebar =
-    (effectiveAccountType || '').toUpperCase() === 'COMPANY';
+  // Use UIContext for layout decisions
+  const { showSidebar, canCreateOrder, navItems, accountType } = uiContext;
+  
+  // For company org, check if user is project manager or editor (limited roles)
+  const activeMembership = memberships.find((m) => m?.orgId === activeOrgId);
   const activeRole = (
     (activeMembership?.role || (activeMembership as any)?.orgRole || '') as string
   ).toUpperCase();
-  const activeOrgType =
-    activeMembership?.organization?.type ||
-    (activeMembership as any)?.organizationType ||
-    '';
-  const isProjectManager =
-    activeRole === 'PROJECT_MANAGER' && activeOrgType !== 'PERSONAL';
-  const isEditor = activeRole === 'EDITOR' && activeOrgType !== 'PERSONAL';
-  // Determine if user can create jobs (company only, excluding project managers)
-  const canCreateJobs = shouldShowSidebar && !isProjectManager && !isEditor;
+  const isProjectManager = activeRole === 'PROJECT_MANAGER' && showSidebar;
+  const isEditor = activeRole === 'EDITOR' && showSidebar;
+  const isLimitedRole = isProjectManager || isEditor;
+  
+  // In company orgs, only OWNER and ADMIN can create jobs (not PM or Editor)
+  const canCreateJobs = showSidebar && canCreateOrder && !isLimitedRole;
 
   const jobFormContent = (
-    <>
-      <JobRequestForm
-        initialValues={jobCreation.initialValues}
-        onSubmit={jobCreation.handleJobCreate}
-      />
-    </>
+    <JobRequestForm
+      initialValues={jobCreation.initialValues}
+      onSubmit={jobCreation.handleJobCreate}
+    />
   );
 
-  // For roles with sidebar (admin/project manager/editor)
-  if (shouldShowSidebar) {
+  // For COMPANY orgs - show sidebar layout
+  if (showSidebar) {
     return (
       <SidebarProvider>
         {/* Header */}
         <div className="fixed top-0 left-0 right-0 z-50">
-          <AppHeader user={userForUi} showNewJobButton={canCreateJobs} />
+          <AppHeader 
+            user={user} 
+            showNewJobButton={canCreateJobs}
+            uiContext={uiContext}
+          />
         </div>
 
         {/* Sidebar */}
         <CompanySidebar />
 
         {/* Main Content */}
-        <SidebarInset
-          className="min-w-0 pt-header-h pb-dock-h md:pb-0!"
-        >
+        <SidebarInset className="min-w-0 pt-header-h pb-dock-h md:pb-0!">
           {children}
         </SidebarInset>
 
         {/* Mobile Menu Dock */}
-        <MobileMenuDock />
+        <MobileMenuDock uiContext={uiContext} />
 
         {/* Job Creation - Drawer on mobile, Dialog on desktop */}
-        {canCreateJobs &&
-          (isMobile ? (
+        {canCreateJobs && (
+          isMobile ? (
             <Drawer open={jobCreation.isOpen} onOpenChange={(open) => {
-              if (!open) {
-                jobCreation.closeJobCreationDialog();
-              }
+              if (!open) jobCreation.closeJobCreationDialog();
             }}>
-              <DrawerContent className="">
+              <DrawerContent>
                 <DrawerHeader className="sr-only">
                   <DrawerTitle>Create New Job</DrawerTitle>
                 </DrawerHeader>
@@ -164,9 +134,7 @@ function LayoutContent({
             </Drawer>
           ) : (
             <Dialog open={jobCreation.isOpen} onOpenChange={(open) => {
-              if (!open) {
-                jobCreation.closeJobCreationDialog();
-              }
+              if (!open) jobCreation.closeJobCreationDialog();
             }}>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
@@ -175,15 +143,14 @@ function LayoutContent({
                 {jobFormContent}
               </DialogContent>
             </Dialog>
-          ))}
+          )
+        )}
 
         {/* Rankings Dialog - For admin roles */}
         <RankingsDialog
           open={jobManagement.showRankings}
           onOpenChange={(open) => {
-            if (!open) {
-              jobManagement.closeRankings();
-            }
+            if (!open) jobManagement.closeRankings();
           }}
           selectedJob={jobManagement.selectedJob}
           technicians={USE_MOCK_DATA ? [] : technicians}
@@ -193,17 +160,17 @@ function LayoutContent({
     );
   }
 
-  // For roles without sidebar (agent, technician/technician)
+  // For PERSONAL/TEAM orgs - header-only layout
   return (
     <div className="flex h-screen w-full flex-col overflow-y-scroll">
-        {/* Header */}
-        <div className="fixed top-0 left-0 right-0 z-50">
-          <AppHeader
-            user={userForUi}
-            showNewJobButton={canCreateJobs}
-            forceShowNavigation={!shouldShowSidebar}
-          />
-        </div>
+      {/* Header with navigation */}
+      <div className="fixed top-0 left-0 right-0 z-50">
+        <AppHeader
+          user={user}
+          showNewJobButton={false}
+          uiContext={uiContext}
+        />
+      </div>
 
       {/* Main Content */}
       <main className="pt-header-h pb-dock-h md:pb-0! size-full flex-1">
@@ -211,42 +178,7 @@ function LayoutContent({
       </main>
 
       {/* Mobile Menu Dock */}
-      <MobileMenuDock />
-
-      {/* Job Creation - Only show if user can create jobs */}
-      {canCreateJobs && (
-        <>
-          {isMobile ? (
-            <Drawer open={jobCreation.isOpen} onOpenChange={(open) => {
-              if (!open) {
-                jobCreation.closeJobCreationDialog();
-              }
-            }}>
-              <DrawerContent className="">
-                <DrawerHeader className="">
-                  <DrawerTitle>Create New Job</DrawerTitle>
-                </DrawerHeader>
-                <div className="overflow-y-auto px-4 pb-4">
-                  {jobFormContent}
-                </div>
-              </DrawerContent>
-            </Drawer>
-          ) : (
-            <Dialog open={jobCreation.isOpen} onOpenChange={(open) => {
-              if (!open) {
-                jobCreation.closeJobCreationDialog();
-              }
-            }}>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Create New Job</DialogTitle>
-                </DialogHeader>
-                {jobFormContent}
-              </DialogContent>
-            </Dialog>
-          )}
-        </>
-      )}
+      <MobileMenuDock uiContext={uiContext} />
     </div>
   );
 }
@@ -263,19 +195,16 @@ export default function ProtectedLayout({
     'COMPANY',
   ]);
   const [initialProjects, setInitialProjects] = useState<Project[] | null>(null);
+  
+  // Build UIContext from user and memberships
+  const uiContext = useMemo(() => {
+    return getUIContext(user, memberships, organizationId);
+  }, [user, memberships, organizationId]);
+  
   const activeMembership = memberships.find((m) => m.orgId === organizationId);
-  const effectiveAccountType = deriveAccountTypeFromMembership(
-    activeMembership,
-    user?.accountType
-  );
-  const effectiveMemberRole = activeMembership?.orgRole || null;
-  const userForUi = {
-    ...user,
-    accountType: effectiveAccountType,
-    role: effectiveAccountType,
-  };
+  const effectiveMemberRole = (activeMembership as any)?.orgRole || activeMembership?.role || null;
 
-  // Preload projects from dashboard API (reused from agent layout)
+  // Preload projects from dashboard API
   useEffect(() => {
     const loadInitialProjects = async () => {
       if (!organizationId) return;
@@ -285,7 +214,6 @@ export default function ProtectedLayout({
         setInitialProjects(dashboardData.projects || []);
       } catch (error) {
         console.error('Failed to preload projects', error);
-        // Fallback: try to load projects directly
         try {
           const projects = await api.projects.listForCurrentUser();
           setInitialProjects(projects);
@@ -330,7 +258,7 @@ export default function ProtectedLayout({
     );
   }
 
-  if (!user) {
+  if (!user || !uiContext) {
     return null; // Redirect handled by hook
   }
 
@@ -339,13 +267,13 @@ export default function ProtectedLayout({
       defaultUserId={user?.id}
       defaultOrganizationId={organizationId || undefined}
       initialProjects={initialProjects || undefined}
-      userRole={userForUi?.accountType}
+      userRole={uiContext.accountType}
       memberRole={effectiveMemberRole}
     >
       <JobCreationProviderWrapper
         defaultUserId={user?.id}
         defaultOrganizationId={organizationId || undefined}
-        userRole={userForUi?.accountType}
+        userRole={uiContext.accountType}
       >
         <MessagingProvider
           defaultUserId={user?.id}
@@ -353,9 +281,10 @@ export default function ProtectedLayout({
         >
           <DispatcherNavigationProvider>
             <LayoutContent
-              user={userForUi}
+              user={user}
               memberships={memberships}
               activeOrgId={organizationId}
+              uiContext={uiContext}
             >
               {children}
             </LayoutContent>
@@ -368,7 +297,6 @@ export default function ProtectedLayout({
 }
 
 // Wrapper component to connect JobManagementContext with JobCreationContext
-// Reused from dispatcher/agent/technician layouts
 function JobCreationProviderWrapper({
   children,
   defaultUserId,
@@ -383,7 +311,6 @@ function JobCreationProviderWrapper({
   const jobManagement = useJobManagement();
 
   const handleCreateJob = async (job: Partial<JobRequest>): Promise<JobRequest> => {
-    // Map JobRequest (View Model) to Project (Domain)
     const projectData: Partial<Project> = {
       address: {
         unparsed_address: job.propertyAddress || "",
@@ -393,12 +320,10 @@ function JobCreationProviderWrapper({
       scheduledTime: job.scheduledDate && job.scheduledTime
         ? new Date(`${job.scheduledDate}T${job.scheduledTime}`)
         : undefined,
-      // Map other fields as needed
       notes: job.requirements,
       customerId: job.customerId,
       orgId: job.organizationId || defaultOrganizationId,
       projectManagerId: job.createdBy || (userRole === 'AGENT' ? defaultUserId : undefined),
-      // ... copy other matching fields if any
     };
 
     const newProject = await jobManagement.createJob(projectData);

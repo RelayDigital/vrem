@@ -24,9 +24,8 @@ import { format } from "date-fns";
 import { cn } from "../../../lib/utils";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { P } from "@/components/ui/typography";
-import { useRequireRole } from "@/hooks/useRequireRole";
 import { useAuth } from "@/context/auth-context";
-import { getActiveOrgRoleFromMemberships } from "@/hooks/userRoleInfo";
+import { useProjectPermissions } from "@/hooks/useProjectPermissions";
 
 interface JobCardProps {
   job: JobRequest;
@@ -127,8 +126,13 @@ export function JobCard({
     }
   };
 
-  const { memberships, activeOrganizationId } = useAuth();
-  const activeOrgRole = getActiveOrgRoleFromMemberships(memberships, activeOrganizationId);
+  // Map JobRequest fields to Project-compatible shape for permission check
+  const projectForPermissions = {
+    projectManagerId: job.projectManagerId ?? undefined,
+    technicianId: job.assignedTechnicianId ?? undefined,
+    editorId: job.editorId ?? undefined,
+  };
+  const { canAssignTechnician } = useProjectPermissions(projectForPermissions);
 
 
   const priorityConfig = getPriorityConfig(job.priority);
@@ -476,7 +480,7 @@ export function JobCard({
           </div>
 
           {/* Technician Profile Overlay or Find Technician Button */}
-          {activeOrgRole !== "EDITOR" && activeOrgRole !== "TECHNICIAN" && (
+          {canAssignTechnician && (
               <div className="flex z-10 self-center w-full">
                 {technician ? (
                   <div className="flex items-center gap-3 pl-1 pr-3 py-1 backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200 rounded-full max-w-[80%] mx-auto h-auto">

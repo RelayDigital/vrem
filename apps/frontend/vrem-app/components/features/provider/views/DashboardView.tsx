@@ -35,6 +35,8 @@ interface ProviderDashboardViewProps {
   onNavigateToJobInProjectManagement?: (job: JobRequest) => void;
   onJobClick?: (job: JobRequest) => void;
   currentUserId?: string | null;
+  /** Optional self-marker for the current provider (used in PERSONAL orgs) */
+  selfTechnicianOverride?: Technician | null;
 }
 
 export function ProviderDashboardView({
@@ -49,6 +51,7 @@ export function ProviderDashboardView({
   onNavigateToJobInProjectManagement,
   onJobClick,
   currentUserId,
+  selfTechnicianOverride,
 }: ProviderDashboardViewProps) {
   const assignedJobs = jobs.filter((j) => j.status === "assigned");
   const [currentDate] = useState(new Date());
@@ -90,11 +93,15 @@ export function ProviderDashboardView({
   );
 
   const selfTechnician = useMemo(
-    () =>
-      currentUserId
+    () => {
+      // Use override if provided (for PERSONAL org providers)
+      if (selfTechnicianOverride) return selfTechnicianOverride;
+      // Otherwise try to find in technicians list
+      return currentUserId
         ? techniciansWithLocation.find((tech) => tech.id === currentUserId)
-        : undefined,
-    [techniciansWithLocation, currentUserId]
+        : undefined;
+    },
+    [techniciansWithLocation, currentUserId, selfTechnicianOverride]
   );
 
   const calendarTechnicians =

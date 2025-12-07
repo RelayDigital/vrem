@@ -42,6 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { H2, P } from "@/components/ui/typography";
 import { api } from "@/lib/api";
 import { CustomerManagement } from "../../customer/CustomerManagement";
+import { useOrgPermissions } from "@/hooks/useProjectPermissions";
 
 interface CustomersViewProps {
   customers: Customer[];
@@ -52,6 +53,9 @@ export function CustomersView({
   customers,
   isLoading = false,
 }: CustomersViewProps) {
+  // Permission check: only OWNER/ADMIN can manage customers (create/edit/delete)
+  const { canManageCustomers } = useOrgPermissions();
+  
   const [customerList, setCustomerList] = useState<Customer[]>(customers);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -547,7 +551,8 @@ export function CustomersView({
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-4xl mb-xs">Customers</H2>
             <div className="flex gap-2">
-              {selectedCustomers.length > 0 && !isDeleting && (
+              {/* Bulk delete - only visible to users who can manage customers */}
+              {canManageCustomers && selectedCustomers.length > 0 && !isDeleting && (
                 <>
                   <P className="text-destructive self-center">
                     {selectedCustomers.length} selected
@@ -562,58 +567,65 @@ export function CustomersView({
                   </Button>
                 </>
               )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={handleImport}
-              />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="px-0"
-                    disabled={isImporting}
-                  >
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Import/Export
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleExport}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download CSV
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleExport}
-                    disabled={selectedCustomers.length === 0}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download Selected
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleImportClick}
-                    disabled={isImporting}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload CSV
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Dialog
-                open={dialogOpen}
-                onOpenChange={(open) => {
-                  setDialogOpen(open);
-                  if (!open) resetForm();
-                }}
-              >
-                <DialogTrigger asChild>
-                  <Button variant="default" className="px-0">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Customer
-                  </Button>
-                </DialogTrigger>
+              {/* Import/Export - only visible to users who can manage customers */}
+              {canManageCustomers && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    onChange={handleImport}
+                  />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="px-0"
+                        disabled={isImporting}
+                      >
+                        <FileSpreadsheet className="h-4 w-4 mr-2" />
+                        Import/Export
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handleExport}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleExport}
+                        disabled={selectedCustomers.length === 0}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Selected
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleImportClick}
+                        disabled={isImporting}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload CSV
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              )}
+              {/* Add Customer dialog - only visible to users who can manage customers */}
+              {canManageCustomers && (
+                <Dialog
+                  open={dialogOpen}
+                  onOpenChange={(open) => {
+                    setDialogOpen(open);
+                    if (!open) resetForm();
+                  }}
+                >
+                  <DialogTrigger asChild>
+                    <Button variant="default" className="px-0">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Customer
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent className="sm:max-w-lg">
                   <DialogHeader>
                     <DialogTitle>
@@ -708,18 +720,19 @@ export function CustomersView({
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+              )}
             </div>
           </div>
           <CustomerManagement
             customers={customerList}
             isLoading={isLoading}
-            onEdit={handleStartEdit}
-            onDelete={handleConfirmDeleteClick}
+            onEdit={canManageCustomers ? handleStartEdit : undefined}
+            onDelete={canManageCustomers ? handleConfirmDeleteClick : undefined}
             deletingId={deletingId}
             isDeleting={isDeleting}
-            selectedIds={selectedIds}
-            onToggleSelect={handleToggleSelect}
-            onToggleSelectAll={handleToggleSelectAll}
+            selectedIds={canManageCustomers ? selectedIds : []}
+            onToggleSelect={canManageCustomers ? handleToggleSelect : undefined}
+            onToggleSelectAll={canManageCustomers ? handleToggleSelectAll : undefined}
           />
         </div>
       </article>

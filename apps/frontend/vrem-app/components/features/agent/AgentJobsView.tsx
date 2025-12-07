@@ -228,9 +228,9 @@ export function AgentJobsView({
         <div className="@container w-full mt-md mb-md">
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-4xl mb-xs">My Jobs</H2>
-            <Button variant="default" className="px-0" onClick={onNewJobClick}>
+            <Button variant="default" onClick={onNewJobClick}>
               <Plus className="h-4 w-4 mr-2" />
-              New Booking
+              Create Order
             </Button>
           </div>
           <div className="@container w-full mb-md">
@@ -300,7 +300,7 @@ export function AgentJobsView({
                   emptyTitle="No jobs yet"
                   emptyDescription="Create your first booking to get started"
                   emptyAction={{
-                    label: "Create Booking",
+                    label: "Create Order",
                     onClick: onNewJobClick,
                   }}
                   itemsPerPage={12}
