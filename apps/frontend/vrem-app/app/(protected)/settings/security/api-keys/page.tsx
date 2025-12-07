@@ -14,13 +14,11 @@ import { Label } from "@/components/ui/label";
 
 export default function SecurityApiKeysPage() {
   const { user, isLoading } = useRequireRole([
-    "dispatcher",
-    "DISPATCHER",
+    "COMPANY",
     "PROJECT_MANAGER",
   ]);
   const { isAllowed } = useRoleGuard([
-    "dispatcher",
-    "DISPATCHER",
+    "COMPANY",
     "PROJECT_MANAGER",
   ]);
 
@@ -60,4 +58,3 @@ export default function SecurityApiKeysPage() {
     </SettingsRightContentSection>
   );
 }
-

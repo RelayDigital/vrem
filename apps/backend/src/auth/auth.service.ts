@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { OrgRole, OrgType, UserAccountType } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { AuthenticatedUser } from './auth-context';
 
 @Injectable()
 export class AuthService {
@@ -82,10 +83,7 @@ export class AuthService {
       },
     });
 
-    // Auto-create personal organization for technicians
-    if (role === UserAccountType.PROVIDER) {
-      await this.ensurePersonalOrganization(user.id, name);
-    }
+    await this.ensurePersonalOrganization(user.id, name);
 
     // Create JWT
     const token = this.jwtService.sign({
@@ -110,9 +108,7 @@ export class AuthService {
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
     // Ensure technicians have exactly one personal org
-    if (user.accountType === UserAccountType.PROVIDER) {
-      await this.ensurePersonalOrganization(user.id, user.name);
-    }
+    await this.ensurePersonalOrganization(user.id, user.name);
 
     const token = this.jwtService.sign({ sub: user.id, role: user.accountType });
 
@@ -132,8 +128,29 @@ export class AuthService {
     };
   }
 
-  async validateUser(userId: string) {
-    return this.prisma.user.findUnique({ where: { id: userId } });
+  async validateUser(userId: string): Promise<AuthenticatedUser | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        accountType: true,
+      },
+    });
+
+    if (!user) return null;
+
+    const personalOrg = await this.prisma.organizationMember.findFirst({
+      where: { userId, organization: { type: OrgType.PERSONAL } },
+      select: { orgId: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return {
+      ...user,
+      personalOrgId: personalOrg?.orgId || null,
+    };
   }
 
   async me(userId: string) {

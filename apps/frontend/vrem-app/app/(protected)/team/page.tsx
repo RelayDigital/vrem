@@ -11,8 +11,7 @@ import { fetchOrganizationTechnicians } from "@/lib/technicians";
 
 export default function TeamPage() {
   const { user, isLoading, isAllowed } = useRoleGuard([
-    "dispatcher",
-    "DISPATCHER",
+    "COMPANY",
     "PROJECT_MANAGER",
   ]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);

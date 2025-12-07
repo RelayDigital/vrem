@@ -5,47 +5,63 @@ import {
   Get,
   Param,
   Post,
+  Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { SendMessageDto } from './dto/send-message.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { UserAccountType } from '@prisma/client';
-
-type CurrentUserType = {
-  id: string;
-  accountType: UserAccountType;
-};
+import { OrgContextGuard } from '../auth/org-context.guard';
+import type { AuthenticatedUser, OrgContext } from '../auth/auth-context';
+import { ProjectChatChannel } from '@prisma/client';
 
 @Controller('messages')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard)
 export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}
 
   @Post()
   async sendMessage(
-    @CurrentUser() user: CurrentUserType,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req,
     @Body() dto: SendMessageDto,
   ) {
-    return this.messagesService.sendMessage(user.id, dto);
+    const ctx = req.orgContext as OrgContext;
+    return this.messagesService.sendMessage(ctx, user, dto);
   }
 
   @Get('project/:projectId')
-  async getMessagesForProject(@Param('projectId') projectId: string) {
-    return this.messagesService.getMessagesForProject(projectId);
+  async getMessagesForProject(
+    @Param('projectId') projectId: string,
+    @Req() req,
+    @Query('channel') channel?: ProjectChatChannel,
+  ) {
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    return this.messagesService.getMessagesForProject(
+      ctx,
+      user,
+      projectId,
+      channel,
+    );
   }
 
   @Get(':id')
-  async getMessageById(@Param('id') id: string) {
-    return this.messagesService.getMessageById(id);
+  async getMessageById(@Param('id') id: string, @Req() req) {
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    return this.messagesService.getMessageById(ctx, user, id);
   }
 
   @Delete(':id')
   async deleteMessage(
     @Param('id') id: string,
-    @CurrentUser() user: CurrentUserType,
+    @Req() req,
   ) {
-    return this.messagesService.deleteMessage(id, user);
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    return this.messagesService.deleteMessage(id, ctx, user);
   }
 }

@@ -1,8 +1,7 @@
-import { JwtAuthGuard } from './auth/jwt-auth.guard';
-import { RolesGuard } from './auth/roles.guard';
-import { Reflector } from '@nestjs/core';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { OrgContextGuard } from './auth/org-context.guard';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -12,8 +11,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const reflector = app.get(Reflector);
-  app.useGlobalGuards(app.get(JwtAuthGuard), app.get(RolesGuard));
+  app.useGlobalGuards(app.get(JwtAuthGuard), app.get(OrgContextGuard));
 
   await app.listen(process.env.PORT ?? 3001);
 }

@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { toEffectiveRole } from "@/lib/roles";
 
 interface SettingsSection {
   id: string;
@@ -183,25 +184,20 @@ const settingsSections: SettingsSection[] = [
 const deriveRoleFromMembership = (
   membership: any,
   fallback: string | undefined
-) => {
-  const normalizedFallback =
-    (fallback || "").toUpperCase() === "COMPANY" ? "DISPATCHER" : fallback;
-  if (!membership) return normalizedFallback;
+): "COMPANY" | "TECHNICIAN" | "AGENT" => {
+  if (!membership) return toEffectiveRole(fallback);
   const orgType =
     membership.organization?.type ||
     (membership as any)?.organizationType ||
     "";
-  if (orgType === "PERSONAL") return "DISPATCHER";
-  const roleUpper = (membership.role || "").toUpperCase();
-  if (
-    ["OWNER", "ADMIN", "DISPATCHER", "PROJECT_MANAGER", "EDITOR"].includes(
-      roleUpper
-    )
-  ) {
-    return "DISPATCHER";
-  }
-  if (roleUpper === "AGENT") return "AGENT";
-  return "TECHNICIAN";
+  if (orgType === "PERSONAL") return "COMPANY";
+  const roleUpper = (
+    membership.role ||
+    (membership as any)?.orgRole ||
+    fallback ||
+    ""
+  ).toUpperCase();
+  return toEffectiveRole(roleUpper);
 };
 
 export default function SettingsLayout({
@@ -258,7 +254,8 @@ export default function SettingsLayout({
     const effectiveRole =
       deriveRoleFromMembership(membership, user.accountType) ||
       user.accountType;
-    return item.roles.includes(effectiveRole);
+    const normalizedRoles = item.roles.map((role) => toEffectiveRole(role));
+    return normalizedRoles.includes(toEffectiveRole(effectiveRole));
   };
 
   const filteredSections = settingsSections

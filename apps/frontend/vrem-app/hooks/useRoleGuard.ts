@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from '@/types';
 import { useAuth } from '@/context/auth-context';
+import { EffectiveRole, getEffectiveOrgRole, toEffectiveRole } from '@/lib/roles';
 
 interface UseRoleGuardOptions {
   /**
@@ -24,47 +25,6 @@ interface UseRoleGuardReturn {
   isLoading: boolean;
   isAllowed: boolean;
 }
-
-type NormalizedRole = 'DISPATCHER' | 'TECHNICIAN' | 'AGENT';
-
-// Map backend role names to frontend role names (for normalization)
-// Same mapping as useRequireRole for consistency
-const roleMap: Record<string, NormalizedRole> = {
-  COMPANY: 'DISPATCHER',
-  DISPATCHER: 'DISPATCHER',
-  PROVIDER: 'TECHNICIAN',
-  TECHNICIAN: 'TECHNICIAN',
-  AGENT: 'AGENT',
-  // Legacy/old mappings to new roles
-  ADMIN: 'DISPATCHER',
-  PROJECT_MANAGER: 'DISPATCHER',
-  EDITOR: 'DISPATCHER',
-  company: 'DISPATCHER',
-  dispatcher: 'DISPATCHER',
-  provider: 'TECHNICIAN',
-  technician: 'TECHNICIAN',
-  agent: 'AGENT',
-  admin: 'DISPATCHER',
-  project_manager: 'DISPATCHER',
-  editor: 'DISPATCHER',
-};
-
-const mapMembershipToEffectiveRole = (
-  membership: any | undefined,
-  fallback: NormalizedRole
-): NormalizedRole => {
-  if (!membership) return fallback;
-  const orgType =
-    membership.organization?.type || membership.organizationType || '';
-  if (orgType === 'PERSONAL') return 'DISPATCHER';
-  const role = (membership.role || '').toUpperCase();
-  if (
-    ['OWNER', 'ADMIN', 'DISPATCHER', 'PROJECT_MANAGER', 'EDITOR'].includes(role)
-  ) {
-    return 'DISPATCHER';
-  }
-  return 'TECHNICIAN';
-};
 
 /**
  * Hook to guard routes based on user roles
@@ -92,18 +52,12 @@ export function useRoleGuard(
     }
 
     // Normalize role names (handle both backend and frontend role formats)
-    const normalizedRequiredRoles = requiredRoles.map(role =>
-      roleMap[role] || (role as NormalizedRole)
+    const normalizedRequiredRoles = requiredRoles.map((role) =>
+      toEffectiveRole(role),
     );
-    const normalizedUserRole: NormalizedRole =
-      roleMap[user.accountType] || 'AGENT';
-    const activeMembership = memberships.find(
-      (m) => m.orgId === activeOrganizationId
-    );
-    const effectiveUserRole = mapMembershipToEffectiveRole(
-      activeMembership,
-      normalizedUserRole
-    );
+    const effectiveUserRole =
+      getEffectiveOrgRole(user, memberships, activeOrganizationId) ||
+      toEffectiveRole(user.accountType);
 
     // Check if user has one of the required roles
     const hasRequiredRole = normalizedRequiredRoles.includes(effectiveUserRole);
@@ -119,19 +73,13 @@ export function useRoleGuard(
     if (isLoading || !user) {
       return false;
     }
-    const normalizedRequiredRoles = requiredRoles.map(role =>
-      roleMap[role] || (role as NormalizedRole)
+    const normalizedRequiredRoles = requiredRoles.map((role) =>
+      toEffectiveRole(role),
     );
-    const normalizedUserRole: NormalizedRole =
-      roleMap[user.accountType] || 'AGENT';
-    const activeMembership = memberships.find(
-      (m) => m.orgId === activeOrganizationId
-    );
-    const effectiveUserRole = mapMembershipToEffectiveRole(
-      activeMembership,
-      normalizedUserRole
-    );
-    return normalizedRequiredRoles.includes(effectiveUserRole);
+    const effectiveUserRole =
+      getEffectiveOrgRole(user, memberships, activeOrganizationId) ||
+      toEffectiveRole(user.accountType);
+    return normalizedRequiredRoles.includes(effectiveUserRole as EffectiveRole);
   })();
 
   return {

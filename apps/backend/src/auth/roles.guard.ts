@@ -4,6 +4,15 @@ import { ROLES_KEY } from './roles.decorator';
 import { OrgRole, UserAccountType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
+/**
+ * @deprecated Use OrgRolesGuard instead for org-role based authorization.
+ * This guard uses User.accountType which should not be used for authorization decisions.
+ * All authorization should be based on OrganizationMember.role within the org context.
+ *
+ * Migration:
+ * - Replace `@UseGuards(RolesGuard)` with `@UseGuards(OrgContextGuard, OrgRolesGuard)`
+ * - Replace `@Roles(UserAccountType.COMPANY)` with `@OrgRoles('OWNER', 'ADMIN')`
+ */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector, private prisma: PrismaService) {}

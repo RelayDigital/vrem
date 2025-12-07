@@ -1,44 +1,41 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards, Patch, Param, Delete, Req } from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { UserAccountType } from '@prisma/client';
-import { CurrentOrg } from '../organizations/current-org.decorator';
-import { OrgMemberGuard } from '../organizations/org-member.guard';
+import { OrgContextGuard } from '../auth/org-context.guard';
+import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 
 @Controller('customers')
-@UseGuards(JwtAuthGuard, RolesGuard, OrgMemberGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard)
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
   @Get()
-  @Roles(UserAccountType.COMPANY)
-  list(@CurrentOrg() org, @Query('search') search?: string) {
-    return this.customersService.listForOrg(org.id, search);
+  list(@Req() req, @Query('search') search?: string) {
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    return this.customersService.listForOrg(ctx, user, search);
   }
 
   @Post()
-  @Roles(UserAccountType.COMPANY)
-  create(@CurrentOrg() org, @Body() dto: CreateCustomerDto) {
-    return this.customersService.create(org.id, dto);
+  create(@Req() req, @Body() dto: CreateCustomerDto) {
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    return this.customersService.create(ctx, user, dto);
   }
 
   @Patch(':id')
-  @Roles(UserAccountType.COMPANY)
-  update(
-    @CurrentOrg() org,
-    @Param('id') id: string,
-    @Body() dto: UpdateCustomerDto,
-  ) {
-    return this.customersService.update(org.id, id, dto);
+  update(@Req() req, @Param('id') id: string, @Body() dto: UpdateCustomerDto) {
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    return this.customersService.update(ctx, user, id, dto);
   }
 
   @Delete(':id')
-  @Roles(UserAccountType.COMPANY)
-  delete(@CurrentOrg() org, @Param('id') id: string) {
-    return this.customersService.delete(org.id, id);
+  delete(@Req() req, @Param('id') id: string) {
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    return this.customersService.delete(ctx, user, id);
   }
 }

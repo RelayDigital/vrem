@@ -17,23 +17,20 @@ import { CreateInviteDto } from './dto/create-invite.dto';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
-import { OrgMemberGuard } from './org-member.guard';
-import { OrgRole, UserAccountType } from '@prisma/client';
-import { Roles } from '../auth/roles.decorator';
+import type { AuthenticatedUser, OrgContext } from '../auth/auth-context';
+import { OrgContextGuard } from '../auth/org-context.guard';
 
 @Controller('organizations')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard)
 export class OrganizationsController {
   constructor(private orgs: OrganizationsService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Post()
-  @Roles(UserAccountType.COMPANY) // Only global COMPANY users can create an organization
   async createOrg(
-    @CurrentUser() user,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateOrganizationDto,
   ) {
-    return this.orgs.createOrganization(user.id, dto);
+    return this.orgs.createOrganization(user, dto);
   }
 
 
@@ -45,14 +42,18 @@ export class OrganizationsController {
   }
 
   // Invite someone into an org
-  @UseGuards(OrgMemberGuard)
   @Post(':orgId/invite')
   invite(
     @Param('orgId') orgId: string,
     @Body() dto: CreateInviteDto,
-    @CurrentUser() user,
+    @Req() req,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.orgs.createInvite(orgId, dto, user.id);
+    const ctx = req.orgContext as OrgContext;
+    if (ctx.org.id !== orgId) {
+      throw new ForbiddenException('Active organization does not match request');
+    }
+    return this.orgs.createInvite(ctx, dto, user);
   }
 
   // Accept invite
@@ -65,43 +66,38 @@ export class OrganizationsController {
   }
 
   // Get organization by ID
-  @UseGuards(OrgMemberGuard)
   @Get(':orgId')
-  getOrganization(@Param('orgId') orgId: string) {
-    return this.orgs.getOrganizationById(orgId);
+  getOrganization(@Param('orgId') orgId: string, @Req() req) {
+    const ctx = req.orgContext as OrgContext;
+    return this.orgs.getOrganizationById(orgId, ctx);
   }
 
   // List organization members (with user details)
-  @UseGuards(OrgMemberGuard)
   @Get(':orgId/members')
-  listMembers(@Param('orgId') orgId: string) {
-    return this.orgs.listOrganizationMembers(orgId);
+  listMembers(@Param('orgId') orgId: string, @Req() req) {
+    const ctx = req.orgContext as OrgContext;
+    if (ctx.org.id !== orgId) {
+      throw new ForbiddenException('Active organization does not match request');
+    }
+    return this.orgs.listOrganizationMembers(ctx);
   }
 
   // Update organization settings
-  @UseGuards(OrgMemberGuard)
   @Patch(':orgId/settings')
   updateOrganizationSettings(
     @Param('orgId') orgId: string,
     @Body() dto: UpdateOrganizationSettingsDto,
     @Req() req: any,
   ) {
-    // Check if user has OWNER or ADMIN role in the organization
-    const membership = req.membership || req.activeOrgMembership;
-    if (
-      !membership ||
-      (membership.role !== OrgRole.OWNER &&
-        membership.role !== OrgRole.ADMIN)
-    ) {
-      throw new ForbiddenException(
-        'Only OWNER and ADMIN can update organization settings',
-      );
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    if (ctx.org.id !== orgId) {
+      throw new ForbiddenException('Active organization does not match request');
     }
 
-    return this.orgs.updateOrganizationSettings(orgId, dto);
+    return this.orgs.updateOrganizationSettings(ctx, dto, user);
   }
 
-  @UseGuards(OrgMemberGuard)
   @Patch(':orgId/members/:memberId/role')
   async updateMemberRole(
     @Param('orgId') orgId: string,
@@ -109,13 +105,11 @@ export class OrganizationsController {
     @Body() dto: UpdateMemberRoleDto,
     @Req() req: any,
   ) {
-    const membership = req.membership || req.activeOrgMembership;
-    if (
-      !membership ||
-      (membership.role !== OrgRole.OWNER && membership.role !== OrgRole.ADMIN)
-    ) {
-      throw new ForbiddenException('Only OWNER and ADMIN can update member roles');
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    if (ctx.org.id !== orgId) {
+      throw new ForbiddenException('Active organization does not match request');
     }
-    return this.orgs.updateMemberRole(orgId, memberId, dto.role, membership);
+    return this.orgs.updateMemberRole(ctx, memberId, dto.role, user);
   }
 }

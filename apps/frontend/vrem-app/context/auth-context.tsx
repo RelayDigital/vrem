@@ -36,12 +36,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   const normalizeUser = (u: any): User => {
+    const normalizedType = (u.accountType || "").toUpperCase();
     const accountType =
-      (u.accountType || "").toUpperCase() === "DISPATCHER"
-        ? "COMPANY"
-        : (u.accountType || "").toUpperCase() === "TECHNICIAN"
-        ? "PROVIDER"
-        : u.accountType;
+      normalizedType === "TECHNICIAN" ? "PROVIDER" : u.accountType;
     return {
       ...u,
       accountType,

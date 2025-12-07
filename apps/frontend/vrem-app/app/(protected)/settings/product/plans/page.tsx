@@ -11,13 +11,11 @@ import { Label } from "@/components/ui/label";
 
 export default function ProductPlansPage() {
   const { user, isLoading } = useRequireRole([
-    "dispatcher",
-    "DISPATCHER",
+    "COMPANY",
     "PROJECT_MANAGER",
   ]);
   const { isAllowed } = useRoleGuard([
-    "dispatcher",
-    "DISPATCHER",
+    "COMPANY",
     "PROJECT_MANAGER",
   ]);
 
@@ -51,4 +49,3 @@ export default function ProductPlansPage() {
     </SettingsRightContentSection>
   );
 }
-

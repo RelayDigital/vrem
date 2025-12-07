@@ -32,7 +32,7 @@ export default function JobDetailPage() {
   const roleUpper = (
     (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
   ).toUpperCase();
-  const canViewCustomerChat = ["OWNER", "ADMIN", "DISPATCHER"].includes(roleUpper);
+  const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
   const [, setLoadingTechnicians] = useState(false);
 
   const jobId = params?.id as string;

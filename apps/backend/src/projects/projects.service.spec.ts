@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProjectsService } from './projects.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CronofyService } from '../cronofy/cronofy.service';
+import { AuthorizationService } from '../auth/authorization.service';
 
 describe('ProjectsService', () => {
   let service: ProjectsService;
@@ -10,6 +11,7 @@ describe('ProjectsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProjectsService,
+        AuthorizationService,
         {
           provide: PrismaService,
           useValue: {},

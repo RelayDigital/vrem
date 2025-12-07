@@ -17,11 +17,10 @@ import { SettingsRightContentSection } from "@/components/shared/settings/Settin
 
 export default function PreferencesLanguagePage() {
   const { user, isLoading } = useRequireRole([
-    "dispatcher",
+    "COMPANY",
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const [language, setLanguage] = useState("en");

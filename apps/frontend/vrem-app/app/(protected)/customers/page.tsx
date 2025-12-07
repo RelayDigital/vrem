@@ -10,7 +10,7 @@ import { api } from '@/lib/api';
 
 export default function CustomersPage() {
   const { user, isLoading, isAllowed } = useRoleGuard([
-    'dispatcher',
+    'COMPANY',
     'ADMIN',
     'PROJECT_MANAGER',
   ]);

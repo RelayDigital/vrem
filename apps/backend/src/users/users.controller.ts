@@ -13,13 +13,14 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
+import { OrgContextGuard } from '../auth/org-context.guard';
+import { OrgRolesGuard } from '../auth/org-roles.guard';
+import { OrgRoles } from '../auth/org-roles.decorator';
 import { UserAccountType } from '@prisma/client';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserAccountType.COMPANY, UserAccountType.COMPANY)
+@UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
+@OrgRoles('OWNER', 'ADMIN')
 export class UsersController {
   constructor(private usersService: UsersService) {}
 

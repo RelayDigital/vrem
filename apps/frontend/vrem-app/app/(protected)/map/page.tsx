@@ -9,18 +9,17 @@ import { MapLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSk
 import { useJobManagement } from "@/context/JobManagementContext";
 import { JobDataBoundary } from "@/components/shared/jobs";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
-import { getEffectiveOrgRole, isDispatcherRole } from "@/lib/roles";
+import { getEffectiveOrgRole, isCompanyRole } from "@/lib/roles";
 import { Organization } from "@/types";
 import { api } from "@/lib/api";
 import { geocodeAddress } from "@/lib/technicians";
 
 export default function MapPage() {
   const { user, isLoading, memberships, organizationId } = useRequireRole([
-    "dispatcher",
+    "COMPANY",
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const router = useRouter();
@@ -97,7 +96,7 @@ export default function MapPage() {
   }, [organizationId, user]);
 
   const effectiveRole = getEffectiveOrgRole(user, memberships, organizationId);
-  const dispatcherElevated = isDispatcherRole(effectiveRole);
+  const companyElevated = isCompanyRole(effectiveRole);
   const activeMembership = memberships.find((m) => m.orgId === organizationId);
   const activeOrg =
     (orgDetails as Organization | null) ||
@@ -235,8 +234,8 @@ export default function MapPage() {
 
     const userRole = effectiveRole;
 
-    // Dispatcher/Admin/Owner: Show all jobs
-    if (dispatcherElevated) {
+    // Company/Admin/Owner: Show all jobs
+    if (companyElevated) {
       return jobManagement.jobs;
     }
 
@@ -254,7 +253,7 @@ export default function MapPage() {
         job.assignedTechnicianId === user.id ||
         job.assignedTechnicianId === user.id
     );
-  }, [dispatcherElevated, effectiveRole, jobManagement.jobs, user]);
+  }, [companyElevated, effectiveRole, jobManagement.jobs, user]);
 
   // Filter technicians based on role
   const displayTechnicians = useMemo(() => {
@@ -262,8 +261,8 @@ export default function MapPage() {
 
     const userRole = effectiveRole;
 
-    // Dispatcher/Admin/Owner: show all technicians
-    if (dispatcherElevated) {
+    // Company/Admin/Owner: show all technicians
+    if (companyElevated) {
       const hasSelf = technicians.some((t) => t.id === user.id);
       if (!hasSelf && selfTechnician) {
         return [selfTechnician, ...technicians];
@@ -294,7 +293,7 @@ export default function MapPage() {
     }
     return technicians;
   }, [
-    dispatcherElevated,
+    companyElevated,
     displayJobs,
     effectiveRole,
     selfTechnician,
@@ -311,8 +310,8 @@ export default function MapPage() {
   }
 
   const userRole = effectiveRole;
-  const canAssignJobs = isDispatcherRole(userRole);
-  const isDispatcherView = canAssignJobs; // Only dispatcher roles see "Pending Assignments" language
+  const canAssignJobs = isCompanyRole(userRole);
+  const isDispatcherView = canAssignJobs; // Only org managers see "Pending Assignments" language
 
   const handleJobSelect = (job: JobRequest) => {
     if (jobManagement.selectedJob?.id === job.id) {

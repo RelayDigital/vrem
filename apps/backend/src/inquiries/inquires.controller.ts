@@ -5,53 +5,61 @@ import {
   Param,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { InquiriesService } from './inquires.service';
 import { CreateInquiryDto } from './dto/create-inquiry.dto';
 import { UpdateInquiryDto } from './dto/update-inquiry.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { UserAccountType } from '@prisma/client';
-import { CurrentOrg } from '../organizations/current-org.decorator';
+import { OrgContextGuard } from '../auth/org-context.guard';
+import { OrgRolesGuard } from '../auth/org-roles.guard';
+import { OrgRoles } from '../auth/org-roles.decorator';
+import { Public } from '../auth/public.decorator';
+import type { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 
 @Controller('inquiries')
+@UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
 export class InquiriesController {
   constructor(private readonly inquiriesService: InquiriesService) {}
 
-  // Public: leads submit inquiries
+  // Public: leads submit inquiries (no auth required)
+  @Public()
   @Post()
   createInquiry(@Body() dto: CreateInquiryDto) {
     return this.inquiriesService.createInquiry(dto);
   }
 
-  // Admin + PM only
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserAccountType.COMPANY, UserAccountType.COMPANY)
+  // OWNER, ADMIN, PROJECT_MANAGER can view inquiries
+  @OrgRoles('PERSONAL_OWNER', 'OWNER', 'ADMIN', 'PROJECT_MANAGER')
   @Get()
-  getAllInquiries() {
-    return this.inquiriesService.getAllInquiries();
+  getAllInquiries(@Req() req) {
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    return this.inquiriesService.getAllInquiries(ctx, user);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserAccountType.COMPANY, UserAccountType.COMPANY)
+  @OrgRoles('PERSONAL_OWNER', 'OWNER', 'ADMIN', 'PROJECT_MANAGER')
   @Get(':id')
-  getInquiryById(@Param('id') id: string) {
-    return this.inquiriesService.getInquiryById(id);
+  getInquiryById(@Param('id') id: string, @Req() req) {
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    return this.inquiriesService.getInquiryById(id, ctx, user);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserAccountType.COMPANY, UserAccountType.COMPANY)
+  @OrgRoles('PERSONAL_OWNER', 'OWNER', 'ADMIN', 'PROJECT_MANAGER')
   @Patch(':id')
-  updateInquiry(@Param('id') id: string, @Body() dto: UpdateInquiryDto) {
-    return this.inquiriesService.updateInquiry(id, dto);
+  updateInquiry(@Param('id') id: string, @Body() dto: UpdateInquiryDto, @Req() req) {
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    return this.inquiriesService.updateInquiry(id, dto, ctx, user);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserAccountType.COMPANY, UserAccountType.COMPANY)
+  @OrgRoles('PERSONAL_OWNER', 'OWNER', 'ADMIN', 'PROJECT_MANAGER')
   @Post(':id/convert')
-  convertToProject(@Param('id') id: string, @CurrentOrg() org: { id: string }) {
-    return this.inquiriesService.convertToProject(id, org.id);
+  convertToProject(@Param('id') id: string, @Req() req) {
+    const ctx = req.orgContext as OrgContext;
+    const user = req.user as AuthenticatedUser;
+    return this.inquiriesService.convertToProject(id, ctx, user);
   }
 }

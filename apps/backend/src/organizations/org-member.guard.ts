@@ -8,6 +8,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+/**
+ * @deprecated Use OrgContextGuard instead.
+ * OrgContextGuard loads org context and membership from x-org-id header
+ * and attaches it to req.orgContext for use by controllers and services.
+ *
+ * This guard is kept for backward compatibility but should not be used
+ * in new code.
+ */
 @Injectable()
 export class OrgMemberGuard implements CanActivate {
   private readonly logger = new Logger(OrgMemberGuard.name);

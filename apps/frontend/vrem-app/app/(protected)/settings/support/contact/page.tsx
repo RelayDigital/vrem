@@ -11,11 +11,10 @@ import { SettingsRightContentSection } from "@/components/shared/settings/Settin
 
 export default function SupportContactPage() {
   const { user, isLoading } = useRequireRole([
-    "dispatcher",
+    "COMPANY",
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const [subject, setSubject] = useState("");

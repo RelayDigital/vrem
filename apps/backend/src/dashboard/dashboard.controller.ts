@@ -1,23 +1,18 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
-import { DashboardService } from './dashboard.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import type { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { UserAccountType } from '@prisma/client';
-import { CurrentOrg } from '../organizations/current-org.decorator';
-import { OrgMemberGuard } from '../organizations/org-member.guard';
-
-type CurrentUserType = {
-  id: string;
-  accountType: UserAccountType;
-};
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OrgContextGuard } from '../auth/org-context.guard';
+import { DashboardService } from './dashboard.service';
 
 @Controller('dashboard')
-@UseGuards(JwtAuthGuard, OrgMemberGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get()
-  async getDashboard(@CurrentUser() user: CurrentUserType, @CurrentOrg() org) {
-    return this.dashboardService.getDashboardForUser(user, org?.id || null);
+  async getDashboard(@CurrentUser() user: AuthenticatedUser, @Req() req) {
+    const ctx = req.orgContext as OrgContext;
+    return this.dashboardService.getDashboardForUser(user, ctx);
   }
 }

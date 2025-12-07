@@ -10,6 +10,9 @@ import {
 import { Server, Socket } from 'socket.io';
 import { MessagesService } from './messages.service';
 import { JwtService } from '@nestjs/jwt';
+import { PrismaService } from '../prisma/prisma.service';
+import { OrgType } from '@prisma/client';
+import { AuthenticatedUser } from '../auth/auth-context';
 
 @WebSocketGateway({
   namespace: '/chat',
@@ -23,7 +26,8 @@ export class MessagesGateway
 
   constructor(
     private readonly messagesService: MessagesService,
-    private readonly jwtService: JwtService, // ← INJECT JWT SERVICE
+    private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -35,32 +39,42 @@ export class MessagesGateway
     }
 
     try {
-      const payload = this.jwtService.verify(token); // ← USE JWT SERVICE
+      const payload = this.jwtService.verify(token);
 
-      const rawRole =
-        payload.accountType ||
-        payload.account_type ||
-        payload.role ||
-        payload.account_type;
-      const roleUpper = (rawRole || '').toUpperCase();
-      const accountType =
-        roleUpper === 'AGENT'
-          ? 'AGENT'
-          : ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'DISPATCHER', 'COMPANY'].includes(
-              roleUpper,
-            )
-          ? 'COMPANY'
-          : ['TECHNICIAN', 'PROVIDER', 'EDITOR'].includes(roleUpper)
-          ? 'PROVIDER'
-          : 'PROVIDER'; // default to provider for unrecognized roles
+      // Fetch full user data from database to build AuthenticatedUser
+      const dbUser = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          accountType: true,
+        },
+      });
 
-      client.data.user = {
-        id: payload.sub,
-        email: payload.email,
-        role: payload.role,
-        accountType,
-        name: payload.name,
+      if (!dbUser) {
+        client.disconnect();
+        return;
+      }
+
+      // Find user's personal org
+      const personalOrg = await this.prisma.organizationMember.findFirst({
+        where: { userId: dbUser.id, organization: { type: OrgType.PERSONAL } },
+        select: { orgId: true },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      // Store AuthenticatedUser in socket data - no accountType derivation needed
+      // Authorization is handled by MessagesService using org membership roles
+      const authenticatedUser: AuthenticatedUser = {
+        id: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.name,
+        accountType: dbUser.accountType,
+        personalOrgId: personalOrg?.orgId || null,
       };
+
+      client.data.user = authenticatedUser;
     } catch (e) {
       client.disconnect();
     }
@@ -75,11 +89,10 @@ export class MessagesGateway
   ) {
     const user = client.data.user;
 
-    const allowed = await this.messagesService.userHasAccessToProject({
-      userId: user.id,
-      accountType: (user.accountType || user.role) as any,
-      projectId: data.projectId,
-    });
+    const allowed = await this.messagesService.userHasAccessToProject(
+      user,
+      data.projectId,
+    );
 
     if (!allowed) {
       return { error: 'Access denied' };
@@ -98,22 +111,24 @@ export class MessagesGateway
   ) {
     const user = client.data.user;
 
-    const allowed = await this.messagesService.userHasAccessToProject({
-      userId: user.id,
-      accountType: (user.accountType || user.role) as any,
-      projectId: data.projectId,
-    });
+    const normalizedChannel =
+      data.channel && data.channel.toUpperCase() === 'CUSTOMER'
+        ? 'customer'
+        : 'team';
+    const allowed = await this.messagesService.userHasAccessToProject(
+      user,
+      data.projectId,
+      normalizedChannel,
+    );
 
     if (!allowed) {
       return { error: 'Access denied' };
     }
 
     const channel =
-      data.channel && data.channel.toUpperCase() === 'CUSTOMER'
-        ? 'CUSTOMER'
-        : 'TEAM';
+      normalizedChannel === 'customer' ? 'CUSTOMER' : 'TEAM';
 
-    const message = await this.messagesService.sendMessage(user.id, {
+    const message = await this.messagesService.sendMessageWithOrg(user, {
       projectId: data.projectId,
       content: data.content,
       channel: channel as any,

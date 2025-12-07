@@ -12,11 +12,10 @@ import { Label } from "@/components/ui/label";
 
 export default function SecuritySessionsPage() {
   const { user, isLoading } = useRequireRole([
-    "dispatcher",
+    "COMPANY",
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
 
@@ -90,4 +89,3 @@ export default function SecuritySessionsPage() {
     </SettingsRightContentSection>
   );
 }
-

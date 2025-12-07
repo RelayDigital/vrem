@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode,
 import { JobRequest, Project, ProjectStatus } from '@/types';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { toEffectiveRole } from '@/lib/roles';
 
 interface JobManagementContextType {
   // Job state
@@ -116,13 +117,12 @@ export function JobManagementProvider({
       const hasOrgRole = Boolean(memberRoleUpper || userRoleUpper);
       const isProjectManagerRole =
         memberRoleUpper === 'PROJECT_MANAGER' || userRoleUpper === 'PROJECT_MANAGER';
+      const effectiveRole = toEffectiveRole(memberRoleUpper || userRoleUpper);
       const canViewOrgProjects =
         hasOrgRole &&
         userRoleUpper !== 'AGENT' &&
         !isProjectManagerRole &&
-        ['DISPATCHER', 'ADMIN', 'OWNER', 'EDITOR', 'COMPANY'].includes(
-          memberRoleUpper || userRoleUpper
-        );
+        effectiveRole === 'COMPANY';
 
       let fetchedProjects: Project[] = [];
       if (canViewOrgProjects) {

@@ -1,19 +1,21 @@
 import { AccountType, OrgRole } from '@/types';
 import { OrganizationMember } from '@/types';
+import { toEffectiveRole } from '@/lib/roles';
 
 export const mapMembershipToEffectiveRole = (
   membership: OrganizationMember | any | undefined,
   fallback: OrgRole | AccountType,
-): OrgRole | AccountType => {
-  if (!membership) return fallback;
+) => {
+  if (!membership) return toEffectiveRole(fallback);
   const orgType =
     membership.organization?.type || membership.organizationType || '';
-  if (orgType === 'PERSONAL') return fallback || 'PROVIDER';
-  const role = (membership.role || '').toUpperCase();
-  if (['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'EDITOR'].includes(role)) {
-    return 'COMPANY';
-  }
-  return 'PROVIDER';
+  if (orgType === 'PERSONAL') return 'COMPANY';
+  const role =
+    (membership.orgRole ||
+      membership.role ||
+      membership?.organizationRole ||
+      fallback) as string;
+  return toEffectiveRole(role);
 };
 
 export const getActiveOrgRoleFromMemberships = (
@@ -33,8 +35,9 @@ export const getActiveOrgRoleFromMemberships = (
 };
 
 export const getUserDashboardPath = (role: OrgRole | AccountType): string => {
-  if (role === 'COMPANY') return '/dashboard';
-  if (role === 'AGENT') return '/dashboard';
-  if (role === 'PROVIDER') return '/dashboard';
+  const effectiveRole = toEffectiveRole(role);
+  if (effectiveRole === 'COMPANY') return '/dashboard';
+  if (effectiveRole === 'AGENT') return '/dashboard';
+  if (effectiveRole === 'TECHNICIAN') return '/dashboard';
   return '/';
 };

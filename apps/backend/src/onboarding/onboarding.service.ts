@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserAccountType } from '@prisma/client';
+import { OrgRole, OrgType } from '@prisma/client';
 
 @Injectable()
 export class OnboardingService {
@@ -20,71 +20,94 @@ export class OnboardingService {
       return { step: 'error', message: 'User not found' };
     }
 
-    const globalRole = user.accountType;
     const memberships = user.organizations;
-    const membershipCount = memberships.length;
+
+    // Separate personal org from team/company orgs
+    const personalOrgMembership = memberships.find(
+      (m) => m.organization.type === OrgType.PERSONAL,
+    );
+    const teamOrCompanyMemberships = memberships.filter(
+      (m) => m.organization.type !== OrgType.PERSONAL,
+    );
+
+    // Check if user is an OWNER or ADMIN in any non-personal org (manager capability)
+    const hasManagerRole = teamOrCompanyMemberships.some(
+      (m) => m.role === OrgRole.OWNER || m.role === OrgRole.ADMIN,
+    );
+
+    // Any authenticated user can create organizations (TEAM or COMPANY)
+    const canCreateOrganization = true;
 
     //
-    // GLOBAL ADMIN FLOW
+    // MANAGER FLOW (user is OWNER/ADMIN in at least one team/company org)
     //
-    if (globalRole === UserAccountType.COMPANY) {
-      if (membershipCount === 0) {
-        return {
-          step: 'create-organization',
-          message: 'You must create your media company',
-        };
-      }
-
-      if (membershipCount === 1) {
+    if (hasManagerRole) {
+      if (teamOrCompanyMemberships.length === 1) {
         return {
           step: 'dashboard',
-          orgId: memberships[0].orgId,
+          orgId: teamOrCompanyMemberships[0].orgId,
         };
       }
 
-      // Admin in multiple orgs → choose workspace
+      // Multiple team/company orgs → choose workspace
       return {
         step: 'choose-organization',
-        organizations: memberships.map((m) => ({
+        organizations: teamOrCompanyMemberships.map((m) => ({
           orgId: m.orgId,
           name: m.organization.name,
           role: m.role,
+          type: m.organization.type,
         })),
       };
     }
 
     //
-    // PROJECT MANAGER + TECHNICIAN + EDITOR + AGENT FLOW
+    // MEMBER FLOW (TECHNICIAN, EDITOR, PROJECT_MANAGER in team/company orgs)
     //
+    if (teamOrCompanyMemberships.length > 0) {
+      if (teamOrCompanyMemberships.length === 1) {
+        return {
+          step: 'dashboard',
+          orgId: teamOrCompanyMemberships[0].orgId,
+        };
+      }
 
-    // No organizations yet, but user can still continue
-    if (membershipCount === 0) {
+      // Multiple orgs → choose one
       return {
-        step: 'no-organizations-yet',
-        canCreateOrganization: user.accountType === UserAccountType.COMPANY,
-        canJoinOrganization: true,
-        showCreateOrgCTA: user.accountType === UserAccountType.COMPANY,
-        showJoinOrgCTA: true,
-        message: 'You are not part of any organization yet.',
+        step: 'choose-organization',
+        organizations: teamOrCompanyMemberships.map((m) => ({
+          orgId: m.orgId,
+          name: m.organization.name,
+          role: m.role,
+          type: m.organization.type,
+        })),
       };
     }
 
-    // Exactly one organization → go straight to dashboard
-    if (membershipCount === 1) {
+    //
+    // PERSONAL-ONLY FLOW (user only has personal org)
+    //
+    if (personalOrgMembership) {
       return {
         step: 'dashboard',
-        orgId: memberships[0].orgId,
+        orgId: personalOrgMembership.orgId,
+        isPersonalOnly: true,
+        canCreateOrganization,
+        canJoinOrganization: true,
+        showCreateOrgCTA: true,
+        showJoinOrgCTA: true,
+        message: 'You are in your personal workspace. Create or join an organization to collaborate.',
       };
     }
 
-    // Multiple orgs → choose one
+    // Edge case: no organizations at all (should not happen as personal org is created on registration)
     return {
-      step: 'choose-organization',
-      organizations: memberships.map((m) => ({
-        orgId: m.orgId,
-        name: m.organization.name,
-        role: m.role,
-      })),
+      step: 'no-organizations-yet',
+      canCreateOrganization,
+      canJoinOrganization: true,
+      showCreateOrgCTA: true,
+      showJoinOrgCTA: true,
+      message: 'You are not part of any organization yet.',
     };
   }
 }

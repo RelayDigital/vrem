@@ -8,47 +8,52 @@ import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto';
-import {
-  OrgRole,
-  UserAccountType,
-  OrgType,
-  OrganizationMember,
-  Prisma,
-} from '@prisma/client';
+import { OrgRole, OrgType, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { AuthorizationService } from '../auth/authorization.service';
+import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 
 @Injectable()
 export class OrganizationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private authorization: AuthorizationService,
+  ) {}
 
-  async createOrganization(userId: string, dto: CreateOrganizationDto) {
-    // Fetch global user role
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { accountType: true, name: true },
-    });
+  async createOrganization(
+    user: AuthenticatedUser,
+    dto: CreateOrganizationDto,
+  ) {
+    // Determine org type - default to COMPANY if not specified, but prevent PERSONAL creation
+    const orgType = dto.type || OrgType.COMPANY;
 
-    if (!user) throw new NotFoundException('User not found');
-
-    // ENFORCEMENT: only global ADMIN can create organizations
-    if (user.accountType !== UserAccountType.COMPANY) {
+    // PERSONAL orgs are created automatically during registration, not via this endpoint
+    if (orgType === OrgType.PERSONAL) {
       throw new ForbiddenException(
-        'Only COMPANY users can create a media company',
+        'Personal organizations are created automatically and cannot be created manually',
       );
     }
 
-    // Create the organization
+    // Use authorization service to check if user can create this type of org
+    if (!this.authorization.canCreateOrganization(user, orgType)) {
+      throw new ForbiddenException(
+        'You are not allowed to create this type of organization',
+      );
+    }
+
+    // Create the organization with the specified type
     const org = await this.prisma.organization.create({
       data: {
         id: randomUUID(),
         name: dto.name,
+        type: orgType,
       },
     });
 
     // Make the creator an OrgRole.OWNER
     await this.prisma.organizationMember.create({
       data: {
-        userId,
+        userId: user.id,
         orgId: org.id,
         role: OrgRole.OWNER,
       },
@@ -66,19 +71,20 @@ export class OrganizationsService {
     });
   }
 
-  async createInvite(orgId: string, dto: CreateInviteDto, inviterId: string) {
-    // Ensure org exists
-    const org = await this.prisma.organization.findUnique({
-      where: { id: orgId },
-    });
-
-    if (!org) throw new NotFoundException('Organization not found');
+  async createInvite(
+    ctx: OrgContext,
+    dto: CreateInviteDto,
+    inviter: AuthenticatedUser,
+  ) {
+    if (!this.authorization.canManageTeamMembers(ctx, inviter)) {
+      throw new ForbiddenException('You cannot invite members to this org');
+    }
 
     const token = randomUUID();
 
     return this.prisma.invitation.create({
       data: {
-        orgId,
+        orgId: ctx.org.id,
         email: dto.email,
         role: dto.role,
         token,
@@ -96,11 +102,6 @@ export class OrganizationsService {
     }
 
     if (invite.accepted) return invite;
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { accountType: true },
-    });
 
     // Check if already a member
     const existing = await this.prisma.organizationMember.findFirst({
@@ -125,7 +126,11 @@ export class OrganizationsService {
     return invite;
   }
 
-  async getOrganizationById(orgId: string) {
+  async getOrganizationById(orgId: string, ctx: OrgContext) {
+    if (ctx.org.id !== orgId) {
+      throw new ForbiddenException('Organization does not match active context');
+    }
+
     const org = await this.prisma.organization.findUnique({
       where: { id: orgId },
     });
@@ -138,9 +143,15 @@ export class OrganizationsService {
   }
 
   async updateOrganizationSettings(
-    orgId: string,
+    ctx: OrgContext,
     dto: UpdateOrganizationSettingsDto,
+    user: AuthenticatedUser,
   ) {
+    if (!this.authorization.canManageOrgSettings(ctx, user)) {
+      throw new ForbiddenException('You cannot update organization settings');
+    }
+
+    const orgId = ctx.org.id;
     const org = await this.prisma.organization.findUnique({
       where: { id: orgId },
     });
@@ -191,7 +202,12 @@ export class OrganizationsService {
     return updated;
   }
 
-  async listOrganizationMembers(orgId: string) {
+  async listOrganizationMembers(ctx: OrgContext) {
+    if (ctx.effectiveRole === 'NONE') {
+      throw new ForbiddenException('You are not a member of this organization');
+    }
+
+    const orgId = ctx.org.id;
     const members = await this.prisma.organizationMember.findMany({
       where: { orgId },
       include: {
@@ -200,31 +216,35 @@ export class OrganizationsService {
       orderBy: { createdAt: 'asc' },
     });
 
-    const technicianIds = members
-      .filter((m) => m.user?.accountType === UserAccountType.PROVIDER)
+    // Filter by org membership role (TECHNICIAN or EDITOR) instead of accountType
+    const fieldWorkerRoles: OrgRole[] = [OrgRole.TECHNICIAN, OrgRole.EDITOR];
+    const fieldWorkerIds = members
+      .filter((m) => fieldWorkerRoles.includes(m.role))
       .map((m) => m.userId);
 
-    // Ensure each technician has a personal org
-    for (const techId of technicianIds) {
+    // Ensure each field worker has a personal org
+    for (const workerId of fieldWorkerIds) {
       const personalMembership = await this.prisma.organizationMember.findFirst({
         where: {
-          userId: techId,
+          userId: workerId,
           organization: { type: OrgType.PERSONAL },
         },
       });
 
       if (!personalMembership) {
-        const techUser = await this.prisma.user.findUnique({ where: { id: techId } });
+        const workerUser = await this.prisma.user.findUnique({
+          where: { id: workerId },
+        });
         const personalOrg = await this.prisma.organization.create({
           data: {
             id: randomUUID(),
-            name: `${techUser?.name || 'Technician'}'s Workspace`,
+            name: `${workerUser?.name || 'User'}'s Workspace`,
             type: OrgType.PERSONAL,
           },
         });
         await this.prisma.organizationMember.create({
           data: {
-            userId: techId,
+            userId: workerId,
             orgId: personalOrg.id,
             role: OrgRole.OWNER,
           },
@@ -232,11 +252,11 @@ export class OrganizationsService {
       }
     }
 
-    const personalOrgs = technicianIds.length
+    const personalOrgs = fieldWorkerIds.length
       ? await this.prisma.organization.findMany({
           where: {
             type: OrgType.PERSONAL,
-            members: { some: { userId: { in: technicianIds } } },
+            members: { some: { userId: { in: fieldWorkerIds } } },
           },
           include: { members: true },
         })
@@ -256,7 +276,22 @@ export class OrganizationsService {
     });
   }
 
-  async updateMemberRole(orgId: string, memberId: string, role: OrgRole, actingMembership: OrganizationMember) {
+  async updateMemberRole(
+    ctx: OrgContext,
+    memberId: string,
+    role: OrgRole,
+    actingUser: AuthenticatedUser,
+  ) {
+    const orgId = ctx.org.id;
+    const actingMembership = ctx.membership;
+
+    if (
+      !actingMembership ||
+      !this.authorization.canManageTeamMembers(ctx, actingUser)
+    ) {
+      throw new ForbiddenException('You cannot update member roles in this org');
+    }
+
     const member = await this.prisma.organizationMember.findFirst({
       where: { id: memberId, orgId },
     });

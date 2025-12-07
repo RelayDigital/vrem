@@ -8,8 +8,7 @@ import { AccessDenied } from "@/components/common/AccessDenied";
 
 export default function OrganizationMembersPage() {
   const { user, isLoading, isAllowed } = useRoleGuard([
-    "dispatcher",
-    "DISPATCHER",
+    "COMPANY",
     "PROJECT_MANAGER",
   ]);
   const router = useRouter();

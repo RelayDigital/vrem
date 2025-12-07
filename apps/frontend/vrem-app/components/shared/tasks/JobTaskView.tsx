@@ -246,7 +246,7 @@ export function JobTaskView({
   const [activeChatTab, setActiveChatTab] = useState<"client" | "team">(
     isAgentUser ? "client" : "team"
   );
-  const canViewCustomerChat = ["OWNER", "ADMIN", "DISPATCHER"].includes(
+  const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(
     orgRoleUpper
   );
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
@@ -294,7 +294,7 @@ export function JobTaskView({
   const canAssignTeamMembers = useMemo(() => {
     const orgRole = orgRoleUpper;
     return (
-      ["OWNER", "ADMIN", "DISPATCHER", "PROJECT_MANAGER"].includes(
+      ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(
         orgRole || ""
       ) || isAssignedProjectManager
     );
@@ -302,12 +302,12 @@ export function JobTaskView({
   const canAssignTechnicianOrEditor = canAssignTeamMembers;
   const canAssignProjectManager = useMemo(() => {
     const orgRole = orgRoleUpper;
-    return ["OWNER", "ADMIN", "DISPATCHER"].includes(orgRole || "");
+    return ["OWNER", "ADMIN"].includes(orgRole || "");
   }, [orgRoleUpper]);
   const canAssign = canAssignTeamMembers;
   const canAssignCustomer = useMemo(() => {
     const orgRole = orgRoleUpper;
-    return ["OWNER", "ADMIN", "DISPATCHER"].includes(orgRole || "");
+    return ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(orgRole || "");
   }, [orgRoleUpper]);
   const canDeleteProject = useMemo(() => {
     const orgRole = orgRoleUpper;

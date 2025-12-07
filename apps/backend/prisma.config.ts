@@ -6,8 +6,8 @@ export default defineConfig({
   migrations: {
     path: "./prisma/migrations",
   },
-  engine: "classic",
   datasource: {
+    // Supabase direct (non-pooled) connection string
     url: env("DATABASE_URL"),
   },
 });

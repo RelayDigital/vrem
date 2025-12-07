@@ -25,16 +25,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
-import { getEffectiveOrgRole, isDispatcherRole } from "@/lib/roles";
+import { getEffectiveOrgRole, isCompanyRole } from "@/lib/roles";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isLoading, organizationId, memberships } = useRequireRole([
-    "dispatcher",
+    "COMPANY",
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const jobCreation = useJobCreation();
@@ -55,7 +54,7 @@ export default function DashboardPage() {
   const roleUpper = (
     (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
   ).toUpperCase();
-  const canViewCustomerChat = ["OWNER", "ADMIN", "DISPATCHER"].includes(roleUpper);
+  const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
   const assignedJobs = useMemo(() => {
     if (!user) return [];
     return jobManagement.jobs.filter(
@@ -83,7 +82,7 @@ export default function DashboardPage() {
   }, [assignedJobs, providerProfile]);
 
   const effectiveRole = getEffectiveOrgRole(user, memberships, organizationId);
-  const shouldFetchMetrics = isDispatcherRole(effectiveRole);
+  const shouldFetchMetrics = isCompanyRole(effectiveRole);
 
   const {
     metrics,
@@ -267,8 +266,8 @@ export default function DashboardPage() {
   // Role-based rendering
   const userRole = effectiveRole;
 
-  // Dispatcher/Admin/Project Manager/Editor: Use CompanyDashboardView
-  if (isDispatcherRole(userRole)) {
+  // Company/Admin/Project Manager/Editor: Use CompanyDashboardView
+  if (isCompanyRole(userRole)) {
     const displayMetrics = metrics ?? emptyMetrics;
     const handleViewRankings = jobManagement.openRankings;
     const handleJobAssign = jobManagement.assignJob;

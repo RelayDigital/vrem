@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Connection URL is provided via prisma.config.ts (Supabase direct, non-pooled). connection_limit is enforced in Prisma client options.
 }
 
 model User {
@@ -185,6 +185,7 @@ enum OrgRole {
 enum OrgType {
   COMPANY
   PERSONAL
+  TEAM
 }
 
 enum MediaType {

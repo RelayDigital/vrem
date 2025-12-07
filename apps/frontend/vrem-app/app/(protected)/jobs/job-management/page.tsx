@@ -24,8 +24,7 @@ import { JobDataBoundary, JobsGridSkeleton } from "@/components/shared/jobs";
 export default function JobManagementPage() {
   const router = useRouter();
   const { user, isLoading, organizationId, memberships } = useRequireRole([
-    "dispatcher",
-    "DISPATCHER",
+    "COMPANY",
     "PROJECT_MANAGER",
     "EDITOR",
   ]);
@@ -35,7 +34,7 @@ export default function JobManagementPage() {
   const roleUpper = (
     (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
   ).toUpperCase();
-  const canViewCustomerChat = ["OWNER", "ADMIN", "DISPATCHER"].includes(roleUpper);
+  const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
 
   // Listen for navigation events to open job task view
   useEffect(() => {

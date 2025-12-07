@@ -2,7 +2,21 @@ import { OrganizationMember, User } from '@/types';
 
 export type EffectiveRole = 'COMPANY' | 'TECHNICIAN' | 'AGENT';
 
-const dispatcherLikeRoles = ['OWNER', 'ADMIN', 'COMPANY', 'PROJECT_MANAGER', 'EDITOR'];
+export const companyOrgRoles = ['OWNER', 'ADMIN', 'PROJECT_MANAGER', 'EDITOR'] as const;
+
+export const toEffectiveRole = (rawRole?: string | null): EffectiveRole => {
+  const roleUpper = (rawRole || '').toUpperCase();
+  if (roleUpper === 'COMPANY' || companyOrgRoles.includes(roleUpper as any)) {
+    return 'COMPANY';
+  }
+  if (roleUpper === 'TECHNICIAN' || roleUpper === 'PROVIDER') {
+    return 'TECHNICIAN';
+  }
+  if (roleUpper === 'AGENT') {
+    return 'AGENT';
+  }
+  return 'AGENT';
+};
 
 export const getEffectiveOrgRole = (
   user: User | null,
@@ -11,10 +25,7 @@ export const getEffectiveOrgRole = (
 ): EffectiveRole | null => {
   if (!user) return null;
   const membership = memberships.find((m) => m.orgId === activeOrgId);
-  const fallbackAccountType = (user.accountType || '').toUpperCase();
-  const fallbackRole = ['COMPANY', 'TECHNICIAN', 'AGENT'].includes(fallbackAccountType)
-    ? (fallbackAccountType as EffectiveRole)
-    : 'AGENT';
+  const fallbackRole = toEffectiveRole(user.accountType);
 
   if (!membership) {
     return fallbackRole;
@@ -22,26 +33,17 @@ export const getEffectiveOrgRole = (
 
   const orgType =
     membership.organization?.type || (membership as any)?.organizationType || '';
-  const roleUpper = (
+  const rawRole =
     (membership as any).orgRole ||
     (membership as any).role ||
-    ''
-  ).toUpperCase();
+    user.accountType;
 
   if (orgType === 'PERSONAL') {
     return 'COMPANY';
   }
 
-  if (dispatcherLikeRoles.includes(roleUpper)) {
-    return 'COMPANY';
-  }
-
-  if (roleUpper === 'AGENT') {
-    return 'AGENT';
-  }
-
-  return 'TECHNICIAN';
+  return toEffectiveRole(rawRole || fallbackRole);
 };
 
-export const isDispatcherRole = (role: EffectiveRole | null) =>
+export const isCompanyRole = (role: EffectiveRole | null) =>
   role === 'COMPANY';

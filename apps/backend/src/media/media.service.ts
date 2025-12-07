@@ -11,20 +11,26 @@ import { buildCdnUrl } from './utils/cdn.util';
 import axios from 'axios';
 import { MediaType } from '@prisma/client';
 import { CreateProjectMediaDto } from './dto/create-project-media.dto';
+import { AuthorizationService } from '../auth/authorization.service';
+import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 
 @Injectable()
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private authorization: AuthorizationService,
+  ) {}
 
-  private async ensureProjectAccess(projectId: string, orgId?: string) {
-    const where: Record<string, any> = { id: projectId };
-    if (orgId) {
-      where.orgId = orgId;
-    }
-
-    const project = await this.prisma.project.findFirst({ where });
+  private async ensureProjectAccess(projectId: string, ctx: OrgContext) {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, orgId: ctx.org.id },
+      include: {
+        technician: true,
+        editor: true,
+      },
+    });
     if (!project) {
       throw new ForbiddenException('Project does not belong to your organization');
     }
@@ -41,7 +47,11 @@ export class MediaService {
     return normalized;
   }
 
-  async confirmUpload(dto: ConfirmUploadDto) {
+  async confirmUpload(
+    dto: ConfirmUploadDto,
+    ctx: OrgContext,
+    user: AuthenticatedUser,
+  ) {
     return this.createMediaForProject(
       {
         projectId: dto.projectId,
@@ -51,15 +61,20 @@ export class MediaService {
         type: dto.type,
         cdnUrl: dto.cdnUrl,
       },
-      undefined,
+      ctx,
+      user,
     );
   }
 
   async createMediaForProject(
     input: CreateProjectMediaDto & { projectId: string },
-    orgId?: string,
+    ctx: OrgContext,
+    user: AuthenticatedUser,
   ) {
-    await this.ensureProjectAccess(input.projectId, orgId);
+    const project = await this.ensureProjectAccess(input.projectId, ctx);
+    if (!this.authorization.canUploadMedia(ctx, project, user)) {
+      throw new ForbiddenException('Not allowed to upload media for this project');
+    }
     const cdnUrl =
       input.cdnUrl ||
       (process.env.UPLOADCARE_CDN_BASE ? buildCdnUrl(input.key) : undefined);
@@ -95,8 +110,15 @@ export class MediaService {
     }
   }
 
-  async getMediaForProject(projectId: string, orgId?: string) {
-    await this.ensureProjectAccess(projectId, orgId);
+  async getMediaForProject(
+    projectId: string,
+    ctx: OrgContext,
+    user: AuthenticatedUser,
+  ) {
+    const project = await this.ensureProjectAccess(projectId, ctx);
+    if (!this.authorization.canViewProject(ctx, project)) {
+      throw new ForbiddenException('Not allowed to view media for this project');
+    }
     return this.prisma.media.findMany({
       where: { projectId },
       orderBy: {
@@ -105,21 +127,27 @@ export class MediaService {
     });
   }
 
-  async getMediaById(id: string, orgId?: string) {
+  async getMediaById(id: string, ctx: OrgContext, user: AuthenticatedUser) {
     const media = await this.prisma.media.findUnique({
       where: { id },
     });
 
     if (!media) throw new NotFoundException('Media not found');
 
-    if (orgId) {
-      await this.ensureProjectAccess(media.projectId, orgId);
+    const project = await this.ensureProjectAccess(media.projectId, ctx);
+    if (!this.authorization.canViewProject(ctx, project)) {
+      throw new ForbiddenException('Not allowed to view this media');
     }
 
     return media;
   }
 
-  async deleteMedia(id: string, projectId?: string, orgId?: string) {
+  async deleteMedia(
+    id: string,
+    projectId: string | undefined,
+    ctx: OrgContext,
+    user: AuthenticatedUser,
+  ) {
     const media = await this.prisma.media.findUnique({
       where: { id },
     });
@@ -130,8 +158,9 @@ export class MediaService {
       throw new ForbiddenException('Media does not belong to this project');
     }
 
-    if (orgId) {
-      await this.ensureProjectAccess(media.projectId, orgId);
+    const project = await this.ensureProjectAccess(media.projectId, ctx);
+    if (!this.authorization.canUploadMedia(ctx, project, user)) {
+      throw new ForbiddenException('Not allowed to delete this media');
     }
 
     await this.deleteFromStorageIfConfigured(media.key);

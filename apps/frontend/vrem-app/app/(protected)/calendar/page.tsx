@@ -12,18 +12,17 @@ import { useJobCreation } from "@/context/JobCreationContext";
 import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
 import { PageHeader } from "@/components/shared/layout";
 import { JobDataBoundary } from "@/components/shared/jobs";
-import { getEffectiveOrgRole, isDispatcherRole } from "@/lib/roles";
+import { getEffectiveOrgRole, isCompanyRole } from "@/lib/roles";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
 import { Technician } from "@/types";
 
 export default function CalendarPage() {
   const router = useRouter();
   const { user, isLoading, organizationId, memberships } = useRequireRole([
-    "dispatcher",
+    "COMPANY",
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const jobManagement = useJobManagement();
@@ -51,7 +50,7 @@ export default function CalendarPage() {
       );
     }
 
-    // Dispatcher/Admin/Project Manager/Editor/Agent: Show all jobs
+    // Company/Admin/Project Manager/Editor/Agent: Show all jobs
     return jobManagement.jobs;
   }, [jobManagement.jobs, memberships, organizationId, user]);
 
@@ -64,7 +63,7 @@ export default function CalendarPage() {
       const roleUpper = (
         (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
       ).toUpperCase();
-      const canViewCustomerChat = ["OWNER", "ADMIN", "DISPATCHER"].includes(roleUpper);
+      const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
       if (canViewCustomerChat) {
         messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
       }
@@ -91,8 +90,8 @@ export default function CalendarPage() {
     activeRole === "PROJECT_MANAGER" && !isPersonalOrg;
   const isEditor = activeRole === "EDITOR" && !isPersonalOrg;
   const canCreateJobs =
-    isDispatcherRole(effectiveRole) && !isProjectManager && !isEditor;
-  const canSeeTechnicians = isDispatcherRole(effectiveRole) && !isPersonalOrg;
+    isCompanyRole(effectiveRole) && !isProjectManager && !isEditor;
+  const canSeeTechnicians = isCompanyRole(effectiveRole) && !isPersonalOrg;
 
   useEffect(() => {
     let cancelled = false;

@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcrypt';
+import prisma from '../prisma/prisma.client';
 
 const TEST_ORG_NAME = 'VX Test Org';
 
@@ -25,8 +25,6 @@ const TEST_USERS: Array<{
 ];
 
 async function seedTestOrg() {
-  const prisma = new PrismaClient();
-
   try {
     console.log('🌱 Starting test organization seed...');
 

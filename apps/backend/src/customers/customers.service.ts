@@ -1,13 +1,32 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { AuthorizationService } from '../auth/authorization.service';
+import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 
 @Injectable()
 export class CustomersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private authorization: AuthorizationService,
+  ) {}
 
-  async listForOrg(orgId: string, search?: string) {
+  private ensureCanManage(ctx: OrgContext, user: AuthenticatedUser) {
+    const allowed = [
+      'PERSONAL_OWNER',
+      'OWNER',
+      'ADMIN',
+      'PROJECT_MANAGER',
+    ];
+    if (!allowed.includes(ctx.effectiveRole)) {
+      throw new ForbiddenException('You are not allowed to manage customers');
+    }
+  }
+
+  async listForOrg(ctx: OrgContext, user: AuthenticatedUser, search?: string) {
+    this.ensureCanManage(ctx, user);
+    const orgId = ctx.org.id;
     const customers = await this.prisma.organizationCustomer.findMany({
       where: {
         orgId,
@@ -29,13 +48,15 @@ export class CustomersService {
 
     return customers.map((customer) => {
       const totalJobs = customer.projects.length;
-      const lastJobDate =
-        customer.projects.reduce<Date | null>((latest, proj) => {
+      const lastJobDate = customer.projects.reduce(
+        (latest: Date | null, proj) => {
           if (!proj.scheduledTime) return latest;
           const current = new Date(proj.scheduledTime);
           if (!latest || current > latest) return current;
           return latest;
-        }, null) || null;
+        },
+        null as Date | null,
+      );
 
       return {
         id: customer.id,
@@ -53,7 +74,9 @@ export class CustomersService {
     });
   }
 
-  async create(orgId: string, dto: CreateCustomerDto) {
+  async create(ctx: OrgContext, user: AuthenticatedUser, dto: CreateCustomerDto) {
+    this.ensureCanManage(ctx, user);
+    const orgId = ctx.org.id;
     // Optional: ensure linked agent user exists
     let linkedUserName: string | undefined;
     if (dto.userId) {
@@ -87,7 +110,9 @@ export class CustomersService {
     return customer;
   }
 
-  async update(orgId: string, customerId: string, dto: UpdateCustomerDto) {
+  async update(ctx: OrgContext, user: AuthenticatedUser, customerId: string, dto: UpdateCustomerDto) {
+    this.ensureCanManage(ctx, user);
+    const orgId = ctx.org.id;
     await this.ensureCustomerInOrg(customerId, orgId);
 
     return this.prisma.organizationCustomer.update({
@@ -101,8 +126,9 @@ export class CustomersService {
     });
   }
 
-  async delete(orgId: string, customerId: string) {
-    await this.ensureCustomerInOrg(customerId, orgId);
+  async delete(ctx: OrgContext, user: AuthenticatedUser, customerId: string) {
+    this.ensureCanManage(ctx, user);
+    await this.ensureCustomerInOrg(customerId, ctx.org.id);
     await this.prisma.organizationCustomer.delete({ where: { id: customerId } });
     return { success: true };
   }

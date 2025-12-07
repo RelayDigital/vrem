@@ -13,11 +13,10 @@ import { SettingsRightContentSection } from "@/components/shared/settings/Settin
 
 export default function Security2FAPage() {
   const { user, isLoading } = useRequireRole([
-    "dispatcher",
+    "COMPANY",
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -71,4 +70,3 @@ export default function Security2FAPage() {
     </SettingsRightContentSection>
   );
 }
-

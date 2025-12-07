@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common';
 import { CronofyService } from './cronofy.service';
-import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
-  providers: [CronofyService, PrismaService],
+  providers: [CronofyService],
   exports: [CronofyService],
 })
 export class CronofyModule {}

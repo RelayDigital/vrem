@@ -10,6 +10,7 @@ import {
   getUserDashboardPath,
   mapMembershipToEffectiveRole,
 } from './userRoleInfo';
+import { toEffectiveRole } from '@/lib/roles';
 
 interface UseRequireRoleOptions {
   redirectTo?: string;
@@ -25,17 +26,6 @@ interface UseRequireRoleReturn {
 }
 
 // Map backend role names to frontend role names (for normalization)
-const roleMap: Record<string, OrgRole | AccountType> = {
-  COMPANY: 'COMPANY',
-  PROVIDER: 'PROVIDER',
-  AGENT: 'AGENT',
-  ADMIN: 'COMPANY',
-  PROJECT_MANAGER: 'COMPANY',
-  EDITOR: 'COMPANY',
-  OWNER: 'COMPANY',
-  TECHNICIAN: 'PROVIDER',
-};
-
 /**
  * Hook to require a user to have one of the specified roles
  */
@@ -62,10 +52,9 @@ export function useRequireRole(
     }
 
     const normalizedAllowedRoles = allowedRoles.map(role =>
-      roleMap[role] || (role as OrgRole | AccountType)
+      toEffectiveRole(role)
     );
-    const normalizedUserRole: OrgRole | AccountType =
-      roleMap[user.accountType] || 'AGENT';
+    const normalizedUserRole = toEffectiveRole(user.accountType);
     const activeMembership = memberships.find(
       (m) => m.orgId === activeOrganizationId
     );

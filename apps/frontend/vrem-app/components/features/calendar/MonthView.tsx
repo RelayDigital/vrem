@@ -82,13 +82,13 @@ export function MonthView({
   return (
     <div className={cn("flex-1 flex flex-col", compact ? "h-auto" : "h-full overflow-hidden")}>
       {/* Week Day Headers */}
-      <div className={cn("grid grid-cols-7 border-b bg-muted/30", compact && "text-xs")}>
+      <div className={cn("grid grid-cols-7 border-b bg-muted", compact && "text-xs")}>
         {weekDays.map((day) => (
           <div
             key={day}
             className={cn(
               "text-center font-semibold border-r last:border-r-0",
-              compact ? "p-1 text-xs" : "p-2 text-sm"
+              compact ? "p-3 text-sm" : "p-2 text-sm"
             )}
           >
             {day}
@@ -113,8 +113,8 @@ export function MonthView({
                 "border-b flex flex-col",
                 !isLastDayOfWeek && "border-r",
                 !isCurrentMonth && "bg-muted/20",
-                isToday && "bg-primary/10 ring-2 ring-primary ring-inset",
-                compact ? "p-1 min-h-[60px]" : "p-2 min-h-[120px]"
+                isToday && "bg-muted/50 ring-1 ring-primary ring-inset",
+                compact ? "p-1 min-h-[90px]" : "p-2 min-h-[120px]"
               )}
             >
               <Button

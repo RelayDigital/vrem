@@ -22,16 +22,15 @@ import {
 import { JobDataBoundary, JobsGridSkeleton } from "@/components/shared/jobs";
 import { Technician } from "@/types";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
-import { getEffectiveOrgRole, isDispatcherRole } from "@/lib/roles";
+import { getEffectiveOrgRole, isCompanyRole } from "@/lib/roles";
 
 export default function JobsPage() {
   const router = useRouter();
   const { user, isLoading, organizationId, memberships } = useRequireRole([
-    "dispatcher",
+    "COMPANY",
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const jobManagement = useJobManagement();
@@ -53,7 +52,7 @@ export default function JobsPage() {
   const roleUpper = (
     (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
   ).toUpperCase();
-  const canViewCustomerChat = ["OWNER", "ADMIN", "DISPATCHER"].includes(roleUpper);
+  const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
 
   // Listen for navigation events to open job task view
   useEffect(() => {
@@ -155,8 +154,8 @@ export default function JobsPage() {
     );
   };
 
-  // Dispatcher/Admin/Project Manager/Editor: Use JobsView
-  if (isDispatcherRole(userRole)) {
+  // Company/Admin/Project Manager/Editor: Use JobsView
+  if (isCompanyRole(userRole)) {
     const technicianList = technicians;
 
     return (

@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { H2, Muted } from '@/components/ui/typography';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { getEffectiveOrgRole, isDispatcherRole } from '@/lib/roles';
+import { getEffectiveOrgRole, isCompanyRole } from '@/lib/roles';
 import { ProviderProfile } from '@/types';
 import { api } from '@/lib/api';
 
@@ -254,10 +254,10 @@ export default function ProfilePage() {
     );
   }
 
-  // Dispatcher/Admin/Project Manager/Editor: Use SettingsView with dispatcher config or simple profile form
-  if (isDispatcherRole(userRole)) {
+  // Org managers/Admin/Project Manager/Editor: Use SettingsView with management config or simple profile form
+  if (isCompanyRole(userRole)) {
     // For now, show a simple profile form
-    // In the future, this could use SettingsView with dispatcher config
+    // In the future, this could use SettingsView with management config
     const handleSave = () => {
       // TODO: Implement save logic with API
       toast.success('Profile updated successfully');

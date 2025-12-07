@@ -12,11 +12,10 @@ import { api } from "@/lib/api";
 
 export default function AccountPage() {
   const { user, isLoading } = useRequireRole([
-    "dispatcher",
+    "COMPANY",
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
   const [name, setName] = useState(user?.name || "");

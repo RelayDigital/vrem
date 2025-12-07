@@ -11,11 +11,10 @@ import { Label } from "@/components/ui/label";
 
 export default function SupportChangelogPage() {
   const { user, isLoading } = useRequireRole([
-    "dispatcher",
+    "COMPANY",
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
-    "DISPATCHER",
     "PROJECT_MANAGER",
   ]);
 

@@ -1,26 +1,30 @@
 import { Injectable } from '@nestjs/common';
+import { ProjectStatus } from '@prisma/client';
+import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { PrismaService } from '../prisma/prisma.service';
-import { ProjectStatus, UserAccountType } from '@prisma/client';
-
-type CurrentUser = { id: string; accountType: UserAccountType };
 
 @Injectable()
 export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
-  async getDashboardForUser(user: CurrentUser, orgId: string | null) {
-    switch (user.accountType) {
-      case UserAccountType.AGENT:
-        return this.getAgentDashboard(user.id);
-      case UserAccountType.PROVIDER:
-        if (!orgId) return this.getProviderDashboard(user.id);
-        return this.getProviderDashboard(user.id, orgId);
-      case UserAccountType.COMPANY:
-        if (!orgId) return this.getAdminDashboard();
-        return this.getOrgManagerDashboard(orgId);
-      default:
-        return { role: user.accountType, data: null };
+  async getDashboardForUser(user: AuthenticatedUser, ctx: OrgContext) {
+    const orgId = ctx.org.id;
+    const managerRoles = [
+      'PERSONAL_OWNER',
+      'OWNER',
+      'ADMIN',
+      'PROJECT_MANAGER',
+    ];
+
+    if (managerRoles.includes(ctx.effectiveRole)) {
+      return this.getOrgManagerDashboard(orgId);
     }
+
+    if (ctx.effectiveRole === 'TECHNICIAN' || ctx.effectiveRole === 'EDITOR') {
+      return this.getProviderDashboard(user.id, orgId);
+    }
+
+    return this.getProviderDashboard(user.id, orgId);
   }
 
   // ---------- Agent ----------
@@ -64,7 +68,7 @@ export class DashboardService {
     });
 
     return {
-      role: UserAccountType.AGENT,
+      role: 'AGENT',
       upcomingShoots,
       deliveredProjects,
       lastProjectForRebook: lastProject,
@@ -101,13 +105,13 @@ export class DashboardService {
     });
 
     return {
-      role: UserAccountType.PROVIDER,
+      role: 'PROVIDER',
       assignedShoots,
       recentCompleted,
     };
   }
 
-  // ---------- Org Manager (dispatcher/admin) ----------
+  // ---------- Org Manager (admin/owner) ----------
 
   private async getOrgManagerDashboard(orgId: string) {
     const projects = await this.prisma.project.findMany({
@@ -132,7 +136,7 @@ export class DashboardService {
     );
 
     return {
-      role: UserAccountType.COMPANY,
+      role: 'COMPANY',
       projects,
       counts,
     };
@@ -162,7 +166,7 @@ export class DashboardService {
     );
 
     return {
-      role: UserAccountType.COMPANY,
+      role: 'COMPANY',
       projects,
       counts,
     };
