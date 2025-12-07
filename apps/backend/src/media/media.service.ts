@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConfirmUploadDto } from './dto/confirm-upload.dto';
 import { buildCdnUrl } from './utils/cdn.util';
 import axios from 'axios';
-import { MediaType } from '@prisma/client';
+import { MediaType, UserAccountType } from '@prisma/client';
 import { CreateProjectMediaDto } from './dto/create-project-media.dto';
 import { AuthorizationService } from '../auth/authorization.service';
 import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
@@ -23,16 +23,39 @@ export class MediaService {
     private authorization: AuthorizationService,
   ) {}
 
-  private async ensureProjectAccess(projectId: string, ctx: OrgContext) {
-    const project = await this.prisma.project.findFirst({
+  /**
+   * Ensures the user has access to the project.
+   * For regular users, the project must belong to their current org.
+   * For AGENT users, they can also access projects where they are the linked customer.
+   */
+  private async ensureProjectAccess(projectId: string, ctx: OrgContext, user: AuthenticatedUser) {
+    // First try to find in current org
+    let project = await this.prisma.project.findFirst({
       where: { id: projectId, orgId: ctx.org.id },
       include: {
         technician: true,
         editor: true,
+        customer: true,
       },
     });
+
+    // If not found in current org and user is an AGENT, check if they're the linked customer
+    if (!project && user.accountType === UserAccountType.AGENT) {
+      project = await this.prisma.project.findFirst({
+        where: {
+          id: projectId,
+          customer: { userId: user.id },
+        },
+        include: {
+          technician: true,
+          editor: true,
+          customer: true,
+        },
+      });
+    }
+
     if (!project) {
-      throw new ForbiddenException('Project does not belong to your organization');
+      throw new ForbiddenException('Project not found or access denied');
     }
 
     return project;
@@ -71,7 +94,7 @@ export class MediaService {
     ctx: OrgContext,
     user: AuthenticatedUser,
   ) {
-    const project = await this.ensureProjectAccess(input.projectId, ctx);
+    const project = await this.ensureProjectAccess(input.projectId, ctx, user);
     if (!this.authorization.canUploadMedia(ctx, project, user)) {
       throw new ForbiddenException('Not allowed to upload media for this project');
     }
@@ -115,8 +138,8 @@ export class MediaService {
     ctx: OrgContext,
     user: AuthenticatedUser,
   ) {
-    const project = await this.ensureProjectAccess(projectId, ctx);
-    if (!this.authorization.canViewProject(ctx, project)) {
+    const project = await this.ensureProjectAccess(projectId, ctx, user);
+    if (!this.authorization.canViewProject(ctx, project, user)) {
       throw new ForbiddenException('Not allowed to view media for this project');
     }
     return this.prisma.media.findMany({
@@ -134,8 +157,8 @@ export class MediaService {
 
     if (!media) throw new NotFoundException('Media not found');
 
-    const project = await this.ensureProjectAccess(media.projectId, ctx);
-    if (!this.authorization.canViewProject(ctx, project)) {
+    const project = await this.ensureProjectAccess(media.projectId, ctx, user);
+    if (!this.authorization.canViewProject(ctx, project, user)) {
       throw new ForbiddenException('Not allowed to view this media');
     }
 
@@ -158,7 +181,7 @@ export class MediaService {
       throw new ForbiddenException('Media does not belong to this project');
     }
 
-    const project = await this.ensureProjectAccess(media.projectId, ctx);
+    const project = await this.ensureProjectAccess(media.projectId, ctx, user);
     if (!this.authorization.canUploadMedia(ctx, project, user)) {
       throw new ForbiddenException('Not allowed to delete this media');
     }

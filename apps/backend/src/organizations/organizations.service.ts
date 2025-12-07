@@ -8,7 +8,14 @@ import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
 import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto';
-import { OrgRole, OrgType, Prisma } from '@prisma/client';
+import {
+  OrgRole,
+  OrgType,
+  Prisma,
+  InvitationType,
+  InvitationStatus,
+  NotificationType,
+} from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { AuthorizationService } from '../auth/authorization.service';
 import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
@@ -81,15 +88,47 @@ export class OrganizationsService {
     }
 
     const token = randomUUID();
+    const inviteType = dto.inviteType || InvitationType.MEMBER;
+    
+    // For CUSTOMER invites, role is not required
+    // For MEMBER invites, default to AGENT if not specified
+    const role = inviteType === InvitationType.CUSTOMER
+      ? (dto.role || OrgRole.AGENT)
+      : (dto.role || OrgRole.AGENT);
 
-    return this.prisma.invitation.create({
+    const invitation = await this.prisma.invitation.create({
       data: {
         orgId: ctx.org.id,
         email: dto.email,
-        role: dto.role,
+        role,
+        inviteType,
+        status: InvitationStatus.PENDING,
         token,
       },
     });
+
+    // If the invited user already exists, create a notification for them
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email.toLowerCase() },
+    });
+
+    if (existingUser) {
+      const notificationType =
+        inviteType === InvitationType.CUSTOMER
+          ? NotificationType.INVITATION_CUSTOMER
+          : NotificationType.INVITATION_MEMBER;
+
+      await this.prisma.notification.create({
+        data: {
+          userId: existingUser.id,
+          orgId: ctx.org.id,
+          type: notificationType,
+          invitationId: invitation.id,
+        },
+      });
+    }
+
+    return invitation;
   }
 
   async acceptInvite(userId: string, dto: AcceptInviteDto) {
@@ -101,26 +140,54 @@ export class OrganizationsService {
       throw new NotFoundException('Invalid invitation token');
     }
 
-    if (invite.accepted) return invite;
+    if (invite.accepted || invite.status === InvitationStatus.ACCEPTED) {
+      return invite;
+    }
 
-    // Check if already a member
-    const existing = await this.prisma.organizationMember.findFirst({
-      where: { userId, orgId: invite.orgId },
+    // Get the user for customer invites
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
     });
 
-    if (!existing) {
-      await this.prisma.organizationMember.create({
-        data: {
-          userId,
-          orgId: invite.orgId,
-          role: invite.role,
-        },
+    if (invite.inviteType === InvitationType.CUSTOMER) {
+      // Handle customer invite
+      const existingCustomer = await this.prisma.organizationCustomer.findFirst({
+        where: { userId, orgId: invite.orgId },
       });
+
+      if (!existingCustomer) {
+        await this.prisma.organizationCustomer.create({
+          data: {
+            userId,
+            orgId: invite.orgId,
+            name: user?.name || invite.email,
+            email: user?.email || invite.email,
+          },
+        });
+      }
+    } else {
+      // Handle member invite
+      const existing = await this.prisma.organizationMember.findFirst({
+        where: { userId, orgId: invite.orgId },
+      });
+
+      if (!existing) {
+        await this.prisma.organizationMember.create({
+          data: {
+            userId,
+            orgId: invite.orgId,
+            role: invite.role,
+          },
+        });
+      }
     }
 
     await this.prisma.invitation.update({
       where: { id: invite.id },
-      data: { accepted: true },
+      data: {
+        accepted: true,
+        status: InvitationStatus.ACCEPTED,
+      },
     });
 
     return invite;

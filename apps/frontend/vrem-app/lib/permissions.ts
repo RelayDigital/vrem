@@ -35,11 +35,34 @@ const CUSTOMER_ADMIN_ROLES: readonly EffectiveOrgRole[] = ['PERSONAL_OWNER', 'OW
 
 /**
  * Check if user can view a project.
- * All org members can view all projects in their org for situational awareness.
+ * 
+ * - OWNER/ADMIN/PROJECT_MANAGER: Can view ALL projects in their org
+ * - TECHNICIAN: Can view ONLY projects where they are assigned as technicianId
+ * - EDITOR: Can view ONLY projects where they are assigned as editorId
  */
-export function canViewProject(orgRole: EffectiveOrgRole | null): boolean {
+export function canViewProject(
+  orgRole: EffectiveOrgRole | null,
+  project: Pick<Project, 'technicianId' | 'editorId'> | null,
+  userId: string | null,
+): boolean {
   if (!orgRole || orgRole === 'NONE') return false;
-  return true;
+
+  // OWNER, ADMIN, PROJECT_MANAGER can view all projects
+  if (['PERSONAL_OWNER', 'OWNER', 'ADMIN', 'PROJECT_MANAGER'].includes(orgRole)) {
+    return true;
+  }
+
+  // TECHNICIAN can only view projects they're assigned to
+  if (orgRole === 'TECHNICIAN') {
+    return project?.technicianId === userId;
+  }
+
+  // EDITOR can only view projects they're assigned to
+  if (orgRole === 'EDITOR') {
+    return project?.editorId === userId;
+  }
+
+  return false;
 }
 
 /**
@@ -151,7 +174,12 @@ export function canCreateOrder(orgRole: EffectiveOrgRole | null): boolean {
 
 /**
  * Check if user can read team chat.
- * All org members can read team chat.
+ * 
+ * - OWNER/ADMIN/PROJECT_MANAGER: Can read team chat for all org projects
+ * - TECHNICIAN/EDITOR: Can read team chat ONLY for projects they can view (assigned to)
+ * 
+ * Note: This function only checks role-level permission. For TECHNICIAN/EDITOR,
+ * the caller should also verify project visibility using canViewProject.
  */
 export function canReadTeamChat(orgRole: EffectiveOrgRole | null): boolean {
   if (!orgRole || orgRole === 'NONE') return false;
@@ -160,7 +188,7 @@ export function canReadTeamChat(orgRole: EffectiveOrgRole | null): boolean {
 
 /**
  * Check if user can write to team chat.
- * All org members can write to team chat.
+ * Same rules as reading - must be able to view the project.
  */
 export function canWriteTeamChat(orgRole: EffectiveOrgRole | null): boolean {
   return canReadTeamChat(orgRole);
@@ -168,11 +196,22 @@ export function canWriteTeamChat(orgRole: EffectiveOrgRole | null): boolean {
 
 /**
  * Check if user can read customer chat.
- * All org members can read customer chat for operational context.
+ * 
+ * - OWNER/ADMIN/PROJECT_MANAGER: Can read customer chat for all org projects
+ * - TECHNICIAN: Cannot read customer chat (hidden in UI)
+ * - EDITOR: Cannot read customer chat (hidden in UI)
  */
 export function canReadCustomerChat(orgRole: EffectiveOrgRole | null): boolean {
   if (!orgRole || orgRole === 'NONE') return false;
-  return true;
+  
+  // EDITOR cannot read customer chat
+  if (orgRole === 'EDITOR') return false;
+  
+  // TECHNICIAN cannot read customer chat
+  if (orgRole === 'TECHNICIAN') return false;
+  
+  // OWNER, ADMIN, PROJECT_MANAGER can read customer chat
+  return ['PERSONAL_OWNER', 'OWNER', 'ADMIN', 'PROJECT_MANAGER'].includes(orgRole);
 }
 
 /**
@@ -306,7 +345,7 @@ export function getProjectPermissions(
   userId: string | null,
 ): ProjectPermissions {
   return {
-    canViewProject: canViewProject(orgRole),
+    canViewProject: canViewProject(orgRole, project, userId),
     canEditProject: canEditProject(orgRole, project, userId),
     canDeleteProject: canDeleteProject(orgRole),
     canChangeCustomer: canChangeProjectCustomer(orgRole),

@@ -167,14 +167,25 @@ export default function DashboardPage() {
   const roleUpper = (
     (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
   ).toUpperCase();
-  const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
+  const isAgent = (user?.accountType || "").toUpperCase() === "AGENT";
+  // Agents can always view customer chat (they ARE the customer)
+  // Other roles need OWNER/ADMIN/PROJECT_MANAGER
+  const canViewCustomerChat = isAgent || ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
   
+  // Filter jobs based on role - TECHNICIAN sees their technician assignments, EDITOR sees their editor assignments
   const assignedJobs = useMemo(() => {
     if (!user) return [];
+    
+    // EDITOR: Filter by editorId
+    if (roleUpper === "EDITOR") {
+      return jobManagement.jobs.filter((job) => job.editorId === user.id);
+    }
+    
+    // TECHNICIAN and others: Filter by assignedTechnicianId
     return jobManagement.jobs.filter(
       (job) => job.assignedTechnicianId === user.id
     );
-  }, [jobManagement.jobs, user]);
+  }, [jobManagement.jobs, user, roleUpper]);
   
   const assignedJobStats = useMemo(() => {
     const upcomingJobs = assignedJobs.filter(
@@ -241,21 +252,27 @@ export default function DashboardPage() {
   }, [jobManagement]);
 
   // Fetch messages when selected job changes
+  // Agents only see CUSTOMER channel (they are the customer)
+  // Other roles can see both TEAM and CUSTOMER channels
   useEffect(() => {
     if (jobManagement.selectedJob) {
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
-      messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+      // Agents should only fetch CUSTOMER channel, not TEAM
+      if (!isAgent) {
+        messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+      }
       if (canViewCustomerChat) {
         messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
       }
     }
-  }, [jobManagement.selectedJob, messaging, canViewCustomerChat]);
+  }, [jobManagement.selectedJob, messaging, canViewCustomerChat, isAgent]);
 
   useEffect(() => {
     let cancelled = false;
 
     const loadProviders = async () => {
-      if (!user) {
+      // Agents don't need to load technicians/providers - they're customers, not managers
+      if (!user || isAgent) {
         setProviders([]);
         setLoadingProviders(false);
         return;
@@ -362,7 +379,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, memberships, organizationId]);
+  }, [user, memberships, organizationId, isAgent]);
 
   if (isLoading) {
     return <DashboardLoadingSkeleton />;
@@ -380,19 +397,12 @@ export default function DashboardPage() {
   const { showSidebar, accountType, orgType, isElevatedRole } = uiContext;
 
   // AGENT in PERSONAL or TEAM org: Show AgentJobsView (job cards with tabs)
+  // Backend already filters to only return projects where agent is customer or project manager
   if (accountType === "AGENT" && !showSidebar) {
-    // Filter to only jobs where the agent is the project manager, creator, or customer
-    const agentJobs = jobManagement.jobCards.filter(
-      (job) =>
-        job.projectManagerId === user.id ||
-        job.createdBy === user.id ||
-        job.customerId === user.id
-    );
-
     return (
       <div className="size-full overflow-x-hidden">
         <AgentJobsView
-          jobs={agentJobs}
+          jobs={jobManagement.jobCards}
           technicians={technicians}
           organizationId={user.organizationId || ""}
           onNewJobClick={() => router.push("/booking")}
@@ -452,6 +462,7 @@ export default function DashboardPage() {
           }
           currentUserId={user?.id || "current-user-id"}
           currentUserName={user?.name || "Current User"}
+          currentUserAccountType={user?.accountType}
           isClient={false}
           open={jobManagement.showTaskView}
           onOpenChange={handleTaskViewClose}
@@ -500,6 +511,7 @@ export default function DashboardPage() {
           }
           currentUserId={user?.id || "current-user-id"}
           currentUserName={user?.name || "Current User"}
+          currentUserAccountType={user?.accountType}
           isClient={false}
           open={jobManagement.showTaskDialog}
           onOpenChange={handleTaskDialogClose}
@@ -608,6 +620,7 @@ export default function DashboardPage() {
           }
           currentUserId={user?.id || "current-user-id"}
           currentUserName={user?.name || "Current User"}
+          currentUserAccountType={user?.accountType}
           isClient={false}
           open={jobManagement.showTaskView}
           onOpenChange={handleTaskViewClose}
@@ -641,6 +654,7 @@ export default function DashboardPage() {
           }
           currentUserId={user?.id || "current-user-id"}
           currentUserName={user?.name || "Current User"}
+          currentUserAccountType={user?.accountType}
           isClient={false}
           open={jobManagement.showTaskDialog}
           onOpenChange={handleTaskDialogClose}

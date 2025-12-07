@@ -6,8 +6,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { ProjectChatChannel, ProjectStatus } from '@prisma/client';
+import { Prisma, UserAccountType } from '@prisma/client';
+import { ProjectChatChannel, ProjectStatus, NotificationType } from '@prisma/client';
 import { AuthorizationService } from '../auth/authorization.service';
 import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { PrismaService } from '../prisma/prisma.service';
@@ -52,6 +52,40 @@ export class ProjectsService {
 
     if (!project) {
       throw new ForbiddenException('Project does not belong to your organization');
+    }
+
+    return project;
+  }
+
+  /**
+   * Find a project with access for messaging/viewing.
+   * Allows agents to access projects they're linked to as customers (cross-org).
+   */
+  private async findProjectForUserAccess(
+    projectId: string,
+    ctx: OrgContext,
+    user: AuthenticatedUser,
+    include?: Prisma.ProjectInclude,
+  ) {
+    // First try to find in current org
+    let project = await this.prisma.project.findFirst({
+      where: { id: projectId, orgId: ctx.org.id },
+      include,
+    });
+
+    // If not found in current org and user is an AGENT, check if they're the linked customer
+    if (!project && user.accountType === UserAccountType.AGENT) {
+      project = await this.prisma.project.findFirst({
+        where: {
+          id: projectId,
+          customer: { userId: user.id },
+        },
+        include,
+      });
+    }
+
+    if (!project) {
+      throw new ForbiddenException('Project not found or access denied');
     }
 
     return project;
@@ -205,6 +239,59 @@ export class ProjectsService {
     return include;
   }
 
+  /**
+   * Create a project assignment notification for a user.
+   * Skips if the user was already notified for this project/role combination.
+   */
+  private async createAssignmentNotification(
+    userId: string,
+    projectId: string,
+    orgId: string,
+    role: 'TECHNICIAN' | 'EDITOR' | 'PROJECT_MANAGER' | 'CUSTOMER',
+    project?: { addressLine1?: string | null; city?: string | null; status?: ProjectStatus },
+  ): Promise<void> {
+    try {
+      // Check if notification already exists for this user/project/role combo
+      const existingNotification = await this.prisma.notification.findFirst({
+        where: {
+          userId,
+          projectId,
+          type: NotificationType.PROJECT_ASSIGNED,
+          payload: {
+            path: ['role'],
+            equals: role,
+          },
+        },
+      });
+
+      if (existingNotification) {
+        // Already notified for this assignment
+        return;
+      }
+
+      const projectAddress = project
+        ? [project.addressLine1, project.city].filter(Boolean).join(', ')
+        : undefined;
+
+      await this.prisma.notification.create({
+        data: {
+          userId,
+          orgId,
+          projectId,
+          type: NotificationType.PROJECT_ASSIGNED,
+          payload: {
+            role,
+            address: projectAddress,
+            status: project?.status,
+          },
+        },
+      });
+    } catch (error) {
+      // Log but don't fail the assignment if notification creation fails
+      this.logger.warn(`Failed to create assignment notification: ${error}`);
+    }
+  }
+
   // =============================
   // Project listing
   // =============================
@@ -218,6 +305,37 @@ export class ProjectsService {
       const orgId = ctx.org.id;
       const include = this.projectInclude(true);
 
+      // AGENT in their PERSONAL org: show all projects where they are assigned as customer
+      // This bypasses org boundaries - customer-assigned projects are visible regardless
+      // of which org the project belongs to. This is different from PROVIDER accounts
+      // which are restricted to projects within their org membership.
+      if (user.accountType === UserAccountType.AGENT && ctx.isPersonalOrg) {
+        // Find all OrganizationCustomer records where this user is linked
+        const customerRecords = await this.prisma.organizationCustomer.findMany({
+          where: { userId: user.id },
+          select: { id: true },
+        });
+        const customerIds = customerRecords.map((c) => c.id);
+
+        // Return projects where user is the customer (across ALL orgs, no org filter)
+        if (customerIds.length > 0) {
+          const projects = await this.prisma.project.findMany({
+            where: {
+              customerId: { in: customerIds },
+            },
+            include: {
+              ...include,
+              organization: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+          return projects;
+        }
+        
+        // No customer records, return empty
+        return [];
+      }
+
       // Manager roles (OWNER, ADMIN, PROJECT_MANAGER) see all org projects
       if (this.isManagerRole(ctx)) {
         return this.prisma.project.findMany({
@@ -227,7 +345,7 @@ export class ProjectsService {
         });
       }
 
-      // TECHNICIAN sees only their assigned projects
+      // TECHNICIAN sees only their assigned projects within the org
       if (ctx.effectiveRole === 'TECHNICIAN') {
         return this.prisma.project.findMany({
           where: { orgId, technicianId: user.id },
@@ -236,7 +354,7 @@ export class ProjectsService {
         });
       }
 
-      // EDITOR sees only their assigned projects
+      // EDITOR sees only their assigned projects within the org
       if (ctx.effectiveRole === 'EDITOR') {
         return this.prisma.project.findMany({
           where: { orgId, editorId: user.id },
@@ -245,7 +363,7 @@ export class ProjectsService {
         });
       }
 
-      // Fallback: return projects where user is project manager
+      // Fallback: return projects where user is project manager within the org
       return this.prisma.project.findMany({
         where: { orgId, projectManagerId: user.id },
         include,
@@ -317,13 +435,15 @@ export class ProjectsService {
     ctx: OrgContext,
     user: AuthenticatedUser,
   ) {
-    const project = await this.ensureProjectInOrg(
+    // Use findProjectForUserAccess to allow agents to view their customer-linked projects
+    const project = await this.findProjectForUserAccess(
       id,
       ctx,
+      user,
       this.projectInclude(true),
     );
 
-    if (!this.authorization.canViewProject(ctx, project)) {
+    if (!this.authorization.canViewProject(ctx, project, user)) {
       throw new ForbiddenException('You are not allowed to view this project');
     }
 
@@ -407,6 +527,9 @@ export class ProjectsService {
 
     const technician = await this.ensureUserExists(technicianId);
 
+    // Check if this is a new assignment (different from current)
+    const isNewAssignment = project.technicianId !== technicianId;
+
     const updated = await this.prisma.project.update({
       where: { id: projectId },
       data: { technicianId },
@@ -417,12 +540,23 @@ export class ProjectsService {
       await this.cronofy.createEvent(updated, technician);
     }
 
+    // Create notification for the newly assigned technician
+    if (isNewAssignment) {
+      await this.createAssignmentNotification(
+        technicianId,
+        projectId,
+        ctx.org.id,
+        'TECHNICIAN',
+        updated,
+      );
+    }
+
     return updated;
   }
 
   async assignCustomer(
     projectId: string,
-    customerId: string,
+    customerId: string | null,
     ctx: OrgContext,
   ) {
     const project = await this.ensureProjectInOrg(projectId, ctx);
@@ -432,16 +566,36 @@ export class ProjectsService {
       throw new ForbiddenException('You cannot change the customer on this project');
     }
 
-    await this.ensureCustomerInOrg(customerId, ctx);
+    // Only validate customer exists if assigning (not unassigning)
+    let customer: { userId?: string | null } | null = null;
+    if (customerId) {
+      customer = await this.ensureCustomerInOrg(customerId, ctx);
+    }
 
-    return this.prisma.project.update({
+    // Check if this is a new assignment (different from current)
+    const isNewAssignment = customerId && project.customerId !== customerId;
+
+    const updated = await this.prisma.project.update({
       where: { id: projectId },
       data: { customerId },
       include: this.projectInclude(true),
     });
+
+    // Create notification for the customer if they have a linked user account
+    if (isNewAssignment && customer?.userId) {
+      await this.createAssignmentNotification(
+        customer.userId,
+        projectId,
+        ctx.org.id,
+        'CUSTOMER',
+        project,
+      );
+    }
+
+    return updated;
   }
 
-  async assignEditor(projectId: string, editorId: string, ctx: OrgContext, user: AuthenticatedUser) {
+  async assignEditor(projectId: string, editorId: string | null, ctx: OrgContext, user: AuthenticatedUser) {
     const project = await this.ensureProjectInOrg(projectId, ctx);
     
     // Use canEditProject which enforces PM assignment check
@@ -449,17 +603,36 @@ export class ProjectsService {
       throw new ForbiddenException('You cannot manage this project');
     }
 
-    await this.ensureUserExists(editorId);
+    // Only validate user exists if assigning (not unassigning)
+    if (editorId) {
+      await this.ensureUserExists(editorId);
+    }
 
-    return this.prisma.project.update({
+    // Check if this is a new assignment (different from current)
+    const isNewAssignment = editorId && project.editorId !== editorId;
+
+    const updated = await this.prisma.project.update({
       where: { id: projectId },
       data: { editorId },
     });
+
+    // Create notification for the newly assigned editor
+    if (isNewAssignment && editorId) {
+      await this.createAssignmentNotification(
+        editorId,
+        projectId,
+        ctx.org.id,
+        'EDITOR',
+        project,
+      );
+    }
+
+    return updated;
   }
 
   async assignProjectManager(
     projectId: string,
-    projectManagerId: string,
+    projectManagerId: string | null,
     ctx: OrgContext,
     user: AuthenticatedUser,
   ) {
@@ -470,12 +643,31 @@ export class ProjectsService {
       throw new ForbiddenException('You cannot manage this project');
     }
 
-    await this.ensureUserExists(projectManagerId);
+    // Only validate user exists if assigning (not unassigning)
+    if (projectManagerId) {
+      await this.ensureUserExists(projectManagerId);
+    }
 
-    return this.prisma.project.update({
+    // Check if this is a new assignment (different from current)
+    const isNewAssignment = projectManagerId && project.projectManagerId !== projectManagerId;
+
+    const updated = await this.prisma.project.update({
       where: { id: projectId },
       data: { projectManagerId },
     });
+
+    // Create notification for the newly assigned project manager
+    if (isNewAssignment && projectManagerId) {
+      await this.createAssignmentNotification(
+        projectManagerId,
+        projectId,
+        ctx.org.id,
+        'PROJECT_MANAGER',
+        project,
+      );
+    }
+
+    return updated;
   }
 
   // =============================
@@ -564,25 +756,26 @@ export class ProjectsService {
     user: AuthenticatedUser,
     channel: ProjectChatChannel = ProjectChatChannel.TEAM,
   ) {
-    const project = await this.ensureProjectInOrg(projectId, ctx, {
+    // Use findProjectForUserAccess to allow agents to access their customer-linked projects
+    const project = await this.findProjectForUserAccess(projectId, ctx, user, {
       technician: true,
       editor: true,
       projectManager: true,
       customer: true,
     });
 
-    if (!this.authorization.canViewProject(ctx, project)) {
+    if (!this.authorization.canViewProject(ctx, project, user)) {
       throw new ForbiddenException('Not allowed');
     }
 
-    // All org members can READ both team and customer chat
     // Check read permission based on channel
+    // EDITOR/TECHNICIAN cannot read customer chat
     if (channel === ProjectChatChannel.CUSTOMER) {
-      if (!this.authorization.canReadCustomerChat(ctx, project)) {
+      if (!this.authorization.canReadCustomerChat(ctx, project, user)) {
         throw new ForbiddenException('Not allowed to view this channel');
       }
     } else {
-      if (!this.authorization.canReadTeamChat(ctx, project)) {
+      if (!this.authorization.canReadTeamChat(ctx, project, user)) {
         throw new ForbiddenException('Not allowed to view this channel');
       }
     }
@@ -600,7 +793,8 @@ export class ProjectsService {
     ctx: OrgContext,
     user: AuthenticatedUser,
   ) {
-    const project = await this.ensureProjectInOrg(projectId, ctx, {
+    // Use findProjectForUserAccess to allow agents to post to their customer-linked projects
+    const project = await this.findProjectForUserAccess(projectId, ctx, user, {
       technician: true,
       editor: true,
       projectManager: true,

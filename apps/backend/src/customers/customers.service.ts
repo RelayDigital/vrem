@@ -4,6 +4,14 @@ import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
+import {
+  OrgType,
+  OrgRole,
+  InvitationType,
+  InvitationStatus,
+  NotificationType,
+} from '@prisma/client';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class CustomersService {
@@ -88,6 +96,8 @@ export class CustomersService {
     // Only OWNER/ADMIN can create customers
     this.ensureCanManage(ctx, user);
     const orgId = ctx.org.id;
+    const orgType = ctx.org.type;
+
     // Optional: ensure linked agent user exists
     let linkedUserName: string | undefined;
     if (dto.userId) {
@@ -98,10 +108,105 @@ export class CustomersService {
       linkedUserName = linkedUser.name;
     }
 
+    // For COMPANY orgs: check if the email belongs to an existing user
+    // If so, send an invitation instead of creating the customer directly
+    if (orgType === OrgType.COMPANY && dto.email && !dto.userId) {
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: dto.email.toLowerCase() },
+      });
+
+      if (existingUser) {
+        // Check if there's already a pending invitation for this user/org
+        const existingInvite = await this.prisma.invitation.findFirst({
+          where: {
+            email: dto.email.toLowerCase(),
+            orgId,
+            inviteType: InvitationType.CUSTOMER,
+            status: InvitationStatus.PENDING,
+          },
+        });
+
+        if (existingInvite) {
+          // Return info about existing pending invite
+          return {
+            type: 'invitation_pending',
+            message: `An invitation is already pending for ${dto.email}`,
+            invitationId: existingInvite.id,
+          };
+        }
+
+        // Check if user is already a customer of this org (by userId OR by email)
+        const existingCustomer = await this.prisma.organizationCustomer.findFirst({
+          where: {
+            orgId,
+            OR: [
+              { userId: existingUser.id },
+              { email: { equals: dto.email, mode: 'insensitive' } },
+            ],
+          },
+        });
+
+        if (existingCustomer) {
+          // If customer exists by email but not linked to user, link them now
+          if (!existingCustomer.userId) {
+            await this.prisma.organizationCustomer.update({
+              where: { id: existingCustomer.id },
+              data: { userId: existingUser.id },
+            });
+            return {
+              type: 'existing_customer_linked',
+              message: `${dto.email} was already a customer and has now been linked to their account`,
+              customer: { ...existingCustomer, userId: existingUser.id },
+            };
+          }
+          // Return the existing customer
+          return {
+            type: 'existing_customer',
+            message: `${dto.email} is already a customer of this organization`,
+            customer: existingCustomer,
+          };
+        }
+
+        // Create an invitation for the existing user
+        const token = randomUUID();
+        const invitation = await this.prisma.invitation.create({
+          data: {
+            orgId,
+            email: dto.email.toLowerCase(),
+            role: OrgRole.AGENT, // Default role for customer invites
+            inviteType: InvitationType.CUSTOMER,
+            status: InvitationStatus.PENDING,
+            token,
+          },
+        });
+
+        // Create a notification for the user
+        await this.prisma.notification.create({
+          data: {
+            userId: existingUser.id,
+            orgId,
+            type: NotificationType.INVITATION_CUSTOMER,
+            invitationId: invitation.id,
+          },
+        });
+
+        return {
+          type: 'invitation_sent',
+          message: `Invitation sent to ${dto.email}. They will appear as a customer once they accept.`,
+          invitationId: invitation.id,
+          invitedUser: {
+            id: existingUser.id,
+            name: existingUser.name,
+            email: existingUser.email,
+          },
+        };
+      }
+    }
+
     // If an agent is linked, always use their name; otherwise, fall back to provided name/email
     const name = linkedUserName || dto.name?.trim() || dto.email || 'Customer';
 
-    return this.prisma.organizationCustomer.create({
+    const customer = await this.prisma.organizationCustomer.create({
       data: {
         orgId,
         name,
@@ -111,6 +216,11 @@ export class CustomersService {
         userId: dto.userId,
       },
     });
+
+    return {
+      type: 'customer_created',
+      customer,
+    };
   }
 
   async ensureCustomerInOrg(customerId: string, orgId: string) {

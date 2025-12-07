@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { JobsView } from "@/components/features/company/views/JobsView";
 import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
-import { ProjectStatus } from "@/types";
+import { JobRequest, ProjectStatus } from "@/types";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
 import { JobsLoadingSkeleton } from "@/components/shared/loading/CompanyLoadingSkeletons";
@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/breadcrumb";
 import { PageHeader } from "@/components/shared/layout";
 import { JobDataBoundary, JobsGridSkeleton } from "@/components/shared/jobs";
+import { canChangeStatus } from "@/lib/permissions";
+import { EffectiveOrgRole } from "@/lib/permissions";
 
 export default function JobManagementPage() {
   const router = useRouter();
@@ -34,7 +36,23 @@ export default function JobManagementPage() {
   const roleUpper = (
     (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
   ).toUpperCase();
-  const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
+  const isAgent = (user?.accountType || "").toUpperCase() === "AGENT";
+  // Agents can always view customer chat (they ARE the customer)
+  const canViewCustomerChat = isAgent || ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
+  
+  // Get effective role for permission checks
+  const effectiveRole: EffectiveOrgRole = (roleUpper || 'NONE') as EffectiveOrgRole;
+  
+  // Permission check function for kanban drag-and-drop
+  // EDITOR cannot change global status at all
+  // PROJECT_MANAGER can only change status on projects they manage
+  const canChangeJobStatus = useCallback((job: JobRequest): boolean => {
+    // Need projectManagerId for the permission check
+    const projectForPermission = {
+      projectManagerId: job.projectManagerId ?? null,
+    };
+    return canChangeStatus(effectiveRole, projectForPermission, user?.id ?? null);
+  }, [effectiveRole, user?.id]);
 
   // Listen for navigation events to open job task view
   useEffect(() => {
@@ -59,15 +77,20 @@ export default function JobManagementPage() {
   }, [jobManagement]);
 
   // Fetch messages when selected job changes
+  // Agents only see CUSTOMER channel (they are the customer)
+  // Other roles can see both TEAM and CUSTOMER channels
   useEffect(() => {
     if (jobManagement.selectedJob) {
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
-      messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+      // Agents should only fetch CUSTOMER channel, not TEAM
+      if (!isAgent) {
+        messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+      }
       if (canViewCustomerChat) {
         messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
       }
     }
-  }, [jobManagement.selectedJob, messaging, canViewCustomerChat]);
+  }, [jobManagement.selectedJob, messaging, canViewCustomerChat, isAgent]);
 
   if (isLoading) {
     return <JobsLoadingSkeleton />;
@@ -132,6 +155,7 @@ export default function JobManagementPage() {
           onJobStatusChange={handleJobStatusChangeWrapper}
           onJobClick={handleJobClick}
           activeView="kanban"
+          canChangeJobStatus={canChangeJobStatus}
         />
       </JobDataBoundary>
 
@@ -146,6 +170,7 @@ export default function JobManagementPage() {
         }
         currentUserId={user?.id || "current-user-id"}
         currentUserName={user?.name || "Current User"}
+        currentUserAccountType={user?.accountType}
         isClient={false}
         open={jobManagement.showTaskView}
         onOpenChange={handleTaskViewClose}

@@ -30,6 +30,7 @@ import { User } from "@/types";
 import { useJobCreation } from "@/context/JobCreationContext";
 import { useAuth } from "@/context/auth-context";
 import { OrganizationSwitcher } from "@/components/features/company/OrganizationSwitcher";
+import { NotificationBell } from "@/components/shared/layout/NotificationBell";
 import { UIContext } from "@/lib/roles";
 
 function SafeSidebarTrigger() {
@@ -99,7 +100,7 @@ export function AppHeader({
 
   return (
     <header className="sticky top-0 z-50 flex items-center border-b bg-card/80 backdrop-blur-xl shadow-sm w-full pl-2 pr-4 h-header-h">
-      <div className="w-full max-w-full overflow-hidden">
+      <div className="w-full max-w-full">
         <div className="flex items-center justify-between">
           {/* Left side: Logo/Org Switcher */}
           <div className="flex items-center gap-3">
@@ -161,6 +162,11 @@ export function AppHeader({
                 <Plus className="h-4 w-4" />
                 {createActionLabel}
               </Button>
+            )}
+
+            {/* Notification Bell for AGENT and PROVIDER accounts */}
+            {(accountType === "AGENT" || accountType === "PROVIDER") && (
+              <NotificationBell />
             )}
 
             {/* Profile Dropdown */}

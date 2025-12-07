@@ -35,40 +35,51 @@ export default function CalendarPage() {
   const displayJobs = useMemo(() => {
     if (!user) return [];
 
-    const effectiveRole = getEffectiveOrgRole(
-      user,
-      memberships,
-      organizationId
-    );
+    const activeMembership = memberships.find((m) => m.orgId === organizationId);
+    const roleUpper = (
+      (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+    ).toUpperCase();
 
-    // Technician/Technician: Only show assigned jobs
-    if (effectiveRole === "TECHNICIAN") {
+    // TECHNICIAN: Only show jobs where they are assigned as technician
+    if (roleUpper === "TECHNICIAN") {
       return jobManagement.jobs.filter(
-        (job) =>
-          job.assignedTechnicianId === user.id ||
-          job.assignedTechnicianId === user.id
+        (job) => job.assignedTechnicianId === user.id
       );
     }
 
-    // Company/Admin/Project Manager/Editor/Agent: Show all jobs
+    // EDITOR: Only show jobs where they are assigned as editor
+    if (roleUpper === "EDITOR") {
+      return jobManagement.jobs.filter(
+        (job) => job.editorId === user.id
+      );
+    }
+
+    // Company/Admin/Project Manager/Agent: Show all jobs
     return jobManagement.jobs;
   }, [jobManagement.jobs, memberships, organizationId, user]);
 
   // Fetch messages when selected job changes
+  // Agents only see CUSTOMER channel (they are the customer)
+  // Other roles can see both TEAM and CUSTOMER channels
+  const isAgent = (user?.accountType || "").toUpperCase() === "AGENT";
   useEffect(() => {
     if (jobManagement.selectedJob) {
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
-      messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+      // Agents should only fetch CUSTOMER channel, not TEAM
+      if (!isAgent) {
+        messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+      }
       const activeMembership = memberships.find((m) => m.orgId === organizationId);
       const roleUpper = (
         (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
       ).toUpperCase();
-      const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
+      // Agents can always view customer chat (they ARE the customer)
+      const canViewCustomerChat = isAgent || ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
       if (canViewCustomerChat) {
         messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
       }
     }
-  }, [jobManagement.selectedJob, messaging, memberships, organizationId]);
+  }, [jobManagement.selectedJob, messaging, memberships, organizationId, isAgent]);
 
   if (isLoading) {
     return <CalendarLoadingSkeleton />;
@@ -188,6 +199,7 @@ export default function CalendarPage() {
         }
         currentUserId={user?.id || "current-user-id"}
         currentUserName={user?.name || "Current User"}
+        currentUserAccountType={user?.accountType}
         isClient={false}
         open={jobManagement.showTaskView}
         onOpenChange={handleTaskViewClose}
@@ -226,6 +238,7 @@ export default function CalendarPage() {
         }
         currentUserId={user?.id || "current-user-id"}
         currentUserName={user?.name || "Current User"}
+        currentUserAccountType={user?.accountType}
         isClient={false}
         open={jobManagement.showTaskDialog}
         onOpenChange={handleTaskDialogClose}

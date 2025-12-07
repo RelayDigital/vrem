@@ -341,15 +341,37 @@ export function JobRequestForm({
       return;
     }
     try {
-      const created = await api.customers.create({
+      const response = await api.customers.create({
         name: newCustomer.name.trim(),
         email: newCustomer.email || undefined,
         phone: newCustomer.phone || undefined,
       });
-      setCustomers((prev) => [created, ...prev]);
-      handleCustomerSelect(created);
-      setNewCustomer({ name: "", email: "", phone: "" });
-      toast.success("Customer added");
+      
+      // Handle different response types
+      if (response.type === "customer_created" && response.customer) {
+        setCustomers((prev) => [response.customer!, ...prev]);
+        handleCustomerSelect(response.customer);
+        setNewCustomer({ name: "", email: "", phone: "" });
+        toast.success("Customer added");
+      } else if (response.type === "invitation_sent") {
+        toast.success(response.message || `Invitation sent to ${newCustomer.email}`);
+        setNewCustomer({ name: "", email: "", phone: "" });
+        setShowNewCustomer(false);
+      } else if (response.type === "invitation_pending") {
+        toast.info(response.message || `An invitation is already pending for ${newCustomer.email}`);
+      } else if ((response.type === "existing_customer" || response.type === "existing_customer_linked") && response.customer) {
+        // Customer already exists (or was just linked), select them
+        setCustomers((prev) => {
+          const exists = prev.some((c) => c.id === response.customer!.id);
+          return exists ? prev : [response.customer!, ...prev];
+        });
+        handleCustomerSelect(response.customer);
+        setNewCustomer({ name: "", email: "", phone: "" });
+        const message = response.type === "existing_customer_linked" 
+          ? "Customer linked to their account"
+          : "Customer already exists";
+        toast.info(response.message || message);
+      }
     } catch (err) {
       console.error("Failed to create customer", err);
       toast.error("Unable to create customer");

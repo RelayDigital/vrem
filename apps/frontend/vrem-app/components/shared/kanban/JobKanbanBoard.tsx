@@ -23,6 +23,12 @@ interface JobKanbanBoardProps {
   onJobStatusChange?: (jobId: string, newStatus: JobRequest["status"]) => void;
   onJobClick?: (job: JobRequest) => void;
   disableContextMenu?: boolean; // Disable context menu when sheet is open
+  /** 
+   * Function to check if user can change status for a specific job.
+   * If not provided, all jobs are draggable.
+   * Used to disable drag-and-drop for jobs the user cannot edit.
+   */
+  canChangeJobStatus?: (job: JobRequest) => boolean;
 }
 
 type PipelineStage = "booked" | "shooting" | "editing" | "delivered";
@@ -87,6 +93,7 @@ export function JobKanbanBoard({
   onJobStatusChange,
   onJobClick,
   disableContextMenu = false,
+  canChangeJobStatus,
 }: JobKanbanBoardProps) {
   // Transform jobs into kanban items
   const kanbanData = useMemo<JobKanbanItem[]>(() => {
@@ -179,6 +186,12 @@ export function JobKanbanBoard({
                           (p) => p.id === jobItem.job.assignedTechnicianId
                         )
                       : undefined;
+                    
+                    // Check if user can change status for this job
+                    // If canChangeJobStatus is not provided, assume all jobs are draggable
+                    const canDrag = canChangeJobStatus 
+                      ? canChangeJobStatus(jobItem.job) 
+                      : true;
 
                     return (
                       <div key={jobItem.id} className="w-full">
@@ -187,6 +200,7 @@ export function JobKanbanBoard({
                           name={jobItem.name}
                           column={jobItem.column}
                           className="p-0 w-full"
+                          disabled={!canDrag}
                         >
                           <JobCardKanban
                             job={jobItem.job}

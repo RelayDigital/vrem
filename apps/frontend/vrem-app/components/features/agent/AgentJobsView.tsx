@@ -53,10 +53,9 @@ export function AgentJobsView({
   const router = useRouter();
   // Use technicians if provided, fallback to technicians for backwards compatibility
   const effectiveTechnicians = technicians || technicians || [];
-  // Filter by org when known; otherwise include all jobs returned for this agent
-  const myJobs = organizationId
-    ? jobs.filter((job) => job.organizationId === organizationId)
-    : jobs;
+  // For agents, don't filter by org - customer-assigned projects can belong to any org
+  // The backend already returns only the projects the agent should see
+  const myJobs = jobs;
 
   const pendingJobs = myJobs.filter((j) => j.status === "pending");
   const assignedJobs = myJobs.filter((j) => j.status === "assigned");

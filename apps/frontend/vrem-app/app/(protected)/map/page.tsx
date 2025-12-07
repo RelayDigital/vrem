@@ -232,28 +232,37 @@ export default function MapPage() {
   const displayJobs = useMemo(() => {
     if (!user) return [];
 
-    const userRole = effectiveRole;
+    const activeMembership = memberships.find((m) => m.orgId === organizationId);
+    const roleUpper = (
+      (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+    ).toUpperCase();
 
-    // Company/Admin/Owner: Show all jobs
+    // Company/Admin/Owner/Project Manager: Show all jobs
     if (companyElevated) {
       return jobManagement.jobs;
     }
 
-    // Technician/Technician: Only show assigned jobs
-    if (["TECHNICIAN"].includes(userRole || "")) {
+    // TECHNICIAN: Only show jobs where they are assigned as technician
+    if (roleUpper === "TECHNICIAN") {
       return jobManagement.jobs.filter(
-        (job) =>
-          job.assignedTechnicianId === user.id ||
-          job.assignedTechnicianId === user.id
+        (job) => job.assignedTechnicianId === user.id
       );
     }
-    // Other roles: fallback to assigned
+
+    // EDITOR: Only show jobs where they are assigned as editor
+    if (roleUpper === "EDITOR") {
+      return jobManagement.jobs.filter(
+        (job) => job.editorId === user.id
+      );
+    }
+
+    // Fallback: filter by technician or editor assignment
     return jobManagement.jobs.filter(
       (job) =>
         job.assignedTechnicianId === user.id ||
-        job.assignedTechnicianId === user.id
+        job.editorId === user.id
     );
-  }, [companyElevated, effectiveRole, jobManagement.jobs, user]);
+  }, [companyElevated, jobManagement.jobs, memberships, organizationId, user]);
 
   // Filter technicians based on role
   const displayTechnicians = useMemo(() => {

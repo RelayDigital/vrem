@@ -21,33 +21,35 @@ model User {
   techProjects    Project[]              @relation("TechProjects")
   managerProjects Project[]              @relation("ManagerProjects")
   customers       OrganizationCustomer[]
+  notifications   Notification[]
 }
 
 model Organization {
-  id           String                 @id
-  name         String
-  createdAt    DateTime               @default(now())
-  type         OrgType                @default(COMPANY)
-  addressLine1 String?
-  addressLine2 String?
-  city         String?
-  region       String?
-  postalCode   String?
-  countryCode  String?
-  lat          Float?
-  lng          Float?
-  legalName    String?
-  logoUrl      String?
-  phone        String?
-  primaryEmail String?
-  serviceArea  Json?
-  slug         String?
-  timezone     String?
-  websiteUrl   String?
-  invitations  Invitation[]
-  members      OrganizationMember[]
-  projects     Project[]
-  customers    OrganizationCustomer[]
+  id            String                 @id
+  name          String
+  createdAt     DateTime               @default(now())
+  type          OrgType                @default(COMPANY)
+  addressLine1  String?
+  addressLine2  String?
+  city          String?
+  region        String?
+  postalCode    String?
+  countryCode   String?
+  lat           Float?
+  lng           Float?
+  legalName     String?
+  logoUrl       String?
+  phone         String?
+  primaryEmail  String?
+  serviceArea   Json?
+  slug          String?
+  timezone      String?
+  websiteUrl    String?
+  invitations   Invitation[]
+  members       OrganizationMember[]
+  projects      Project[]
+  customers     OrganizationCustomer[]
+  notifications Notification[]
 }
 
 model OrganizationMember {
@@ -119,6 +121,7 @@ model Project {
   technician       User?                 @relation("TechProjects", fields: [technicianId], references: [id])
   projectManager   User?                 @relation("ManagerProjects", fields: [projectManagerId], references: [id])
   customer         OrganizationCustomer? @relation(fields: [customerId], references: [id])
+  notifications    Notification[]
 }
 
 model OrganizationCustomer {
@@ -158,14 +161,17 @@ model CalendarEvent {
 }
 
 model Invitation {
-  id           String       @id @default(uuid())
-  email        String
-  orgId        String
-  role         OrgRole
-  token        String       @unique
-  accepted     Boolean      @default(false)
-  createdAt    DateTime     @default(now())
-  organization Organization @relation(fields: [orgId], references: [id])
+  id            String           @id @default(uuid())
+  email         String
+  orgId         String
+  role          OrgRole
+  token         String           @unique
+  accepted      Boolean          @default(false)
+  inviteType    InvitationType   @default(MEMBER)
+  status        InvitationStatus @default(PENDING)
+  createdAt     DateTime         @default(now())
+  organization  Organization     @relation(fields: [orgId], references: [id])
+  notifications Notification[]
 }
 
 enum UserAccountType {
@@ -209,4 +215,38 @@ enum InquiryStatus {
   APPROVED
   REJECTED
   CONVERTED_TO_PROJECT
+}
+
+enum InvitationType {
+  MEMBER
+  CUSTOMER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum NotificationType {
+  INVITATION_MEMBER
+  INVITATION_CUSTOMER
+  PROJECT_ASSIGNED
+}
+
+model Notification {
+  id           String           @id @default(uuid())
+  userId       String
+  orgId        String
+  type         NotificationType
+  invitationId String?
+  projectId    String?
+  payload      Json?
+  createdAt    DateTime         @default(now())
+  readAt       DateTime?
+
+  user         User             @relation(fields: [userId], references: [id])
+  organization Organization     @relation(fields: [orgId], references: [id])
+  invitation   Invitation?      @relation(fields: [invitationId], references: [id])
+  project      Project?         @relation(fields: [projectId], references: [id])
 }

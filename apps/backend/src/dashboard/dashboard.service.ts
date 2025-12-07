@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ProjectStatus } from '@prisma/client';
+import { ProjectStatus, UserAccountType } from '@prisma/client';
 import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -9,6 +9,16 @@ export class DashboardService {
 
   async getDashboardForUser(user: AuthenticatedUser, ctx: OrgContext) {
     const orgId = ctx.org.id;
+    
+    // For AGENT accountType in PERSONAL org, show agent dashboard
+    // which includes projects where they are the customer
+    if (
+      user.accountType === UserAccountType.AGENT &&
+      (ctx.effectiveRole === 'PERSONAL_OWNER' || ctx.isPersonalOrg)
+    ) {
+      return this.getAgentDashboard(user.id);
+    }
+
     const managerRoles = [
       'PERSONAL_OWNER',
       'OWNER',
@@ -20,11 +30,15 @@ export class DashboardService {
       return this.getOrgManagerDashboard(orgId);
     }
 
-    if (ctx.effectiveRole === 'TECHNICIAN' || ctx.effectiveRole === 'EDITOR') {
-      return this.getProviderDashboard(user.id, orgId);
+    if (ctx.effectiveRole === 'TECHNICIAN') {
+      return this.getTechnicianDashboard(user.id, orgId);
     }
 
-    return this.getProviderDashboard(user.id, orgId);
+    if (ctx.effectiveRole === 'EDITOR') {
+      return this.getEditorDashboard(user.id, orgId);
+    }
+
+    return this.getTechnicianDashboard(user.id, orgId);
   }
 
   // ---------- Agent ----------
@@ -32,9 +46,45 @@ export class DashboardService {
   private async getAgentDashboard(agentId: string) {
     const now = new Date();
 
+    // Find all OrganizationCustomer records where this user is linked
+    const customerRecords = await this.prisma.organizationCustomer.findMany({
+      where: { userId: agentId },
+      select: { id: true },
+    });
+    const customerIds = customerRecords.map((c) => c.id);
+
+    // Build the where clause to include projects where user is:
+    // 1. The project manager (legacy behavior)
+    // 2. The linked customer (via OrganizationCustomer.userId)
+    const projectWhereClause = {
+      OR: [
+        { projectManagerId: agentId },
+        ...(customerIds.length > 0 ? [{ customerId: { in: customerIds } }] : []),
+      ],
+    };
+
+
+    const projectInclude = {
+      media: true,
+      customer: true,
+      organization: true,
+      technician: true,
+      editor: true,
+      projectManager: true,
+      messages: true,
+    };
+
+    // Fetch all projects for this agent (for the main projects array)
+    const projects = await this.prisma.project.findMany({
+      where: projectWhereClause,
+      orderBy: { createdAt: 'desc' },
+      include: projectInclude,
+    });
+    
+
     const upcomingShoots = await this.prisma.project.findMany({
       where: {
-        projectManagerId: agentId,
+        ...projectWhereClause,
         status: {
           in: [
             ProjectStatus.BOOKED,
@@ -45,30 +95,27 @@ export class DashboardService {
         scheduledTime: { gte: now },
       },
       orderBy: { scheduledTime: 'asc' },
-      include: {
-        media: true,
-      },
+      include: projectInclude,
     });
 
     const deliveredProjects = await this.prisma.project.findMany({
       where: {
-        projectManagerId: agentId,
+        ...projectWhereClause,
         status: ProjectStatus.DELIVERED,
       },
       orderBy: { updatedAt: 'desc' },
       take: 20,
-      include: {
-        media: true,
-      },
+      include: projectInclude,
     });
 
     const lastProject = await this.prisma.project.findFirst({
-      where: { projectManagerId: agentId },
+      where: projectWhereClause,
       orderBy: { createdAt: 'desc' },
     });
 
     return {
       role: 'AGENT',
+      projects, // Main projects array for frontend compatibility
       upcomingShoots,
       deliveredProjects,
       lastProjectForRebook: lastProject,
@@ -77,7 +124,7 @@ export class DashboardService {
 
   // ---------- Technician ----------
 
-  private async getProviderDashboard(technicianId: string, orgId?: string) {
+  private async getTechnicianDashboard(technicianId: string, orgId?: string) {
     const assignedShoots = await this.prisma.project.findMany({
       where: {
         technicianId,
@@ -89,25 +136,115 @@ export class DashboardService {
       orderBy: { scheduledTime: 'asc' },
       include: {
         projectManager: true,
+        technician: true,
+        editor: true,
+        customer: true,
+        media: true,
       },
     });
 
     const recentCompleted = await this.prisma.project.findMany({
       where: {
         technicianId,
+        ...(orgId ? { orgId } : {}),
         status: ProjectStatus.EDITING,
       },
       orderBy: { updatedAt: 'desc' },
       take: 10,
       include: {
         projectManager: true,
+        technician: true,
+        editor: true,
+        customer: true,
+        media: true,
+      },
+    });
+
+    // Return all assigned projects for the technician
+    const projects = await this.prisma.project.findMany({
+      where: {
+        technicianId,
+        ...(orgId ? { orgId } : {}),
+      },
+      orderBy: { scheduledTime: 'asc' },
+      include: {
+        projectManager: true,
+        technician: true,
+        editor: true,
+        customer: true,
+        media: true,
+        messages: true,
       },
     });
 
     return {
-      role: 'PROVIDER',
+      role: 'TECHNICIAN',
+      projects,
       assignedShoots,
       recentCompleted,
+    };
+  }
+
+  // ---------- Editor ----------
+
+  private async getEditorDashboard(editorId: string, orgId?: string) {
+    // Get all projects assigned to this editor
+    const projects = await this.prisma.project.findMany({
+      where: {
+        editorId,
+        ...(orgId ? { orgId } : {}),
+      },
+      orderBy: { scheduledTime: 'asc' },
+      include: {
+        projectManager: true,
+        technician: true,
+        editor: true,
+        customer: true,
+        media: true,
+        messages: true,
+      },
+    });
+
+    // Projects ready for editing (shooting complete)
+    const readyForEditing = await this.prisma.project.findMany({
+      where: {
+        editorId,
+        ...(orgId ? { orgId } : {}),
+        status: ProjectStatus.EDITING,
+      },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        projectManager: true,
+        technician: true,
+        editor: true,
+        customer: true,
+        media: true,
+      },
+    });
+
+    // Recently delivered projects
+    const recentDelivered = await this.prisma.project.findMany({
+      where: {
+        editorId,
+        ...(orgId ? { orgId } : {}),
+        status: ProjectStatus.DELIVERED,
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+      include: {
+        projectManager: true,
+        technician: true,
+        editor: true,
+        customer: true,
+        media: true,
+      },
+    });
+
+    return {
+      role: 'EDITOR',
+      projects,
+      readyForEditing,
+      recentDelivered,
     };
   }
 

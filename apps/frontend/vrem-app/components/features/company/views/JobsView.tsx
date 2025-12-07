@@ -48,6 +48,12 @@ interface JobsViewProps {
   onJobClick?: (job: JobRequest) => void;
   disableContextMenu?: boolean;
   activeView?: "all" | "kanban"; // New prop to control which view to show
+  /** 
+   * Function to check if user can change status for a specific job.
+   * If not provided, all jobs are draggable.
+   * Used to disable drag-and-drop for jobs the user cannot edit.
+   */
+  canChangeJobStatus?: (job: JobRequest) => boolean;
 }
 
 export function JobsView({
@@ -60,6 +66,7 @@ export function JobsView({
   onJobClick,
   disableContextMenu = false,
   activeView = "all",
+  canChangeJobStatus,
 }: JobsViewProps) {
   // Kanban view search, filter, and sort state
   const [kanbanSearchQuery, setKanbanSearchQuery] = useState("");
@@ -520,6 +527,7 @@ export function JobsView({
                     onJobStatusChange={onJobStatusChange}
                     onJobClick={onJobClick}
                     disableContextMenu={disableContextMenu}
+                    canChangeJobStatus={canChangeJobStatus}
                   />
                 </div>
               </div>

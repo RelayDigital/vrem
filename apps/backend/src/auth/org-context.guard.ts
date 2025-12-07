@@ -3,21 +3,77 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { OrgRole, OrgType } from '@prisma/client';
+import { OrgRole, OrgType, UserAccountType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
 import { AuthenticatedUser, OrgContext, buildOrgContext } from './auth-context';
 
 @Injectable()
 export class OrgContextGuard implements CanActivate {
+  private readonly logger = new Logger(OrgContextGuard.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly reflector: Reflector,
   ) {}
+
+  /**
+   * Check if an AGENT user has customer access to a project in the given org.
+   * This allows agents to access project resources (messages, media) for projects
+   * where they are the linked customer, even if they're not a member of the org.
+   */
+  private async checkCustomerAccess(
+    req: any,
+    user: AuthenticatedUser,
+    orgId: string,
+  ): Promise<boolean> {
+    // Only agents can have customer access
+    if (user.accountType !== UserAccountType.AGENT) {
+      return false;
+    }
+
+    // Extract project ID from URL path
+    // Matches patterns like:
+    // - /projects/:projectId/... or /projects/:projectId
+    // - /media/project/:projectId
+    const url = req.url || req.path || '';
+    let projectId: string | null = null;
+    
+    // Try /projects/:projectId pattern
+    const projectsMatch = url.match(/\/projects\/([a-f0-9-]+)/i);
+    if (projectsMatch) {
+      projectId = projectsMatch[1];
+    }
+    
+    // Try /media/project/:projectId pattern
+    if (!projectId) {
+      const mediaMatch = url.match(/\/media\/project\/([a-f0-9-]+)/i);
+      if (mediaMatch) {
+        projectId = mediaMatch[1];
+      }
+    }
+    
+    if (!projectId) {
+      return false;
+    }
+
+    // Check if the project belongs to this org AND the user is the linked customer
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id: projectId,
+        orgId: orgId,
+        customer: { userId: user.id },
+      },
+      select: { id: true },
+    });
+
+    return !!project;
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -104,7 +160,14 @@ export class OrgContextGuard implements CanActivate {
       }
       req.user = { ...user, personalOrgId: org.id };
     } else if (!membership) {
-      throw new ForbiddenException('You do not belong to this organization');
+      // Check if user is an AGENT accessing a project they're linked to as a customer
+      // This allows cross-org access for customer-assigned projects
+      const isCustomerAccess = await this.checkCustomerAccess(req, user, org.id);
+      if (!isCustomerAccess) {
+        throw new ForbiddenException('You do not belong to this organization');
+      }
+      // For customer access, we create a minimal context - the service layer will handle authorization
+      this.logger.debug(`Agent ${user.id} granted customer access to org ${org.id}`);
     }
 
     const orgContext = buildOrgContext({

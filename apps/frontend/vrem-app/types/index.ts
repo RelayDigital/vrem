@@ -339,6 +339,7 @@ export interface JobRequest {
   organizationId: string; // maps to Project.orgId
   clientName: string;
   customerId?: string;
+  customer?: OrganizationCustomer | null; // Full customer object for linked user checks
   projectManagerId?: string | null;
   projectManager?: Pick<User, "id" | "name" | "avatarUrl" | "email"> | null;
   editorId?: string | null;
@@ -482,4 +483,71 @@ export interface Transaction {
   type: "payout" | "charge";
   status: "pending" | "completed" | "failed";
   createdAt: Date;
+}
+
+// =============================
+// Notifications
+// =============================
+
+export type NotificationType =
+  | "INVITATION_MEMBER"
+  | "INVITATION_CUSTOMER"
+  | "PROJECT_ASSIGNED";
+
+export type ProjectAssignedRole =
+  | "TECHNICIAN"
+  | "EDITOR"
+  | "PROJECT_MANAGER"
+  | "CUSTOMER";
+
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  orgId: string;
+  orgName: string;
+  orgType: OrgType;
+  createdAt: Date;
+  readAt?: Date | null;
+
+  // For invitation notifications
+  invitationId?: string;
+  role?: OrgRole;
+
+  // For project assignment notifications
+  projectId?: string;
+  projectAddress?: string;
+  assignedRole?: ProjectAssignedRole;
+}
+
+export interface OrganizationPublicInfo {
+  id: string;
+  name: string;
+  type: OrgType;
+  logoUrl?: string;
+  websiteUrl?: string;
+  city?: string;
+  region?: string;
+}
+
+// =============================
+// Customer Creation Response
+// =============================
+
+export type CustomerCreateResponseType =
+  | "customer_created"
+  | "invitation_sent"
+  | "invitation_pending"
+  | "existing_customer"
+  | "existing_customer_linked";
+
+export interface CustomerCreateResponse {
+  type: CustomerCreateResponseType;
+  message?: string;
+  customer?: OrganizationCustomer;
+  invitationId?: string;
+  invitedUser?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }

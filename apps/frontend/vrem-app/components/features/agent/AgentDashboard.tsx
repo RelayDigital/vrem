@@ -37,14 +37,15 @@ export function AgentDashboard({
 }: AgentDashboardProps) {
   const router = useRouter();
 
-  // Filter jobs to only show agent's own orders (where they are the project manager/creator)
+  // Filter jobs to only show agent's own orders (where they are the project manager/creator/customer)
+  // Note: customerId is OrganizationCustomer.id, so we check customer.userId for linked users
   const myOrders = useMemo(() => {
     return jobs.filter(
       (job) =>
         job.projectManagerId === user.id ||
         job.createdBy === user.id ||
-        // Also include jobs where customer is linked to this user
-        job.customerId === user.id
+        // Check if the customer record is linked to this user
+        job.customer?.userId === user.id
     );
   }, [jobs, user.id]);
 

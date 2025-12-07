@@ -513,7 +513,7 @@ export function MapView({
               </span>
             </div>
             <div style="font-size: 10px; color: ${getMutedTextColor()}; margin-bottom: 3px;">
-              <span style="font-weight: 500;">Client:</span> ${job.clientName}
+              <span style="font-weight: 500;">Customer:</span> ${job.clientName}
             </div>
             <div style="font-size: 10px; color: ${getMutedTextColor()}; margin-bottom: 6px;">
               <span style="font-weight: 500;">Schedule:</span> ${

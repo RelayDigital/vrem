@@ -162,6 +162,7 @@ import {
   canDeleteProject as canDeleteProjectFn,
   canChangeProjectCustomer,
   canWriteCustomerChat,
+  canReadCustomerChat,
   isAdmin,
   EffectiveOrgRole,
 } from "@/lib/permissions";
@@ -252,18 +253,41 @@ export function JobTaskView({
   ).toUpperCase();
   const isEditorRole = orgRoleUpper === "EDITOR";
   
+  // Get organization type to determine if this is a personal org
+  const orgType = (activeMembership as any)?.organization?.type || 
+    (activeMembership as any)?.organizationType || 
+    'PERSONAL';
+  const isPersonalOrg = orgType === 'PERSONAL';
+  
   // Get effective role for permission checks - must be defined before canViewCustomerChat
   const effectiveOrgRole = useMemo((): EffectiveOrgRole => {
     if (!orgRoleUpper || orgRoleUpper === '') return 'NONE';
-    // Check if it's a personal org (handled by org type, but we use PERSONAL_OWNER role)
+    // For personal orgs, use PERSONAL_OWNER which has full permissions
+    if (isPersonalOrg) return 'PERSONAL_OWNER';
     return orgRoleUpper as EffectiveOrgRole;
-  }, [orgRoleUpper]);
+  }, [orgRoleUpper, isPersonalOrg]);
   
-  const [activeChatTab, setActiveChatTab] = useState<"client" | "team">(
-    isAgentUser ? "client" : "team"
-  );
-  // All org members can READ customer chat, but only some can WRITE
-  const canViewCustomerChat = effectiveOrgRole !== 'NONE';
+  // Permission: Can read customer chat
+  // - OWNER/ADMIN/PROJECT_MANAGER: yes
+  // - EDITOR/TECHNICIAN: no
+  // - AGENT viewing their customer-linked project: yes (they are the customer)
+  const canViewCustomerChat = useMemo(() => {
+    // Agents can always view customer chat for projects they're assigned to as customers
+    if (isAgentUser) return true;
+    return canReadCustomerChat(effectiveOrgRole);
+  }, [effectiveOrgRole, isAgentUser]);
+  
+  // Default chat tab: agents see client chat, EDITOR/TECHNICIAN see team chat only
+  const defaultChatTab = isAgentUser ? "client" : (canViewCustomerChat ? "client" : "team");
+  const [activeChatTab, setActiveChatTab] = useState<"client" | "team">(defaultChatTab);
+  
+  // Update active chat tab when permissions change (e.g., if user switches orgs)
+  // Also ensure EDITOR/TECHNICIAN can't stay on client tab if they somehow got there
+  useEffect(() => {
+    if (!canViewCustomerChat && activeChatTab === "client") {
+      setActiveChatTab("team");
+    }
+  }, [canViewCustomerChat, activeChatTab]);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
@@ -354,6 +378,104 @@ export function JobTaskView({
           .join("")
           .slice(0, 2)
       : "NA";
+
+  // Assignee selector component - shows avatar + name when assigned, or empty state when not
+  const renderAssigneeSelector = ({
+    isAssigned,
+    name,
+    avatar,
+    label,
+    onClear,
+    canEdit,
+    disabled,
+    children,
+  }: {
+    isAssigned: boolean;
+    name?: string;
+    avatar?: string;
+    label: string;
+    onClear?: () => void;
+    canEdit: boolean;
+    disabled?: boolean;
+    children: React.ReactNode;
+  }) => {
+    if (!canEdit) {
+      // Read-only view
+      return (
+        <div className="flex items-center gap-2">
+          <Avatar className="h-7 w-7">
+            {isAssigned ? (
+              <>
+                <AvatarImage src={avatar} alt={name} />
+                <AvatarFallback className="text-xs bg-muted-foreground/20">
+                  {getInitials(name)}
+                </AvatarFallback>
+              </>
+            ) : (
+              <AvatarFallback className="text-xs bg-transparent border-2 border-secondary border-dashed" />
+            )}
+          </Avatar>
+          <span className="text-sm text-muted-foreground">
+            {isAssigned ? name : "Unassigned"}
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <DropdownMenu>
+        <div className="flex items-center gap-1">
+          <DropdownMenuTrigger asChild disabled={disabled}>
+            <button
+              className={cn(
+                "flex items-center gap-2 px-2 py-1 -ml-2 rounded-md transition-colors",
+                "hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
+                disabled && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              <Avatar className="h-7 w-7">
+                {isAssigned ? (
+                  <>
+                    <AvatarImage src={avatar} alt={name} />
+                    <AvatarFallback className="text-xs bg-muted-foreground/20">
+                      {getInitials(name)}
+                    </AvatarFallback>
+                  </>
+                ) : (
+                  <AvatarFallback className="text-xs bg-transparent border-2 border-secondary border-dashed" />
+                )}
+              </Avatar>
+              <span className={cn(
+                "text-sm",
+                isAssigned ? "text-foreground" : "text-muted-foreground"
+              )}>
+                {isAssigned ? name : label}
+              </span>
+            </button>
+          </DropdownMenuTrigger>
+          {isAssigned && onClear && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onClear();
+              }}
+              className={cn(
+                "flex items-center justify-center size-5 rounded-full transition-colors",
+                "text-muted-foreground hover:text-foreground hover:bg-muted/80",
+                "focus:outline-none focus:ring-2 focus:ring-ring"
+              )}
+              disabled={disabled}
+            >
+              <X className="size-3" />
+            </button>
+          )}
+        </div>
+        {children}
+      </DropdownMenu>
+    );
+  };
+
+  // Legacy badge for places that still need it
   const renderAssigneeBadge = (name: string, avatar?: string) => (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -664,10 +786,11 @@ export function JobTaskView({
   ]);
 
   const handleAssignCustomerInline = async (customerId: string) => {
-    if (!job || !customerId || !canAssignCustomer) return;
+    if (!job || !canAssignCustomer) return;
+    const isUnassigning = !customerId;
     setLoadingAssignments(true);
     try {
-      if (onAssignCustomer) {
+      if (onAssignCustomer && customerId) {
         await onAssignCustomer(customerId);
         await jobManagement.refreshJobs();
         const refreshed = jobManagement.getJobById(job.id);
@@ -677,12 +800,12 @@ export function JobTaskView({
       } else {
         const updatedProject = await api.projects.assignCustomer(
           job.id,
-          customerId
+          customerId || null
         );
         jobManagement.updateJob(job.id, updatedProject);
         jobManagement.selectJob(api.mapProjectToJobCard(updatedProject));
       }
-      toast.success("Customer assigned");
+      toast.success(isUnassigning ? "Customer unassigned" : "Customer assigned");
     } catch (error: any) {
       console.error("Failed to assign customer", error);
     } finally {
@@ -691,10 +814,11 @@ export function JobTaskView({
   };
 
   const handleAssignProjectManagerInline = async (userId: string) => {
-    if (!job || !userId || !canAssignProjectManager) return;
+    if (!job || !canAssignProjectManager) return;
+    const isUnassigning = !userId;
     setLoadingAssignments(true);
     try {
-      if (onAssignProjectManager) {
+      if (onAssignProjectManager && userId) {
         await onAssignProjectManager(userId);
         await jobManagement.refreshJobs();
         const refreshed = jobManagement.getJobById(job.id);
@@ -704,12 +828,12 @@ export function JobTaskView({
       } else {
         const updatedProject = await api.projects.assignProjectManager(
           job.id,
-          userId
+          userId || null
         );
         jobManagement.updateJob(job.id, updatedProject);
         jobManagement.selectJob(api.mapProjectToJobCard(updatedProject));
       }
-      toast.success("Project manager assigned");
+      toast.success(isUnassigning ? "Project manager unassigned" : "Project manager assigned");
     } catch (error: any) {
       console.error("Failed to assign project manager", error);
     } finally {
@@ -718,10 +842,11 @@ export function JobTaskView({
   };
 
   const handleAssignEditorInline = async (userId: string) => {
-    if (!job || !userId || !canAssignTechnicianOrEditor) return;
+    if (!job || !canAssignTechnicianOrEditor) return;
+    const isUnassigning = !userId;
     setLoadingAssignments(true);
     try {
-      if (onAssignEditor) {
+      if (onAssignEditor && userId) {
         await onAssignEditor(userId);
         await jobManagement.refreshJobs();
         const refreshed = jobManagement.getJobById(job.id);
@@ -729,11 +854,11 @@ export function JobTaskView({
           jobManagement.selectJob(refreshed);
         }
       } else {
-        const updatedProject = await api.projects.assignEditor(job.id, userId);
+        const updatedProject = await api.projects.assignEditor(job.id, userId || null);
         jobManagement.updateJob(job.id, updatedProject);
         jobManagement.selectJob(api.mapProjectToJobCard(updatedProject));
       }
-      toast.success("Editor assigned");
+      toast.success(isUnassigning ? "Editor unassigned" : "Editor assigned");
     } catch (error: any) {
       console.error("Failed to assign editor", error);
     } finally {
@@ -1850,7 +1975,7 @@ export function JobTaskView({
           <ItemTitle className="">{job?.propertyAddress || "Job"}</ItemTitle>
           {!isAgentUser && job?.clientName && (
             <ItemDescription className="">
-              Client: {job.clientName}
+              Customer: {job.clientName}
             </ItemDescription>
           )}
         </ItemContent>
@@ -1977,27 +2102,30 @@ export function JobTaskView({
               </Button>
             )}
 
-            <Button
-              variant="ghost"
-              onClick={() => setActiveChatTab("team")}
-              className={cn(
-                "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
-                activeChatTab === "team"
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <User className="size-3.5" />
-              Team Chat
-              {!isClient && (
-                <Badge variant="secondary" className="ml-1 text-xs h-4 px-1.5">
-                  Private
-                </Badge>
-              )}
-              {activeChatTab === "team" && (
-                <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
-              )}
-            </Button>
+            {/* Team Chat tab - hidden for agents (they only see Customer Chat) */}
+            {!isAgentUser && (
+              <Button
+                variant="ghost"
+                onClick={() => setActiveChatTab("team")}
+                className={cn(
+                  "relative h-8 inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors",
+                  activeChatTab === "team"
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <User className="size-3.5" />
+                Team Chat
+                {!isClient && (
+                  <Badge variant="secondary" className="ml-1 text-xs h-4 px-1.5">
+                    Private
+                  </Badge>
+                )}
+                {activeChatTab === "team" && (
+                  <span className="absolute bottom-[-4px] left-0 right-0 h-0.5 bg-primary rounded-full" />
+                )}
+              </Button>
+            )}
           </div>
         )}
         {replyingTo && (
@@ -2562,7 +2690,7 @@ export function JobTaskView({
               {/* Task Fields Grid */}
               <div className="grid grid-cols-[minmax(0,140px)_1fr] gap-y-3.5">
                 {/* Address */}
-                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                   Address
                 </div>
                 <div className="text-sm font-medium text-foreground">
@@ -2572,35 +2700,21 @@ export function JobTaskView({
                 {/* Customer */}
                 {!isAgentUser && (
                   <>
-                    <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                    <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                       Customer
                     </div>
-                    <div className="text-sm text-foreground flex items-center gap-2 flex-wrap">
-                      {customerDisplayName !== "Unassigned" ? (
-                        renderAssigneeBadge(customerDisplayName)
-                      ) : (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Avatar className="h-7 w-7">
-                              <AvatarFallback className="text-xs bg-transparent border-2 border-secondary border-dashed"></AvatarFallback>
-                            </Avatar>
-                          </TooltipTrigger>
-                          <TooltipContent>Unassigned</TooltipContent>
-                        </Tooltip>
-                      )}
-                      {canAssignCustomer && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="muted"
-                              size="sm"
-                              className="h-7 rounded-full"
-                              disabled={loadingAssignments}
-                            >
-                              {assignedCustomer ? "Change" : "Assign Customer"}
-                              <ChevronDown className="size-3.5 ml-2" />
-                            </Button>
-                          </DropdownMenuTrigger>
+                    <div className="flex items-center">
+                      {renderAssigneeSelector({
+                        isAssigned: customerDisplayName !== "Unassigned",
+                        name: customerDisplayName,
+                        avatar: undefined,
+                        label: "Assign Customer",
+                        onClear: assignedCustomer
+                          ? () => handleAssignCustomerInline("")
+                          : undefined,
+                        canEdit: canAssignCustomer,
+                        disabled: loadingAssignments,
+                        children: (
                           <DropdownMenuContent
                             align="start"
                             className="w-72 max-h-[300px] overflow-y-auto p-0"
@@ -2648,47 +2762,30 @@ export function JobTaskView({
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
+                        ),
+                      })}
                     </div>
                   </>
                 )}
 
-                {/* Project Manager Assigned */}
-                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-                  PM Assigned
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {projectManagerDisplayName !== "Unassigned" ? (
-                    renderAssigneeBadge(
-                      projectManagerDisplayName,
-                      projectManagerDisplayAvatar
-                    )
-                  ) : (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Avatar className="h-7 w-7">
-                          <AvatarFallback className="text-xs bg-transparent border-2 border-secondary border-dashed"></AvatarFallback>
-                        </Avatar>
-                      </TooltipTrigger>
-                      <TooltipContent>Unassigned</TooltipContent>
-                    </Tooltip>
-                  )}
-                  {canAssignProjectManager && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="muted"
-                          size="sm"
-                          className="h-7 rounded-full"
-                          disabled={loadingAssignments}
-                        >
-                          {assignedProjectManager
-                            ? "Change"
-                            : "Assign Project Manager"}
-                          <ChevronDown className="size-3.5 ml-2" />
-                        </Button>
-                      </DropdownMenuTrigger>
+                {/* Project Manager Assigned - hide if agent and unassigned */}
+                {(!isAgentUser || projectManagerDisplayName !== "Unassigned") && (
+                  <>
+                    <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
+                      PM Assigned
+                    </div>
+                    <div className="flex items-center">
+                      {renderAssigneeSelector({
+                        isAssigned: projectManagerDisplayName !== "Unassigned",
+                        name: projectManagerDisplayName,
+                        avatar: projectManagerDisplayAvatar,
+                        label: "Assign PM",
+                        onClear: assignedProjectManager
+                          ? () => handleAssignProjectManagerInline("")
+                          : undefined,
+                        canEdit: canAssignProjectManager,
+                        disabled: loadingAssignments,
+                        children: (
                       <DropdownMenuContent
                         align="start"
                         className="w-72 max-h-[300px] overflow-y-auto p-0"
@@ -2746,97 +2843,110 @@ export function JobTaskView({
                           </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
+                    ),
+                  })}
+                    </div>
+                  </>
+                )}
 
-                {/* Technician Assigned */}
-                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-                  Tech Assigned
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* Technician Assigned */}
-                  {technician ? (
-                    renderAssigneeBadge(technician.name, technician.avatarUrl)
-                  ) : (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Avatar className="h-7 w-7">
-                          <AvatarFallback className="text-xs bg-transparent border-2 border-secondary border-dashed"></AvatarFallback>
-                        </Avatar>
-                      </TooltipTrigger>
-                      <TooltipContent>Unassigned</TooltipContent>
-                    </Tooltip>
-                  )}
-                  {/* Change Technician */}
-                  {canAssignTechnicianOrEditor &&
-                    technician &&
-                    onChangeTechnician &&
-                    (job?.status === "assigned" ||
-                      job?.status === "in_progress") && (
-                      <Button
-                        onClick={onChangeTechnician}
-                        variant="muted"
-                        size="sm"
-                        className="h-7 rounded-full"
+                {/* Technician Assigned - hide if agent and unassigned */}
+                {(!isAgentUser || technician) && (
+                  <>
+                    <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
+                      Tech Assigned
+                    </div>
+                    <div className="flex items-center">
+                      {canAssignTechnicianOrEditor ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={technician ? onChangeTechnician : onAssignTechnician}
+                        className={cn(
+                          "flex items-center gap-2 px-2 py-1 -ml-2 rounded-md transition-colors",
+                          "hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+                        )}
+                        disabled={
+                          technician
+                            ? !(job?.status === "assigned" || job?.status === "in_progress")
+                            : !onAssignTechnician
+                        }
                       >
-                        <Edit className="size-3.5 mr-1.5" />
-                        Change
-                      </Button>
-                    )}
-
-                  {/* Assign Technician */}
-                  {canAssignTechnicianOrEditor &&
-                    onAssignTechnician &&
-                    !technician && (
-                      <Button
-                        onClick={onAssignTechnician}
-                        variant="muted"
-                        size="sm"
-                        className="h-7 rounded-full"
-                      >
-                        <span>Assign Technician</span>
-                        <MapIcon className="size-3.5 ml-2" />
-                      </Button>
-                    )}
-                </div>
-
-                {/* Editor Assigned */}
-                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
-                  Editor Assigned
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {editorDisplayName !== "Unassigned" ? (
-                    renderAssigneeBadge(editorDisplayName, editorDisplayAvatar)
-                  ) : (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
                         <Avatar className="h-7 w-7">
-                          <AvatarFallback className="text-xs bg-transparent border-2 border-secondary border-dashed"></AvatarFallback>
-                        </Avatar>
-                      </TooltipTrigger>
-                      <TooltipContent>Unassigned</TooltipContent>
-                    </Tooltip>
-                  )}
-                  {canAssignTechnicianOrEditor && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="muted"
-                          size="sm"
-                          className="h-7 rounded-full"
-                          disabled={loadingAssignments}
-                        >
-                          {assignedEditor ? (
-                            "Change"
-                          ) : (
+                          {technician ? (
                             <>
-                              <span>Assign Editor</span>
-                              <ChevronDown className="size-3.5 ml-2" />
+                              <AvatarImage src={technician.avatarUrl} alt={technician.name} />
+                              <AvatarFallback className="text-xs bg-muted-foreground/20">
+                                {getInitials(technician.name)}
+                              </AvatarFallback>
                             </>
+                          ) : (
+                            <AvatarFallback className="text-xs bg-transparent border-2 border-secondary border-dashed" />
                           )}
-                        </Button>
-                      </DropdownMenuTrigger>
+                        </Avatar>
+                        <span className={cn(
+                          "text-sm",
+                          technician ? "text-foreground" : "text-muted-foreground"
+                        )}>
+                          {technician ? technician.name : "Assign Technician"}
+                        </span>
+                      </button>
+                      {technician && onChangeTechnician && (job?.status === "assigned" || job?.status === "in_progress") && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // For technician, clicking X should open change dialog (no direct unassign)
+                            onChangeTechnician();
+                          }}
+                          className={cn(
+                            "flex items-center justify-center size-5 rounded-full transition-colors",
+                            "text-muted-foreground hover:text-foreground hover:bg-muted/80",
+                            "focus:outline-none focus:ring-2 focus:ring-ring"
+                          )}
+                        >
+                          <X className="size-3" />
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-7 w-7">
+                        {technician ? (
+                          <>
+                            <AvatarImage src={technician.avatarUrl} alt={technician.name} />
+                            <AvatarFallback className="text-xs bg-muted-foreground/20">
+                              {getInitials(technician.name)}
+                            </AvatarFallback>
+                          </>
+                        ) : (
+                          <AvatarFallback className="text-xs bg-transparent border-2 border-secondary border-dashed" />
+                        )}
+                      </Avatar>
+                      <span className="text-sm text-muted-foreground">
+                        {technician ? technician.name : "Unassigned"}
+                      </span>
+                    </div>
+                  )}
+                    </div>
+                  </>
+                )}
+
+                {/* Editor Assigned - hide if agent and unassigned */}
+                {(!isAgentUser || editorDisplayName !== "Unassigned") && (
+                  <>
+                    <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
+                      Editor Assigned
+                    </div>
+                    <div className="flex items-center">
+                      {renderAssigneeSelector({
+                        isAssigned: editorDisplayName !== "Unassigned",
+                        name: editorDisplayName,
+                        avatar: editorDisplayAvatar,
+                        label: "Assign Editor",
+                        onClear: assignedEditor
+                          ? () => handleAssignEditorInline("")
+                          : undefined,
+                        canEdit: canAssignTechnicianOrEditor,
+                        disabled: loadingAssignments,
+                        children: (
                       <DropdownMenuContent
                         align="start"
                         className="w-72 max-h-[300px] overflow-y-auto p-0"
@@ -2893,12 +3003,14 @@ export function JobTaskView({
                           </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
+                    ),
+                  })}
+                    </div>
+                  </>
+                )}
 
                 {/* Schedule Date */}
-                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                   Schedule Date
                 </div>
                 <div className="text-sm text-muted-foreground">
@@ -2908,7 +3020,7 @@ export function JobTaskView({
                 </div>
 
                 {/* Status */}
-                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                   Status
                 </div>
                 <div>
@@ -2935,7 +3047,7 @@ export function JobTaskView({
                 </div>
 
                 {/* Tags (Media Types) */}
-                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                   Tags
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -2952,7 +3064,7 @@ export function JobTaskView({
                 </div>
 
                 {/* Priority */}
-                <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                   Priority
                 </div>
                 <div
@@ -2965,7 +3077,7 @@ export function JobTaskView({
                 </div>
 
                 {/* Created By */}
-                {/* <div className="text-[13px] font-medium text-muted-foreground tracking-wide">
+                {/* <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                   Created by
                 </div>
                 <div className="inline-flex items-center gap-2">

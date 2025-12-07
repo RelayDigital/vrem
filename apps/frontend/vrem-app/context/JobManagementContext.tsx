@@ -117,11 +117,18 @@ export function JobManagementProvider({
       const hasOrgRole = Boolean(memberRoleUpper || userRoleUpper);
       const isProjectManagerRole =
         memberRoleUpper === 'PROJECT_MANAGER' || userRoleUpper === 'PROJECT_MANAGER';
+      // TECHNICIAN and EDITOR can only see their own assigned projects
+      const isLimitedRole =
+        memberRoleUpper === 'TECHNICIAN' || memberRoleUpper === 'EDITOR' ||
+        userRoleUpper === 'TECHNICIAN' || userRoleUpper === 'EDITOR';
       const effectiveRole = toEffectiveRole(memberRoleUpper || userRoleUpper);
+      // Only OWNER/ADMIN can view all org projects via listForOrg
+      // PROJECT_MANAGER, TECHNICIAN, EDITOR should use listForCurrentUser
       const canViewOrgProjects =
         hasOrgRole &&
         userRoleUpper !== 'AGENT' &&
         !isProjectManagerRole &&
+        !isLimitedRole &&
         effectiveRole === 'COMPANY';
 
       let fetchedProjects: Project[] = [];

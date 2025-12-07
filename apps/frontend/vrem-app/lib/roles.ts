@@ -55,6 +55,31 @@ const AGENT_NAV_ITEMS: NavItem[] = [
 const PROVIDER_NAV_ITEMS: NavItem[] = [
   { path: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard' },
   { path: '/jobs/all-jobs', label: 'Jobs', icon: 'Briefcase' },
+  { path: '/map', label: 'Map', icon: 'Map' },
+  { path: '/calendar', label: 'Calendar', icon: 'Calendar' },
+];
+
+/** 
+ * Navigation items for TECHNICIAN in COMPANY org.
+ * Restricted "workbench" view - only sees assigned jobs.
+ */
+const TECHNICIAN_NAV_ITEMS: NavItem[] = [
+  { path: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard' },
+  { path: '/jobs/all-jobs', label: 'My Jobs', icon: 'Briefcase' },
+  { path: '/map', label: 'Map', icon: 'Map' },
+  { path: '/calendar', label: 'Calendar', icon: 'Calendar' },
+];
+
+/** 
+ * Navigation items for EDITOR in COMPANY org.
+ * Restricted "workbench" view - only sees assigned editing jobs.
+ * No access to customer-facing features.
+ */
+const EDITOR_NAV_ITEMS: NavItem[] = [
+  { path: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard' },
+  { path: '/jobs/all-jobs', label: 'My Jobs', icon: 'Briefcase' },
+  { path: '/jobs/job-management', label: 'Job Board', icon: 'Kanban' },
+  { path: '/map', label: 'Map', icon: 'Map' },
   { path: '/calendar', label: 'Calendar', icon: 'Calendar' },
 ];
 
@@ -176,8 +201,18 @@ export function getUIContext(
       canCreateOrder = true;
       createActionLabel = 'Create Order';
       createActionPath = '/booking'; // Use original AgentBookingFlow
+    } else if (orgType === 'COMPANY' && roleUpper === 'EDITOR') {
+      // EDITOR in COMPANY org - restricted workbench view
+      navItems = EDITOR_NAV_ITEMS;
+      // Editors don't create jobs - they receive them
+      canCreateOrder = false;
+    } else if (orgType === 'COMPANY' && roleUpper === 'TECHNICIAN') {
+      // TECHNICIAN in COMPANY org - restricted workbench view
+      navItems = TECHNICIAN_NAV_ITEMS;
+      // Technicians don't create jobs - they receive them
+      canCreateOrder = false;
     } else if (accountType === 'PROVIDER' || accountType === 'COMPANY') {
-      // PROVIDER in PERSONAL org or TECHNICIAN/EDITOR in COMPANY org
+      // PROVIDER in PERSONAL org
       navItems = PROVIDER_NAV_ITEMS;
       // Providers don't create jobs - they receive them
       canCreateOrder = false;

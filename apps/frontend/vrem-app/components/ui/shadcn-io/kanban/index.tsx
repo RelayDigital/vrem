@@ -95,6 +95,8 @@ export const KanbanBoard = ({ id, children, className }: KanbanBoardProps) => {
 export type KanbanCardProps<T extends KanbanItemProps = KanbanItemProps> = T & {
   children?: ReactNode;
   className?: string;
+  /** Disable drag and drop for this card (read-only mode) */
+  disabled?: boolean;
 };
 
 export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
@@ -102,6 +104,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
   name,
   children,
   className,
+  disabled = false,
 }: KanbanCardProps<T>) => {
   const {
     attributes,
@@ -112,6 +115,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
     isDragging,
   } = useSortable({
     id,
+    disabled,
   });
   const { activeCardId } = useContext(KanbanContext) as KanbanContextProps;
 
@@ -120,12 +124,17 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
     transform: CSS.Transform.toString(transform),
   };
 
+  // When disabled, don't attach drag listeners
+  const dragProps = disabled ? {} : { ...listeners, ...attributes };
+
   return (
     <>
-      <div style={style} {...listeners} {...attributes} ref={setNodeRef}>
+      <div style={style} {...dragProps} ref={setNodeRef}>
         <Card
           className={cn(
-            'cursor-grab gap-4 rounded-md p-3 shadow-sm',
+            'gap-4 rounded-md p-3 shadow-sm',
+            !disabled && 'cursor-grab',
+            disabled && 'cursor-default',
             isDragging && 'pointer-events-none cursor-grabbing opacity-30',
             className
           )}
@@ -133,7 +142,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
           {children ?? <p className="m-0 font-medium text-sm">{name}</p>}
         </Card>
       </div>
-      {activeCardId === id && (
+      {activeCardId === id && !disabled && (
         <t.In>
           <Card
             className={cn(

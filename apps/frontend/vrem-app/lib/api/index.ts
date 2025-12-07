@@ -1,4 +1,4 @@
-import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer } from '@/types';
+import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse } from '@/types';
 import {
   currentUser,
   jobRequests,
@@ -546,22 +546,25 @@ class ApiClient {
         updatedAt: new Date(c.updatedAt),
       }));
     },
-    create: async (payload: Partial<Customer>): Promise<Customer> => {
+    create: async (payload: Partial<Customer>): Promise<CustomerCreateResponse> => {
       if (USE_MOCK_DATA) {
         const now = new Date();
         return {
-          id: `cust-${Date.now()}`,
-          orgId: payload.orgId || 'org-mock',
-          name: payload.name || 'New Customer',
-          email: payload.email,
-          phone: payload.phone,
-          notes: payload.notes,
-          userId: payload.userId,
-          createdAt: now,
-          updatedAt: now,
+          type: 'customer_created',
+          customer: {
+            id: `cust-${Date.now()}`,
+            orgId: payload.orgId || 'org-mock',
+            name: payload.name || 'New Customer',
+            email: payload.email,
+            phone: payload.phone,
+            notes: payload.notes,
+            userId: payload.userId,
+            createdAt: now,
+            updatedAt: now,
+          },
         };
       }
-      const customer = await this.request<Customer>('/customers', {
+      const response = await this.request<CustomerCreateResponse>('/customers', {
         method: 'POST',
         body: JSON.stringify({
           name: payload.name,
@@ -571,11 +574,17 @@ class ApiClient {
           userId: payload.userId,
         }),
       });
-      return {
-        ...customer,
-        createdAt: new Date(customer.createdAt),
-        updatedAt: new Date(customer.updatedAt),
-      };
+      
+      // Normalize dates if customer is present
+      if (response.customer) {
+        response.customer = {
+          ...response.customer,
+          createdAt: new Date(response.customer.createdAt),
+          updatedAt: new Date(response.customer.updatedAt),
+        };
+      }
+      
+      return response;
     },
     update: async (id: string, payload: Partial<Customer>): Promise<Customer> => {
       if (USE_MOCK_DATA) {
@@ -715,36 +724,36 @@ class ApiClient {
       });
       return this.normalizeProject(project);
     },
-    assignCustomer: async (id: string, customerId: string): Promise<Project> => {
+    assignCustomer: async (id: string, customerId: string | null): Promise<Project> => {
       if (USE_MOCK_DATA) {
         const project = await this.projects.getById(id);
-        return { ...project, customerId, updatedAt: new Date() };
+        return { ...project, customerId: customerId || undefined, updatedAt: new Date() };
       }
       const project = await this.request<Project>(`/projects/${id}/assign-customer`, {
         method: 'PATCH',
-        body: JSON.stringify({ customerId }),
+        body: JSON.stringify({ customerId: customerId || null }),
       });
       return this.normalizeProject(project);
     },
-    assignProjectManager: async (id: string, projectManagerId: string): Promise<Project> => {
+    assignProjectManager: async (id: string, projectManagerId: string | null): Promise<Project> => {
       if (USE_MOCK_DATA) {
         const project = await this.projects.getById(id);
-        return { ...project, projectManagerId, updatedAt: new Date() };
+        return { ...project, projectManagerId: projectManagerId || undefined, updatedAt: new Date() };
       }
       const project = await this.request<Project>(`/projects/${id}/assign-project-manager`, {
         method: 'PATCH',
-        body: JSON.stringify({ projectManagerId }),
+        body: JSON.stringify({ projectManagerId: projectManagerId || null }),
       });
       return this.normalizeProject(project);
     },
-    assignEditor: async (id: string, editorId: string): Promise<Project> => {
+    assignEditor: async (id: string, editorId: string | null): Promise<Project> => {
       if (USE_MOCK_DATA) {
         const project = await this.projects.getById(id);
-        return { ...project, editorId, updatedAt: new Date() };
+        return { ...project, editorId: editorId || undefined, updatedAt: new Date() };
       }
       const project = await this.request<Project>(`/projects/${id}/assign-editor`, {
         method: 'PATCH',
-        body: JSON.stringify({ editorId }),
+        body: JSON.stringify({ editorId: editorId || null }),
       });
       return this.normalizeProject(project);
     },
@@ -1086,6 +1095,7 @@ class ApiClient {
       organizationId: project.orgId,
       clientName: project.customer?.name || 'Unassigned',
       customerId: project.customerId || undefined,
+      customer: project.customer || null, // Include full customer object for linked user checks
       projectManagerId: project.projectManagerId || null,
       projectManager: project.projectManager
         ? {
@@ -1286,6 +1296,69 @@ class ApiClient {
         ];
       }
       throw new Error('Marketplace endpoints are not implemented on the backend.');
+    },
+  };
+
+  // =============================
+  // Notifications API
+  // =============================
+  notifications = {
+    /**
+     * Get all notifications for the current user (invitations + project assignments)
+     */
+    list: async (): Promise<NotificationItem[]> => {
+      if (USE_MOCK_DATA) {
+        return [];
+      }
+      const notifications = await this.request<any[]>('/me/notifications');
+      return notifications.map((n) => ({
+        ...n,
+        createdAt: new Date(n.createdAt),
+        readAt: n.readAt ? new Date(n.readAt) : null,
+      }));
+    },
+
+    /**
+     * Mark a notification as read
+     */
+    markRead: async (id: string): Promise<void> => {
+      if (USE_MOCK_DATA) return;
+      await this.request(`/notifications/${id}/read`, { method: 'POST' });
+    },
+  };
+
+  // =============================
+  // Invitations API
+  // =============================
+  invitations = {
+    /**
+     * Accept an invitation
+     */
+    accept: async (id: string): Promise<void> => {
+      if (USE_MOCK_DATA) return;
+      await this.request(`/invitations/${id}/accept`, { method: 'POST' });
+    },
+
+    /**
+     * Decline an invitation
+     */
+    decline: async (id: string): Promise<void> => {
+      if (USE_MOCK_DATA) return;
+      await this.request(`/invitations/${id}/decline`, { method: 'POST' });
+    },
+
+    /**
+     * Get public organization info for viewing from an invitation
+     */
+    getOrganizationPublic: async (orgId: string): Promise<OrganizationPublicInfo> => {
+      if (USE_MOCK_DATA) {
+        return {
+          id: orgId,
+          name: 'Mock Organization',
+          type: 'COMPANY',
+        };
+      }
+      return this.request<OrganizationPublicInfo>(`/organizations/${orgId}/public`);
     },
   };
 

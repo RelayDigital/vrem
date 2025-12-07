@@ -314,7 +314,12 @@ export function CustomersView({
       const results = await Promise.all(
         payloads.map(async (payload) => {
           try {
-            return await api.customers.create(payload);
+            const response = await api.customers.create(payload);
+            // Return customer if created, null for invitations
+            if (response.type === "customer_created" && response.customer) {
+              return response.customer;
+            }
+            return null;
           } catch (error) {
             console.error("Failed to import customer row", error);
             return null;
@@ -432,9 +437,45 @@ export function CustomersView({
         );
         toast.success("Customer updated");
       } else {
-        const created = await api.customers.create(payload);
-        setCustomerList((prev) => [created, ...prev]);
-        toast.success("Customer added");
+        const response = await api.customers.create(payload);
+        
+        // Handle different response types
+        switch (response.type) {
+          case "customer_created":
+            if (response.customer) {
+              setCustomerList((prev) => [response.customer!, ...prev]);
+              toast.success("Customer added");
+            }
+            break;
+          case "invitation_sent":
+            toast.success(response.message || `Invitation sent to ${payload.email}`);
+            break;
+          case "invitation_pending":
+            toast.info(response.message || `An invitation is already pending for ${payload.email}`);
+            break;
+          case "existing_customer":
+            toast.info(response.message || `${payload.email} is already a customer`);
+            if (response.customer) {
+              // Refresh the list to ensure we have the latest
+              const customers = await api.customers.list();
+              setCustomerList(customers);
+            }
+            break;
+          case "existing_customer_linked":
+            toast.success(response.message || `${payload.email} has been linked to their account`);
+            if (response.customer) {
+              // Refresh the list to get the updated customer with userId
+              const customers = await api.customers.list();
+              setCustomerList(customers);
+            }
+            break;
+          default:
+            // Fallback for backward compatibility
+            if (response.customer) {
+              setCustomerList((prev) => [response.customer!, ...prev]);
+              toast.success("Customer added");
+            }
+        }
       }
       setDialogOpen(false);
       resetForm();

@@ -619,10 +619,10 @@ export function JobCard({
             </div>
           </div>
 
-          {/* Listing Attribution - Client Name */}
+          {/* Listing Attribution - Customer Name */}
           <div className="mt-1">
             <P className="text-[11px] leading-[1.4] text-muted-foreground italic">
-              Client: {job.clientName}
+              Customer: {job.clientName}
             </P>
           </div>
 

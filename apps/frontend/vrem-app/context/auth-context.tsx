@@ -62,14 +62,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const orgs = await api.organizations.listMine();
           setMemberships(orgs);
           const storedOrg = api.organizations.getActiveOrganization();
+          // Validate stored org is in user's memberships
+          const isValidStoredOrg = storedOrg && orgs.some((m) => m.orgId === storedOrg);
           const personal = orgs.find(
             (m) =>
               m.organization?.type === "PERSONAL" ||
               (m.organization as any)?.type === "PERSONAL"
           );
           const resolvedOrgId =
-            storedOrg ||
-            user.organizationId ||
+            (isValidStoredOrg ? storedOrg : null) ||
             personal?.orgId ||
             orgs[0]?.orgId ||
             null;
@@ -128,14 +129,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(normalizeUser(response.user));
       const orgs = await api.organizations.listMine();
       setMemberships(orgs);
+      const storedOrg = api.organizations.getActiveOrganization();
+      // Validate stored org is in user's memberships
+      const isValidStoredOrg = storedOrg && orgs.some((m) => m.orgId === storedOrg);
       const personal = orgs.find(
         (m) =>
           m.organization?.type === "PERSONAL" ||
           (m.organization as any)?.type === "PERSONAL"
       );
       const resolvedOrgId =
-        api.organizations.getActiveOrganization() ||
-        response.user.organizationMemberships?.[0]?.orgId ||
+        (isValidStoredOrg ? storedOrg : null) ||
         personal?.orgId ||
         orgs[0]?.orgId ||
         null;
@@ -162,14 +165,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(normalizeUser(response.user));
       const orgs = await api.organizations.listMine();
       setMemberships(orgs);
+      const storedOrg = api.organizations.getActiveOrganization();
+      // Validate stored org is in user's memberships
+      const isValidStoredOrg = storedOrg && orgs.some((m) => m.orgId === storedOrg);
       const personal = orgs.find(
         (m) =>
           m.organization?.type === "PERSONAL" ||
           (m.organization as any)?.type === "PERSONAL"
       );
       const resolvedOrgId =
-        api.organizations.getActiveOrganization() ||
-        response.user.organizationMemberships?.[0]?.orgId ||
+        (isValidStoredOrg ? storedOrg : null) ||
         personal?.orgId ||
         orgs[0]?.orgId ||
         null;

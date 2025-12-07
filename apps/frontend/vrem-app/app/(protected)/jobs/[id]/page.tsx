@@ -32,7 +32,6 @@ export default function JobDetailPage() {
   const roleUpper = (
     (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
   ).toUpperCase();
-  const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
   const [, setLoadingTechnicians] = useState(false);
 
   const jobId = params?.id as string;
@@ -40,6 +39,8 @@ export default function JobDetailPage() {
   const isAgent =
     (user?.accountType || "").toUpperCase() === "AGENT" ||
     userRole === "AGENT";
+  // Agents can always view customer chat (they ARE the customer)
+  const canViewCustomerChat = isAgent || ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
 
   // Load job by ID
   useEffect(() => {
@@ -70,23 +71,29 @@ export default function JobDetailPage() {
   }, [jobId, jobManagement]);
 
   // Fetch messages when job is loaded
+  // Agents only see CUSTOMER channel (they are the customer)
+  // Other roles can see both TEAM and CUSTOMER channels
   useEffect(() => {
     if (
       jobManagement.selectedJob &&
       jobManagement.selectedJob.id === jobId
     ) {
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
-      messaging.fetchMessages(jobId, "TEAM", orgId);
+      // Agents should only fetch CUSTOMER channel, not TEAM
+      if (!isAgent) {
+        messaging.fetchMessages(jobId, "TEAM", orgId);
+      }
       if (canViewCustomerChat) {
         messaging.fetchMessages(jobId, "CUSTOMER", orgId);
       }
     }
-  }, [jobManagement.selectedJob, jobId, messaging, canViewCustomerChat]);
+  }, [jobManagement.selectedJob, jobId, messaging, canViewCustomerChat, isAgent]);
 
   useEffect(() => {
     let cancelled = false;
     const loadTechnicians = async () => {
-      if (!user) return;
+      // Agents don't need to load technicians - they're customers, not managers
+      if (!user || isAgent) return;
       setLoadingTechnicians(true);
       try {
         const techs = await fetchOrganizationTechnicians();
@@ -109,7 +116,7 @@ export default function JobDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, isAgent]);
 
   if (isLoading) {
     return <JobsLoadingSkeleton />;

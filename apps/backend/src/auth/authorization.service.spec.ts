@@ -109,8 +109,9 @@ describe('AuthorizationService', () => {
 
     it('PERSONAL_OWNER can view projects', () => {
       const ctx = createContext(OrgType.PERSONAL, OrgRole.OWNER);
+      const user = mockUser();
       const project = mockProject({ orgId: ctx.org.id });
-      expect(service.canViewProject(ctx, project)).toBe(true);
+      expect(service.canViewProject(ctx, project, user)).toBe(true);
     });
 
     it('PERSONAL_OWNER can manage projects', () => {
@@ -157,7 +158,7 @@ describe('AuthorizationService', () => {
       expect(ctx.effectiveRole).toBe('NONE');
 
       const project = mockProject({ orgId: ctx.org.id });
-      expect(service.canViewProject(ctx, project)).toBe(false);
+      expect(service.canViewProject(ctx, project, user)).toBe(false);
       expect(service.canManageOrgSettings(ctx, user)).toBe(false);
     });
   });
@@ -224,8 +225,9 @@ describe('AuthorizationService', () => {
 
       it('can view projects', () => {
         const ctx = createContext(OrgType.COMPANY, OrgRole.PROJECT_MANAGER);
+        const user = mockUser();
         const project = mockProject({ orgId: ctx.org.id });
-        expect(service.canViewProject(ctx, project)).toBe(true);
+        expect(service.canViewProject(ctx, project, user)).toBe(true);
       });
     });
 
@@ -242,10 +244,18 @@ describe('AuthorizationService', () => {
         expect(service.canManageProject(ctx, project)).toBe(false);
       });
 
-      it('can view projects', () => {
-        const ctx = createContext(OrgType.COMPANY, OrgRole.TECHNICIAN);
-        const project = mockProject({ orgId: ctx.org.id });
-        expect(service.canViewProject(ctx, project)).toBe(true);
+      it('can view assigned projects', () => {
+        const user = mockUser();
+        const ctx = createContext(OrgType.COMPANY, OrgRole.TECHNICIAN, user.id);
+        const project = mockProject({ orgId: ctx.org.id, technicianId: user.id });
+        expect(service.canViewProject(ctx, project, user)).toBe(true);
+      });
+
+      it('cannot view unassigned projects', () => {
+        const user = mockUser();
+        const ctx = createContext(OrgType.COMPANY, OrgRole.TECHNICIAN, user.id);
+        const project = mockProject({ orgId: ctx.org.id, technicianId: 'other-user' });
+        expect(service.canViewProject(ctx, project, user)).toBe(false);
       });
 
       it('can update own work on assigned project', () => {
@@ -304,10 +314,18 @@ describe('AuthorizationService', () => {
     });
 
     describe('EDITOR role', () => {
-      it('can view projects', () => {
-        const ctx = createContext(OrgType.COMPANY, OrgRole.EDITOR);
-        const project = mockProject({ orgId: ctx.org.id });
-        expect(service.canViewProject(ctx, project)).toBe(true);
+      it('can view assigned projects', () => {
+        const user = mockUser();
+        const ctx = createContext(OrgType.COMPANY, OrgRole.EDITOR, user.id);
+        const project = mockProject({ orgId: ctx.org.id, editorId: user.id });
+        expect(service.canViewProject(ctx, project, user)).toBe(true);
+      });
+
+      it('cannot view unassigned projects', () => {
+        const user = mockUser();
+        const ctx = createContext(OrgType.COMPANY, OrgRole.EDITOR, user.id);
+        const project = mockProject({ orgId: ctx.org.id, editorId: 'other-user' });
+        expect(service.canViewProject(ctx, project, user)).toBe(false);
       });
 
       it('can update own work on assigned project', () => {
@@ -334,9 +352,10 @@ describe('AuthorizationService', () => {
 
   describe('Cross-org access prevention', () => {
     it('cannot view project from different org', () => {
+      const user = mockUser();
       const ctx = createContext(OrgType.COMPANY, OrgRole.OWNER);
       const project = mockProject({ orgId: 'different-org' });
-      expect(service.canViewProject(ctx, project)).toBe(false);
+      expect(service.canViewProject(ctx, project, user)).toBe(false);
     });
 
     it('cannot manage project from different org', () => {

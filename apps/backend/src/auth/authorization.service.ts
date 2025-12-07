@@ -1,6 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { OrgType, Project } from '@prisma/client';
+import { OrgType, Project, UserAccountType } from '@prisma/client';
 import { AuthenticatedUser, EffectiveOrgRole, OrgContext } from './auth-context';
+
+/**
+ * Extended project type that includes customer relation for authorization checks.
+ */
+type ProjectWithCustomer = Project & {
+  customer?: { userId?: string | null } | null;
+};
 
 /**
  * Roles that can create projects/orders.
@@ -57,10 +64,31 @@ export class AuthorizationService {
   // =============================
 
   /**
-   * Determines if a user can view a project.
-   * All org members can view all projects in their org for situational awareness.
+   * Check if user is the linked customer for a project.
+   * Used to grant agents access to projects they're assigned to as customers.
    */
-  canViewProject(ctx: OrgContext, project: Project): boolean {
+  private isLinkedCustomer(project: ProjectWithCustomer, user: AuthenticatedUser): boolean {
+    return !!(
+      user.accountType === UserAccountType.AGENT &&
+      project.customer?.userId &&
+      project.customer.userId === user.id
+    );
+  }
+
+  /**
+   * Determines if a user can view a project.
+   * 
+   * - OWNER/ADMIN/PROJECT_MANAGER: Can view ALL projects in their org
+   * - TECHNICIAN: Can view ONLY projects where they are assigned as technicianId
+   * - EDITOR: Can view ONLY projects where they are assigned as editorId
+   * - AGENT (customer): Can view projects where they are the linked customer (cross-org)
+   */
+  canViewProject(ctx: OrgContext, project: ProjectWithCustomer, user: AuthenticatedUser): boolean {
+    // AGENT customers can view projects they're assigned to, regardless of org
+    if (this.isLinkedCustomer(project, user)) {
+      return true;
+    }
+
     if (project.orgId !== ctx.org.id) {
       return false;
     }
@@ -69,8 +97,22 @@ export class AuthorizationService {
       return ctx.effectiveRole === 'PERSONAL_OWNER';
     }
 
-    // All org members can view all projects in their org
-    return ctx.effectiveRole !== 'NONE';
+    // OWNER, ADMIN, PROJECT_MANAGER can view all projects in their org
+    if (['OWNER', 'ADMIN', 'PROJECT_MANAGER'].includes(ctx.effectiveRole)) {
+      return true;
+    }
+
+    // TECHNICIAN can only view projects they're assigned to
+    if (ctx.effectiveRole === 'TECHNICIAN') {
+      return project.technicianId === user.id;
+    }
+
+    // EDITOR can only view projects they're assigned to
+    if (ctx.effectiveRole === 'EDITOR') {
+      return project.editorId === user.id;
+    }
+
+    return false;
   }
 
   // =============================
@@ -245,9 +287,11 @@ export class AuthorizationService {
 
   /**
    * Determines if a user can read team chat messages.
-   * All org members can read team chat for operational context.
+   * 
+   * - OWNER/ADMIN/PROJECT_MANAGER: Can read team chat for all org projects
+   * - TECHNICIAN/EDITOR: Can read team chat ONLY for projects they can view (assigned to)
    */
-  canReadTeamChat(ctx: OrgContext, project: Project): boolean {
+  canReadTeamChat(ctx: OrgContext, project: Project, user: AuthenticatedUser): boolean {
     if (project.orgId !== ctx.org.id) {
       return false;
     }
@@ -256,23 +300,33 @@ export class AuthorizationService {
       return ctx.effectiveRole === 'PERSONAL_OWNER';
     }
 
-    return ctx.effectiveRole !== 'NONE';
+    // Must be able to view the project to read its team chat
+    return this.canViewProject(ctx, project, user);
   }
 
   /**
    * Determines if a user can write to team chat.
-   * All org members can write to team chat.
+   * Same rules as reading - must be able to view the project.
    */
-  canWriteTeamChat(ctx: OrgContext, project: Project): boolean {
-    // Same as read - all org members can write team chat
-    return this.canReadTeamChat(ctx, project);
+  canWriteTeamChat(ctx: OrgContext, project: Project, user: AuthenticatedUser): boolean {
+    // Same as read - must be able to view the project
+    return this.canReadTeamChat(ctx, project, user);
   }
 
   /**
    * Determines if a user can read customer chat messages.
-   * All org members can read customer chat for operational context.
+   * 
+   * - OWNER/ADMIN/PROJECT_MANAGER: Can read customer chat for all org projects
+   * - TECHNICIAN: Cannot read customer chat (hidden in UI)
+   * - EDITOR: Cannot read customer chat (hidden in UI)
+   * - AGENT (customer): Can read customer chat for projects they're assigned to
    */
-  canReadCustomerChat(ctx: OrgContext, project: Project): boolean {
+  canReadCustomerChat(ctx: OrgContext, project: ProjectWithCustomer, user: AuthenticatedUser): boolean {
+    // AGENT customers can read customer chat for their assigned projects
+    if (this.isLinkedCustomer(project, user)) {
+      return true;
+    }
+
     if (project.orgId !== ctx.org.id) {
       return false;
     }
@@ -281,8 +335,18 @@ export class AuthorizationService {
       return ctx.effectiveRole === 'PERSONAL_OWNER';
     }
 
-    // All org members can read customer chat for context
-    return ctx.effectiveRole !== 'NONE';
+    // EDITOR cannot read customer chat
+    if (ctx.effectiveRole === 'EDITOR') {
+      return false;
+    }
+
+    // TECHNICIAN cannot read customer chat
+    if (ctx.effectiveRole === 'TECHNICIAN') {
+      return false;
+    }
+
+    // OWNER, ADMIN, PROJECT_MANAGER can read customer chat for all org projects
+    return ['OWNER', 'ADMIN', 'PROJECT_MANAGER'].includes(ctx.effectiveRole);
   }
 
   /**
@@ -291,12 +355,18 @@ export class AuthorizationService {
    * - OWNER/ADMIN: Can write to any project's customer chat
    * - PROJECT_MANAGER: Can write ONLY to customer chat on projects they manage
    * - TECHNICIAN/EDITOR: Cannot write to customer chat
+   * - AGENT (customer): Can write to customer chat for projects they're assigned to
    */
   canWriteCustomerChat(
     ctx: OrgContext,
-    project: Project,
+    project: ProjectWithCustomer,
     user: AuthenticatedUser,
   ): boolean {
+    // AGENT customers can write to customer chat for their assigned projects
+    if (this.isLinkedCustomer(project, user)) {
+      return true;
+    }
+
     if (project.orgId !== ctx.org.id) {
       return false;
     }
@@ -325,10 +395,15 @@ export class AuthorizationService {
    */
   canPostMessage(
     ctx: OrgContext,
-    project: Project,
+    project: ProjectWithCustomer,
     channel: 'team' | 'customer',
     user: AuthenticatedUser,
   ): boolean {
+    // AGENT customers can post to customer chat regardless of org
+    if (this.isLinkedCustomer(project, user) && channel === 'customer') {
+      return true;
+    }
+
     if (project.orgId !== ctx.org.id) {
       return false;
     }
@@ -336,7 +411,7 @@ export class AuthorizationService {
     const normalizedChannel = channel === 'customer' ? 'customer' : 'team';
 
     if (normalizedChannel === 'team') {
-      return this.canWriteTeamChat(ctx, project);
+      return this.canWriteTeamChat(ctx, project, user);
     }
 
     return this.canWriteCustomerChat(ctx, project, user);

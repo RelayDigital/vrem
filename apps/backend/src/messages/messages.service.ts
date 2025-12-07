@@ -37,6 +37,9 @@ export class MessagesService {
   /**
    * Check if user has access to a project's messages.
    * Used for WebSocket/real-time message subscriptions.
+   * 
+   * - EDITOR/TECHNICIAN cannot access customer chat
+   * - EDITOR/TECHNICIAN can only access team chat for projects they're assigned to
    */
   async userHasAccessToProject(
     user: AuthenticatedUser,
@@ -60,14 +63,13 @@ export class MessagesService {
       membership,
     });
 
-    // All org members can READ both channels
-    // For WRITE access to customer chat, check canWriteCustomerChat
+    // Check read access based on channel
+    // EDITOR/TECHNICIAN cannot read customer chat
     if (channel === 'customer') {
-      // For subscription purposes, check read access (all org members can read)
-      return this.authorization.canReadCustomerChat(ctx, project as any);
+      return this.authorization.canReadCustomerChat(ctx, project as any, user);
     }
 
-    return this.authorization.canReadTeamChat(ctx, project as any);
+    return this.authorization.canReadTeamChat(ctx, project as any, user);
   }
 
   /**
@@ -183,14 +185,14 @@ export class MessagesService {
   ) {
     const project = await this.loadProject(projectId, ctx);
     
-    if (!this.authorization.canViewProject(ctx, project)) {
+    if (!this.authorization.canViewProject(ctx, project, user)) {
       throw new ForbiddenException('You are not allowed to view messages');
     }
 
-    // All org members can READ both team and customer chat
     // Determine which channels to return based on request and read permissions
-    const canReadTeam = this.authorization.canReadTeamChat(ctx, project);
-    const canReadCustomer = this.authorization.canReadCustomerChat(ctx, project);
+    // EDITOR/TECHNICIAN cannot read customer chat
+    const canReadTeam = this.authorization.canReadTeamChat(ctx, project, user);
+    const canReadCustomer = this.authorization.canReadCustomerChat(ctx, project, user);
 
     let channels: ProjectChatChannel[] = [];
     
@@ -234,17 +236,18 @@ export class MessagesService {
     if (!message) throw new NotFoundException('Message not found');
     const project = await this.loadProject(message.projectId, ctx);
     
-    if (!this.authorization.canViewProject(ctx, project)) {
+    if (!this.authorization.canViewProject(ctx, project, user)) {
       throw new ForbiddenException('You are not allowed to view this message');
     }
     
     // Check read permission based on channel
+    // EDITOR/TECHNICIAN cannot read customer chat
     if (message.channel === ProjectChatChannel.CUSTOMER) {
-      if (!this.authorization.canReadCustomerChat(ctx, project)) {
+      if (!this.authorization.canReadCustomerChat(ctx, project, user)) {
         throw new ForbiddenException('You are not allowed to view this message');
       }
     } else {
-      if (!this.authorization.canReadTeamChat(ctx, project)) {
+      if (!this.authorization.canReadTeamChat(ctx, project, user)) {
         throw new ForbiddenException('You are not allowed to view this message');
       }
     }
@@ -265,7 +268,7 @@ export class MessagesService {
 
     const project = await this.loadProject(message.projectId, ctx);
 
-    if (!this.authorization.canViewProject(ctx, project)) {
+    if (!this.authorization.canViewProject(ctx, project, currentUser)) {
       throw new ForbiddenException('You are not allowed to delete this message');
     }
 
@@ -279,7 +282,7 @@ export class MessagesService {
         throw new ForbiddenException('You are not allowed to delete this message');
       }
     } else {
-      if (!this.authorization.canWriteTeamChat(ctx, project)) {
+      if (!this.authorization.canWriteTeamChat(ctx, project, currentUser)) {
         throw new ForbiddenException('You are not allowed to delete this message');
       }
     }

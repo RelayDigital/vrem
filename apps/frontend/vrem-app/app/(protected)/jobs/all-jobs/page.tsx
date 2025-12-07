@@ -39,20 +39,29 @@ export default function JobsPage() {
     (user?.accountType || "").toUpperCase() === "AGENT";
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [, setLoadingTechnicians] = useState(false);
+  // Jobs assigned to the current user (as technician or editor)
   const assignedJobs = useMemo(() => {
     if (!user) return [];
     return jobManagement.jobs.filter(
       (job) =>
         job.assignedTechnicianId === user.id ||
-        job.assignedTechnicianId === user.id
+        job.editorId === user.id
     );
+  }, [jobManagement.jobs, user]);
+
+  // Jobs assigned to the current user as editor specifically
+  const editorAssignedJobs = useMemo(() => {
+    if (!user) return [];
+    return jobManagement.jobs.filter((job) => job.editorId === user.id);
   }, [jobManagement.jobs, user]);
 
   const activeMembership = memberships.find((m) => m.orgId === organizationId);
   const roleUpper = (
     (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
   ).toUpperCase();
-  const canViewCustomerChat = ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
+  // Agents can always view customer chat (they ARE the customer)
+  // Other roles need OWNER/ADMIN/PROJECT_MANAGER
+  const canViewCustomerChat = isAgent || ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
 
   // Listen for navigation events to open job task view
   useEffect(() => {
@@ -77,20 +86,26 @@ export default function JobsPage() {
   }, [jobManagement]);
 
   // Fetch messages when selected job changes
+  // Agents only see CUSTOMER channel (they are the customer)
+  // Other roles can see both TEAM and CUSTOMER channels
   useEffect(() => {
     if (jobManagement.selectedJob) {
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
-      messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+      // Agents should only fetch CUSTOMER channel, not TEAM
+      if (!isAgent) {
+        messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+      }
       if (canViewCustomerChat) {
         messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
       }
     }
-  }, [jobManagement.selectedJob, messaging, canViewCustomerChat]);
+  }, [jobManagement.selectedJob, messaging, canViewCustomerChat, isAgent]);
 
   useEffect(() => {
     let cancelled = false;
     const loadTechnicians = async () => {
-      if (!user) return;
+      // Agents don't need to load technicians - they're customers, not managers
+      if (!user || isAgent) return;
       setLoadingTechnicians(true);
       try {
         const techs = await fetchOrganizationTechnicians();
@@ -114,7 +129,7 @@ export default function JobsPage() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, isAgent]);
 
   if (isLoading) {
     return <JobsLoadingSkeleton />;
@@ -275,7 +290,7 @@ export default function JobsPage() {
     );
   }
 
-  // Technician/Technician: Filter to assigned jobs only
+  // Technician: Filter to assigned jobs only (where they are the technician)
   if (userRole === "TECHNICIAN") {
     const technicianList = technicians;
 
@@ -377,25 +392,118 @@ export default function JobsPage() {
     );
   }
 
-  // Agent: Use AgentJobsView - filtered to only their orders
-  if (userRole === "AGENT") {
+  // Editor: Filter to assigned jobs only (where they are the editor)
+  if (roleUpper === "EDITOR") {
     const technicianList = technicians;
-    // Filter to only jobs where the agent is the project manager or creator
-    const agentJobs = jobManagement.jobCards.filter(
-      (job) =>
-        job.projectManagerId === user.id ||
-        job.createdBy === user.id ||
-        job.customerId === user.id
-    );
 
+    return (
+      <div className="size-full overflow-x-hidden space-y-6">
+        <JobDataBoundary fallback={<JobsGridSkeleton />}>
+          <JobsView
+            jobs={editorAssignedJobs}
+            technicians={technicianList}
+            messages={messaging.messages}
+            onViewRankings={() => {}}
+            onChangeTechnician={undefined}
+            onJobStatusChange={handleJobStatusChangeWrapper}
+            onJobClick={handleJobClick}
+            activeView="all"
+          />
+        </JobDataBoundary>
+
+        {/* Job Task View - Sheet */}
+        <JobTaskView
+          job={jobManagement.selectedJob}
+          messages={
+            jobManagement.selectedJob
+              ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
+              : []
+          }
+          currentUserId={user?.id || "current-user-id"}
+          currentUserName={user?.name || "Current User"}
+          isClient={false}
+          open={jobManagement.showTaskView}
+          onOpenChange={handleTaskViewClose}
+          onSendMessage={(content, chatType, threadId) =>
+            messaging.sendMessage(
+              jobManagement.selectedJob?.id || "",
+              content,
+              chatType,
+              threadId
+            )
+          }
+          onEditMessage={(messageId, content) =>
+            messaging.editMessage(messageId, content)
+          }
+          onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
+          onStatusChange={(status) => {
+            if (jobManagement.selectedJob) {
+              handleJobStatusChangeWrapper(
+                jobManagement.selectedJob.id,
+                status
+              );
+            }
+          }}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
+          variant="sheet"
+          onFullScreen={handleFullScreen}
+          onOpenInNewPage={handleOpenInNewPage}
+        />
+
+        {/* Job Task View - Dialog (Full Screen) */}
+        <JobTaskView
+          job={jobManagement.selectedJob}
+          messages={
+            jobManagement.selectedJob
+              ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
+              : []
+          }
+          currentUserId={user?.id || "current-user-id"}
+          currentUserName={user?.name || "Current User"}
+          isClient={false}
+          open={jobManagement.showTaskDialog}
+          onOpenChange={handleTaskDialogClose}
+          onSendMessage={(content, chatType, threadId) =>
+            messaging.sendMessage(
+              jobManagement.selectedJob?.id || "",
+              content,
+              chatType,
+              threadId
+            )
+          }
+          onEditMessage={(messageId, content) =>
+            messaging.editMessage(messageId, content)
+          }
+          onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
+          onStatusChange={(status) => {
+            if (jobManagement.selectedJob) {
+              handleJobStatusChangeWrapper(
+                jobManagement.selectedJob.id,
+                status
+              );
+            }
+          }}
+          onAssignTechnician={jobManagement.handleAssignTechnician}
+          onChangeTechnician={jobManagement.handleChangeTechnician}
+          variant="dialog"
+        />
+      </div>
+    );
+  }
+
+  // Agent: Use AgentJobsView
+  // Backend already filters to only return projects where agent is customer or project manager
+  // No additional frontend filtering needed
+  if (userRole === "AGENT") {
     return (
       <div className="size-full overflow-x-hidden">
         <JobDataBoundary fallback={<JobsGridSkeleton />}>
           <AgentJobsView
-            jobs={agentJobs}
-            technicians={technicianList}
+            jobs={jobManagement.jobCards}
+            technicians={[]}
             organizationId={user.organizationId || ""}
-            onNewJobClick={() => router.push("/orders/new")}
+            onNewJobClick={() => router.push("/booking")}
           />
         </JobDataBoundary>
       </div>

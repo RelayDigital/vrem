@@ -321,7 +321,15 @@ export default function OrganizationSettingsPage() {
 
   const isAllowed = membershipElevated || isPersonalOrg;
 
+  // Check if this is an AGENT's personal org (minimal settings)
+  const accountType = (user?.accountType || "").toUpperCase();
+  const isAgentPersonalOrg = isPersonalOrg && accountType === "AGENT";
+  const isProviderPersonalOrg = isPersonalOrg && accountType === "PROVIDER";
+
+  // Sections hidden for different org types
   const companyOnlySections = ["branding", "serviceAreas", "booking", "analytics"];
+  // For AGENT personal orgs, also hide address section (they don't provide services)
+  const agentHiddenSections = [...companyOnlySections, "address"];
   const sections = useMemo(() => {
     const base = [
       { id: "companyDetails", label: "Company Details" },
@@ -333,7 +341,17 @@ export default function OrganizationSettingsPage() {
       { id: "analytics", label: "Analytics" },
     ];
 
+    if (isAgentPersonalOrg) {
+      // AGENT personal org: only show Contact section
+      return base.filter(
+        (section) =>
+          !agentHiddenSections.includes(section.id) &&
+          section.id !== "companyDetails"
+      );
+    }
+    
     if (isPersonalOrg) {
+      // PROVIDER personal org: show Address & Contact
       return base.filter(
         (section) =>
           !companyOnlySections.includes(section.id) &&
@@ -341,11 +359,11 @@ export default function OrganizationSettingsPage() {
       );
     }
     return base;
-  }, [isPersonalOrg]);
+  }, [isPersonalOrg, isAgentPersonalOrg]);
 
   useEffect(() => {
     setCurrentSectionIndex(0);
-  }, [isPersonalOrg]);
+  }, [isPersonalOrg, isAgentPersonalOrg]);
 
   const sectionIsVisible = (id: string) =>
     sections.some((section) => section.id === id);
@@ -430,8 +448,10 @@ export default function OrganizationSettingsPage() {
             <div>
               <H2 className="text-2xl mb-2">Organization Settings</H2>
               <Muted className="text-sm">
-                {isPersonalOrg
-                  ? "Manage your personal organization details. Company-only settings are hidden."
+                {isAgentPersonalOrg
+                  ? "Manage your workspace contact details."
+                  : isPersonalOrg
+                  ? "Manage your personal workspace details."
                   : "Manage your company profile, service areas, and operational preferences."}
               </Muted>
             </div>
@@ -478,8 +498,10 @@ export default function OrganizationSettingsPage() {
               <div className="mb-6">
                 <H2 className="text-2xl mb-2">Organization Settings</H2>
                 <Muted className="text-sm">
-                  {isPersonalOrg
-                    ? "Personal organization: company-only settings are hidden."
+                  {isAgentPersonalOrg
+                    ? "Manage your workspace contact details."
+                    : isPersonalOrg
+                    ? "Manage your personal workspace details."
                     : "Manage your company profile, service areas, and operational preferences."}
                 </Muted>
               </div>
@@ -517,9 +539,14 @@ export default function OrganizationSettingsPage() {
             </div>
 
             <div className="@container w-full flex flex-col">
-              {isPersonalOrg && (
+              {isAgentPersonalOrg && (
                 <div className="mb-md rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-                  Some settings (branding, service areas, booking, analytics) are only available to company organizations and are hidden for personal organizations.
+                  As a real estate agent, your workspace settings are simplified. You can manage your contact information below.
+                </div>
+              )}
+              {isProviderPersonalOrg && (
+                <div className="mb-md rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+                  Some settings (branding, service areas, booking, analytics) are only available to company organizations and are hidden for personal workspaces.
                 </div>
               )}
 
@@ -951,7 +978,9 @@ export default function OrganizationSettingsPage() {
               >
                 {/* Heading */}
                 <div className="mb-md flex items-baseline justify-between">
-                  <H2 className="text-lg border-0">Contact & Communication</H2>
+                  <H2 className="text-lg border-0">
+                    {isAgentPersonalOrg ? "Contact Information" : "Contact & Communication"}
+                  </H2>
                 </div>
 
                 {/* Content */}
@@ -959,7 +988,9 @@ export default function OrganizationSettingsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
                     {/* Primary Email */}
                     <div className="space-y-2">
-                      <Label htmlFor="primary-email">Primary Email</Label>
+                      <Label htmlFor="primary-email">
+                        {isAgentPersonalOrg ? "Email Address" : "Primary Email"}
+                      </Label>
                       <Input
                         id="primary-email"
                         type="email"
@@ -968,29 +999,33 @@ export default function OrganizationSettingsPage() {
                           setPrimaryEmail(e.target.value);
                           setHasChanges(true);
                         }}
-                        placeholder="operations@company.com"
+                        placeholder={isAgentPersonalOrg ? "you@email.com" : "operations@company.com"}
                       />
                       <Muted className="text-xs">
-                        Main contact email for business operations
+                        {isAgentPersonalOrg
+                          ? "Your contact email for order updates"
+                          : "Main contact email for business operations"}
                       </Muted>
                     </div>
-                    {/* Support Email */}
-                    <div className="space-y-2">
-                      <Label htmlFor="support-email">Support Email</Label>
-                      <Input
-                        id="support-email"
-                        type="email"
-                        value={supportEmail}
-                        onChange={(e) => {
-                          setSupportEmail(e.target.value);
-                          setHasChanges(true);
-                        }}
-                        placeholder="support@company.com"
-                      />
-                      <Muted className="text-xs">
-                        Customer support and inquiries
-                      </Muted>
-                    </div>
+                    {/* Support Email - hide for AGENT personal orgs */}
+                    {!isAgentPersonalOrg && (
+                      <div className="space-y-2">
+                        <Label htmlFor="support-email">Support Email</Label>
+                        <Input
+                          id="support-email"
+                          type="email"
+                          value={supportEmail}
+                          onChange={(e) => {
+                            setSupportEmail(e.target.value);
+                            setHasChanges(true);
+                          }}
+                          placeholder="support@company.com"
+                        />
+                        <Muted className="text-xs">
+                          Customer support and inquiries
+                        </Muted>
+                      </div>
+                    )}
                     {/* Phone Number */}
                     <div className="space-y-2">
                       <Label htmlFor="phone">Phone Number</Label>
@@ -1004,77 +1039,100 @@ export default function OrganizationSettingsPage() {
                         }}
                         placeholder="+1 (555) 123-4567"
                       />
+                      {isAgentPersonalOrg && (
+                        <Muted className="text-xs">
+                          Your contact phone for urgent updates
+                        </Muted>
+                      )}
                     </div>
-                    {/* SMS Contact Number (Optional) */}
-                    <div className="space-y-2">
-                      <Label htmlFor="sms">SMS Contact Number (Optional)</Label>
-                      <Input
-                        id="sms"
-                        type="tel"
-                        value={smsNumber}
-                        onChange={(e) => {
-                          setSmsNumber(e.target.value);
-                          setHasChanges(true);
-                        }}
-                        placeholder="+1 (555) 123-4567"
-                      />
-                    </div>
+                    {/* SMS Contact Number (Optional) - hide for AGENT personal orgs */}
+                    {!isAgentPersonalOrg && (
+                      <div className="space-y-2">
+                        <Label htmlFor="sms">SMS Contact Number (Optional)</Label>
+                        <Input
+                          id="sms"
+                          type="tel"
+                          value={smsNumber}
+                          onChange={(e) => {
+                            setSmsNumber(e.target.value);
+                            setHasChanges(true);
+                          }}
+                          placeholder="+1 (555) 123-4567"
+                        />
+                      </div>
+                    )}
                   </div>
-                  {/* Notification Preferences */}
-                  <div className="space-y-4">
-                    <Label>Notification Preferences</Label>
-                    <div className="space-y-3">
-                      {/* Email Notifications */}
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label htmlFor="email-notifications">
-                            Email Notifications
-                          </Label>
-                          <Muted className="text-xs block">
-                            Receive updates via email
-                          </Muted>
+                  {/* Notification Preferences - hide for AGENT personal orgs */}
+                  {!isAgentPersonalOrg && (
+                    <div className="space-y-4">
+                      <Label>Notification Preferences</Label>
+                      <div className="space-y-3">
+                        {/* Email Notifications */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label htmlFor="email-notifications">
+                              Email Notifications
+                            </Label>
+                            <Muted className="text-xs block">
+                              Receive updates via email
+                            </Muted>
+                          </div>
+                          <Switch
+                            id="email-notifications"
+                            // checked={emailNotifications}
+                            // onCheckedChange={setEmailNotifications}
+                          />
                         </div>
-                        <Switch
-                          id="email-notifications"
-                          // checked={emailNotifications}
-                          // onCheckedChange={setEmailNotifications}
-                        />
-                      </div>
-                      {/* SMS Notifications */}
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label htmlFor="sms-notifications">
-                            SMS Notifications
-                          </Label>
-                          <Muted className="text-xs block">
-                            Receive urgent updates via SMS
-                          </Muted>
+                        {/* SMS Notifications */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label htmlFor="sms-notifications">
+                              SMS Notifications
+                            </Label>
+                            <Muted className="text-xs block">
+                              Receive urgent updates via SMS
+                            </Muted>
+                          </div>
+                          <Switch
+                            id="sms-notifications"
+                            // checked={smsNotifications}
+                            // onCheckedChange={setSmsNotifications}
+                          />
                         </div>
-                        <Switch
-                          id="sms-notifications"
-                          // checked={smsNotifications}
-                          // onCheckedChange={setSmsNotifications}
-                        />
-                      </div>
-                      {/* Job Assignment Alerts */}
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label htmlFor="job-assignment-alerts">
-                            Job Assignment Alerts
-                          </Label>
+                        {/* Job Assignment Alerts */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label htmlFor="job-assignment-alerts">
+                              Job Assignment Alerts
+                            </Label>
 
-                          <Muted className="text-xs block">
-                            Notify when jobs are assigned
-                          </Muted>
+                            <Muted className="text-xs block">
+                              Notify when jobs are assigned
+                            </Muted>
+                          </div>
+                          <Switch
+                            id="job-assignment-alerts"
+                            // checked={jobAssignmentAlerts}
+                            // onCheckedChange={setJobAssignmentAlerts}
+                          />
                         </div>
-                        <Switch
-                          id="job-assignment-alerts"
-                          // checked={jobAssignmentAlerts}
-                          // onCheckedChange={setJobAssignmentAlerts}
-                        />
                       </div>
                     </div>
-                  </div>
+                  )}
+                  {/* Save Button for AGENT personal orgs */}
+                  {isAgentPersonalOrg && (
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={handleSave}
+                        disabled={!hasChanges || isSaving}
+                      >
+                        {isSaving && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Save Contact Info
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </section>
 
