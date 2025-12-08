@@ -21,7 +21,11 @@ export default function BookingPage() {
   const [companies, setCompanies] = useState<Organization[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
+  // Determine if user is an agent
+  const isAgent = user?.accountType?.toUpperCase() === "AGENT";
+
   // Fetch technicians and companies for the booking flow
+  // Agents don't need technicians - they select a provider org instead
   useEffect(() => {
     let cancelled = false;
 
@@ -30,10 +34,13 @@ export default function BookingPage() {
 
       setLoadingData(true);
       try {
-        // Fetch available technicians
-        const techs = await fetchOrganizationTechnicians();
-        if (!cancelled) {
-          setTechnicians(techs);
+        // Only fetch technicians for COMPANY users, not agents
+        // Agents select a provider org via ProviderStep, not individual technicians
+        if (!isAgent) {
+          const techs = await fetchOrganizationTechnicians();
+          if (!cancelled) {
+            setTechnicians(techs);
+          }
         }
 
         // Fetch companies (organizations that can fulfill orders)
@@ -59,7 +66,7 @@ export default function BookingPage() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, isAgent]);
 
   // Get preferred vendors (could be from user preferences or org settings)
   const preferredVendors = useMemo(() => {

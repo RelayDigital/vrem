@@ -268,9 +268,13 @@ export default function MapPage() {
   const displayTechnicians = useMemo(() => {
     if (!user) return [];
 
-    const userRole = effectiveRole;
+    // Get the actual membership role (not the simplified effectiveRole)
+    const activeMembership = memberships.find((m) => m.orgId === organizationId);
+    const membershipRole = (
+      (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+    ).toUpperCase();
 
-    // Company/Admin/Owner: show all technicians
+    // Company/Admin/Owner/Project Manager: show all technicians
     if (companyElevated) {
       const hasSelf = technicians.some((t) => t.id === user.id);
       if (!hasSelf && selfTechnician) {
@@ -279,8 +283,14 @@ export default function MapPage() {
       return technicians;
     }
 
-    // Technician: only those involved in their jobs + self
-    if ((userRole || "") === "TECHNICIAN") {
+    // EDITOR: should not see any technicians on the map
+    // They only see jobs they're assigned to edit, not technician locations
+    if (membershipRole === "EDITOR") {
+      return [];
+    }
+
+    // TECHNICIAN: only those involved in their jobs + self
+    if (membershipRole === "TECHNICIAN") {
       const ids = new Set(
         displayJobs
           .map((job) => job.assignedTechnicianId || job.assignedTechnicianId)
@@ -296,7 +306,7 @@ export default function MapPage() {
       return filtered;
     }
 
-    // Default: show all technicians
+    // Default: show all technicians (for any other roles)
     if (selfTechnician && !technicians.some((t) => t.id === user.id)) {
       return [selfTechnician, ...technicians];
     }
@@ -304,7 +314,8 @@ export default function MapPage() {
   }, [
     companyElevated,
     displayJobs,
-    effectiveRole,
+    memberships,
+    organizationId,
     selfTechnician,
     technicians,
     user,

@@ -156,17 +156,23 @@ export default function DashboardPage() {
     };
   }, [user, isPersonalOrg, isProviderAccount, hasOrgLocation, orgGeocodedCoords, activeMembership, organizationId, activeOrg, orgLat, orgLng]);
 
-  const technicians = useMemo(
-    () => providers.filter((p) => p.role === "TECHNICIAN"),
-    [providers]
-  );
+  const roleUpper = (
+    (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
+  ).toUpperCase();
+  
+  // Filter technicians based on role
+  // EDITOR: should not see any technicians on the map
+  const technicians = useMemo(() => {
+    if (roleUpper === "EDITOR") {
+      return [];
+    }
+    return providers.filter((p) => p.role === "TECHNICIAN");
+  }, [providers, roleUpper]);
+  
   const providerProfile = useMemo(() => {
     if (!user) return null;
     return providers.find((provider) => provider.userId === user.id) || null;
   }, [providers, user]);
-  const roleUpper = (
-    (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
-  ).toUpperCase();
   const isAgent = (user?.accountType || "").toUpperCase() === "AGENT";
   // Agents can always view customer chat (they ARE the customer)
   // Other roles need OWNER/ADMIN/PROJECT_MANAGER

@@ -42,7 +42,18 @@ export function ProviderStep({
       setIsLoading(true);
       setError(null);
       try {
+        // Clear org header for this request - /me/customer-organizations is user-scoped,
+        // not org-scoped. Agents may have a stale org ID in localStorage that they don't belong to.
+        const previousOrgId = api.organizations.getActiveOrganization();
+        api.organizations.setActiveOrganization(null);
+        
         const orgs = await api.me.customerOrganizations();
+        
+        // Restore previous org ID after the request
+        if (previousOrgId) {
+          api.organizations.setActiveOrganization(previousOrgId);
+        }
+        
         if (!cancelled) {
           setProviders(orgs);
         }
