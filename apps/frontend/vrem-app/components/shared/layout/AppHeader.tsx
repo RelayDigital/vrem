@@ -164,8 +164,8 @@ export function AppHeader({
               </Button>
             )}
 
-            {/* Notification Bell for AGENT and PROVIDER accounts */}
-            {(accountType === "AGENT" || accountType === "PROVIDER") && (
+            {/* Notification Bell for all account types */}
+            {(accountType === "AGENT" || accountType === "PROVIDER" || accountType === "COMPANY") && (
               <NotificationBell />
             )}
 

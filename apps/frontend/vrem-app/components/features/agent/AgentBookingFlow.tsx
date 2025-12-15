@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { JobRequest, Technician, Organization, CustomerOrganization } from '../../../types';
+import { JobRequest, Technician, Organization, CustomerOrganization, ServicePackage, PackageAddOn } from '../../../types';
 import { rankTechnicians } from '../../../lib/ranking';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'framer-motion';
@@ -11,7 +11,9 @@ import {
   ProviderStep,
   TechnicianSelectionStep,
   LoginDialog,
+  PackageSelectionStep,
 } from './steps';
+import type { AddOnWithQuantity } from './steps/PackageSelectionStep';
 
 export interface AgentJobData extends Partial<JobRequest> {
   providerOrgId?: string;
@@ -22,6 +24,12 @@ export interface AgentJobData extends Partial<JobRequest> {
   region?: string;
   postalCode?: string;
   countryCode?: string;
+  // Package selection
+  packageId?: string;
+  packageName?: string;
+  addOnIds?: string[];
+  addOnQuantities?: Record<string, number>; // addOnId -> quantity
+  totalPrice?: number;
 }
 
 interface AgentBookingFlowProps {
@@ -36,7 +44,7 @@ interface AgentBookingFlowProps {
   initialLocation?: { lat: number; lng: number };
 }
 
-type Step = 'provider' | 'address' | 'details' | 'confirm';
+type Step = 'provider' | 'package' | 'address' | 'details' | 'confirm';
 
 export function AgentBookingFlow({
   technicians,
@@ -71,6 +79,11 @@ export function AgentBookingFlow({
   // Provider selection state
   const [selectedProvider, setSelectedProvider] = useState<CustomerOrganization | null>(null);
 
+  // Package selection state
+  const [selectedPackage, setSelectedPackage] = useState<ServicePackage | null>(null);
+  const [selectedAddOns, setSelectedAddOns] = useState<AddOnWithQuantity[]>([]);
+  const [totalPrice, setTotalPrice] = useState<number>(0);
+
   const [jobDetails, setJobDetails] = useState({
     clientName: '',
     scheduledDate: '',
@@ -83,6 +96,18 @@ export function AgentBookingFlow({
 
   const handleProviderSelect = (provider: CustomerOrganization) => {
     setSelectedProvider(provider);
+    // Reset package selection when provider changes
+    setSelectedPackage(null);
+    setSelectedAddOns([]);
+    setTotalPrice(0);
+    // Go to package selection step
+    setStep('package');
+  };
+
+  const handlePackageSelect = (pkg: ServicePackage, addOnsWithQty: AddOnWithQuantity[], total: number) => {
+    setSelectedPackage(pkg);
+    setSelectedAddOns(addOnsWithQty);
+    setTotalPrice(total);
     // If we have an initial address, skip to details
     if (initialAddress) {
       setStep('details');
@@ -115,7 +140,8 @@ export function AgentBookingFlow({
       toast.error('Please select a date and time');
       return;
     }
-    if (jobDetails.mediaTypes.length === 0) {
+    // Only require media type selection if no package is selected
+    if (!selectedPackage && jobDetails.mediaTypes.length === 0) {
       toast.error('Please select at least one media type');
       return;
     }
@@ -136,13 +162,31 @@ export function AgentBookingFlow({
       return;
     }
 
+    if (!selectedPackage) {
+      toast.error('Please select a package');
+      setStep('package');
+      return;
+    }
+
+    // Use package media types if package selected, otherwise use form selection
+    const mediaTypes = selectedPackage
+      ? selectedPackage.mediaTypes
+      : jobDetails.mediaTypes;
+
+    // Build add-on IDs and quantities
+    const addOnIds = selectedAddOns.map(item => item.addOn.id);
+    const addOnQuantities: Record<string, number> = {};
+    selectedAddOns.forEach(item => {
+      addOnQuantities[item.addOn.id] = item.quantity;
+    });
+
     const job: AgentJobData = {
       clientName: jobDetails.clientName || 'Agent Booking',
       propertyAddress: selectedAddress,
       location: selectedLocation!,
       scheduledDate: jobDetails.scheduledDate,
       scheduledTime: jobDetails.scheduledTime,
-      mediaType: jobDetails.mediaTypes as any,
+      mediaType: mediaTypes as any,
       priority: jobDetails.priority,
       estimatedDuration: jobDetails.estimatedDuration,
       requirements: jobDetails.requirements,
@@ -156,6 +200,12 @@ export function AgentBookingFlow({
       region: addressComponents.region,
       postalCode: addressComponents.postalCode,
       countryCode: addressComponents.countryCode,
+      // Include package selection
+      packageId: selectedPackage.id,
+      packageName: selectedPackage.name,
+      addOnIds,
+      addOnQuantities,
+      totalPrice,
     };
 
     onJobCreate(job);
@@ -165,6 +215,9 @@ export function AgentBookingFlow({
     setSelectedAddress('');
     setSelectedLocation(null);
     setSelectedProvider(null);
+    setSelectedPackage(null);
+    setSelectedAddOns([]);
+    setTotalPrice(0);
     setAddressComponents({});
     setJobDetails({
       clientName: '',
@@ -178,6 +231,10 @@ export function AgentBookingFlow({
   };
 
   const handleBackFromAddress = () => {
+    setStep('package');
+  };
+
+  const handleBackFromPackage = () => {
     setStep('provider');
   };
 
@@ -230,16 +287,33 @@ export function AgentBookingFlow({
           />
         )}
 
-        {/* Step 2: Address Search */}
+        {/* Step 2: Package Selection */}
+        {step === 'package' && selectedProvider && (
+          <PackageSelectionStep
+            providerOrgId={selectedProvider.orgId}
+            providerName={selectedProvider.orgName}
+            selectedPackageId={selectedPackage?.id}
+            selectedAddOnQuantities={
+              selectedAddOns.reduce((acc, item) => {
+                acc[item.addOn.id] = item.quantity;
+                return acc;
+              }, {} as Record<string, number>)
+            }
+            onPackageSelect={handlePackageSelect}
+            onBack={handleBackFromPackage}
+          />
+        )}
+
+        {/* Step 3: Address Search */}
         {step === 'address' && (
           <AddressStep
             onAddressSelect={handleAddressSelect}
             selectedProviderName={selectedProvider?.orgName}
-            onBack={() => setStep('provider')}
+            onBack={handleBackFromAddress}
           />
         )}
 
-        {/* Step 3: Job Details */}
+        {/* Step 4: Job Details / Scheduling */}
         {step === 'details' && (
           <DetailsStep
             selectedAddress={selectedAddress}
@@ -248,6 +322,9 @@ export function AgentBookingFlow({
             onBack={handleBackFromDetails}
             onNext={handleDetailsComplete}
             selectedProviderName={selectedProvider?.orgName}
+            selectedPackage={selectedPackage}
+            selectedAddOns={selectedAddOns}
+            totalPrice={totalPrice}
           />
         )}
 

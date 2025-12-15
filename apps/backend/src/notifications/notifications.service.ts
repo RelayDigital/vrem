@@ -57,11 +57,17 @@ export class NotificationsService {
       });
     }
 
-    // 2. Get unread project assignment notifications
+    // 2. Get unread notifications (PROJECT_ASSIGNED, NEW_MESSAGE, PROJECT_APPROVED)
     const projectNotifications = await this.prisma.notification.findMany({
       where: {
         userId: user.id,
-        type: NotificationType.PROJECT_ASSIGNED,
+        type: {
+          in: [
+            NotificationType.PROJECT_ASSIGNED,
+            NotificationType.NEW_MESSAGE,
+            NotificationType.PROJECT_APPROVED,
+          ],
+        },
         readAt: null,
       },
       include: {
@@ -86,6 +92,9 @@ export class NotificationsService {
         projectId: notification.projectId || undefined,
         projectAddress,
         assignedRole: payload?.role,
+        messagePreview: payload?.preview,
+        messageChannel: payload?.channel,
+        approverName: payload?.approverName,
       });
     }
 
@@ -352,6 +361,140 @@ export class NotificationsService {
         },
       },
     });
+  }
+
+  /**
+   * Create notifications for a new message.
+   * Notifies project watchers based on channel visibility.
+   */
+  async createMessageNotifications(
+    senderId: string,
+    projectId: string,
+    orgId: string,
+    channel: 'TEAM' | 'CUSTOMER',
+    messageId: string,
+    preview: string,
+  ): Promise<void> {
+    // Get project with assignments
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        customer: true,
+        technician: true,
+        editor: true,
+        projectManager: true,
+        organization: {
+          include: {
+            members: {
+              where: {
+                role: { in: ['OWNER', 'ADMIN'] },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!project) return;
+
+    const watcherIds = new Set<string>();
+
+    // TEAM channel: notify technician, editor, PM, OWNER/ADMIN
+    if (channel === 'TEAM') {
+      if (project.technicianId) watcherIds.add(project.technicianId);
+      if (project.editorId) watcherIds.add(project.editorId);
+      if (project.projectManagerId) watcherIds.add(project.projectManagerId);
+      project.organization.members.forEach((m) => watcherIds.add(m.userId));
+    }
+
+    // CUSTOMER channel: notify PM, OWNER/ADMIN, and customer
+    if (channel === 'CUSTOMER') {
+      if (project.projectManagerId) watcherIds.add(project.projectManagerId);
+      project.organization.members.forEach((m) => watcherIds.add(m.userId));
+      if (project.customer?.userId) watcherIds.add(project.customer.userId);
+    }
+
+    // Don't notify the sender
+    watcherIds.delete(senderId);
+
+    // Create notifications with deduplication by messageId
+    for (const userId of watcherIds) {
+      const existing = await this.prisma.notification.findFirst({
+        where: {
+          userId,
+          projectId,
+          type: NotificationType.NEW_MESSAGE,
+          messageId,
+        },
+      });
+
+      if (!existing) {
+        await this.prisma.notification.create({
+          data: {
+            userId,
+            orgId,
+            projectId,
+            type: NotificationType.NEW_MESSAGE,
+            messageId,
+            payload: {
+              channel,
+              preview: preview.substring(0, 100),
+            },
+          },
+        });
+      }
+    }
+  }
+
+  /**
+   * Create notifications when a project is approved by customer.
+   * Notifies ops team (PM, OWNER/ADMIN).
+   */
+  async createApprovalNotifications(
+    projectId: string,
+    orgId: string,
+    approverId: string,
+    approverName: string,
+  ): Promise<void> {
+    // Get project with org members
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        organization: {
+          include: {
+            members: {
+              where: {
+                role: { in: ['OWNER', 'ADMIN', 'PROJECT_MANAGER'] },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!project) return;
+
+    const watcherIds = new Set<string>();
+    if (project.projectManagerId) watcherIds.add(project.projectManagerId);
+    project.organization.members.forEach((m) => watcherIds.add(m.userId));
+
+    // Don't notify the approver
+    watcherIds.delete(approverId);
+
+    for (const userId of watcherIds) {
+      await this.prisma.notification.create({
+        data: {
+          userId,
+          orgId,
+          projectId,
+          type: NotificationType.PROJECT_APPROVED,
+          payload: {
+            approverName,
+            address: this.buildProjectAddress(project),
+          },
+        },
+      });
+    }
   }
 
   private buildProjectAddress(

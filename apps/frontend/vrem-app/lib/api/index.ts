@@ -1,4 +1,4 @@
-import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization } from '@/types';
+import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization, DeliveryResponse, DeliveryComment, MediaType, ServicePackage, PackageAddOn, CreatePackagePayload, CreateAddOnPayload } from '@/types';
 import {
   currentUser,
   jobRequests,
@@ -1147,6 +1147,7 @@ class ApiClient {
       assignedAt: project.technicianId ? new Date(project.updatedAt) : undefined,
       propertyImage: 'https://images.unsplash.com/photo-1706808849780-7a04fbac83ef?w=800', // Default image
       media: project.media || [],
+      deliveryToken: project.deliveryToken || null,
     };
   }
 
@@ -1233,6 +1234,51 @@ class ApiClient {
       }
       const orders = await this.request<any[]>('/orders');
       return orders.map((o) => this.normalizeProject(o));
+    },
+
+    /**
+     * Create a Stripe Checkout session for an agent order.
+     * Returns a URL to redirect the user to Stripe Checkout.
+     */
+    createCheckout: async (payload: {
+      providerOrgId: string;
+      addressLine1: string;
+      addressLine2?: string;
+      city?: string;
+      region?: string;
+      postalCode?: string;
+      countryCode?: string;
+      lat?: number;
+      lng?: number;
+      scheduledTime: string;
+      estimatedDuration?: number;
+      mediaTypes: string[];
+      priority: 'standard' | 'rush' | 'urgent';
+      notes?: string;
+      packageId: string;
+      addOnIds?: string[];
+      addOnQuantities?: Record<string, number>; // addOnId -> quantity
+    }): Promise<{ checkoutUrl: string; sessionId: string }> => {
+      return this.request<{ checkoutUrl: string; sessionId: string }>('/orders/checkout', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    /**
+     * Get the status of a pending order by Stripe session ID.
+     */
+    getOrderStatus: async (sessionId: string): Promise<{
+      status: 'PENDING_PAYMENT' | 'PAYMENT_COMPLETED' | 'PROJECT_CREATED' | 'EXPIRED' | 'CANCELLED';
+      projectId: string | null;
+      project: {
+        id: string;
+        addressLine1: string | null;
+        city: string | null;
+        status: ProjectStatus;
+      } | null;
+    }> => {
+      return this.request(`/orders/status/${sessionId}`);
     },
   };
 
@@ -1345,6 +1391,307 @@ class ApiClient {
     markRead: async (id: string): Promise<void> => {
       if (USE_MOCK_DATA) return;
       await this.request(`/notifications/${id}/read`, { method: 'POST' });
+    },
+  };
+
+  // =============================
+  // Delivery API (Public)
+  // =============================
+  delivery = {
+    /**
+     * Get delivery data by token (public - no auth required for viewing)
+     */
+    getByToken: async (token: string): Promise<DeliveryResponse> => {
+      const data = await this.request<any>(`/delivery/${token}`);
+      // Normalize dates
+      return {
+        ...data,
+        project: {
+          ...data.project,
+          scheduledTime: new Date(data.project.scheduledTime),
+          clientApprovedAt: data.project.clientApprovedAt ? new Date(data.project.clientApprovedAt) : null,
+          deliveryEnabledAt: data.project.deliveryEnabledAt ? new Date(data.project.deliveryEnabledAt) : null,
+        },
+        media: data.media.map((m: any) => ({
+          ...m,
+          createdAt: new Date(m.createdAt),
+        })),
+        comments: data.comments.map((c: any) => ({
+          ...c,
+          timestamp: new Date(c.timestamp),
+        })),
+      };
+    },
+
+    /**
+     * Get comments for a delivery (public)
+     */
+    getComments: async (token: string): Promise<DeliveryComment[]> => {
+      const data = await this.request<any[]>(`/delivery/${token}/comments`);
+      return data.map((c) => ({
+        ...c,
+        timestamp: new Date(c.timestamp),
+      }));
+    },
+
+    /**
+     * Approve delivery (requires auth as customer)
+     */
+    approve: async (token: string): Promise<void> => {
+      await this.request(`/delivery/${token}/approve`, { method: 'POST' });
+    },
+
+    /**
+     * Request changes (requires auth as customer)
+     */
+    requestChanges: async (token: string, feedback: string): Promise<void> => {
+      await this.request(`/delivery/${token}/request-changes`, {
+        method: 'POST',
+        body: JSON.stringify({ feedback }),
+      });
+    },
+
+    /**
+     * Add comment (requires auth as customer)
+     */
+    addComment: async (token: string, content: string): Promise<DeliveryComment> => {
+      const data = await this.request<any>(`/delivery/${token}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      });
+      return {
+        ...data,
+        timestamp: new Date(data.timestamp),
+      };
+    },
+
+    /**
+     * Download all media as zip (public)
+     * Returns the download URL for direct streaming
+     */
+    getDownloadUrl: (token: string, mediaTypes?: MediaType[]): string => {
+      const params = mediaTypes?.length ? `?mediaTypes=${mediaTypes.join(',')}` : '';
+      return `${API_URL}${API_PREFIX}/delivery/${token}/download-all${params}`;
+    },
+
+    /**
+     * Trigger download of all media as zip
+     */
+    downloadAll: async (token: string, mediaTypes?: MediaType[]): Promise<void> => {
+      const response = await fetch(`${API_URL}${API_PREFIX}/delivery/${token}/download-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mediaTypes }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to download');
+      }
+
+      // Get filename from Content-Disposition header
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+      const filename = filenameMatch?.[1] || 'media.zip';
+
+      // Create blob and trigger download
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    },
+  };
+
+  // =============================
+  // Packages API
+  // =============================
+  packages = {
+    /**
+     * Get all active packages for an organization (public - for agents viewing provider packages)
+     */
+    getForOrg: async (orgId: string): Promise<ServicePackage[]> => {
+      const packages = await this.request<any[]>(`/packages/org/${orgId}`);
+      return packages.map((p) => ({
+        ...p,
+        createdAt: new Date(p.createdAt),
+        updatedAt: new Date(p.updatedAt),
+      }));
+    },
+
+    /**
+     * Get all active add-ons for an organization (public - for agents viewing provider add-ons)
+     */
+    getAddOnsForOrg: async (orgId: string): Promise<PackageAddOn[]> => {
+      const addOns = await this.request<any[]>(`/packages/org/${orgId}/addons`);
+      return addOns.map((a) => ({
+        ...a,
+        createdAt: new Date(a.createdAt),
+        updatedAt: new Date(a.updatedAt),
+      }));
+    },
+
+    /**
+     * Calculate total price for package + add-ons
+     */
+    calculateTotal: async (packageId: string, addOnIds: string[]): Promise<{
+      total: number;
+      currency: string;
+      breakdown: {
+        package: { id: string; name: string; price: number };
+        addOns: { id: string; name: string; price: number }[];
+      };
+    }> => {
+      return this.request('/packages/calculate', {
+        method: 'POST',
+        body: JSON.stringify({ packageId, addOnIds }),
+      });
+    },
+
+    /**
+     * Get all packages for current org (including inactive) - for management
+     */
+    list: async (): Promise<ServicePackage[]> => {
+      const packages = await this.request<any[]>('/packages');
+      return packages.map((p) => ({
+        ...p,
+        createdAt: new Date(p.createdAt),
+        updatedAt: new Date(p.updatedAt),
+      }));
+    },
+
+    /**
+     * Get all add-ons for current org (including inactive) - for management
+     */
+    listAddOns: async (): Promise<PackageAddOn[]> => {
+      const addOns = await this.request<any[]>('/packages/addons');
+      return addOns.map((a) => ({
+        ...a,
+        createdAt: new Date(a.createdAt),
+        updatedAt: new Date(a.updatedAt),
+      }));
+    },
+
+    /**
+     * Create a new package
+     */
+    create: async (payload: CreatePackagePayload): Promise<ServicePackage> => {
+      const pkg = await this.request<any>('/packages', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return {
+        ...pkg,
+        createdAt: new Date(pkg.createdAt),
+        updatedAt: new Date(pkg.updatedAt),
+      };
+    },
+
+    /**
+     * Update a package
+     */
+    update: async (id: string, payload: Partial<CreatePackagePayload> & { isActive?: boolean }): Promise<ServicePackage> => {
+      const pkg = await this.request<any>(`/packages/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      return {
+        ...pkg,
+        createdAt: new Date(pkg.createdAt),
+        updatedAt: new Date(pkg.updatedAt),
+      };
+    },
+
+    /**
+     * Delete a package
+     */
+    delete: async (id: string): Promise<void> => {
+      await this.request(`/packages/${id}`, { method: 'DELETE' });
+    },
+
+    /**
+     * Create a new add-on
+     */
+    createAddOn: async (payload: CreateAddOnPayload): Promise<PackageAddOn> => {
+      const addOn = await this.request<any>('/packages/addons', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      return {
+        ...addOn,
+        createdAt: new Date(addOn.createdAt),
+        updatedAt: new Date(addOn.updatedAt),
+      };
+    },
+
+    /**
+     * Update an add-on
+     */
+    updateAddOn: async (id: string, payload: Partial<CreateAddOnPayload> & { isActive?: boolean }): Promise<PackageAddOn> => {
+      const addOn = await this.request<any>(`/packages/addons/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      return {
+        ...addOn,
+        createdAt: new Date(addOn.createdAt),
+        updatedAt: new Date(addOn.updatedAt),
+      };
+    },
+
+    /**
+     * Delete an add-on
+     */
+    deleteAddOn: async (id: string): Promise<void> => {
+      await this.request(`/packages/addons/${id}`, { method: 'DELETE' });
+    },
+  };
+
+  // =============================
+  // Calendar Integrations API
+  // =============================
+  calendarIntegrations = {
+    /**
+     * Get or create ICS feed URL for current user
+     */
+    getIcsFeed: async (): Promise<{
+      id: string;
+      feedUrl: string;
+      feedToken: string;
+      isActive: boolean;
+      createdAt: Date;
+      lastAccessAt: Date | null;
+    }> => {
+      const data = await this.request<any>('/calendar-integrations/ics-feed');
+      return {
+        ...data,
+        createdAt: new Date(data.createdAt),
+        lastAccessAt: data.lastAccessAt ? new Date(data.lastAccessAt) : null,
+      };
+    },
+
+    /**
+     * Regenerate ICS feed token (invalidates old URL)
+     */
+    regenerateIcsFeed: async (): Promise<{
+      id: string;
+      feedUrl: string;
+      feedToken: string;
+      isActive: boolean;
+      createdAt: Date;
+      lastAccessAt: Date | null;
+    }> => {
+      const data = await this.request<any>('/calendar-integrations/ics-feed/regenerate', {
+        method: 'POST',
+      });
+      return {
+        ...data,
+        createdAt: new Date(data.createdAt),
+        lastAccessAt: data.lastAccessAt ? new Date(data.lastAccessAt) : null,
+      };
     },
   };
 

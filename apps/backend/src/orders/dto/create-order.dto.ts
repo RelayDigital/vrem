@@ -8,6 +8,7 @@ import {
   ValidateNested,
   IsEmail,
   ValidateIf,
+  IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -116,5 +117,20 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   projectManagerId?: string;
+
+  // Package selection (for agent checkout flow)
+  @IsOptional()
+  @IsString()
+  packageId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  addOnIds?: string[];
+
+  // Add-on quantities (optional, defaults to 1 for each add-on)
+  @IsOptional()
+  @IsObject()
+  addOnQuantities?: Record<string, number>;
 }
 

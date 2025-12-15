@@ -37,3 +37,6 @@ FROM information_schema.routines
 WHERE routine_schema = 'public' 
   AND routine_name = 'get_current_user_id';
 
+
+
+

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
 import { ProjectStatus, Technician } from "@/types";
@@ -17,6 +17,7 @@ import { getEffectiveOrgRole } from "@/lib/roles";
 export default function JobDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isLoading, organizationId, memberships } = useRequireRole([
     "AGENT",
     "TECHNICIAN",
@@ -35,6 +36,10 @@ export default function JobDetailPage() {
   const [, setLoadingTechnicians] = useState(false);
 
   const jobId = params?.id as string;
+
+  // Read query params for initial tab state (from notifications)
+  const initialTab = searchParams?.get("tab") || undefined;
+  const initialChatTab = searchParams?.get("chat") as "client" | "team" | undefined;
   const userRole = getEffectiveOrgRole(user, memberships, organizationId);
   const isAgent =
     (user?.accountType || "").toUpperCase() === "AGENT" ||
@@ -228,6 +233,8 @@ export default function JobDetailPage() {
           onAssignTechnician={jobManagement.handleAssignTechnician}
           onChangeTechnician={jobManagement.handleChangeTechnician}
           variant="page"
+          initialTab={initialTab}
+          initialChatTab={initialChatTab}
         />
       )}
     </div>

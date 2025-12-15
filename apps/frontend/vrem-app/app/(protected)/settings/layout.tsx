@@ -16,6 +16,7 @@ import {
   ChevronRightIcon,
   ChevronRight,
   ChevronLeft,
+  Calendar,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import {
@@ -60,6 +61,11 @@ const settingsSections: SettingsSection[] = [
         label: "Notifications",
         path: "/settings/notifications",
       },
+      {
+        id: "calendar",
+        label: "Calendar",
+        path: "/settings/calendar",
+      },
     ],
   },
   {
@@ -100,6 +106,12 @@ const settingsSections: SettingsSection[] = [
     icon: Package,
     hideForAgentPersonal: true, // Agents in PERSONAL orgs don't manage products
     items: [
+      {
+        id: "packages",
+        label: "Packages",
+        path: "/settings/product/packages",
+        roles: ["OWNER", "ADMIN"],
+      },
       {
         id: "features",
         label: "Features",
@@ -212,7 +224,8 @@ export default function SettingsLayout({
     if (
       pathname?.startsWith("/settings/account") ||
       pathname?.startsWith("/settings/notifications") ||
-      pathname?.startsWith("/settings/profile")
+      pathname?.startsWith("/settings/profile") ||
+      pathname?.startsWith("/settings/calendar")
     )
       return "personal";
     return "personal";

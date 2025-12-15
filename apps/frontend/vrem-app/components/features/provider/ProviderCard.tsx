@@ -36,6 +36,7 @@ interface ProviderCardProps {
   onAssign?: () => void;
   onClick?: () => void;
   showFullAddress?: boolean; // If false, only show city, state/province, and country
+  allowOverride?: boolean; // If true, allow assigning even if technician appears unavailable (for admin override)
 }
 
 const scoreChartConfig = {
@@ -52,6 +53,7 @@ export function ProviderCard({
   onAssign,
   onClick,
   showFullAddress = false, // Default to false (only show city/state/country)
+  allowOverride = false, // Default to false, admins can set to true
 }: ProviderCardProps) {
   const getScoreColor = (s: number) => {
     if (s >= 80) return "hsl(142, 76%, 36%)"; // emerald-600
@@ -335,7 +337,7 @@ export function ProviderCard({
                       e.stopPropagation();
                       onAssign();
                     }}
-                    disabled={!isAvailable}
+                    disabled={!isAvailable && !allowOverride}
                     className={`w-full ${
                       recommended ? "bg-emerald-600 " : "bg-primary "
                     } shadow-md disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -345,7 +347,7 @@ export function ProviderCard({
                   </Button>
                 </span>
               </TooltipTrigger>
-              {!isAvailable && (
+              {!isAvailable && !allowOverride && (
                 <TooltipContent>
                   <P>This technician is not available for assignment</P>
                 </TooltipContent>

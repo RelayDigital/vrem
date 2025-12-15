@@ -8,14 +8,21 @@ export class NotificationResponseDto {
   orgType: OrgType;
   createdAt: Date;
   readAt?: Date | null;
-  
+
   // For invitation notifications
   invitationId?: string;
   role?: OrgRole;
-  
+
   // For project assignment notifications
   projectId?: string;
   projectAddress?: string;
   assignedRole?: 'TECHNICIAN' | 'EDITOR' | 'PROJECT_MANAGER' | 'CUSTOMER';
+
+  // For NEW_MESSAGE notifications
+  messagePreview?: string;
+  messageChannel?: 'TEAM' | 'CUSTOMER';
+
+  // For PROJECT_APPROVED notifications
+  approverName?: string;
 }
 

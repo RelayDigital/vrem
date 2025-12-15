@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../../ui/select";
+import { Badge } from "../../../ui/badge";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { H2, Small, Muted, Large } from "../../../ui/typography";
@@ -26,10 +27,13 @@ import {
   ArrowLeft,
   CheckCircle2,
   Home,
+  Package,
+  Sparkles,
 } from "lucide-react";
-import { JobDetails } from "../../../../types";
+import { JobDetails, ServicePackage } from "../../../../types";
 import { mediaTypeOptions, toggleMediaType } from '../../../shared/jobs/utils';
 import { ToggleGroup, ToggleGroupItem } from "../../../ui/toggle-group";
+import type { AddOnWithQuantity } from './PackageSelectionStep';
 
 interface DetailsStepProps {
   selectedAddress: string;
@@ -39,6 +43,17 @@ interface DetailsStepProps {
   onNext: () => void;
   // Optional: provider name when in agent flow
   selectedProviderName?: string;
+  // Package selection (agent flow)
+  selectedPackage?: ServicePackage | null;
+  selectedAddOns?: AddOnWithQuantity[];
+  totalPrice?: number;
+}
+
+function formatPrice(cents: number, currency: string = "usd"): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(cents / 100);
 }
 
 export function DetailsStep({
@@ -48,9 +63,13 @@ export function DetailsStep({
   onBack,
   onNext,
   selectedProviderName,
+  selectedPackage,
+  selectedAddOns = [],
+  totalPrice = 0,
 }: DetailsStepProps) {
-  // Determine if we're in agent flow (provider already selected)
+  // Determine if we're in agent flow (provider already selected with package)
   const isAgentFlow = !!selectedProviderName;
+  const hasPackageSelected = !!selectedPackage;
 
   return (
     <motion.div
@@ -69,17 +88,20 @@ export function DetailsStep({
           {isAgentFlow && (
             <>
               <CheckCircle2 className="h-5 w-5 text-green-500" />
-              <span>Provider selected</span>
-              <ArrowRight className="h-4 w-4 mx-2" />
+              <span>Provider</span>
+              <ArrowRight className="h-4 w-4 mx-1" />
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              <span>Package</span>
+              <ArrowRight className="h-4 w-4 mx-1" />
             </>
           )}
           <CheckCircle2 className="h-5 w-5 text-green-500" />
-          <span>Address selected</span>
-          <ArrowRight className="h-4 w-4 mx-2" />
-          <span className="text-primary font-medium">Job details</span>
-          <ArrowRight className="h-4 w-4 mx-2" />
+          <span>Address</span>
+          <ArrowRight className="h-4 w-4 mx-1" />
+          <span className="text-primary font-medium">Schedule</span>
+          <ArrowRight className="h-4 w-4 mx-1" />
           <span className="text-muted-foreground/60">
-            {isAgentFlow ? 'Confirm order' : 'Find technician'}
+            {isAgentFlow ? 'Confirm' : 'Find technician'}
           </span>
         </div>
 
@@ -105,7 +127,9 @@ export function DetailsStep({
 
         {/* Job Details Form */}
         <div className="bg-card rounded-2xl border-2 border-border p-8 shadow-sm space-y-6">
-          <H2 className="text-2xl border-0">Tell us about the shoot</H2>
+          <H2 className="text-2xl border-0">
+            {hasPackageSelected ? "Schedule your shoot" : "Tell us about the shoot"}
+          </H2>
 
           {/* Shoot Date and Time */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -354,39 +378,103 @@ export function DetailsStep({
             </div>
           </div>
 
-          {/* Media Types */}
-          <div className="space-y-2">
-            <Label className="text-sm">What media do you need? *</Label>
-            <ToggleGroup
-              type="multiple"
-              value={jobDetails.mediaTypes}
-              onValueChange={(value) => {
-                onJobDetailsChange({
-                  ...jobDetails,
-                  mediaTypes: value,
-                });
-              }}
-              className="grid grid-cols-2 gap-3 w-full"
-            >
-              {mediaTypeOptions.map((type) => {
-                const Icon = type.icon;
-                return (
-                  <ToggleGroupItem
-                    key={type.id}
-                    value={type.id}
-                    className="flex items-center gap-3 p-4 h-auto data-[state=on]:bg-accent data-[state=on]:border-primary"
-                  >
-                    <div className="p-2.5 rounded-lg bg-primary">
-                      <Icon className="h-5 w-5 text-primary-foreground" />
+          {/* Package Summary (Agent Flow) or Media Types (Provider Flow) */}
+          {hasPackageSelected ? (
+            <div className="space-y-3">
+              <Label className="text-sm">Selected Package</Label>
+              <div className="bg-muted/50 rounded-xl p-4 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Package className="h-5 w-5 text-primary" />
                     </div>
-                    <div className="flex-1 text-left">
-                      <div className="text-sm font-medium">{type.label}</div>
+                    <div>
+                      <div className="font-medium">{selectedPackage.name}</div>
+                      {selectedPackage.description && (
+                        <div className="text-sm text-muted-foreground mt-0.5">
+                          {selectedPackage.description}
+                        </div>
+                      )}
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {selectedPackage.mediaTypes.map((type) => (
+                          <Badge key={type} variant="secondary" className="text-xs">
+                            {type}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                  </ToggleGroupItem>
-                );
-              })}
-            </ToggleGroup>
-          </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold">
+                      {formatPrice(selectedPackage.price, selectedPackage.currency)}
+                    </div>
+                  </div>
+                </div>
+
+                {selectedAddOns.length > 0 && (
+                  <div className="border-t border-border pt-3 space-y-2">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Sparkles className="h-4 w-4" />
+                      <span>Add-ons included:</span>
+                    </div>
+                    {selectedAddOns.map(({ addOn, quantity }) => (
+                      <div key={addOn.id} className="flex justify-between text-sm pl-6">
+                        <span>
+                          {addOn.name}
+                          {quantity > 1 && (
+                            <span className="text-muted-foreground ml-1">× {quantity}</span>
+                          )}
+                        </span>
+                        <span className="text-muted-foreground">
+                          +{formatPrice(addOn.price * quantity, addOn.currency)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="border-t border-border pt-3 flex justify-between items-center">
+                  <span className="font-medium">Total</span>
+                  <span className="text-lg font-bold text-primary">
+                    {formatPrice(totalPrice, selectedPackage.currency)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label className="text-sm">What media do you need? *</Label>
+              <ToggleGroup
+                type="multiple"
+                value={jobDetails.mediaTypes}
+                onValueChange={(value) => {
+                  onJobDetailsChange({
+                    ...jobDetails,
+                    mediaTypes: value,
+                  });
+                }}
+                className="grid grid-cols-2 gap-3 w-full"
+              >
+                {mediaTypeOptions.map((type) => {
+                  const Icon = type.icon;
+                  return (
+                    <ToggleGroupItem
+                      key={type.id}
+                      value={type.id}
+                      className="flex items-center gap-3 p-4 h-auto data-[state=on]:bg-accent data-[state=on]:border-primary"
+                    >
+                      <div className="p-2.5 rounded-lg bg-primary">
+                        <Icon className="h-5 w-5 text-primary-foreground" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="text-sm font-medium">{type.label}</div>
+                      </div>
+                    </ToggleGroupItem>
+                  );
+                })}
+              </ToggleGroup>
+            </div>
+          )}
 
           {/* Special Instructions */}
           <div className="space-y-2">

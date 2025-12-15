@@ -124,6 +124,9 @@ export function MapWithSidebar({
   const { memberships, activeOrganizationId } = useAuth();
   const activeOrgRole = getActiveOrgRoleFromMemberships(memberships, activeOrganizationId);
 
+  // Allow OWNER/ADMIN to override availability restrictions when assigning technicians
+  const canOverrideAvailability = activeOrgRole === "OWNER" || activeOrgRole === "ADMIN";
+
   const pendingJobs = jobs.filter((j) => j.status === "pending");
 
   // Filter pending jobs based on search
@@ -664,6 +667,7 @@ export function MapWithSidebar({
                               recommended={ranking.recommended}
                               selected={isSelected}
                               isAssigning={isAssigning}
+                              allowOverride={canOverrideAvailability}
                               onClick={() =>
                                 setSelectedProviderId(ranking.provider.userId)
                               }

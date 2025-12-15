@@ -215,6 +215,12 @@ export interface Project {
   createdAt: Date;
   updatedAt: Date;
 
+  // Delivery fields
+  deliveryToken?: string | null;
+  deliveryEnabledAt?: Date | null;
+  clientApprovalStatus?: ClientApprovalStatus;
+  clientApprovedAt?: Date | null;
+
   // Optional expansions
   calendarEvent?: CalendarEvent | null;
   media?: Media[];
@@ -394,6 +400,7 @@ export interface JobRequest {
   completedAt?: Date;
   propertyImage?: string;
   media?: Media[];
+  deliveryToken?: string | null;
 }
 
 export interface JobDetails {
@@ -510,7 +517,9 @@ export interface Transaction {
 export type NotificationType =
   | "INVITATION_MEMBER"
   | "INVITATION_CUSTOMER"
-  | "PROJECT_ASSIGNED";
+  | "PROJECT_ASSIGNED"
+  | "NEW_MESSAGE"
+  | "PROJECT_APPROVED";
 
 export type ProjectAssignedRole =
   | "TECHNICIAN"
@@ -535,6 +544,13 @@ export interface NotificationItem {
   projectId?: string;
   projectAddress?: string;
   assignedRole?: ProjectAssignedRole;
+
+  // For NEW_MESSAGE notifications
+  messagePreview?: string;
+  messageChannel?: 'TEAM' | 'CUSTOMER';
+
+  // For PROJECT_APPROVED notifications
+  approverName?: string;
 }
 
 export interface OrganizationPublicInfo {
@@ -568,4 +584,130 @@ export interface CustomerCreateResponse {
     name: string;
     email: string;
   };
+}
+
+// =============================
+// Service Packages & Add-ons
+// =============================
+
+export enum AddOnCategory {
+  AERIAL = "AERIAL",
+  TWILIGHT = "TWILIGHT",
+  VIRTUAL_TOUR = "VIRTUAL_TOUR",
+  FLOORPLAN = "FLOORPLAN",
+  RUSH = "RUSH",
+  OTHER = "OTHER",
+}
+
+export interface ServicePackage {
+  id: string;
+  orgId: string;
+  name: string;
+  description: string | null;
+  price: number; // Price in cents
+  currency: string;
+  mediaTypes: MediaType[];
+  isActive: boolean;
+  displayOrder: number;
+  turnaroundDays: number | null;
+  photoCount: number | null;
+  videoMinutes: number | null;
+  features: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PackageAddOn {
+  id: string;
+  orgId: string;
+  name: string;
+  description: string | null;
+  price: number; // Price in cents
+  currency: string;
+  category: AddOnCategory;
+  isActive: boolean;
+  displayOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreatePackagePayload {
+  name: string;
+  description?: string;
+  price: number;
+  currency: string;
+  mediaTypes: MediaType[];
+  turnaroundDays?: number;
+  photoCount?: number;
+  videoMinutes?: number;
+  features?: string[];
+  displayOrder?: number;
+}
+
+export interface CreateAddOnPayload {
+  name: string;
+  description?: string;
+  price: number;
+  currency: string;
+  category: AddOnCategory;
+  displayOrder?: number;
+}
+
+// =============================
+// Delivery Surface
+// =============================
+
+export enum ClientApprovalStatus {
+  PENDING_REVIEW = "PENDING_REVIEW",
+  APPROVED = "APPROVED",
+  CHANGES_REQUESTED = "CHANGES_REQUESTED",
+}
+
+export interface DeliveryMedia {
+  id: string;
+  key: string;
+  cdnUrl: string | null;
+  filename: string;
+  size: number;
+  type: MediaType;
+  createdAt: Date;
+}
+
+export interface DeliveryComment {
+  id: string;
+  content: string;
+  timestamp: Date;
+  user: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface DeliveryResponse {
+  project: {
+    id: string;
+    addressLine1: string | null;
+    city: string | null;
+    region: string | null;
+    scheduledTime: Date;
+    status: ProjectStatus;
+    clientApprovalStatus: ClientApprovalStatus;
+    clientApprovedAt: Date | null;
+    deliveryEnabledAt: Date | null;
+  };
+  organization: {
+    id: string;
+    name: string;
+    logoUrl: string | null;
+    primaryEmail: string | null;
+    phone: string | null;
+  };
+  media: DeliveryMedia[];
+  comments: DeliveryComment[];
+  customer?: {
+    id: string;
+    name: string;
+    email: string | null;
+  };
+  canApprove: boolean;
 }

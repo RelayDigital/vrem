@@ -1,9 +1,11 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { AuthorizationService } from '../auth/authorization.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { AuthenticatedUser, OrgContext, buildOrgContext } from '../auth/auth-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -11,9 +13,12 @@ import { ProjectChatChannel } from '@prisma/client';
 
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name);
+
   constructor(
     private prisma: PrismaService,
     private authorization: AuthorizationService,
+    private notifications: NotificationsService,
   ) {}
 
   private async loadProject(projectId: string, ctx: OrgContext) {
@@ -152,6 +157,20 @@ export class MessagesService {
         user: true,
       },
     });
+
+    // Create notifications for project watchers
+    try {
+      await this.notifications.createMessageNotifications(
+        user.id,
+        dto.projectId,
+        project.orgId,
+        channel === 'customer' ? 'CUSTOMER' : 'TEAM',
+        message.id,
+        dto.content,
+      );
+    } catch (error: any) {
+      this.logger.warn(`Failed to create message notifications: ${error.message}`);
+    }
 
     return message;
   }

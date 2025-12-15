@@ -61,6 +61,18 @@ describe('AuthorizationService', () => {
     customerId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
+    // Delivery fields
+    deliveryToken: null,
+    deliveryEnabledAt: null,
+    // Approval fields
+    clientApprovalStatus: 'PENDING_REVIEW' as any,
+    clientApprovedAt: null,
+    clientApprovedById: null,
+    // Payment fields
+    stripePaymentIntentId: null,
+    paidAt: null,
+    paymentAmount: null,
+    paymentCurrency: null,
     ...overrides,
   });
 

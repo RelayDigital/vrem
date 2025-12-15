@@ -740,9 +740,15 @@ export class ProjectsService {
   }
 
   private async setProjectStatus(projectId: string, status: ProjectStatus) {
+    // When status changes to DELIVERED, also set deliveryEnabledAt
+    const data: any = { status };
+    if (status === ProjectStatus.DELIVERED) {
+      data.deliveryEnabledAt = new Date();
+    }
+
     return this.prisma.project.update({
       where: { id: projectId },
-      data: { status },
+      data,
     });
   }
 

@@ -41,6 +41,7 @@ interface ProviderCardMinimalProps {
   selected?: boolean;
   isAssigning?: boolean;
   onCollapse?: () => void;
+  allowOverride?: boolean; // Allow admins to assign unavailable technicians
 }
 
 const scoreChartConfig = {
@@ -59,6 +60,7 @@ export function ProviderCardMinimal({
   selected,
   isAssigning = false,
   onCollapse,
+  allowOverride = false,
 }: ProviderCardMinimalProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const prevExpandedRef = useRef(isExpanded);
@@ -385,7 +387,7 @@ export function ProviderCardMinimal({
                           e.stopPropagation();
                           onAssign();
                         }}
-                        disabled={!isAvailable || isAssigning}
+                        disabled={(!isAvailable && !allowOverride) || isAssigning}
                         className={`w-full ${
                           recommended
                             ? "bg-emerald-600 hover:bg-emerald-700"
@@ -399,7 +401,7 @@ export function ProviderCardMinimal({
                       </Button>
                     </span>
                   </TooltipTrigger>
-                  {!isAvailable && (
+                  {!isAvailable && !allowOverride && (
                     <TooltipContent>
                       <P>This technician is not available for assignment</P>
                     </TooltipContent>

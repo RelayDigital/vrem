@@ -214,6 +214,17 @@ export function JobManagementProvider({
     window.dispatchEvent(new CustomEvent('jobsUpdated', { detail: jobCards }));
   }, [jobCards]);
 
+  // Keep selectedJob in sync with jobCards when the underlying data changes
+  // This ensures the task view shows fresh data after updates like technician assignment
+  useEffect(() => {
+    if (selectedJob) {
+      const updatedJob = jobCards.find((job) => job.id === selectedJob.id);
+      if (updatedJob && JSON.stringify(updatedJob) !== JSON.stringify(selectedJob)) {
+        setSelectedJob(updatedJob);
+      }
+    }
+  }, [jobCards, selectedJob]);
+
   // Listen for job creation events
   useEffect(() => {
     const handleJobCreated = (event: CustomEvent<Project>) => {

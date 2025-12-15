@@ -50,6 +50,7 @@ interface FindTechnicianViewProps {
   onAssign: (technicianId: string, score: number) => void;
   preferredVendors?: string[];
   isLoading?: boolean;
+  allowOverride?: boolean; // Allow admins to assign unavailable technicians
 }
 
 export function FindTechnicianView({
@@ -58,6 +59,7 @@ export function FindTechnicianView({
   onAssign,
   preferredVendors = [],
   isLoading = false,
+  allowOverride = false,
 }: FindTechnicianViewProps) {
   const [priorityOrder, setPriorityOrder] = useState<PriorityFactor[]>([
     'availability',
@@ -390,6 +392,7 @@ export function FindTechnicianView({
                       score={ranking.score}
                       recommended={ranking.recommended}
                       showFullAddress={true}
+                      allowOverride={allowOverride}
                       onAssign={() => {
                         setSelectedTechnicianId(technician.id);
                         handleAssign(technician.id, ranking.score);

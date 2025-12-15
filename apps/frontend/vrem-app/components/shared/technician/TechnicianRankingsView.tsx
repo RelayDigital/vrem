@@ -10,6 +10,7 @@ interface TechnicianRankingsViewProps {
   technicians: Technician[];
   onAssign: (technicianId: string, score: number) => void;
   preferredVendors?: string[];
+  allowOverride?: boolean; // Allow admins to assign unavailable technicians
 }
 
 export function TechnicianRankingsView({
@@ -17,6 +18,7 @@ export function TechnicianRankingsView({
   technicians,
   onAssign,
   preferredVendors = [],
+  allowOverride = false,
 }: TechnicianRankingsViewProps) {
   const rankings = rankTechnicians(technicians, job, preferredVendors);
 
@@ -36,6 +38,7 @@ export function TechnicianRankingsView({
             score={ranking.score}
             recommended={ranking.recommended && index === 0}
             showFullAddress={true}
+            allowOverride={allowOverride}
             onAssign={() => onAssign(technician.id, ranking.score)}
           />
             );

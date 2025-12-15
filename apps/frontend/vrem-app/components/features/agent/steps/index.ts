@@ -2,5 +2,9 @@
 export { AddressStep } from './AddressStep';
 export { DetailsStep } from './DetailsStep';
 export { ProviderStep } from './ProviderStep';
+export { PackageSelectionStep } from './PackageSelectionStep';
 export { TechnicianSelectionStep } from './TechnicianSelectionStep';
 export { LoginDialog } from './LoginDialog';
+
+// Types
+export type { AddOnWithQuantity } from './PackageSelectionStep';

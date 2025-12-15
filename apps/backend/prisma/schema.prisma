@@ -8,20 +8,26 @@ datasource db {
 }
 
 model User {
-  id              String                 @id @default(uuid())
-  email           String                 @unique
-  name            String
-  password        String
-  accountType     UserAccountType        @default(AGENT)
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
-  messages        Message[]
-  organizations   OrganizationMember[]
-  editorProjects  Project[]              @relation("EditorProjects")
-  techProjects    Project[]              @relation("TechProjects")
-  managerProjects Project[]              @relation("ManagerProjects")
-  customers       OrganizationCustomer[]
-  notifications   Notification[]
+  id               String                 @id @default(uuid())
+  email            String                 @unique
+  name             String
+  password         String
+  accountType      UserAccountType        @default(AGENT)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  messages         Message[]
+  organizations    OrganizationMember[]
+  editorProjects   Project[]              @relation("EditorProjects")
+  techProjects     Project[]              @relation("TechProjects")
+  managerProjects  Project[]              @relation("ManagerProjects")
+  approvedProjects Project[]              @relation("ApprovedProjects")
+  customers        OrganizationCustomer[]
+  notifications    Notification[]
+
+  // Calendar integrations
+  calendarIntegrations UserCalendarIntegration[]
+  icsFeed              UserIcsFeed?
+  techCalendarEvents   TechnicianCalendarEvent[] @relation("TechCalendarEvents")
 }
 
 model Organization {
@@ -50,6 +56,8 @@ model Organization {
   projects      Project[]
   customers     OrganizationCustomer[]
   notifications Notification[]
+  packages      ServicePackage[]
+  addOns        PackageAddOn[]
 }
 
 model OrganizationMember {
@@ -113,6 +121,23 @@ model Project {
   updatedAt        DateTime              @updatedAt
   orgId            String
   customerId       String?
+
+  // Delivery fields
+  deliveryToken        String?              @unique @default(uuid())
+  deliveryEnabledAt    DateTime?
+
+  // Approval fields
+  clientApprovalStatus ClientApprovalStatus @default(PENDING_REVIEW)
+  clientApprovedAt     DateTime?
+  clientApprovedById   String?
+
+  // Payment fields
+  stripePaymentIntentId String?
+  paidAt                DateTime?
+  paymentAmount         Int?
+  paymentCurrency       String?
+
+  // Relations
   calendarEvent    CalendarEvent?
   media            Media[]
   messages         Message[]
@@ -121,7 +146,10 @@ model Project {
   technician       User?                 @relation("TechProjects", fields: [technicianId], references: [id])
   projectManager   User?                 @relation("ManagerProjects", fields: [projectManagerId], references: [id])
   customer         OrganizationCustomer? @relation(fields: [customerId], references: [id])
+  clientApprovedBy User?                 @relation("ApprovedProjects", fields: [clientApprovedById], references: [id])
   notifications    Notification[]
+  pendingOrder     PendingOrder?
+  techCalendarEvents TechnicianCalendarEvent[]
 }
 
 model OrganizationCustomer {
@@ -232,6 +260,22 @@ enum NotificationType {
   INVITATION_MEMBER
   INVITATION_CUSTOMER
   PROJECT_ASSIGNED
+  NEW_MESSAGE
+  PROJECT_APPROVED
+}
+
+enum ClientApprovalStatus {
+  PENDING_REVIEW
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+enum PendingOrderStatus {
+  PENDING_PAYMENT
+  PAYMENT_COMPLETED
+  PROJECT_CREATED
+  EXPIRED
+  CANCELLED
 }
 
 model Notification {
@@ -241,6 +285,7 @@ model Notification {
   type         NotificationType
   invitationId String?
   projectId    String?
+  messageId    String?
   payload      Json?
   createdAt    DateTime         @default(now())
   readAt       DateTime?
@@ -249,4 +294,172 @@ model Notification {
   organization Organization     @relation(fields: [orgId], references: [id])
   invitation   Invitation?      @relation(fields: [invitationId], references: [id])
   project      Project?         @relation(fields: [projectId], references: [id])
+}
+
+model PendingOrder {
+  id                    String             @id @default(uuid())
+  stripeSessionId       String             @unique
+  stripePaymentIntentId String?
+  agentUserId           String
+  agentCustomerId       String
+  providerOrgId         String
+  orderData             Json
+  status                PendingOrderStatus @default(PENDING_PAYMENT)
+  totalAmount           Int
+  currency              String             @default("usd")
+  createdAt             DateTime           @default(now())
+  expiresAt             DateTime
+  completedAt           DateTime?
+  projectId             String?            @unique
+  project               Project?           @relation(fields: [projectId], references: [id])
+
+  // Package selection
+  packageId             String?
+  package               ServicePackage?    @relation(fields: [packageId], references: [id])
+  selectedAddOnIds      String[]           @default([])
+
+  @@index([agentUserId])
+  @@index([providerOrgId])
+  @@index([status])
+}
+
+// =============================
+// Service Packages & Add-ons
+// =============================
+
+model ServicePackage {
+  id            String         @id @default(uuid())
+  orgId         String
+  name          String
+  description   String?
+  price         Int            // Price in cents
+  currency      String         @default("usd")
+  mediaTypes    MediaType[]    // Included media types
+  isActive      Boolean        @default(true)
+  displayOrder  Int            @default(0)
+  turnaroundDays Int?          // Expected delivery time
+  photoCount    Int?           // Number of photos included
+  videoMinutes  Int?           // Minutes of video included
+  features      String[]       @default([])  // Feature bullet points
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  organization  Organization   @relation(fields: [orgId], references: [id])
+  pendingOrders PendingOrder[]
+
+  @@index([orgId])
+  @@index([isActive])
+}
+
+model PackageAddOn {
+  id            String       @id @default(uuid())
+  orgId         String
+  name          String
+  description   String?
+  price         Int          // Price in cents
+  currency      String       @default("usd")
+  category      AddOnCategory @default(OTHER)
+  isActive      Boolean      @default(true)
+  displayOrder  Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  organization  Organization @relation(fields: [orgId], references: [id])
+
+  @@index([orgId])
+  @@index([isActive])
+}
+
+enum AddOnCategory {
+  AERIAL        // Drone photography/video
+  TWILIGHT      // Twilight/dusk shots
+  VIRTUAL_TOUR  // 3D virtual tours
+  FLOORPLAN     // Floor plans
+  RUSH          // Rush delivery
+  OTHER
+}
+
+// =============================
+// Calendar Integrations
+// =============================
+
+enum CalendarProvider {
+  GOOGLE
+  OUTLOOK
+  CRONOFY
+}
+
+enum CalendarIntegrationStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  DISCONNECTED
+}
+
+enum CalendarEventSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+  DELETED
+}
+
+// Per-user OAuth calendar connections
+model UserCalendarIntegration {
+  id                String                    @id @default(uuid())
+  userId            String
+  provider          CalendarProvider
+  providerAccountId String?
+  calendarId        String
+  calendarName      String?
+  accessToken       String                    // Encrypted
+  refreshToken      String?                   // Encrypted
+  tokenExpiresAt    DateTime?
+  status            CalendarIntegrationStatus @default(PENDING)
+  isPrimary         Boolean                   @default(false)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  lastSyncAt        DateTime?
+  lastSyncError     String?
+
+  user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calendarEvents TechnicianCalendarEvent[]
+
+  @@unique([userId, provider, calendarId])
+  @@index([userId])
+}
+
+// ICS feed per user
+model UserIcsFeed {
+  id           String    @id @default(uuid())
+  userId       String    @unique
+  feedToken    String    @unique @default(uuid())
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  lastAccessAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([feedToken])
+}
+
+// Track events synced to external calendars
+model TechnicianCalendarEvent {
+  id              String                   @id @default(uuid())
+  projectId       String
+  technicianId    String
+  integrationId   String?
+  externalEventId String?
+  status          CalendarEventSyncStatus  @default(PENDING)
+  syncedAt        DateTime?
+  lastError       String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  project     Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  technician  User                     @relation("TechCalendarEvents", fields: [technicianId], references: [id], onDelete: Cascade)
+  integration UserCalendarIntegration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, technicianId, integrationId])
+  @@index([technicianId])
+  @@index([projectId])
 }

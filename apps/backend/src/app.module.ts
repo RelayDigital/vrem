@@ -13,6 +13,10 @@ import { ActiveOrgMiddleware } from './organizations/active-org.middleware';
 import { CustomersModule } from './customers/customers.module';
 import { OrdersModule } from './orders/orders.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { DeliveryModule } from './delivery/delivery.module';
+import { StripeModule } from './stripe/stripe.module';
+import { PackagesModule } from './packages/packages.module';
+import { CalendarIntegrationsModule } from './calendar-integrations/calendar-integrations.module';
 import { OrgRolesGuard } from './auth/org-roles.guard';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { Reflector } from '@nestjs/core';
@@ -32,6 +36,10 @@ import { PrismaModule } from './prisma/prisma.module';
     CustomersModule,
     OrdersModule,
     NotificationsModule,
+    DeliveryModule,
+    StripeModule,
+    PackagesModule,
+    CalendarIntegrationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, ActiveOrgMiddleware, OrgRolesGuard, JwtAuthGuard, Reflector],

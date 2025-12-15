@@ -58,6 +58,7 @@ import {
   Underline,
   Smile,
   ChevronDown,
+  ChevronRight,
   Edit,
   Trash2,
   Paperclip,
@@ -78,6 +79,11 @@ import {
   Loader2,
   Navigation,
   Map as MapIcon,
+  Reply,
+  CheckCheck,
+  Forward,
+  SmilePlus,
+  Users,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
@@ -105,6 +111,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Popover,
@@ -212,6 +221,8 @@ interface JobTaskViewProps {
   variant?: "sheet" | "dialog" | "page";
   onFullScreen?: () => void; // Opens larger dialog
   onOpenInNewPage?: () => void; // Navigates to full page view
+  initialTab?: string; // Initial tab to open (e.g., "discussion")
+  initialChatTab?: "client" | "team"; // Initial chat tab to open
 }
 
 export function JobTaskView({
@@ -239,13 +250,15 @@ export function JobTaskView({
   variant = "sheet",
   onFullScreen,
   onOpenInNewPage,
+  initialTab,
+  initialChatTab,
 }: JobTaskViewProps) {
   const { activeOrganizationId, activeMembership } = useCurrentOrganization();
   const jobManagement = useJobManagement();
   const isAgentUser = (currentUserAccountType || "").toUpperCase() === "AGENT";
   const [activeTab, setActiveTab] = useState<
     "description" | "discussion" | "attachments" | "media"
-  >("discussion");
+  >((initialTab as "description" | "discussion" | "attachments" | "media") || "discussion");
   const orgRoleUpper = (
     (activeMembership?.role ||
       (activeMembership as any)?.orgRole ||
@@ -278,8 +291,11 @@ export function JobTaskView({
   }, [effectiveOrgRole, isAgentUser]);
   
   // Default chat tab: agents see client chat, EDITOR/TECHNICIAN see team chat only
+  // Use initialChatTab from props (from notifications) if provided
   const defaultChatTab = isAgentUser ? "client" : (canViewCustomerChat ? "client" : "team");
-  const [activeChatTab, setActiveChatTab] = useState<"client" | "team">(defaultChatTab);
+  const [activeChatTab, setActiveChatTab] = useState<"client" | "team">(
+    initialChatTab || defaultChatTab
+  );
   
   // Update active chat tab when permissions change (e.g., if user switches orgs)
   // Also ensure EDITOR/TECHNICIAN can't stay on client tab if they somehow got there
@@ -289,6 +305,8 @@ export function JobTaskView({
     }
   }, [canViewCustomerChat, activeChatTab]);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+  const [threadViewMessage, setThreadViewMessage] = useState<ChatMessage | null>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(
     null
@@ -574,6 +592,28 @@ export function JobTaskView({
       ) || null
     );
   }, [editors, job]);
+
+  // Look up assigned technician from technicians list based on job.assignedTechnicianId
+  // This takes precedence over the technician prop if available
+  const assignedTechnician = useMemo(() => {
+    if (!job?.assignedTechnicianId) return null;
+    return (
+      technicians.find(
+        (tech) =>
+          tech.id === job.assignedTechnicianId ||
+          tech.userId === job.assignedTechnicianId
+      ) || null
+    );
+  }, [technicians, job?.assignedTechnicianId]);
+
+  // Use assignedTechnician from lookup, fall back to technician prop
+  const displayTechnician = assignedTechnician
+    ? {
+        name: assignedTechnician.name,
+        avatarUrl: assignedTechnician.avatar,
+        role: assignedTechnician.role || "TECHNICIAN",
+      }
+    : technician || null;
 
   const customerDisplayName =
     assignedCustomer?.name || job?.clientName || "Unassigned";
@@ -979,7 +1019,12 @@ export function JobTaskView({
       return;
     }
     
-    onSendMessage(htmlContent, channel, replyingTo?.id);
+    // If replying to a message that's already in a thread, use the root thread ID
+    // Otherwise, use the message ID as the new thread root
+    const threadId = replyingTo
+      ? (replyingTo.threadId || replyingTo.thread || replyingTo.id)
+      : undefined;
+    onSendMessage(htmlContent, channel, threadId);
     messageEditor.commands.clearContent();
     setReplyingTo(null);
     setHasEditorContent(false);
@@ -1813,63 +1858,217 @@ export function JobTaskView({
     Record<string, boolean>
   >({});
 
-  const renderMessage = (message: any, depth = 0) => {
-    const threadMessages = message.replies || [];
+  // Create a map of message ID to message for quick lookup (used for reply previews)
+  const messageMap = useMemo(() => {
+    const map = new Map<string, ChatMessage>();
+    messages.forEach((m) => map.set(m.id, m));
+    return map;
+  }, [messages]);
+
+  // Get all messages in a thread (original + all replies)
+  // Deduplicate to prevent duplicate key errors
+  const getThreadMessages = useCallback(
+    (rootMessageId: string): ChatMessage[] => {
+      const rootMessage = messageMap.get(rootMessageId);
+      if (!rootMessage) return [];
+
+      const threadMessages = messages.filter(
+        (m) => m.threadId === rootMessageId || m.thread === rootMessageId
+      );
+
+      // Deduplicate by ID
+      const seen = new Set<string>();
+      return [rootMessage, ...threadMessages]
+        .filter((m) => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        })
+        .sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+    },
+    [messages, messageMap]
+  );
+
+  // Get reply count for a message
+  const getReplyCount = useCallback(
+    (messageId: string): number => {
+      return messages.filter((m) => m.threadId === messageId || m.thread === messageId).length;
+    },
+    [messages]
+  );
+
+  // Get sorted flat messages for current chat tab (for WhatsApp-style view)
+  // Deduplicate by message ID to prevent duplicate key errors
+  const flatClientMessages = useMemo(() => {
+    const seen = new Set<string>();
+    return [...clientMessages]
+      .filter((m) => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      })
+      .sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+  }, [clientMessages]);
+
+  const flatTeamMessages = useMemo(() => {
+    const seen = new Set<string>();
+    return [...teamMessages]
+      .filter((m) => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      })
+      .sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+  }, [teamMessages]);
+
+  // WhatsApp-style message bubble renderer
+  const renderMessageBubble = (
+    message: ChatMessage,
+    isFirstInChain: boolean = true,
+    isLastInChain: boolean = true
+  ) => {
     const isOwnMessage = message.userId === currentUserId;
     const isEditing = editingMessageId === message.id;
-    const isCollapsed =
-      expandedThreads[message.id] === false && threadMessages.length > 0;
+    const replyCount = getReplyCount(message.id);
+    const parentMessageId = message.threadId || message.thread;
+    const parentMessage = parentMessageId ? messageMap.get(parentMessageId) : null;
+
+    // Show name on first message, but avatar on last message in chain (drops down to most recent)
+    const showAvatar = isLastInChain;
+    const showName = !isOwnMessage && isFirstInChain;
 
     return (
       <div
         key={message.id}
-        className={cn("flex gap-2.5 relative", depth > 0 && "mt-3")}
-        style={{ marginLeft: depth > 0 ? depth * 16 : 0 }}
+        className={cn(
+          "flex group",
+          isOwnMessage ? "justify-end" : "justify-start",
+          // Tighter spacing for consecutive messages from same user
+          isFirstInChain ? "mt-3" : "mt-0.5"
+        )}
       >
-        {/* User Avatar */}
-        <Avatar className="h-7 w-7 shrink-0">
-          <AvatarImage src={message.userAvatar} alt={message.userName} />
-          <AvatarFallback className="text-xs bg-muted">
-            {message.userName
-              .split(" ")
-              .map((n: string) => n[0])
-              .join("")}
-          </AvatarFallback>
-        </Avatar>
-        {/* Message Content */}
-        <div className="flex-1 min-w-0">
-          <div className="group">
-            {/* Message Header */}
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <span className="text-sm font-medium text-foreground">
+        {/* Avatar for others' messages - only on last message of chain (drops to most recent) */}
+        {!isOwnMessage && (
+          <div className="w-8 mr-2 flex-shrink-0 self-end">
+            {showAvatar ? (
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={message.userAvatar} alt={message.userName} />
+                <AvatarFallback className="text-xs bg-muted">
+                  {message.userName
+                    .split(" ")
+                    .map((n: string) => n[0])
+                    .join("")}
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              // Empty placeholder to maintain alignment
+              <div className="h-8 w-8" />
+            )}
+          </div>
+        )}
+
+        <div className={cn("flex flex-col max-w-[80%]", isOwnMessage ? "items-end" : "items-start")}>
+          {/* Message bubble with dropdown beside it */}
+          <div className={cn("flex items-center gap-1", isOwnMessage ? "flex-row-reverse" : "flex-row")}>
+            {/* The message bubble itself */}
+            <div
+              className={cn(
+                "relative px-3 py-2 shadow-sm",
+                // Adjust corners based on position in chain
+                isOwnMessage
+                  ? cn(
+                      "bg-primary text-primary-foreground",
+                      isFirstInChain && isLastInChain
+                        ? "rounded-2xl rounded-br-md"
+                        : isFirstInChain
+                          ? "rounded-2xl rounded-br-md rounded-br-md"
+                          : isLastInChain
+                            ? "rounded-2xl rounded-tr-md rounded-br-md"
+                            : "rounded-2xl rounded-r-md"
+                    )
+                  : cn(
+                      "bg-muted text-foreground",
+                      isFirstInChain && isLastInChain
+                        ? "rounded-2xl rounded-bl-md"
+                        : isFirstInChain
+                          ? "rounded-2xl rounded-bl-md"
+                          : isLastInChain
+                            ? "rounded-2xl rounded-tl-md rounded-bl-md"
+                            : "rounded-2xl rounded-l-md"
+                    )
+              )}
+            >
+            {/* Sender name inside bubble - only for first message in chain from others */}
+            {showName && (
+              <span className="text-xs font-medium text-primary block mb-1">
                 {message.userName}
               </span>
-              <span className="h-0.5 w-0.5 rounded-full bg-muted-foreground/40" />
-              <span className="text-xs text-muted-foreground">
-                {format(new Date(message.createdAt), "MMM d, h:mm a")}
-              </span>
-            </div>
+            )}
 
-            {/* Message Editor */}
+            {/* Reply preview (WhatsApp style) */}
+            {parentMessage && (
+              <button
+                onClick={() => setThreadViewMessage(parentMessage)}
+                className={cn(
+                  "w-full mb-2 p-2 rounded-lg text-left transition-colors",
+                  isOwnMessage
+                    ? "bg-primary-foreground/10 hover:bg-primary-foreground/20"
+                    : "bg-background/50 hover:bg-background/70"
+                )}
+              >
+                <div
+                  className={cn(
+                    "border-l-2 pl-2",
+                    isOwnMessage ? "border-primary-foreground/50" : "border-primary"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "text-xs font-medium block",
+                      isOwnMessage ? "text-primary-foreground/80" : "text-primary"
+                    )}
+                  >
+                    {parentMessage.userName}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-xs line-clamp-2",
+                      isOwnMessage ? "text-primary-foreground/70" : "text-muted-foreground"
+                    )}
+                    dangerouslySetInnerHTML={{
+                      __html: parentMessage.content.replace(/<[^>]*>/g, '').slice(0, 100) + (parentMessage.content.length > 100 ? '...' : '')
+                    }}
+                  />
+                </div>
+              </button>
+            )}
+
+            {/* Message content - editing mode */}
             {isEditing ? (
-              <div className="mb-1.5">
-                <div className="bg-muted/50 border border-border rounded-2xl overflow-hidden flex flex-col">
+              <div className="min-w-[200px]">
+                <div className="bg-background/20 rounded-lg overflow-hidden">
                   <EditorContent
                     editor={editMessageEditor}
-                    className="[&_.ProseMirror]:min-h-[64px] [&_.ProseMirror]:max-h-[120px] [&_.ProseMirror]:overflow-y-auto [&_.ProseMirror]:px-3.5 [&_.ProseMirror]:py-3 [&_.ProseMirror]:text-sm [&_.ProseMirror]:text-foreground [&_.ProseMirror]:focus:outline-none [&_.ProseMirror]:prose [&_.ProseMirror]:prose-sm [&_.ProseMirror]:max-w-none [&_.ProseMirror_strong]:font-semibold [&_.ProseMirror_em]:italic [&_.ProseMirror_u]:underline"
+                    className="[&_.ProseMirror]:min-h-[40px] [&_.ProseMirror]:max-h-[100px] [&_.ProseMirror]:overflow-y-auto [&_.ProseMirror]:px-2 [&_.ProseMirror]:py-2 [&_.ProseMirror]:text-sm [&_.ProseMirror]:focus:outline-none"
                   />
-                  <div className="flex items-center justify-end gap-2 px-3.5 py-2 border-t border-border/40">
+                  <div className="flex items-center justify-end gap-2 px-2 py-1.5 border-t border-white/10">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 px-3 text-xs"
+                      className="h-6 px-2 text-xs"
                       onClick={handleCancelEdit}
                     >
                       Cancel
                     </Button>
                     <Button
                       size="sm"
-                      className="h-7 px-3 text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="h-6 px-2 text-xs"
                       onClick={handleSaveEdit}
                       disabled={!editMessageEditor || !hasEditEditorContent}
                     >
@@ -1879,83 +2078,321 @@ export function JobTaskView({
                 </div>
               </div>
             ) : (
+              /* Message content - normal mode */
               <div
-                className="text-[13px] leading-relaxed text-foreground wrap-break-word mb-1.5 prose prose-sm max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic [&_u]:underline [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:italic [&_a]:text-primary [&_a]:underline"
+                className={cn(
+                  "text-sm leading-relaxed prose prose-sm max-w-none",
+                  "[&_p]:mb-1 [&_p:last-child]:mb-0",
+                  "[&_strong]:font-semibold [&_em]:italic [&_u]:underline",
+                  "[&_code]:bg-black/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs",
+                  "[&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4",
+                  "[&_blockquote]:border-l-2 [&_blockquote]:pl-2 [&_blockquote]:italic",
+                  isOwnMessage
+                    ? "[&_a]:text-primary-foreground [&_a]:underline [&_blockquote]:border-primary-foreground/50"
+                    : "[&_a]:text-primary [&_a]:underline [&_blockquote]:border-border"
+                )}
                 dangerouslySetInnerHTML={{ __html: message.content }}
               />
             )}
 
-            {/* Message Actions */}
+            {/* Time and status */}
             {!isEditing && (
-              <div className="flex items-center gap-2.5 mt-1.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setReplyingTo(message)}
-                >
-                  Reply
-                </Button>
+              <div
+                className={cn(
+                  "flex items-center gap-1 mt-1",
+                  isOwnMessage ? "justify-end" : "justify-start"
+                )}
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className={cn(
+                        "text-[10px] cursor-default",
+                        isOwnMessage ? "text-primary-foreground/70" : "text-muted-foreground"
+                      )}
+                    >
+                      {format(new Date(message.createdAt), "h:mm a")}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    {format(new Date(message.createdAt), "EEEE, MMMM d, yyyy 'at' h:mm a")}
+                  </TooltipContent>
+                </Tooltip>
                 {isOwnMessage && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleEdit(message)}
-                    >
-                      <Edit className="h-3 w-3 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleDeleteClick(message.id)}
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Delete
-                    </Button>
-                  </>
+                  <CheckCheck
+                    className={cn("h-3 w-3", "text-primary-foreground/70")}
+                  />
                 )}
               </div>
             )}
+            </div>
+
+            {/* Three-dot dropdown menu - shows on hover, positioned beside bubble */}
+            {!isEditing && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={cn(
+                      "flex items-center justify-center h-6 w-6 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                    )}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align={isOwnMessage ? "end" : "start"} className="w-48">
+                  {/* Reply */}
+                  <DropdownMenuItem onClick={() => setReplyingTo(message)}>
+                    <Reply className="h-4 w-4 mr-2" />
+                    Reply
+                  </DropdownMenuItem>
+
+                  {/* React */}
+                  <DropdownMenuItem
+                    onClick={() => {
+                      toast.info("Reactions coming soon!");
+                    }}
+                  >
+                    <SmilePlus className="h-4 w-4 mr-2" />
+                    React
+                  </DropdownMenuItem>
+
+                  {/* Forward submenu */}
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <Forward className="h-4 w-4 mr-2" />
+                      Forward
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-48">
+                      {/* Forward to Team Chat - available if user can write to team chat */}
+                      {activeChatTab !== "team" && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (onSendMessage) {
+                              const forwardedContent = `<blockquote class="border-l-2 border-primary pl-2 italic"><p class="text-xs text-muted-foreground mb-1">Forwarded from ${message.userName}:</p>${message.content}</blockquote>`;
+                              onSendMessage(forwardedContent, "TEAM");
+                              toast.success("Message forwarded to Team Chat");
+                            }
+                          }}
+                        >
+                          <Users className="h-4 w-4 mr-2" />
+                          Team Chat
+                        </DropdownMenuItem>
+                      )}
+
+                      {/* Forward to Customer Chat - available if user can write to customer chat */}
+                      {activeChatTab !== "client" && canWriteToCustomerChat && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            if (onSendMessage) {
+                              const forwardedContent = `<blockquote class="border-l-2 border-primary pl-2 italic"><p class="text-xs text-muted-foreground mb-1">Forwarded from ${message.userName}:</p>${message.content}</blockquote>`;
+                              onSendMessage(forwardedContent, "CUSTOMER");
+                              toast.success("Message forwarded to Customer Chat");
+                            }
+                          }}
+                        >
+                          <MessageSquare className="h-4 w-4 mr-2" />
+                          Customer Chat
+                        </DropdownMenuItem>
+                      )}
+
+                      {/* Forward as DM - placeholder for future */}
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setForwardingMessage(message);
+                          toast.info("Direct messages coming soon!");
+                        }}
+                      >
+                        <User className="h-4 w-4 mr-2" />
+                        Direct Message...
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+
+                  {/* Edit/Delete for own messages */}
+                  {isOwnMessage && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleEdit(message)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDeleteClick(message.id)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
-          {/* Threaded Replies */}
-          {threadMessages.length > 0 && (
-            <div className="mt-2 space-y-2 relative pl-2">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-px bg-border" />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs text-muted-foreground"
-                  onClick={() =>
-                    setExpandedThreads((prev) => ({
-                      ...prev,
-                      [message.id]: isCollapsed ? true : false,
-                    }))
-                  }
-                >
-                  {isCollapsed
-                    ? `Show replies (${threadMessages.length})`
-                    : "Hide replies"}
-                </Button>
-              </div>
-              {!isCollapsed &&
-                threadMessages
-                  .sort(
-                    (a: any, b: any) =>
-                      new Date(a.createdAt).getTime() -
-                      new Date(b.createdAt).getTime()
-                  )
-                  .map((threadMsg: any) => renderMessage(threadMsg, depth + 1))}
-            </div>
+          {/* Thread indicator - below the message row */}
+          {!isEditing && replyCount > 0 && (
+            <button
+              onClick={() => setThreadViewMessage(message)}
+              className={cn(
+                "flex items-center gap-1 text-xs text-primary hover:underline mt-0.5",
+                isOwnMessage ? "self-end mr-1" : "self-start ml-1"
+              )}
+            >
+              <MessageSquare className="h-3 w-3" />
+              {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+              <ChevronRight className="h-3 w-3" />
+            </button>
           )}
         </div>
+
+        {/* Avatar for own messages - only show on last message of chain (drops to most recent) */}
+        {isOwnMessage && (
+          <div className="w-8 ml-2 flex-shrink-0 self-end">
+            {isLastInChain ? (
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={currentUserAvatar} alt={currentUserName} />
+                <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                  {currentUserName
+                    .split(" ")
+                    .map((n: string) => n[0])
+                    .join("")}
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              // Empty placeholder to maintain alignment
+              <div className="h-8 w-8" />
+            )}
+          </div>
+        )}
       </div>
     );
+  };
+
+  // Thread view sheet renderer
+  const renderThreadViewSheet = () => {
+    if (!threadViewMessage) return null;
+
+    const threadMessages = getThreadMessages(threadViewMessage.id);
+
+    return (
+      <Sheet open={!!threadViewMessage} onOpenChange={() => setThreadViewMessage(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
+          <SheetHeader className="px-4 py-3 border-b">
+            <SheetTitle className="text-base">Thread</SheetTitle>
+          </SheetHeader>
+
+          <ScrollArea className="flex-1 px-4">
+            <div className="py-4 space-y-1">
+              {threadMessages.map((message, index) => {
+                const isOwn = message.userId === currentUserId;
+                const isOriginal = index === 0;
+
+                return (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      "flex mb-2",
+                      isOwn ? "justify-end" : "justify-start"
+                    )}
+                  >
+                    {!isOwn && (
+                      <Avatar className="h-7 w-7 mr-2 mt-auto mb-1 flex-shrink-0">
+                        <AvatarImage src={message.userAvatar} alt={message.userName} />
+                        <AvatarFallback className="text-xs bg-muted">
+                          {message.userName
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+
+                    <div
+                      className={cn(
+                        "flex flex-col max-w-[80%]",
+                        isOwn ? "items-end" : "items-start"
+                      )}
+                    >
+                      {!isOwn && (
+                        <span className="text-xs text-muted-foreground ml-1 mb-0.5">
+                          {message.userName}
+                        </span>
+                      )}
+
+                      <div
+                        className={cn(
+                          "relative px-3 py-2 rounded-2xl shadow-sm",
+                          isOwn
+                            ? "bg-primary text-primary-foreground rounded-br-md"
+                            : "bg-muted text-foreground rounded-bl-md",
+                          isOriginal && "ring-2 ring-primary/20"
+                        )}
+                      >
+                        {isOriginal && (
+                          <div className="text-[10px] font-medium mb-1 opacity-70">
+                            Original message
+                          </div>
+                        )}
+                        <div
+                          className={cn(
+                            "text-sm leading-relaxed prose prose-sm max-w-none",
+                            "[&_p]:mb-1 [&_p:last-child]:mb-0",
+                            isOwn
+                              ? "[&_a]:text-primary-foreground"
+                              : "[&_a]:text-primary"
+                          )}
+                          dangerouslySetInnerHTML={{ __html: message.content }}
+                        />
+                        <div
+                          className={cn(
+                            "flex items-center gap-1 mt-1",
+                            isOwn ? "justify-end" : "justify-start"
+                          )}
+                        >
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                className={cn(
+                                  "text-[10px] cursor-default",
+                                  isOwn ? "text-primary-foreground/70" : "text-muted-foreground"
+                                )}
+                              >
+                                {format(new Date(message.createdAt), "h:mm a")}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              {format(new Date(message.createdAt), "EEEE, MMMM d, yyyy 'at' h:mm a")}
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    </div>
+
+                    {isOwn && (
+                      <Avatar className="h-7 w-7 ml-2 mt-auto mb-1 flex-shrink-0">
+                        <AvatarImage src={currentUserAvatar} alt={currentUserName} />
+                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                          {currentUserName
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
+    );
+  };
+
+  // Legacy render function for backward compatibility (kept for reference, not used)
+  const renderMessage = (message: any, depth = 0) => {
+    return renderMessageBubble(message);
   };
 
   // Render header content (shared between Sheet and Dialog)
@@ -2025,6 +2462,32 @@ export function JobTaskView({
                 <Link className="mr-2 h-4 w-4" />
                 Copy link
               </DropdownMenuItem>
+              {job?.status === "delivered" && job?.deliveryToken && (
+                <>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      window.open(`/delivery/${job.deliveryToken}`, '_blank');
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Open delivery page
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      const deliveryUrl = `${window.location.origin}/delivery/${job.deliveryToken}`;
+                      navigator.clipboard.writeText(deliveryUrl);
+                      toast.success('Delivery link copied to clipboard');
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <Link className="mr-2 h-4 w-4" />
+                    Copy delivery link
+                  </DropdownMenuItem>
+                </>
+              )}
               {onStatusChange && job?.status !== "delivered" && (
                 <DropdownMenuItem
                   onSelect={(e) => {
@@ -2854,7 +3317,7 @@ export function JobTaskView({
                 )}
 
                 {/* Technician Assigned - hide if agent and unassigned */}
-                {(!isAgentUser || technician) && (
+                {(!isAgentUser || displayTechnician) && (
                   <>
                     <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                       Tech Assigned
@@ -2863,23 +3326,23 @@ export function JobTaskView({
                       {canAssignTechnicianOrEditor ? (
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={technician ? onChangeTechnician : onAssignTechnician}
+                        onClick={displayTechnician ? onChangeTechnician : onAssignTechnician}
                         className={cn(
                           "flex items-center gap-2 px-2 py-1 -ml-2 rounded-md transition-colors",
                           "hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
                         )}
                         disabled={
-                          technician
+                          displayTechnician
                             ? !(job?.status === "assigned" || job?.status === "in_progress")
                             : !onAssignTechnician
                         }
                       >
                         <Avatar className="h-7 w-7">
-                          {technician ? (
+                          {displayTechnician ? (
                             <>
-                              <AvatarImage src={technician.avatarUrl} alt={technician.name} />
+                              <AvatarImage src={displayTechnician.avatarUrl} alt={displayTechnician.name} />
                               <AvatarFallback className="text-xs bg-muted-foreground/20">
-                                {getInitials(technician.name)}
+                                {getInitials(displayTechnician.name)}
                               </AvatarFallback>
                             </>
                           ) : (
@@ -2888,12 +3351,12 @@ export function JobTaskView({
                         </Avatar>
                         <span className={cn(
                           "text-sm",
-                          technician ? "text-foreground" : "text-muted-foreground"
+                          displayTechnician ? "text-foreground" : "text-muted-foreground"
                         )}>
-                          {technician ? technician.name : "Assign Technician"}
+                          {displayTechnician ? displayTechnician.name : "Assign Technician"}
                         </span>
                       </button>
-                      {technician && onChangeTechnician && (job?.status === "assigned" || job?.status === "in_progress") && (
+                      {displayTechnician && onChangeTechnician && (job?.status === "assigned" || job?.status === "in_progress") && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -2913,11 +3376,11 @@ export function JobTaskView({
                   ) : (
                     <div className="flex items-center gap-2">
                       <Avatar className="h-7 w-7">
-                        {technician ? (
+                        {displayTechnician ? (
                           <>
-                            <AvatarImage src={technician.avatarUrl} alt={technician.name} />
+                            <AvatarImage src={displayTechnician.avatarUrl} alt={displayTechnician.name} />
                             <AvatarFallback className="text-xs bg-muted-foreground/20">
-                              {getInitials(technician.name)}
+                              {getInitials(displayTechnician.name)}
                             </AvatarFallback>
                           </>
                         ) : (
@@ -2925,7 +3388,7 @@ export function JobTaskView({
                         )}
                       </Avatar>
                       <span className="text-sm text-muted-foreground">
-                        {technician ? technician.name : "Unassigned"}
+                        {displayTechnician ? displayTechnician.name : "Unassigned"}
                       </span>
                     </div>
                   )}
@@ -3049,6 +3512,26 @@ export function JobTaskView({
                     </span>
                   </Badge>
                 </div>
+
+                {/* Delivery Link (only for delivered projects) */}
+                {job?.status === "delivered" && job?.deliveryToken && (
+                  <>
+                    <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
+                      Delivery
+                    </div>
+                    <div>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-[13px] font-medium"
+                        onClick={() => window.open(`/delivery/${job.deliveryToken}`, '_blank')}
+                      >
+                        <ExternalLink className="mr-1.5 h-3 w-3" />
+                        View delivery page
+                      </Button>
+                    </div>
+                  </>
+                )}
 
                 {/* Tags (Media Types) */}
                 <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
@@ -3258,34 +3741,54 @@ export function JobTaskView({
 
                 {activeTab === "discussion" && (
                   <div className="flex flex-col gap-4">
-                    {/* Chat Content */}
+                    {/* Chat Content - WhatsApp Style */}
                     {activeChatTab === "client" ? (
-                      <ScrollArea className="flex-1 pr-4 min-h-[400px]">
-                        <div className="space-y-4">
-                          {clientMessages.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground text-sm">
-                              {isAgentUser
-                                ? "No messages yet"
-                                : "No messages in customer chat yet"}
+                      <ScrollArea className="flex-1 pr-2 min-h-[400px]">
+                        <div className="py-2">
+                          {flatClientMessages.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                              <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                              <p className="text-sm text-muted-foreground">
+                                {isAgentUser
+                                  ? "No messages yet"
+                                  : "No messages in customer chat yet"}
+                              </p>
+                              <p className="text-xs text-muted-foreground/70 mt-1">
+                                Start the conversation below
+                              </p>
                             </div>
                           ) : (
-                            clientThreaded.map((message: any) =>
-                              renderMessage(message, 0)
-                            )
+                            flatClientMessages.map((message, index, arr) => {
+                              const prevMessage = index > 0 ? arr[index - 1] : null;
+                              const nextMessage = index < arr.length - 1 ? arr[index + 1] : null;
+                              const isFirstInChain = !prevMessage || prevMessage.userId !== message.userId;
+                              const isLastInChain = !nextMessage || nextMessage.userId !== message.userId;
+                              return renderMessageBubble(message, isFirstInChain, isLastInChain);
+                            })
                           )}
                         </div>
                       </ScrollArea>
                     ) : (
-                      <ScrollArea className="flex-1 pr-4 min-h-[400px]">
-                        <div className="space-y-4">
-                          {teamMessages.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground text-sm">
-                              No messages in team chat yet
+                      <ScrollArea className="flex-1 pr-2 min-h-[400px]">
+                        <div className="py-2">
+                          {flatTeamMessages.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                              <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                              <p className="text-sm text-muted-foreground">
+                                No messages in team chat yet
+                              </p>
+                              <p className="text-xs text-muted-foreground/70 mt-1">
+                                Start the conversation below
+                              </p>
                             </div>
                           ) : (
-                            teamThreaded.map((message: any) =>
-                              renderMessage(message, 0)
-                            )
+                            flatTeamMessages.map((message, index, arr) => {
+                              const prevMessage = index > 0 ? arr[index - 1] : null;
+                              const nextMessage = index < arr.length - 1 ? arr[index + 1] : null;
+                              const isFirstInChain = !prevMessage || prevMessage.userId !== message.userId;
+                              const isLastInChain = !nextMessage || nextMessage.userId !== message.userId;
+                              return renderMessageBubble(message, isFirstInChain, isLastInChain);
+                            })
                           )}
                         </div>
                       </ScrollArea>
@@ -3582,6 +4085,9 @@ export function JobTaskView({
       </AlertDialog>
 
       {mainContent}
+
+      {/* Thread View Sheet */}
+      {renderThreadViewSheet()}
     </>
   );
 }

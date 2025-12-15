@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Check, X, ExternalLink, Briefcase, Building2 } from "lucide-react";
+import { Bell, Check, X, ExternalLink, Briefcase, Building2, MessageSquare, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,13 +18,32 @@ import { api } from "@/lib/api";
 import { NotificationItem, NotificationType } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/auth-context";
 
 interface NotificationBellProps {
   className?: string;
 }
 
+// Grouped notification for multiple messages in the same project
+interface GroupedMessageNotification {
+  type: "GROUPED_MESSAGES";
+  projectId: string;
+  projectAddress?: string;
+  notifications: NotificationItem[];
+  messageCount: number;
+  unreadCount: number;
+  latestNotification: NotificationItem;
+}
+
+type DisplayNotification = NotificationItem | GroupedMessageNotification;
+
+function isGroupedNotification(n: DisplayNotification): n is GroupedMessageNotification {
+  return (n as GroupedMessageNotification).type === "GROUPED_MESSAGES";
+}
+
 export function NotificationBell({ className }: NotificationBellProps) {
   const router = useRouter();
+  const { activeOrganizationId, switchOrganization } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -111,7 +130,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
 
   const handleViewProject = async (notification: NotificationItem) => {
     if (!notification.projectId) return;
-    
+
     // Mark as read
     try {
       await api.notifications.markRead(notification.id);
@@ -123,17 +142,139 @@ export function NotificationBell({ className }: NotificationBellProps) {
     } catch (error) {
       console.error("Failed to mark notification as read:", error);
     }
-    
+
+    // Switch organization if needed
+    if (notification.orgId && notification.orgId !== activeOrganizationId) {
+      switchOrganization(notification.orgId);
+    }
+
+    // Build URL with query params for chat tab
+    let url = `/jobs/${notification.projectId}`;
+    const params = new URLSearchParams();
+
+    // If it's a message notification, open the chat and set the correct tab
+    if (notification.type === "NEW_MESSAGE") {
+      params.set("tab", "discussion");
+      if (notification.messageChannel) {
+        params.set("chat", notification.messageChannel === "CUSTOMER" ? "client" : "team");
+      }
+    }
+
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+
     // Navigate to project
-    router.push(`/jobs/${notification.projectId}`);
+    router.push(url);
     setIsOpen(false);
   };
 
-  const getNotificationIcon = (type: NotificationType) => {
-    if (type === "PROJECT_ASSIGNED") {
-      return <Briefcase className="h-4 w-4 text-blue-500" />;
+  const handleViewGroupedProject = async (grouped: GroupedMessageNotification) => {
+    // Mark all notifications in the group as read
+    try {
+      await Promise.all(
+        grouped.notifications
+          .filter((n) => !n.readAt)
+          .map((n) => api.notifications.markRead(n.id))
+      );
+      setNotifications((prev) =>
+        prev.map((n) =>
+          grouped.notifications.some((gn) => gn.id === n.id)
+            ? { ...n, readAt: new Date() }
+            : n
+        )
+      );
+    } catch (error) {
+      console.error("Failed to mark notifications as read:", error);
     }
-    return <Building2 className="h-4 w-4 text-purple-500" />;
+
+    // Switch organization if needed (use org from latest notification)
+    const orgId = grouped.latestNotification.orgId;
+    if (orgId && orgId !== activeOrganizationId) {
+      switchOrganization(orgId);
+    }
+
+    // Build URL - open to discussion tab for message notifications
+    let url = `/jobs/${grouped.projectId}`;
+    const params = new URLSearchParams();
+    params.set("tab", "discussion");
+
+    // Determine which chat tab to open (prefer the one with most recent unread)
+    const latestChannel = grouped.latestNotification.messageChannel;
+    if (latestChannel) {
+      params.set("chat", latestChannel === "CUSTOMER" ? "client" : "team");
+    }
+
+    url += `?${params.toString()}`;
+
+    // Navigate to project
+    router.push(url);
+    setIsOpen(false);
+  };
+
+  // Group NEW_MESSAGE notifications by project
+  const displayNotifications = useMemo((): DisplayNotification[] => {
+    const messagesByProject = new Map<string, NotificationItem[]>();
+    const otherNotifications: NotificationItem[] = [];
+
+    for (const notification of notifications) {
+      if (notification.type === "NEW_MESSAGE" && notification.projectId) {
+        const existing = messagesByProject.get(notification.projectId) || [];
+        existing.push(notification);
+        messagesByProject.set(notification.projectId, existing);
+      } else {
+        otherNotifications.push(notification);
+      }
+    }
+
+    const result: DisplayNotification[] = [...otherNotifications];
+
+    // Create grouped notifications for projects with messages
+    for (const [projectId, projectNotifications] of messagesByProject) {
+      if (projectNotifications.length === 1) {
+        // Single message - show as regular notification
+        result.push(projectNotifications[0]);
+      } else {
+        // Multiple messages - group them
+        const sorted = projectNotifications.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        const latest = sorted[0];
+        result.push({
+          type: "GROUPED_MESSAGES",
+          projectId,
+          projectAddress: latest.projectAddress,
+          notifications: projectNotifications,
+          messageCount: projectNotifications.length,
+          unreadCount: projectNotifications.filter((n) => !n.readAt).length,
+          latestNotification: latest,
+        });
+      }
+    }
+
+    // Sort by most recent
+    return result.sort((a, b) => {
+      const dateA = isGroupedNotification(a)
+        ? new Date(a.latestNotification.createdAt).getTime()
+        : new Date(a.createdAt).getTime();
+      const dateB = isGroupedNotification(b)
+        ? new Date(b.latestNotification.createdAt).getTime()
+        : new Date(b.createdAt).getTime();
+      return dateB - dateA;
+    });
+  }, [notifications]);
+
+  const getNotificationIcon = (type: NotificationType) => {
+    switch (type) {
+      case "PROJECT_ASSIGNED":
+        return <Briefcase className="h-4 w-4 text-blue-500" />;
+      case "NEW_MESSAGE":
+        return <MessageSquare className="h-4 w-4 text-green-500" />;
+      case "PROJECT_APPROVED":
+        return <CheckCircle className="h-4 w-4 text-emerald-500" />;
+      default:
+        return <Building2 className="h-4 w-4 text-purple-500" />;
+    }
   };
 
   const getNotificationTitle = (notification: NotificationItem) => {
@@ -144,6 +285,10 @@ export function NotificationBell({ className }: NotificationBellProps) {
         return `Invited as customer of ${notification.orgName}`;
       case "PROJECT_ASSIGNED":
         return `Assigned to project`;
+      case "NEW_MESSAGE":
+        return `New message in project`;
+      case "PROJECT_APPROVED":
+        return `Project approved`;
       default:
         return "Notification";
     }
@@ -164,6 +309,31 @@ export function NotificationBell({ className }: NotificationBellProps) {
         return notification.projectAddress
           ? `As ${roleLabel} at ${notification.projectAddress}`
           : `As ${roleLabel}`;
+      case "NEW_MESSAGE":
+        const channelLabel = notification.messageChannel === "CUSTOMER" ? "Customer" : "Team";
+        const projectInfo = notification.projectAddress || (notification.projectId ? `Project ${notification.projectId.substring(0, 8)}...` : '');
+        if (notification.messagePreview) {
+          // Strip HTML tags and decode entities for plain text display
+          const plainText = notification.messagePreview
+            .replace(/<[^>]*>/g, '') // Remove HTML tags
+            .replace(/&nbsp;/g, ' ') // Replace non-breaking spaces
+            .replace(/&amp;/g, '&')  // Decode ampersands
+            .replace(/&lt;/g, '<')   // Decode less than
+            .replace(/&gt;/g, '>')   // Decode greater than
+            .replace(/&quot;/g, '"') // Decode quotes
+            .replace(/&#39;/g, "'")  // Decode apostrophes
+            .trim();
+          const truncated = plainText.substring(0, 50);
+          const projectPrefix = projectInfo ? `${projectInfo} • ` : '';
+          return `${projectPrefix}${channelLabel}: "${truncated}${plainText.length > 50 ? '...' : ''}"`;
+        }
+        return projectInfo
+          ? `${projectInfo} • New message in ${channelLabel} channel`
+          : `New message in ${channelLabel} channel`;
+      case "PROJECT_APPROVED":
+        return notification.approverName
+          ? `Approved by ${notification.approverName}${notification.projectAddress ? ` - ${notification.projectAddress}` : ''}`
+          : notification.projectAddress || 'Project delivery approved';
       default:
         return "";
     }
@@ -204,7 +374,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
           <div className="flex items-center justify-center py-8">
             <Spinner className="h-6 w-6" />
           </div>
-        ) : notifications.length === 0 ? (
+        ) : displayNotifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
             <Bell className="h-8 w-8 mb-2 opacity-50" />
             <p className="text-sm">All caught up!</p>
@@ -212,9 +382,62 @@ export function NotificationBell({ className }: NotificationBellProps) {
         ) : (
           <ScrollArea className="max-h-[400px]">
             <div className="flex flex-col">
-              {notifications.map((notification) => {
+              {displayNotifications.map((item) => {
+                // Handle grouped message notifications
+                if (isGroupedNotification(item)) {
+                  const projectInfo = item.projectAddress || `Project ${item.projectId.substring(0, 8)}...`;
+                  return (
+                    <div
+                      key={`grouped-${item.projectId}`}
+                      className={cn(
+                        "flex flex-col gap-2 p-3 border-b last:border-b-0 hover:bg-muted/50 transition-colors",
+                        item.unreadCount > 0 && "bg-muted/30"
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <MessageSquare className="h-4 w-4 text-green-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium leading-tight">
+                              {item.messageCount} new messages
+                            </p>
+                            {item.unreadCount > 0 && (
+                              <Badge variant="secondary" className="h-5 text-xs px-1.5">
+                                {item.unreadCount} unread
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {projectInfo}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatDistanceToNow(item.latestNotification.createdAt, {
+                              addSuffix: true,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 ml-7">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => handleViewGroupedProject(item)}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          View Project
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Handle regular notifications
+                const notification = item;
                 const isProcessing = processingIds.has(notification.id);
-                
+
                 return (
                   <div
                     key={notification.id}

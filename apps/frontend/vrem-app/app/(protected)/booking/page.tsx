@@ -86,14 +86,20 @@ export default function BookingPage() {
       return;
     }
 
+    // Agent flow requires a package selection
+    if (!job.packageId) {
+      toast.error("Please select a package.");
+      return;
+    }
+
     try {
       // Build scheduled time ISO string from date and time
       const scheduledTime = job.scheduledDate && job.scheduledTime
         ? new Date(`${job.scheduledDate}T${job.scheduledTime}`).toISOString()
         : new Date().toISOString();
 
-      // Create the order via API with providerOrgId for agent flow
-      const result = await api.orders.create({
+      // Create checkout session and redirect to Stripe
+      const { checkoutUrl } = await api.orders.createCheckout({
         // Agent flow: specify the provider org
         providerOrgId: job.providerOrgId,
         // Address - use parsed components from Mapbox, fallback to full address string
@@ -111,15 +117,18 @@ export default function BookingPage() {
         mediaTypes: job.mediaType || [],
         priority: job.priority || "standard",
         notes: job.requirements || "",
+        // Package selection
+        packageId: job.packageId,
+        addOnIds: job.addOnIds,
+        addOnQuantities: job.addOnQuantities,
       });
 
-      const providerName = job.providerName || "the provider";
-      toast.success(`Order created for ${providerName}. The job is now pending assignment.`);
-      router.push(`/jobs/${result.project.id}`);
+      // Redirect to Stripe Checkout
+      window.location.href = checkoutUrl;
     } catch (error) {
-      console.error("Failed to create order:", error);
+      console.error("Failed to create checkout session:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to create order"
+        error instanceof Error ? error.message : "Failed to process order"
       );
     }
   };

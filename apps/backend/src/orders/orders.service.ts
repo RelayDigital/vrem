@@ -5,10 +5,12 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
-import { Prisma, OrgType, CalendarEvent } from '@prisma/client';
+import { Prisma, OrgType, CalendarEvent, PendingOrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CronofyService } from '../cronofy/cronofy.service';
 import { AuthorizationService } from '../auth/authorization.service';
+import { StripeService } from '../stripe/stripe.service';
+import { PackagesService } from '../packages/packages.service';
 import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderResult } from './dto/order-result.dto';
@@ -21,6 +23,8 @@ export class OrdersService {
     private prisma: PrismaService,
     private cronofy: CronofyService,
     private authorization: AuthorizationService,
+    private stripe: StripeService,
+    private packages: PackagesService,
   ) {}
 
   /**
@@ -507,6 +511,129 @@ export class OrdersService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /**
+   * Creates a Stripe Checkout session for an agent order.
+   * This is used when payment is required before creating the project.
+   */
+  async createCheckoutSession(
+    ctx: OrgContext,
+    user: AuthenticatedUser,
+    dto: CreateOrderDto,
+  ): Promise<{ checkoutUrl: string; sessionId: string }> {
+    // Only agents can use checkout flow
+    if (!dto.providerOrgId) {
+      throw new BadRequestException('providerOrgId is required for checkout');
+    }
+
+    // Validate the provider org exists and is a COMPANY
+    const providerOrg = await this.prisma.organization.findUnique({
+      where: { id: dto.providerOrgId },
+    });
+
+    if (!providerOrg) {
+      throw new ForbiddenException('Provider organization not found');
+    }
+
+    if (providerOrg.type !== OrgType.COMPANY) {
+      throw new ForbiddenException('Provider organization must be a COMPANY');
+    }
+
+    // Validate the user is a customer of this provider org
+    const customerRelation = await this.prisma.organizationCustomer.findFirst({
+      where: {
+        orgId: dto.providerOrgId,
+        userId: user.id,
+      },
+    });
+
+    if (!customerRelation) {
+      throw new ForbiddenException(
+        'You are not registered as a customer of this organization',
+      );
+    }
+
+    // Validate media types
+    if (!dto.mediaTypes || dto.mediaTypes.length === 0) {
+      throw new BadRequestException('At least one media type must be selected');
+    }
+
+    // Validate package is selected for checkout
+    if (!dto.packageId) {
+      throw new BadRequestException('Package selection is required for checkout');
+    }
+
+    // Calculate price from package and add-ons with quantities
+    const pricing = await this.packages.calculateTotal(
+      dto.packageId,
+      dto.addOnIds || [],
+      dto.addOnQuantities,
+    );
+    const totalAmount = pricing.total;
+    const currency = pricing.currency;
+
+    // Build order description using package name
+    const addressParts = [dto.addressLine1, dto.city, dto.region].filter(Boolean);
+    const description = `${pricing.breakdown.package.name} at ${addressParts.join(', ')}`;
+
+    // Create PendingOrder
+    const pendingOrder = await this.prisma.pendingOrder.create({
+      data: {
+        stripeSessionId: '', // Will be updated after creating session
+        agentUserId: user.id,
+        agentCustomerId: customerRelation.id,
+        providerOrgId: dto.providerOrgId,
+        packageId: dto.packageId,
+        selectedAddOnIds: dto.addOnIds || [],
+        orderData: {
+          addressLine1: dto.addressLine1,
+          addressLine2: dto.addressLine2,
+          city: dto.city,
+          region: dto.region,
+          postalCode: dto.postalCode,
+          countryCode: dto.countryCode,
+          lat: dto.lat,
+          lng: dto.lng,
+          scheduledTime: dto.scheduledTime,
+          notes: dto.notes,
+          mediaTypes: dto.mediaTypes,
+          priority: dto.priority,
+          addOnQuantities: dto.addOnQuantities,
+        },
+        status: PendingOrderStatus.PENDING_PAYMENT,
+        totalAmount,
+        currency,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      },
+    });
+
+    // Create Stripe Checkout Session
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const session = await this.stripe.createCheckoutSession({
+      pendingOrderId: pendingOrder.id,
+      amount: totalAmount,
+      currency,
+      customerEmail: user.email,
+      description,
+      successUrl: `${frontendUrl}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${frontendUrl}/booking/cancel?session_id={CHECKOUT_SESSION_ID}`,
+      metadata: {
+        agentUserId: user.id,
+        providerOrgId: dto.providerOrgId,
+      },
+    });
+
+    // Update PendingOrder with session ID
+    await this.prisma.pendingOrder.update({
+      where: { id: pendingOrder.id },
+      data: { stripeSessionId: session.id },
+    });
+
+    return {
+      checkoutUrl: session.url!,
+      sessionId: session.id,
+    };
   }
 }
 
