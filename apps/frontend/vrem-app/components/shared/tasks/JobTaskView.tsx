@@ -3744,7 +3744,7 @@ export function JobTaskView({
                     {/* Chat Content - WhatsApp Style */}
                     {activeChatTab === "client" ? (
                       <ScrollArea className="flex-1 pr-2 min-h-[400px]">
-                        <div className="py-2">
+                        <div>
                           {flatClientMessages.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
                               <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-3" />
@@ -3770,7 +3770,7 @@ export function JobTaskView({
                       </ScrollArea>
                     ) : (
                       <ScrollArea className="flex-1 pr-2 min-h-[400px]">
-                        <div className="py-2">
+                        <div>
                           {flatTeamMessages.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
                               <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-3" />

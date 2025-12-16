@@ -6,9 +6,10 @@ import { AuthModule } from '../auth/auth.module';
 import { CronofyModule } from '../cronofy/cronofy.module';
 import { StripeModule } from '../stripe/stripe.module';
 import { PackagesModule } from '../packages/packages.module';
+import { NylasModule } from '../nylas/nylas.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, CronofyModule, StripeModule, PackagesModule],
+  imports: [PrismaModule, AuthModule, CronofyModule, StripeModule, PackagesModule, NylasModule],
   controllers: [OrdersController],
   providers: [OrdersService],
   exports: [OrdersService],

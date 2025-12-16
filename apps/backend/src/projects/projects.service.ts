@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   HttpException,
   HttpStatus,
@@ -12,6 +13,8 @@ import { AuthorizationService } from '../auth/authorization.service';
 import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { PrismaService } from '../prisma/prisma.service';
 import { CronofyService } from '../cronofy/cronofy.service';
+import { AvailabilityService } from '../availability/availability.service';
+import { CalendarSyncService } from '../nylas/calendar-sync.service';
 import { AssignProjectDto } from './dto/assign-project.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -25,6 +28,8 @@ export class ProjectsService {
     private prisma: PrismaService,
     private cronofy: CronofyService,
     private authorization: AuthorizationService,
+    private availabilityService: AvailabilityService,
+    private calendarSync: CalendarSyncService,
   ) {}
 
   /**
@@ -482,10 +487,19 @@ export class ProjectsService {
 
   async remove(id: string, ctx: OrgContext) {
     const project = await this.ensureProjectInOrg(id, ctx);
-    
+
     // Use canDeleteProject - only OWNER/ADMIN can delete, never PM
     if (!this.authorization.canDeleteProject(ctx, project)) {
       throw new ForbiddenException('You cannot delete this project');
+    }
+
+    // Remove calendar event if technician was assigned
+    if (project.technicianId) {
+      try {
+        await this.calendarSync.removeProjectFromCalendar(id);
+      } catch (error) {
+        this.logger.warn(`Failed to remove calendar event on project delete: ${error.message}`);
+      }
     }
 
     return this.prisma.project.delete({ where: { id } });
@@ -519,13 +533,35 @@ export class ProjectsService {
     user: AuthenticatedUser,
   ) {
     const project = await this.ensureProjectInOrg(projectId, ctx);
-    
+
     // Use canEditProject which enforces PM assignment check
     if (!this.authorization.canEditProject(ctx, project, user)) {
       throw new ForbiddenException('You cannot manage this project');
     }
 
     const technician = await this.ensureUserExists(technicianId);
+
+    // Check technician availability if project has a scheduled time
+    if (project.scheduledTime) {
+      const availabilityCheck = await this.availabilityService.isUserAvailableAt(
+        technicianId,
+        project.scheduledTime,
+      );
+
+      if (!availabilityCheck.available) {
+        // Check if auto-decline is enabled
+        const availability = await this.availabilityService.getUserAvailability(technicianId);
+        if (availability.status.autoDeclineBookings) {
+          throw new BadRequestException(
+            `Technician is not available: ${availabilityCheck.reason}`,
+          );
+        }
+        // Log warning but allow assignment if auto-decline is not enabled
+        this.logger.warn(
+          `Assigning technician ${technicianId} to project ${projectId} outside their availability: ${availabilityCheck.reason}`,
+        );
+      }
+    }
 
     // Check if this is a new assignment (different from current)
     const isNewAssignment = project.technicianId !== technicianId;
@@ -538,6 +574,24 @@ export class ProjectsService {
 
     if (project.scheduledTime && process.env.CRONOFY_ACCESS_TOKEN) {
       await this.cronofy.createEvent(updated, technician);
+    }
+
+    // Sync to Nylas calendar if technician has a connected calendar
+    if (project.scheduledTime) {
+      // If there was a previous technician, remove from their calendar
+      if (project.technicianId && project.technicianId !== technicianId) {
+        try {
+          await this.calendarSync.removeProjectFromCalendar(projectId);
+        } catch (error) {
+          this.logger.warn(`Failed to remove calendar event from previous technician: ${error.message}`);
+        }
+      }
+      // Sync to new technician's calendar
+      try {
+        await this.calendarSync.syncProjectToCalendar(projectId);
+      } catch (error) {
+        this.logger.warn(`Failed to sync calendar event for technician: ${error.message}`);
+      }
     }
 
     // Create notification for the newly assigned technician
@@ -689,7 +743,12 @@ export class ProjectsService {
 
     const updated = await this.prisma.project.update({
       where: { id: projectId },
-      data: { scheduledTime: scheduled },
+      data: {
+        scheduledTime: scheduled,
+        // Clear any calendar conflict when schedule is updated
+        calendarConflict: false,
+        calendarConflictNote: null,
+      },
     });
 
     const event = await this.prisma.calendarEvent.findUnique({
@@ -698,6 +757,15 @@ export class ProjectsService {
 
     if (event && process.env.CRONOFY_ACCESS_TOKEN) {
       await this.cronofy.updateEvent(updated, event);
+    }
+
+    // Sync to Nylas calendar if technician has a connected calendar
+    if (project.technicianId) {
+      try {
+        await this.calendarSync.syncProjectToCalendar(projectId);
+      } catch (error) {
+        this.logger.warn(`Failed to sync calendar event for schedule update: ${error.message}`);
+      }
     }
 
     return updated;
@@ -744,6 +812,15 @@ export class ProjectsService {
     const data: any = { status };
     if (status === ProjectStatus.DELIVERED) {
       data.deliveryEnabledAt = new Date();
+    }
+
+    // If cancelling, remove calendar event
+    if (status === ProjectStatus.CANCELLED) {
+      try {
+        await this.calendarSync.removeProjectFromCalendar(projectId);
+      } catch (error) {
+        this.logger.warn(`Failed to remove calendar event on cancellation: ${error.message}`);
+      }
     }
 
     return this.prisma.project.update({

@@ -1,4 +1,4 @@
-import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization, DeliveryResponse, DeliveryComment, MediaType, ServicePackage, PackageAddOn, CreatePackagePayload, CreateAddOnPayload } from '@/types';
+import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization, DeliveryResponse, DeliveryComment, MediaType, ServicePackage, PackageAddOn, CreatePackagePayload, CreateAddOnPayload, DayOfWeek } from '@/types';
 import {
   currentUser,
   jobRequests,
@@ -8,7 +8,12 @@ import {
   organizations,
 } from '@/lib/mock-data';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// Determine which API URL to use based on toggle
+const USE_PRODUCTION_API = process.env.NEXT_PUBLIC_USE_PRODUCTION_API === 'true';
+const LOCAL_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const PRODUCTION_API_URL = process.env.NEXT_PUBLIC_PRODUCTION_API_URL || '';
+
+const API_URL = USE_PRODUCTION_API && PRODUCTION_API_URL ? PRODUCTION_API_URL : LOCAL_API_URL;
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || '';
 const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
 
@@ -188,9 +193,11 @@ class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const orgId = typeof window !== 'undefined' ? localStorage.getItem('organizationId') : null;
-    
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
+      // Required for ngrok free tier to bypass browser warning interstitial
+      'ngrok-skip-browser-warning': 'true',
       ...options.headers,
     };
 
@@ -1331,6 +1338,78 @@ class ApiClient {
       });
       return this.request<{ available: boolean }>(`/availability/check?${query}`);
     },
+
+    /**
+     * Get current user's availability settings (status + work hours)
+     */
+    get: async (): Promise<{
+      status: {
+        isAvailable: boolean;
+        availabilityNote: string | null;
+        autoDeclineBookings: boolean;
+      };
+      workHours: {
+        dayOfWeek: DayOfWeek;
+        isEnabled: boolean;
+        startTime: string;
+        endTime: string;
+      }[];
+    }> => {
+      return this.request('/user-availability');
+    },
+
+    /**
+     * Update availability status (available/unavailable toggle)
+     */
+    updateStatus: async (dto: {
+      isAvailable: boolean;
+      availabilityNote?: string | null;
+      autoDeclineBookings?: boolean;
+    }): Promise<{
+      status: {
+        isAvailable: boolean;
+        availabilityNote: string | null;
+        autoDeclineBookings: boolean;
+      };
+      workHours: {
+        dayOfWeek: DayOfWeek;
+        isEnabled: boolean;
+        startTime: string;
+        endTime: string;
+      }[];
+    }> => {
+      return this.request('/user-availability/status', {
+        method: 'PATCH',
+        body: JSON.stringify(dto),
+      });
+    },
+
+    /**
+     * Update all work hours at once
+     */
+    updateWorkHours: async (workHours: {
+      dayOfWeek: DayOfWeek;
+      isEnabled: boolean;
+      startTime: string;
+      endTime: string;
+    }[]): Promise<{
+      status: {
+        isAvailable: boolean;
+        availabilityNote: string | null;
+        autoDeclineBookings: boolean;
+      };
+      workHours: {
+        dayOfWeek: DayOfWeek;
+        isEnabled: boolean;
+        startTime: string;
+        endTime: string;
+      }[];
+    }> => {
+      return this.request('/user-availability/work-hours', {
+        method: 'PUT',
+        body: JSON.stringify(workHours),
+      });
+    },
   };
 
   marketplace = {
@@ -1692,6 +1771,152 @@ class ApiClient {
         createdAt: new Date(data.createdAt),
         lastAccessAt: data.lastAccessAt ? new Date(data.lastAccessAt) : null,
       };
+    },
+  };
+
+  // =============================
+  // Nylas Calendar API
+  // =============================
+  nylas = {
+    /**
+     * Check if Nylas is configured on the server
+     */
+    isConfigured: async (): Promise<{ configured: boolean }> => {
+      return this.request('/nylas/configured');
+    },
+
+    /**
+     * Get calendar connection status for current user
+     */
+    getConnectionStatus: async (): Promise<{
+      connected: boolean;
+      integrations: Array<{
+        id: string;
+        provider: string;
+        providerAccountId: string;
+        calendarName: string | null;
+        status: string;
+        isWriteTarget: boolean;
+        createdAt: string;
+        lastSyncAt: string | null;
+      }>;
+    }> => {
+      return this.request('/nylas/connection');
+    },
+
+    /**
+     * Start OAuth flow - returns redirect URL
+     */
+    startOAuth: async (provider: 'google' | 'microsoft'): Promise<{ url: string }> => {
+      return this.request(`/nylas/oauth/start?provider=${provider}`);
+    },
+
+    /**
+     * Disconnect a calendar integration
+     */
+    disconnect: async (integrationId: string): Promise<{ success: boolean }> => {
+      return this.request(`/nylas/connection/${integrationId}`, {
+        method: 'DELETE',
+      });
+    },
+
+    /**
+     * Get user's calendars from connected accounts
+     */
+    getCalendars: async (): Promise<{
+      calendars: Array<{
+        integrationId: string;
+        integrationName: string;
+        calendars: Array<{
+          id: string;
+          grant_id: string;
+          name: string;
+          description?: string;
+          is_primary: boolean;
+          read_only: boolean;
+          timezone?: string;
+        }>;
+      }>;
+    }> => {
+      return this.request('/nylas/calendars');
+    },
+
+    /**
+     * Set write target calendar for syncing events
+     */
+    setWriteTarget: async (integrationId: string, calendarId: string): Promise<{ success: boolean }> => {
+      return this.request(`/nylas/calendars/${integrationId}/write-target`, {
+        method: 'PATCH',
+        body: JSON.stringify({ calendarId }),
+      });
+    },
+
+    /**
+     * Get availability slots for a user
+     */
+    getAvailability: async (params: {
+      start: string;
+      end: string;
+      durationMins?: number;
+      timezone?: string;
+      technicianId?: string;
+    }): Promise<{
+      slots: Array<{
+        start: Date;
+        end: Date;
+        available: boolean;
+      }>;
+      allSlots: Array<{
+        start: Date;
+        end: Date;
+        available: boolean;
+      }>;
+      start: string;
+      end: string;
+      durationMins: number;
+    }> => {
+      const queryParams = new URLSearchParams({
+        start: params.start,
+        end: params.end,
+        durationMins: String(params.durationMins || 60),
+        timezone: params.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+      if (params.technicianId) {
+        queryParams.set('technicianId', params.technicianId);
+      }
+      return this.request(`/nylas/availability?${queryParams.toString()}`);
+    },
+
+    /**
+     * Get sync status for a project
+     */
+    getProjectSyncStatus: async (projectId: string): Promise<{
+      synced: boolean;
+      nylasEventId: string | null;
+      lastSyncedAt: string | null;
+      syncStatus: string;
+      lastError: string | null;
+    }> => {
+      return this.request(`/nylas/projects/${projectId}/sync-status`);
+    },
+
+    /**
+     * Manually reconcile a project's calendar event
+     */
+    reconcileProject: async (projectId: string): Promise<{ success: boolean; message: string }> => {
+      return this.request(`/nylas/projects/${projectId}/reconcile`, {
+        method: 'POST',
+      });
+    },
+
+    /**
+     * Sync all assigned projects to calendar
+     * Useful after initially connecting a calendar
+     */
+    syncAllProjects: async (): Promise<{ synced: number; failed: number; skipped: number }> => {
+      return this.request('/nylas/sync-all', {
+        method: 'POST',
+      });
     },
   };
 

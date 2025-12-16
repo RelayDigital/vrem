@@ -17,6 +17,8 @@ import { DeliveryModule } from './delivery/delivery.module';
 import { StripeModule } from './stripe/stripe.module';
 import { PackagesModule } from './packages/packages.module';
 import { CalendarIntegrationsModule } from './calendar-integrations/calendar-integrations.module';
+import { AvailabilityModule } from './availability/availability.module';
+import { NylasModule } from './nylas/nylas.module';
 import { OrgRolesGuard } from './auth/org-roles.guard';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { Reflector } from '@nestjs/core';
@@ -40,6 +42,8 @@ import { PrismaModule } from './prisma/prisma.module';
     StripeModule,
     PackagesModule,
     CalendarIntegrationsModule,
+    AvailabilityModule,
+    NylasModule,
   ],
   controllers: [AppController],
   providers: [AppService, ActiveOrgMiddleware, OrgRolesGuard, JwtAuthGuard, Reflector],

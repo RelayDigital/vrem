@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, Logger, InternalServerErrorException } f
 import { PrismaService } from '../prisma/prisma.service';
 import ical, { ICalCalendar, ICalEventStatus } from 'ical-generator';
 import { randomUUID } from 'crypto';
+import { FRONTEND_URL, API_URL } from '../config/urls.config';
 
 @Injectable()
 export class IcsFeedService {
@@ -10,8 +11,8 @@ export class IcsFeedService {
   private readonly apiUrl: string;
 
   constructor(private prisma: PrismaService) {
-    this.frontendUrl = process.env.FRONTEND_URL || 'https://app.vrem.co';
-    this.apiUrl = process.env.API_URL || 'http://localhost:3001';
+    this.frontendUrl = FRONTEND_URL;
+    this.apiUrl = API_URL;
   }
 
   /**

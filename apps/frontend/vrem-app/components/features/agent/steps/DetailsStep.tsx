@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "../../../ui/button";
 import { Input } from "../../../ui/input";
 import { Label } from "../../../ui/label";
@@ -34,6 +35,7 @@ import { JobDetails, ServicePackage } from "../../../../types";
 import { mediaTypeOptions, toggleMediaType } from '../../../shared/jobs/utils';
 import { ToggleGroup, ToggleGroupItem } from "../../../ui/toggle-group";
 import type { AddOnWithQuantity } from './PackageSelectionStep';
+import { AvailabilityTimeSlots } from './AvailabilityTimeSlots';
 
 interface DetailsStepProps {
   selectedAddress: string;
@@ -47,6 +49,10 @@ interface DetailsStepProps {
   selectedPackage?: ServicePackage | null;
   selectedAddOns?: AddOnWithQuantity[];
   totalPrice?: number;
+  // Optional: technician ID for availability checking
+  technicianId?: string;
+  // Optional: duration in minutes for slot generation
+  estimatedDuration?: number;
 }
 
 function formatPrice(cents: number, currency: string = "usd"): string {
@@ -66,10 +72,27 @@ export function DetailsStep({
   selectedPackage,
   selectedAddOns = [],
   totalPrice = 0,
+  technicianId,
+  estimatedDuration = 60,
 }: DetailsStepProps) {
   // Determine if we're in agent flow (provider already selected with package)
   const isAgentFlow = !!selectedProviderName;
   const hasPackageSelected = !!selectedPackage;
+
+  // Track whether to show manual time picker or availability slots
+  const showAvailabilitySlots = !!technicianId;
+
+  // Parse the selected date from jobDetails for the availability component
+  const selectedDate = jobDetails.scheduledDate
+    ? (() => {
+        try {
+          const date = new Date(jobDetails.scheduledDate + "T00:00:00");
+          return !isNaN(date.getTime()) ? date : null;
+        } catch {
+          return null;
+        }
+      })()
+    : null;
 
   return (
     <motion.div
@@ -377,6 +400,25 @@ export function DetailsStep({
               </Popover>
             </div>
           </div>
+
+          {/* Availability Time Slots - shown when technicianId is provided */}
+          {showAvailabilitySlots && (
+            <div className="space-y-2">
+              <Label>Available Times</Label>
+              <AvailabilityTimeSlots
+                selectedDate={selectedDate}
+                selectedTime={jobDetails.scheduledTime}
+                onTimeSelect={(time) =>
+                  onJobDetailsChange({
+                    ...jobDetails,
+                    scheduledTime: time,
+                  })
+                }
+                technicianId={technicianId}
+                durationMins={estimatedDuration}
+              />
+            </div>
+          )}
 
           {/* Package Summary (Agent Flow) or Media Types (Provider Flow) */}
           {hasPackageSelected ? (

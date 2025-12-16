@@ -28,6 +28,10 @@ model User {
   calendarIntegrations UserCalendarIntegration[]
   icsFeed              UserIcsFeed?
   techCalendarEvents   TechnicianCalendarEvent[] @relation("TechCalendarEvents")
+
+  // Availability / Work hours
+  availability       UserAvailability[]
+  availabilityStatus UserAvailabilityStatus?
 }
 
 model Organization {
@@ -113,6 +117,7 @@ model Project {
   lng              Float?
   notes            String?
   scheduledTime    DateTime
+  scheduledEndTime DateTime?
   status           ProjectStatus         @default(BOOKED)
   technicianId     String?
   editorId         String?
@@ -136,6 +141,10 @@ model Project {
   paidAt                DateTime?
   paymentAmount         Int?
   paymentCurrency       String?
+
+  // Calendar sync fields
+  calendarConflict      Boolean               @default(false) // Flag when external event changed
+  calendarConflictNote  String?               // Description of the conflict
 
   // Relations
   calendarEvent    CalendarEvent?
@@ -180,12 +189,24 @@ model Inquiry {
 }
 
 model CalendarEvent {
-  id             String   @id @default(uuid())
-  projectId      String   @unique
-  cronofyEventId String
-  calendarId     String
-  createdAt      DateTime @default(now())
+  id             String                  @id @default(uuid())
+  projectId      String                  @unique
+  cronofyEventId String?                 // Legacy Cronofy event ID
+  calendarId     String?                 // Legacy calendar ID
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt @default(now())
+
+  // Nylas-specific fields
+  nylasEventId   String?                 // Nylas event ID
+  nylasCalendarId String?                // Nylas calendar ID
+  nylasGrantId   String?                 // Nylas grant ID (for API calls)
+  lastSyncedAt   DateTime?               // When last synced to external calendar
+  syncStatus     CalendarEventSyncStatus @default(PENDING)
+  lastError      String?                 // Last sync error message
+
   project        Project  @relation(fields: [projectId], references: [id])
+
+  @@index([nylasEventId])
 }
 
 model Invitation {
@@ -235,6 +256,7 @@ enum ProjectStatus {
   SHOOTING
   EDITING
   DELIVERED
+  CANCELLED
 }
 
 enum InquiryStatus {
@@ -387,6 +409,7 @@ enum CalendarProvider {
   GOOGLE
   OUTLOOK
   CRONOFY
+  NYLAS
 }
 
 enum CalendarIntegrationStatus {
@@ -403,7 +426,7 @@ enum CalendarEventSyncStatus {
   DELETED
 }
 
-// Per-user OAuth calendar connections
+// Per-user OAuth calendar connections (Nylas-based)
 model UserCalendarIntegration {
   id                String                    @id @default(uuid())
   userId            String
@@ -411,21 +434,27 @@ model UserCalendarIntegration {
   providerAccountId String?
   calendarId        String
   calendarName      String?
-  accessToken       String                    // Encrypted
-  refreshToken      String?                   // Encrypted
+  accessToken       String                    // Encrypted (for legacy/non-Nylas)
+  refreshToken      String?                   // Encrypted (for legacy/non-Nylas)
   tokenExpiresAt    DateTime?
   status            CalendarIntegrationStatus @default(PENDING)
   isPrimary         Boolean                   @default(false)
+  isWriteTarget     Boolean                   @default(false) // Calendar to write events to
   createdAt         DateTime                  @default(now())
   updatedAt         DateTime                  @updatedAt
   lastSyncAt        DateTime?
   lastSyncError     String?
+
+  // Nylas-specific fields
+  nylasGrantId      String?                   // Nylas grant ID after OAuth
+  nylasCalendarId   String?                   // Nylas calendar ID
 
   user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   calendarEvents TechnicianCalendarEvent[]
 
   @@unique([userId, provider, calendarId])
   @@index([userId])
+  @@index([nylasGrantId])
 }
 
 // ICS feed per user
@@ -462,4 +491,45 @@ model TechnicianCalendarEvent {
   @@unique([projectId, technicianId, integrationId])
   @@index([technicianId])
   @@index([projectId])
+}
+
+// Day of week enum for availability
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+// User availability / work hours per day
+model UserAvailability {
+  id        String    @id @default(uuid())
+  userId    String
+  dayOfWeek DayOfWeek
+  isEnabled Boolean   @default(true) // Whether user works this day
+  startTime String    @default("09:00") // HH:mm format
+  endTime   String    @default("17:00") // HH:mm format
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dayOfWeek])
+  @@index([userId])
+}
+
+// Overall availability status for a user
+model UserAvailabilityStatus {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  isAvailable        Boolean  @default(true) // Quick toggle for overall availability
+  availabilityNote   String?  // Optional note (e.g., "On vacation until Jan 15")
+  autoDeclineBookings Boolean @default(false) // Auto-decline new assignments when unavailable
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

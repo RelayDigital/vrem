@@ -6,3 +6,4 @@ export { JobListSection } from './JobListSection';
 export { PaginatedJobGrid } from './PaginatedJobGrid';
 export { JobDataBoundary } from './JobDataBoundary';
 export { JobsGridSkeleton } from './JobDataBoundary';
+export { CalendarSyncStatus } from './CalendarSyncStatus';

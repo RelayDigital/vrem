@@ -5,6 +5,7 @@ export { ProviderStep } from './ProviderStep';
 export { PackageSelectionStep } from './PackageSelectionStep';
 export { TechnicianSelectionStep } from './TechnicianSelectionStep';
 export { LoginDialog } from './LoginDialog';
+export { AvailabilityTimeSlots } from './AvailabilityTimeSlots';
 
 // Types
 export type { AddOnWithQuantity } from './PackageSelectionStep';

@@ -64,6 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const storedOrg = api.organizations.getActiveOrganization();
           // Validate stored org is in user's memberships
           const isValidStoredOrg = storedOrg && orgs.some((m) => m.orgId === storedOrg);
+
+          // If stored org is invalid, clear it immediately
+          if (storedOrg && !isValidStoredOrg) {
+            localStorage.removeItem("organizationId");
+          }
+
           const personal = orgs.find(
             (m) =>
               m.organization?.type === "PERSONAL" ||
@@ -80,7 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setActiveOrganizationId(resolvedOrgId);
         } catch (error) {
           console.error("Failed to fetch user:", error);
+          // Clear all auth data on error
           localStorage.removeItem("token");
+          localStorage.removeItem("organizationId");
           setToken(null);
           setMemberships([]);
           setActiveOrganizationId(null);
@@ -123,22 +131,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (credentials: { email: string; password: string }) => {
     setIsLoading(true);
     try {
+      // Clear any stale organization data before login to prevent 403 errors
+      localStorage.removeItem("organizationId");
+      setActiveOrganizationId(null);
+
       const response = await api.auth.login(credentials);
       localStorage.setItem("token", response.token);
       setToken(response.token);
       setUser(normalizeUser(response.user));
       const orgs = await api.organizations.listMine();
       setMemberships(orgs);
-      const storedOrg = api.organizations.getActiveOrganization();
-      // Validate stored org is in user's memberships
-      const isValidStoredOrg = storedOrg && orgs.some((m) => m.orgId === storedOrg);
+
+      // Find the best organization to use (prefer personal org, then first available)
       const personal = orgs.find(
         (m) =>
           m.organization?.type === "PERSONAL" ||
           (m.organization as any)?.type === "PERSONAL"
       );
       const resolvedOrgId =
-        (isValidStoredOrg ? storedOrg : null) ||
         personal?.orgId ||
         orgs[0]?.orgId ||
         null;
@@ -159,22 +169,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (data: any) => {
     setIsLoading(true);
     try {
+      // Clear any stale organization data before registration
+      localStorage.removeItem("organizationId");
+      setActiveOrganizationId(null);
+
       const response = await api.auth.register(data);
       localStorage.setItem("token", response.token);
       setToken(response.token);
       setUser(normalizeUser(response.user));
       const orgs = await api.organizations.listMine();
       setMemberships(orgs);
-      const storedOrg = api.organizations.getActiveOrganization();
-      // Validate stored org is in user's memberships
-      const isValidStoredOrg = storedOrg && orgs.some((m) => m.orgId === storedOrg);
+
+      // Find the best organization to use (prefer personal org, then first available)
       const personal = orgs.find(
         (m) =>
           m.organization?.type === "PERSONAL" ||
           (m.organization as any)?.type === "PERSONAL"
       );
       const resolvedOrgId =
-        (isValidStoredOrg ? storedOrg : null) ||
         personal?.orgId ||
         orgs[0]?.orgId ||
         null;

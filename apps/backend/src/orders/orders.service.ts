@@ -11,9 +11,12 @@ import { CronofyService } from '../cronofy/cronofy.service';
 import { AuthorizationService } from '../auth/authorization.service';
 import { StripeService } from '../stripe/stripe.service';
 import { PackagesService } from '../packages/packages.service';
+import { NylasService } from '../nylas/nylas.service';
+import { CalendarSyncService } from '../nylas/calendar-sync.service';
 import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderResult } from './dto/order-result.dto';
+import { FRONTEND_URL } from '../config/urls.config';
 
 @Injectable()
 export class OrdersService {
@@ -25,6 +28,8 @@ export class OrdersService {
     private authorization: AuthorizationService,
     private stripe: StripeService,
     private packages: PackagesService,
+    private nylas: NylasService,
+    private calendarSync: CalendarSyncService,
   ) {}
 
   /**
@@ -181,7 +186,7 @@ export class OrdersService {
     const addressData = await this.resolveAddress(dto);
 
     // Execute transaction
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // Step 1: Resolve or create customer
       const { customer, isNewCustomer } = await this.resolveCustomer(
         tx,
@@ -256,6 +261,15 @@ export class OrdersService {
         isNewCustomer,
       };
     });
+
+    // Sync to Nylas calendar after transaction completes (non-blocking)
+    if (result.project.technicianId) {
+      this.calendarSync.syncProjectToCalendar(result.project.id).catch((error) => {
+        this.logger.warn(`Failed to sync project ${result.project.id} to Nylas calendar: ${error.message}`);
+      });
+    }
+
+    return result;
   }
 
   /**
@@ -338,6 +352,7 @@ export class OrdersService {
 
     // Only check conflicts if a technician is being assigned
     if (dto.technicianId) {
+      // Check existing VREM project conflicts
       const conflictingProjects = await this.prisma.project.findMany({
         where: {
           orgId: ctx.org.id,
@@ -357,6 +372,38 @@ export class OrdersService {
             scheduledTime: p.scheduledTime,
           })),
         });
+      }
+
+      // Check external calendar busy times via Nylas
+      try {
+        const freeBusy = await this.nylas.getFreeBusy(
+          dto.technicianId,
+          scheduledTime,
+          endTime,
+        );
+
+        // Check if any busy slot overlaps with our scheduled time
+        if (freeBusy?.time_slots) {
+          for (const slot of freeBusy.time_slots) {
+            if (slot.status === 'busy') {
+              throw new ConflictException({
+                message: 'Technician has a calendar conflict during this time',
+                conflicts: [{
+                  type: 'external_calendar',
+                  startTime: new Date(slot.start_time * 1000).toISOString(),
+                  endTime: new Date(slot.end_time * 1000).toISOString(),
+                }],
+              });
+            }
+          }
+        }
+      } catch (error) {
+        // If it's already a ConflictException, rethrow it
+        if (error instanceof ConflictException) {
+          throw error;
+        }
+        // Otherwise, log and continue (don't block order if Nylas check fails)
+        this.logger.warn(`Failed to check Nylas availability for technician ${dto.technicianId}: ${error.message}`);
       }
     }
   }
@@ -609,15 +656,14 @@ export class OrdersService {
     });
 
     // Create Stripe Checkout Session
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const session = await this.stripe.createCheckoutSession({
       pendingOrderId: pendingOrder.id,
       amount: totalAmount,
       currency,
       customerEmail: user.email,
       description,
-      successUrl: `${frontendUrl}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${frontendUrl}/booking/cancel?session_id={CHECKOUT_SESSION_ID}`,
+      successUrl: `${FRONTEND_URL}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${FRONTEND_URL}/booking/cancel?session_id={CHECKOUT_SESSION_ID}`,
       metadata: {
         agentUserId: user.id,
         providerOrgId: dto.providerOrgId,

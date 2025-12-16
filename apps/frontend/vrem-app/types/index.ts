@@ -29,6 +29,16 @@ export enum MediaType {
   DOCUMENT = "DOCUMENT",
 }
 
+export enum DayOfWeek {
+  MONDAY = "MONDAY",
+  TUESDAY = "TUESDAY",
+  WEDNESDAY = "WEDNESDAY",
+  THURSDAY = "THURSDAY",
+  FRIDAY = "FRIDAY",
+  SATURDAY = "SATURDAY",
+  SUNDAY = "SUNDAY",
+}
+
 // =============================
 // Identity & tenancy
 // =============================

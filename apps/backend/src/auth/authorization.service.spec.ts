@@ -73,6 +73,9 @@ describe('AuthorizationService', () => {
     paidAt: null,
     paymentAmount: null,
     paymentCurrency: null,
+    // Calendar sync fields
+    calendarConflict: false,
+    calendarConflictNote: null,
     ...overrides,
   });
 
