@@ -125,7 +125,7 @@ curl -i -X POST http://localhost:3001/auth/register \
   -d '{"email":"agent@example.com", "name":"Agent", "password":"password123", "accountType":"AGENT"}'
 ```
 
-Valid `accountType` intents are: `AGENT`, `PROVIDER`, `COMPANY`. Choosing `COMPANY` flags the account as a company request, stores the user as `AGENT`, and marks `companyRequestStatus=PENDING`. Optional `companyRequestNote` can be added to the payload.
+Valid `accountType` values for self-serve signup are: `AGENT`, `PROVIDER`.
 
 ### 6.3 Login
 

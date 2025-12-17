@@ -14,12 +14,8 @@ export class RegisterDto {
 
   /**
    * User-facing intent for the account.
-   * COMPANY will be stored as AGENT with a pending company request.
+   * Only AGENT and PROVIDER are user-facing in the UI.
    */
   @IsEnum(UserAccountType)
   accountType: UserAccountType;
-
-  @IsOptional()
-  @IsString()
-  companyRequestNote?: string;
 }

@@ -15,7 +15,6 @@ import Link from "next/link"
 import { useState } from "react"
 import { useAuth } from "@/context/auth-context"
 import { AccountType } from "@/types"
-import { Textarea } from "@/components/ui/textarea"
 
 export function SignupForm({
   className,
@@ -27,11 +26,8 @@ export function SignupForm({
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [accountType, setAccountType] = useState<AccountType>("AGENT")
-  const [companyRequestNote, setCompanyRequestNote] = useState("")
   const [error, setError] = useState("")
   const [oauthError, setOauthError] = useState("")
-
-  const isCompanyRequest = accountType === "COMPANY"
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -48,7 +44,6 @@ export function SignupForm({
         email,
         password,
         accountType,
-        companyRequestNote: isCompanyRequest ? companyRequestNote : undefined,
       })
     } catch (err) {
       setError("Registration failed. Please try again.")
@@ -74,7 +69,6 @@ export function SignupForm({
         token,
         accountType,
         name,
-        companyRequestNote: isCompanyRequest ? companyRequestNote : undefined,
       })
     } catch (err) {
       console.error(`${provider} OAuth failed`, err)
@@ -85,7 +79,6 @@ export function SignupForm({
   const accountOptions: { value: AccountType; title: string; subtitle: string }[] = [
     { value: "AGENT", title: "Agent", subtitle: "Book shoots, review & download media" },
     { value: "PROVIDER", title: "Provider", subtitle: "Technician/editor workflows inside provider orgs" },
-    { value: "COMPANY", title: "Company", subtitle: "Request a company workspace — we’ll contact sales" },
   ]
   return (
     <form className={cn("flex flex-col gap-6", className)} onSubmit={handleSubmit} {...props}>
@@ -117,12 +110,6 @@ export function SignupForm({
               </Button>
             ))}
           </div>
-          {isCompanyRequest && (
-            <FieldDescription className="text-amber-600">
-              We’ll register you as an Agent, flag your company request, and route you to sales. Add a note for our team below or{" "}
-              <Link href="mailto:sales@vrem.com" className="underline underline-offset-4">contact sales</Link>.
-            </FieldDescription>
-          )}
         </Field>
         <Field>
           <FieldLabel htmlFor="name">Full Name</FieldLabel>
@@ -174,17 +161,6 @@ export function SignupForm({
           />
           <FieldDescription>Please confirm your password.</FieldDescription>
         </Field>
-        {isCompanyRequest && (
-          <Field>
-            <FieldLabel htmlFor="company-note">Note to sales (optional)</FieldLabel>
-            <Textarea
-              id="company-note"
-              placeholder="Tell us about your team, expected volume, or who to contact."
-              value={companyRequestNote}
-              onChange={(e) => setCompanyRequestNote(e.target.value)}
-            />
-          </Field>
-        )}
         <Field>
           <Button type="submit" disabled={isLoading}>
             {isLoading ? "Creating account..." : "Create Account"}

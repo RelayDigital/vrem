@@ -6,8 +6,6 @@ export type AccountType = "AGENT" | "PROVIDER" | "COMPANY";
 
 export type OrgType = "PERSONAL" | "TEAM" | "COMPANY";
 
-export type CompanyRequestStatus = "NONE" | "PENDING" | "APPROVED" | "REJECTED";
-
 export type OrgRole =
   | "OWNER"
   | "ADMIN"
@@ -56,9 +54,6 @@ export interface User {
 
   // Global identity: how they entered the system / what they can create
   accountType: AccountType;
-  companyRequestStatus?: CompanyRequestStatus;
-  companyRequestedAt?: Date | null;
-  companyRequestNote?: string | null;
 
   // Memberships define what they actually are inside each org
   organizationMemberships?: OrganizationMember[];

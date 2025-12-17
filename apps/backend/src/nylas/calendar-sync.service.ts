@@ -58,9 +58,20 @@ export class CalendarSyncService {
 
     const startTime = new Date(project.scheduledTime);
     // Use scheduledEndTime if available, otherwise default to 1 hour
-    const endTime = project.scheduledEndTime
-      ? new Date(project.scheduledEndTime)
-      : new Date(startTime.getTime() + 60 * 60 * 1000);
+    // const endTime = project.scheduledEndTime
+    //   ? new Date(project.scheduledEndTime)
+    //   : new Date(startTime.getTime() + 60 * 60 * 1000);
+
+
+
+    // TEMP: default duration (60 minutes)
+    // TODO: replace with package-based duration when available
+    const DEFAULT_DURATION_MINUTES = 60;
+
+    const endTime = new Date(
+      startTime.getTime() + DEFAULT_DURATION_MINUTES * 60 * 1000
+    );
+
 
     try {
       // Check if we should update an existing event or create new

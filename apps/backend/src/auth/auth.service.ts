@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { CompanyRequestStatus, OrgRole, OrgType, UserAccountType } from '@prisma/client';
+import { OrgRole, OrgType, UserAccountType } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { AuthenticatedUser } from './auth-context';
 import { OAuth2Client } from 'google-auth-library';
@@ -18,29 +18,6 @@ export class AuthService {
     this.googleClient = process.env.GOOGLE_CLIENT_ID
       ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
       : null;
-  }
-
-  /**
-   * Resolve the requested account type into a stored account type plus a company-request flag.
-   * COMPANY intent is stored as AGENT with a pending company request.
-   */
-  private resolveAccountTypeIntent(role: UserAccountType) {
-    const allowedRoles: UserAccountType[] = [
-      UserAccountType.COMPANY,
-      UserAccountType.PROVIDER,
-      UserAccountType.AGENT,
-    ];
-
-    const normalizedIntent = allowedRoles.includes(role)
-      ? role
-      : UserAccountType.AGENT;
-
-    const companyRequested = normalizedIntent === UserAccountType.COMPANY;
-    const accountTypeToStore = companyRequested
-      ? UserAccountType.AGENT
-      : normalizedIntent;
-
-    return { accountTypeToStore, companyRequested };
   }
 
   private async finalizeAuth(user: any, name?: string) {
@@ -116,29 +93,25 @@ export class AuthService {
     email: string,
     name: string,
     accountTypeIntent: UserAccountType,
-    companyRequestNote?: string,
   ) {
-    const { accountTypeToStore, companyRequested } =
-      this.resolveAccountTypeIntent(accountTypeIntent);
+    const allowedRoles: UserAccountType[] = [
+      UserAccountType.PROVIDER,
+      UserAccountType.AGENT,
+      // COMPANY exists but is not user-facing; keeping allowed for admin/sales flows.
+      UserAccountType.COMPANY,
+    ];
+    const accountTypeToStore = allowedRoles.includes(accountTypeIntent)
+      ? accountTypeIntent
+      : UserAccountType.AGENT;
 
     const existing = await this.prisma.user.findUnique({ where: { email } });
 
     if (existing) {
-      const shouldFlagCompany =
-        companyRequested &&
-        (existing.companyRequestStatus === CompanyRequestStatus.NONE ||
-          existing.companyRequestStatus === CompanyRequestStatus.REJECTED);
-
       const updated = await this.prisma.user.update({
         where: { id: existing.id },
         data: {
           name: existing.name || name,
           accountType: existing.accountType || accountTypeToStore,
-          ...(shouldFlagCompany && {
-            companyRequestStatus: CompanyRequestStatus.PENDING,
-            companyRequestedAt: new Date(),
-            companyRequestNote: companyRequestNote || existing.companyRequestNote,
-          }),
         },
       });
       return updated;
@@ -153,11 +126,6 @@ export class AuthService {
         name,
         password: hashedPassword,
         accountType: accountTypeToStore,
-        companyRequestStatus: companyRequested
-          ? CompanyRequestStatus.PENDING
-          : CompanyRequestStatus.NONE,
-        companyRequestedAt: companyRequested ? new Date() : null,
-        companyRequestNote: companyRequested ? companyRequestNote : null,
       },
     });
   }
@@ -167,12 +135,12 @@ export class AuthService {
     name: string,
     password: string,
     accountTypeIntent: UserAccountType,
-    companyRequestNote?: string,
   ) {
     const allowedRoles: UserAccountType[] = [
-      UserAccountType.COMPANY,
       UserAccountType.PROVIDER,
       UserAccountType.AGENT,
+      // COMPANY exists but is not user-facing; keeping allowed for admin/sales flows.
+      UserAccountType.COMPANY,
     ];
 
     if (!allowedRoles.includes(accountTypeIntent)) {
@@ -183,8 +151,7 @@ export class AuthService {
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new UnauthorizedException('Email already registered');
 
-    const { accountTypeToStore, companyRequested } =
-      this.resolveAccountTypeIntent(accountTypeIntent);
+    const accountTypeToStore = accountTypeIntent;
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -196,11 +163,6 @@ export class AuthService {
         name,
         password: hashedPassword,
         accountType: accountTypeToStore,
-        companyRequestStatus: companyRequested
-          ? CompanyRequestStatus.PENDING
-          : CompanyRequestStatus.NONE,
-        companyRequestedAt: companyRequested ? new Date() : null,
-        companyRequestNote: companyRequested ? companyRequestNote : null,
       },
     });
 
@@ -280,7 +242,6 @@ export class AuthService {
       token: string;
       accountType: UserAccountType;
       name?: string;
-      companyRequestNote?: string;
     },
   ) {
     const profile =
@@ -292,7 +253,6 @@ export class AuthService {
       profile.email,
       dto.name || profile.name || profile.email,
       dto.accountType,
-      dto.companyRequestNote,
     );
 
     return this.finalizeAuth(user, dto.name || profile.name);

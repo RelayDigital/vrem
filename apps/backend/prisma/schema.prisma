@@ -27,9 +27,6 @@ model User {
   availabilityStatus   UserAvailabilityStatus?
   calendarIntegrations UserCalendarIntegration[]
   icsFeed              UserIcsFeed?
-  companyRequestStatus CompanyRequestStatus @default(NONE)
-  companyRequestedAt   DateTime?
-  companyRequestNote  String?
 }
 
 model Organization {
@@ -379,14 +376,6 @@ enum UserAccountType {
   PROVIDER
   COMPANY
 }
-
-enum CompanyRequestStatus {
-  NONE
-  PENDING
-  APPROVED
-  REJECTED
-}
-
 
 enum OrgRole {
   OWNER

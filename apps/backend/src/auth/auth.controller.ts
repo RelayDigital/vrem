@@ -25,7 +25,6 @@ export class AuthController {
       body.name,
       body.password,
       body.accountType,
-      body.companyRequestNote,
     );
   }
 
@@ -42,7 +41,6 @@ export class AuthController {
       token: body.token,
       accountType: body.accountType,
       name: body.name,
-      companyRequestNote: body.companyRequestNote,
     });
   }
 
@@ -53,7 +51,6 @@ export class AuthController {
       token: body.token,
       accountType: body.accountType,
       name: body.name,
-      companyRequestNote: body.companyRequestNote,
     });
   }
 

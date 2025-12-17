@@ -365,7 +365,6 @@ class ApiClient {
         token: string;
         accountType?: string;
         name?: string;
-        companyRequestNote?: string;
       },
     ) => {
       if (USE_MOCK_DATA) {

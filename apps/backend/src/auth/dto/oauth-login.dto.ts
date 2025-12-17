@@ -11,8 +11,4 @@ export class OAuthLoginDto {
   @IsOptional()
   @IsString()
   name?: string; // optional override if provider profile lacks a name
-
-  @IsOptional()
-  @IsString()
-  companyRequestNote?: string;
 }

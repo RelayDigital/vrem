@@ -23,7 +23,6 @@ interface AuthContextType {
     email: string;
     password: string;
     accountType: User['accountType'];
-    companyRequestNote?: string;
   }) => Promise<void>;
   loginWithOAuth: (
     provider: 'google' | 'facebook',
@@ -31,7 +30,6 @@ interface AuthContextType {
       token: string;
       accountType?: User['accountType'];
       name?: string;
-      companyRequestNote?: string;
     },
   ) => Promise<void>;
   logout: () => void;
@@ -59,13 +57,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       normalizedType === "PROVIDER" ? "PROVIDER" :
       normalizedType === "COMPANY" ? "COMPANY" :
       "PROVIDER"; // Default to PROVIDER if unknown/empty
-    const companyRequestedAt =
-      u.companyRequestedAt ? new Date(u.companyRequestedAt) : u.companyRequestedAt ?? null;
     return {
       ...u,
       accountType,
       role: accountType, // backward compatibility
-      companyRequestedAt,
     };
   };
 
@@ -192,7 +187,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string;
     password: string;
     accountType: User['accountType'];
-    companyRequestNote?: string;
   }) => {
     setIsLoading(true);
     try {
@@ -216,7 +210,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token: string;
       accountType?: User['accountType'];
       name?: string;
-      companyRequestNote?: string;
     },
   ) => {
     setIsLoading(true);
@@ -229,7 +222,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accountType: payload.accountType || "AGENT",
         token: payload.token,
         name: payload.name,
-        companyRequestNote: payload.companyRequestNote,
       });
 
       await applyAuthResponse(response);

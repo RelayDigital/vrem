@@ -45,14 +45,11 @@ x-org-id: <organization-id>
   "email": "user@example.com",
   "name": "John Doe",
   "password": "password123",
-  "accountType": "AGENT",
-  "companyRequestNote": "Optional note if requesting COMPANY"
+  "accountType": "AGENT"
 }
 ```
 
-**Valid Account Types (intent):** `AGENT`, `PROVIDER`, `COMPANY`
-
-- Selecting `COMPANY` creates the user as `AGENT` and flags `companyRequestStatus=PENDING` (`companyRequestedAt` + optional `companyRequestNote`).
+**Valid Account Types (self-serve):** `AGENT`, `PROVIDER`
 
 **Example:**
 ```bash
@@ -75,7 +72,6 @@ curl -X POST http://localhost:3001/auth/register \
     "email": "agent@example.com",
     "name": "Agent User",
     "accountType": "AGENT",
-    "companyRequestStatus": "NONE",
     "createdAt": "2024-01-01T00:00:00.000Z"
   }
 }
@@ -92,13 +88,12 @@ curl -X POST http://localhost:3001/auth/register \
 {
   "token": "<google-id-token-or-facebook-access-token>",
   "accountType": "AGENT",
-  "name": "Optional display name",
-  "companyRequestNote": "Optional note if requesting COMPANY"
+  "name": "Optional display name"
 }
 ```
 
 - Requires provider credentials (Google ID token or Facebook access token).
-- `accountType` intent supports `AGENT`, `PROVIDER`, or `COMPANY` (company intent is stored as AGENT with `companyRequestStatus=PENDING`).
+- `accountType` supports `AGENT` or `PROVIDER` for self-serve signup.
 - Response shape matches `/auth/login` / `/auth/register`.
 
 ---
