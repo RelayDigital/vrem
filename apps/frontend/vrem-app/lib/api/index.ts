@@ -349,14 +349,43 @@ class ApiClient {
           user: { ...currentUser, ...data }
         };
       }
-      // Always inject AGENT accountType for public signup
+      // Respect user-selected accountType; default to AGENT if not provided
       const payload = {
         ...data,
-        accountType: 'AGENT',
+        accountType: (data?.accountType || 'AGENT').toUpperCase(),
       };
       return this.request<{ token: string; user: User }>('/auth/register', {
         method: 'POST',
         body: JSON.stringify(payload),
+      });
+    },
+    oauthLogin: async (
+      provider: 'google' | 'facebook',
+      payload: {
+        token: string;
+        accountType?: string;
+        name?: string;
+        companyRequestNote?: string;
+      },
+    ) => {
+      if (USE_MOCK_DATA) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const mockUser = this.mockUserFromEmail(`oauth+${provider}@example.com`);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('mockUser', JSON.stringify(mockUser));
+        }
+        return {
+          token: 'mock-token',
+          user: mockUser,
+        };
+      }
+      const payloadWithDefaults = {
+        ...payload,
+        accountType: (payload.accountType || 'AGENT').toUpperCase(),
+      };
+      return this.request<{ token: string; user: User }>(`/auth/oauth/${provider}`, {
+        method: 'POST',
+        body: JSON.stringify(payloadWithDefaults),
       });
     },
     me: async () => {

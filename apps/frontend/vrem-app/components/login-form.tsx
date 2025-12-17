@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { useAuth } from "@/context/auth-context"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -20,10 +19,11 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
-  const { login, isLoading } = useAuth()
+  const { login, loginWithOAuth, isLoading } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+  const [oauthError, setOauthError] = useState("")
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -33,6 +33,28 @@ export function LoginForm({
       await login({ email, password })
     } catch (err) {
       setError("Invalid email or password")
+    }
+  }
+
+  const promptForOAuthToken = (provider: "google" | "facebook") => {
+    if (typeof window === "undefined") return null
+    return window.prompt(
+      `Paste the ${provider} OAuth token/credential here.\n\n(Connect the real ${provider} button to pass the credential instead of using this prompt.)`
+    )
+  }
+
+  const handleOAuth = async (provider: "google" | "facebook") => {
+    setOauthError("")
+    try {
+      const token = promptForOAuthToken(provider)
+      if (!token) {
+        setOauthError(`Missing ${provider} token. Please complete the ${provider} sign-in flow.`)
+        return
+      }
+      await loginWithOAuth(provider, { token, accountType: "AGENT" })
+    } catch (err) {
+      console.error(`${provider} OAuth failed`, err)
+      setOauthError(`${provider} sign-in failed. Please try again.`)
     }
   }
 
@@ -85,7 +107,13 @@ export function LoginForm({
         <FieldSeparator>Or continue with</FieldSeparator>
         <Field>
           <div className="flex flex-col gap-2">
-            <Button variant="outline" type="button" className="w-full">
+            <Button
+              variant="outline"
+              type="button"
+              className="w-full"
+              onClick={() => handleOAuth("google")}
+              disabled={isLoading}
+            >
               <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -104,15 +132,24 @@ export function LoginForm({
                   fill="#EA4335"
                 />
               </svg>
-              Login with Google
+              {isLoading ? "Connecting..." : "Login with Google"}
             </Button>
-            <Button variant="outline" type="button" className="w-full">
+            <Button
+              variant="outline"
+              type="button"
+              className="w-full"
+              onClick={() => handleOAuth("facebook")}
+              disabled={isLoading}
+            >
               <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
               </svg>
-              Login with Facebook
+              {isLoading ? "Connecting..." : "Login with Facebook"}
             </Button>
           </div>
+          {oauthError && (
+            <div className="text-red-500 text-sm font-medium text-center mt-2">{oauthError}</div>
+          )}
           <FieldDescription className="text-center mt-2">
             Don&apos;t have an account?{" "}
             <Link href="/signup" className="underline underline-offset-4">

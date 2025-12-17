@@ -18,7 +18,22 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (credentials: { email: string; password: string }) => Promise<void>;
-  register: (data: any) => Promise<void>;
+  register: (data: {
+    name: string;
+    email: string;
+    password: string;
+    accountType: User['accountType'];
+    companyRequestNote?: string;
+  }) => Promise<void>;
+  loginWithOAuth: (
+    provider: 'google' | 'facebook',
+    payload: {
+      token: string;
+      accountType?: User['accountType'];
+      name?: string;
+      companyRequestNote?: string;
+    },
+  ) => Promise<void>;
   logout: () => void;
   switchOrganization: (orgId: string | null) => void;
 }
@@ -44,10 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       normalizedType === "PROVIDER" ? "PROVIDER" :
       normalizedType === "COMPANY" ? "COMPANY" :
       "PROVIDER"; // Default to PROVIDER if unknown/empty
+    const companyRequestedAt =
+      u.companyRequestedAt ? new Date(u.companyRequestedAt) : u.companyRequestedAt ?? null;
     return {
       ...u,
       accountType,
       role: accountType, // backward compatibility
+      companyRequestedAt,
     };
   };
 
@@ -128,6 +146,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const applyAuthResponse = async (response: { token: string; user: any }) => {
+    localStorage.setItem("token", response.token);
+    setToken(response.token);
+    setUser(normalizeUser(response.user));
+    const orgs = await api.organizations.listMine();
+    setMemberships(orgs);
+
+    // Find the best organization to use (prefer personal org, then first available)
+    const personal = orgs.find(
+      (m) =>
+        m.organization?.type === "PERSONAL" ||
+        (m.organization as any)?.type === "PERSONAL"
+    );
+    const resolvedOrgId =
+      personal?.orgId ||
+      orgs[0]?.orgId ||
+      null;
+    if (resolvedOrgId) {
+      api.organizations.setActiveOrganization(resolvedOrgId);
+    }
+    setActiveOrganizationId(resolvedOrgId);
+    router.push("/dashboard");
+  };
+
   const login = async (credentials: { email: string; password: string }) => {
     setIsLoading(true);
     try {
@@ -136,28 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setActiveOrganizationId(null);
 
       const response = await api.auth.login(credentials);
-      localStorage.setItem("token", response.token);
-      setToken(response.token);
-      setUser(normalizeUser(response.user));
-      const orgs = await api.organizations.listMine();
-      setMemberships(orgs);
-
-      // Find the best organization to use (prefer personal org, then first available)
-      const personal = orgs.find(
-        (m) =>
-          m.organization?.type === "PERSONAL" ||
-          (m.organization as any)?.type === "PERSONAL"
-      );
-      const resolvedOrgId =
-        personal?.orgId ||
-        orgs[0]?.orgId ||
-        null;
-      if (resolvedOrgId) {
-        api.organizations.setActiveOrganization(resolvedOrgId);
-      }
-      setActiveOrganizationId(resolvedOrgId);
-
-      router.push("/dashboard");
+      await applyAuthResponse(response);
     } catch (error) {
       console.error("Login failed:", error);
       throw error;
@@ -166,7 +187,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (data: any) => {
+  const register = async (data: {
+    name: string;
+    email: string;
+    password: string;
+    accountType: User['accountType'];
+    companyRequestNote?: string;
+  }) => {
     setIsLoading(true);
     try {
       // Clear any stale organization data before registration
@@ -174,29 +201,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setActiveOrganizationId(null);
 
       const response = await api.auth.register(data);
-      localStorage.setItem("token", response.token);
-      setToken(response.token);
-      setUser(normalizeUser(response.user));
-      const orgs = await api.organizations.listMine();
-      setMemberships(orgs);
-
-      // Find the best organization to use (prefer personal org, then first available)
-      const personal = orgs.find(
-        (m) =>
-          m.organization?.type === "PERSONAL" ||
-          (m.organization as any)?.type === "PERSONAL"
-      );
-      const resolvedOrgId =
-        personal?.orgId ||
-        orgs[0]?.orgId ||
-        null;
-      if (resolvedOrgId) {
-        api.organizations.setActiveOrganization(resolvedOrgId);
-      }
-      setActiveOrganizationId(resolvedOrgId);
-      router.push("/");
+      await applyAuthResponse(response);
     } catch (error) {
       console.error("Registration failed:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loginWithOAuth = async (
+    provider: 'google' | 'facebook',
+    payload: {
+      token: string;
+      accountType?: User['accountType'];
+      name?: string;
+      companyRequestNote?: string;
+    },
+  ) => {
+    setIsLoading(true);
+    try {
+      // Clear any stale organization data before login to prevent 403 errors
+      localStorage.removeItem("organizationId");
+      setActiveOrganizationId(null);
+
+      const response = await api.auth.oauthLogin(provider, {
+        accountType: payload.accountType || "AGENT",
+        token: payload.token,
+        name: payload.name,
+        companyRequestNote: payload.companyRequestNote,
+      });
+
+      await applyAuthResponse(response);
+    } catch (error) {
+      console.error("OAuth login failed:", error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -236,6 +274,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         register,
+        loginWithOAuth,
         logout,
         switchOrganization,
       }}

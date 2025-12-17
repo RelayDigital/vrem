@@ -14,17 +14,24 @@ import Link from "next/link"
 
 import { useState } from "react"
 import { useAuth } from "@/context/auth-context"
+import { AccountType } from "@/types"
+import { Textarea } from "@/components/ui/textarea"
 
 export function SignupForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
-  const { register, isLoading } = useAuth()
+  const { register, loginWithOAuth, isLoading } = useAuth()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [accountType, setAccountType] = useState<AccountType>("AGENT")
+  const [companyRequestNote, setCompanyRequestNote] = useState("")
   const [error, setError] = useState("")
+  const [oauthError, setOauthError] = useState("")
+
+  const isCompanyRequest = accountType === "COMPANY"
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -36,11 +43,50 @@ export function SignupForm({
     }
 
     try {
-      await register({ name, email, password })
+      await register({
+        name,
+        email,
+        password,
+        accountType,
+        companyRequestNote: isCompanyRequest ? companyRequestNote : undefined,
+      })
     } catch (err) {
       setError("Registration failed. Please try again.")
     }
   }
+
+  const promptForOAuthToken = (provider: "google" | "facebook") => {
+    if (typeof window === "undefined") return null
+    return window.prompt(
+      `Paste the ${provider} OAuth token/credential here.\n\n(Connect the real ${provider} button to pass the credential instead of using this prompt.)`
+    )
+  }
+
+  const handleOAuth = async (provider: "google" | "facebook") => {
+    setOauthError("")
+    try {
+      const token = promptForOAuthToken(provider)
+      if (!token) {
+        setOauthError(`Missing ${provider} token. Please complete the ${provider} sign-in flow.`)
+        return
+      }
+      await loginWithOAuth(provider, {
+        token,
+        accountType,
+        name,
+        companyRequestNote: isCompanyRequest ? companyRequestNote : undefined,
+      })
+    } catch (err) {
+      console.error(`${provider} OAuth failed`, err)
+      setOauthError(`${provider} sign-in failed. Please try again.`)
+    }
+  }
+
+  const accountOptions: { value: AccountType; title: string; subtitle: string }[] = [
+    { value: "AGENT", title: "Agent", subtitle: "Book shoots, review & download media" },
+    { value: "PROVIDER", title: "Provider", subtitle: "Technician/editor workflows inside provider orgs" },
+    { value: "COMPANY", title: "Company", subtitle: "Request a company workspace — we’ll contact sales" },
+  ]
   return (
     <form className={cn("flex flex-col gap-6", className)} onSubmit={handleSubmit} {...props}>
       <FieldGroup>
@@ -53,6 +99,31 @@ export function SignupForm({
         {error && (
           <div className="text-red-500 text-sm font-medium text-center">{error}</div>
         )}
+        <Field>
+          <FieldLabel>Select your account type</FieldLabel>
+          <div className="grid grid-cols-1 gap-2">
+            {accountOptions.map((option) => (
+              <Button
+                key={option.value}
+                type="button"
+                variant={accountType === option.value ? "default" : "outline"}
+                className="w-full justify-start"
+                onClick={() => setAccountType(option.value)}
+              >
+                <div className="flex flex-col items-start">
+                  <span className="font-medium">{option.title}</span>
+                  <span className="text-muted-foreground text-xs">{option.subtitle}</span>
+                </div>
+              </Button>
+            ))}
+          </div>
+          {isCompanyRequest && (
+            <FieldDescription className="text-amber-600">
+              We’ll register you as an Agent, flag your company request, and route you to sales. Add a note for our team below or{" "}
+              <Link href="mailto:sales@vrem.com" className="underline underline-offset-4">contact sales</Link>.
+            </FieldDescription>
+          )}
+        </Field>
         <Field>
           <FieldLabel htmlFor="name">Full Name</FieldLabel>
           <Input
@@ -103,6 +174,17 @@ export function SignupForm({
           />
           <FieldDescription>Please confirm your password.</FieldDescription>
         </Field>
+        {isCompanyRequest && (
+          <Field>
+            <FieldLabel htmlFor="company-note">Note to sales (optional)</FieldLabel>
+            <Textarea
+              id="company-note"
+              placeholder="Tell us about your team, expected volume, or who to contact."
+              value={companyRequestNote}
+              onChange={(e) => setCompanyRequestNote(e.target.value)}
+            />
+          </Field>
+        )}
         <Field>
           <Button type="submit" disabled={isLoading}>
             {isLoading ? "Creating account..." : "Create Account"}
@@ -111,7 +193,13 @@ export function SignupForm({
         <FieldSeparator>Or continue with</FieldSeparator>
         <Field>
           <div className="flex flex-col gap-2">
-            <Button variant="outline" type="button" className="w-full">
+            <Button
+              variant="outline"
+              type="button"
+              className="w-full"
+              onClick={() => handleOAuth("google")}
+              disabled={isLoading}
+            >
               <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -130,15 +218,24 @@ export function SignupForm({
                   fill="#EA4335"
                 />
               </svg>
-              Sign up with Google
+              {isLoading ? "Connecting..." : "Sign up with Google"}
             </Button>
-            <Button variant="outline" type="button" className="w-full">
+            <Button
+              variant="outline"
+              type="button"
+              className="w-full"
+              onClick={() => handleOAuth("facebook")}
+              disabled={isLoading}
+            >
               <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
               </svg>
-              Sign up with Facebook
+              {isLoading ? "Connecting..." : "Sign up with Facebook"}
             </Button>
           </div>
+          {oauthError && (
+            <div className="text-red-500 text-sm font-medium text-center mt-2">{oauthError}</div>
+          )}
           <FieldDescription className="px-6 text-center mt-2">
             Already have an account? <Link href="/">Sign in</Link>
           </FieldDescription>
