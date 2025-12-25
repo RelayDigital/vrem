@@ -193,20 +193,29 @@ export class OrganizationsService {
     return invite;
   }
 
-  async getOrganizationById(orgId: string, ctx: OrgContext) {
-    if (ctx.org.id !== orgId) {
-      throw new ForbiddenException('Organization does not match active context');
+  async getOrganizationById(
+    orgId: string,
+    ctx: OrgContext,
+    user: AuthenticatedUser,
+  ) {
+    // If the requested org matches the active context, use the context's org
+    if (ctx.org.id === orgId) {
+      return ctx.org;
     }
 
-    const org = await this.prisma.organization.findUnique({
-      where: { id: orgId },
+    // Otherwise, check if the user is a member of the requested org
+    const membership = await this.prisma.organizationMember.findFirst({
+      where: { userId: user.id, orgId },
+      include: { organization: true },
     });
 
-    if (!org) {
-      throw new NotFoundException('Organization not found');
+    if (!membership) {
+      throw new ForbiddenException(
+        'You are not a member of this organization',
+      );
     }
 
-    return org;
+    return membership.organization;
   }
 
   async updateOrganizationSettings(

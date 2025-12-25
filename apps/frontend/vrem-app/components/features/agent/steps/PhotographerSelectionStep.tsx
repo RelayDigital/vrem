@@ -1,7 +1,7 @@
 import { Button } from '../../../ui/button';
 import { Badge } from '../../../ui/badge';
-import { PhotographerCard } from '../../photographer';
-import { PhotographerSearch } from '../../photographer';
+import { ProviderCard } from '../../provider';
+import { ProviderSearch } from '../../provider';
 import { motion } from 'framer-motion';
 import {
   MapPin,
@@ -13,7 +13,7 @@ import {
   Search as SearchIcon,
   Sparkles,
 } from 'lucide-react';
-import { PhotographerRanking, TechnicianRanking } from '../../../../types';
+import { ProviderRanking, TechnicianRanking } from '../../../../types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { P } from '@/components/ui/typography';
 
@@ -24,7 +24,7 @@ interface PhotographerSelectionStepProps {
     scheduledTime: string;
     mediaTypes: string[];
   };
-  rankings: PhotographerRanking[] | TechnicianRanking[];
+  rankings: ProviderRanking[] | TechnicianRanking[];
   showPhotographerSearch: boolean;
   photographers?: any[]; // Deprecated: use technicians
   technicians?: any[];
@@ -144,8 +144,8 @@ export function PhotographerSelectionStep({
         {/* Photographer Search or AI Ranking */}
         {showPhotographerSearch ? (
           <div className="bg-card rounded-2xl border-2 border-border p-6 shadow-sm">
-            <PhotographerSearch
-              photographers={effectiveTechnicians}
+            <ProviderSearch
+              technicians={effectiveTechnicians}
               companies={companies}
               preferredVendors={preferredVendors}
               onSelect={onPhotographerSelect}
@@ -153,20 +153,16 @@ export function PhotographerSelectionStep({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {rankings.map((ranking, index) => {
-              // Handle both PhotographerRanking and TechnicianRanking
-              const technician = 'technician' in ranking ? ranking.technician : ranking.photographer;
-              return (
-              <PhotographerCard
-                  key={technician.id}
-                  photographer={technician}
+            {rankings.map((ranking, index) => (
+              <ProviderCard
+                key={ranking.provider.id}
+                technician={ranking.provider}
                 ranking={ranking.factors}
                 score={ranking.score}
                 recommended={ranking.recommended && index === 0}
-                  onAssign={() => onPhotographerSelect(technician.id)}
+                onAssign={() => onPhotographerSelect(ranking.provider.id)}
               />
-              );
-            })}
+            ))}
           </div>
         )}
 

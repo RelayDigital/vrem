@@ -375,6 +375,10 @@ export class ProjectsService {
         orderBy: { createdAt: 'desc' },
       });
     } catch (error: any) {
+      // Re-throw HTTP exceptions as-is (e.g., ForbiddenException)
+      if (error instanceof HttpException) {
+        throw error;
+      }
       this.logger.error(`Error in findForUser: ${error.message}`, error.stack);
       throw new HttpException(
         `Failed to fetch projects: ${error.message}`,

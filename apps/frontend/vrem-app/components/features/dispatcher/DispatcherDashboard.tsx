@@ -4,13 +4,13 @@ import { useState, useEffect } from "react";
 import { RankingsDialog } from "./dialogs";
 import {
   JobRequest,
-  Photographer,
+  TechnicianProfile,
   AuditLogEntry,
   Metrics,
 } from "../../../types";
 import { ChatMessage } from "../../../types/chat";
 import { JobTaskView } from "../../shared/tasks/JobTaskView";
-import { DashboardView, JobsView, LiveJobMapView, TeamView, AuditView } from "./views";
+import { CompanyDashboardView as DashboardView, JobsView, LiveJobMapView, TeamView, AuditView } from "../company/views";
 import { CalendarView } from "../calendar";
 import { SettingsView } from "../../shared/settings";
 import { dispatcherSettingsConfig } from "../../shared/settings/settings-config";
@@ -19,11 +19,11 @@ import type { SettingsSubView } from "../../shared/settings";
 
 interface DispatcherDashboardProps {
   jobs: JobRequest[];
-  photographers: Photographer[];
+  technicians: TechnicianProfile[];
   auditLog: AuditLogEntry[];
   metrics: Metrics;
   onJobCreate: (job: Partial<JobRequest>) => void;
-  onJobAssign: (jobId: string, photographerId: string, score: number) => void;
+  onJobAssign: (jobId: string, technicianId: string, score: number) => void;
   onJobStatusChange?: (jobId: string, newStatus: JobRequest["status"]) => void;
   activeView?: "dashboard" | "jobs" | "team" | "audit" | "map" | "calendar" | "settings";
   onNavigateToJobsView?: () => void;
@@ -38,7 +38,7 @@ interface DispatcherDashboardProps {
 
 export function DispatcherDashboard({
   jobs,
-  photographers,
+  technicians,
   auditLog,
   metrics,
   onJobCreate,
@@ -91,10 +91,10 @@ export function DispatcherDashboard({
 
   const handleJobAssign = (
     jobId: string,
-    photographerId: string,
+    technicianId: string,
     score: number
   ) => {
-    onJobAssign(jobId, photographerId, score);
+    onJobAssign(jobId, technicianId, score);
     setShowRankings(false);
     setSelectedJob(null);
   };
@@ -125,7 +125,7 @@ export function DispatcherDashboard({
 
   const handleSendMessage = (
     content: string,
-    chatType: "client" | "team",
+    channel: "TEAM" | "CUSTOMER",
     threadId?: string
   ) => {
     if (!selectedJob) return;
@@ -138,7 +138,8 @@ export function DispatcherDashboard({
       content,
       createdAt: new Date(),
       threadId,
-      chatType,
+      channel,
+      chatType: channel === 'CUSTOMER' ? 'client' : 'team',
     };
 
     setChatMessages((prev) => [...prev, newMessage]);
@@ -181,7 +182,7 @@ export function DispatcherDashboard({
       {activeView === "dashboard" && (
         <DashboardView
           jobs={jobs}
-          photographers={photographers}
+          technicians={technicians}
           metrics={metrics}
           selectedJob={selectedJob}
           onViewRankings={handleViewRankings}
@@ -207,17 +208,17 @@ export function DispatcherDashboard({
       {activeView === "jobs" && (
         <JobsView
           jobs={jobs}
-          photographers={photographers}
+          technicians={technicians}
           messages={chatMessages}
           onViewRankings={handleViewRankings}
-          onChangePhotographer={handleViewRankings} // Reuse the same handler - it opens rankings dialog
+          onChangeTechnician={handleViewRankings} // Reuse the same handler - it opens rankings dialog
           onJobStatusChange={onJobStatusChange}
           onJobClick={handleJobClick}
         />
       )}
 
       {activeView === "team" && (
-        <TeamView photographers={photographers} />
+        <TeamView technicians={technicians} />
       )}
 
       {activeView === "audit" && (
@@ -227,7 +228,7 @@ export function DispatcherDashboard({
       {activeView === "map" && (
         <LiveJobMapView
           jobs={jobs}
-          photographers={photographers}
+          technicians={technicians}
           selectedJob={selectedJob}
           onSelectJob={handleJobSelect}
           onNavigateToJobInProjectManagement={(job) => {
@@ -247,7 +248,7 @@ export function DispatcherDashboard({
       {activeView === "calendar" && (
         <CalendarView
           jobs={jobs}
-          photographers={photographers}
+          technicians={technicians}
           onJobClick={handleJobClick}
           onCreateJob={handleNewJobClick}
         />
@@ -258,7 +259,7 @@ export function DispatcherDashboard({
           subView={settingsSubView}
           onNavigate={(subView) => setSettingsSubView(subView)}
           config={dispatcherSettingsConfig}
-          accountType="dispatcher"
+          accountType="company"
           componentRegistry={dispatcherSettingsComponents}
         />
       )}
@@ -268,18 +269,18 @@ export function DispatcherDashboard({
         open={showRankings}
         onOpenChange={setShowRankings}
         selectedJob={selectedJob}
-        photographers={photographers}
+        technicians={technicians}
         onJobAssign={handleJobAssign}
       />
 
       {/* Job Task View - Sheet (Dashboard) */}
       <JobTaskView
         job={selectedJob}
-        photographer={
-          selectedJob?.assignedPhotographerId
-            ? photographers.find(
-              (p) => p.id === selectedJob.assignedPhotographerId
-            )
+        technician={
+          selectedJob?.assignedTechnicianId
+            ? technicians.find(
+              (p) => p.id === selectedJob.assignedTechnicianId
+            ) as any
             : undefined
         }
         messages={chatMessages.filter((m) => m.jobId === selectedJob?.id)}
@@ -296,13 +297,13 @@ export function DispatcherDashboard({
             onJobStatusChange(selectedJob.id, status);
           }
         }}
-        onAssignPhotographer={() => {
+        onAssignTechnician={() => {
           if (selectedJob) {
             handleViewRankings(selectedJob);
             setShowTaskView(false);
           }
         }}
-        onChangePhotographer={() => {
+        onChangeTechnician={() => {
           if (selectedJob) {
             handleViewRankings(selectedJob);
             setShowTaskView(false);
@@ -315,11 +316,11 @@ export function DispatcherDashboard({
       {/* Job Task View - Dialog (Full Screen) */}
       <JobTaskView
         job={selectedJob}
-        photographer={
-          selectedJob?.assignedPhotographerId
-            ? photographers.find(
-              (p) => p.id === selectedJob.assignedPhotographerId
-            )
+        technician={
+          selectedJob?.assignedTechnicianId
+            ? technicians.find(
+              (p) => p.id === selectedJob.assignedTechnicianId
+            ) as any
             : undefined
         }
         messages={chatMessages.filter((m) => m.jobId === selectedJob?.id)}
@@ -336,13 +337,13 @@ export function DispatcherDashboard({
             onJobStatusChange(selectedJob.id, status);
           }
         }}
-        onAssignPhotographer={() => {
+        onAssignTechnician={() => {
           if (selectedJob) {
             handleViewRankings(selectedJob);
             setShowTaskDialog(false);
           }
         }}
-        onChangePhotographer={() => {
+        onChangeTechnician={() => {
           if (selectedJob) {
             handleViewRankings(selectedJob);
             setShowTaskDialog(false);

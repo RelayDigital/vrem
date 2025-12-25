@@ -1,9 +1,8 @@
 'use client';
 
-import { JobRequest, Photographer, PhotographerRanking } from '../../../types';
+import { JobRequest, ProviderRanking } from '../../../types';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Badge } from '../../ui/badge';
-import { PhotographerTable } from '../../shared/tables';
 import { RankingFactors } from '../../shared/ranking';
 import {
   MapPin,
@@ -15,8 +14,8 @@ import { P } from '@/components/ui/typography';
 
 interface JobAssignmentProps {
   job: JobRequest;
-  rankings: PhotographerRanking[];
-  onAssign: (photographerId: string, score: number) => void;
+  rankings: ProviderRanking[];
+  onAssign: (technicianId: string, score: number) => void;
 }
 
 export function JobAssignment({ job, rankings, onAssign }: JobAssignmentProps) {
@@ -64,19 +63,19 @@ export function JobAssignment({ job, rankings, onAssign }: JobAssignmentProps) {
         </CardContent>
       </Card>
 
-      {/* Ranked Photographers */}
+      {/* Ranked Technicians */}
       <Card>
         <CardHeader>
-          <CardTitle>AI-Ranked Photographers</CardTitle>
+          <CardTitle>AI-Ranked Technicians</CardTitle>
           <P className="text-sm text-muted-foreground">
-            Photographers ranked by availability, distance, reliability, and skill match
+            Technicians ranked by availability, distance, reliability, and skill match
           </P>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {rankings.map((ranking, index) => (
               <div
-                key={ranking.photographer.id}
+                key={ranking.provider.id}
                 className={`p-4 border-2 rounded-xl transition-all ${
                   ranking.recommended && index === 0
                     ? 'border-emerald-500 bg-emerald-50/50'
@@ -86,12 +85,12 @@ export function JobAssignment({ job, rankings, onAssign }: JobAssignmentProps) {
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <div className="font-semibold text-lg">
-                      {ranking.photographer.name}
+                      {ranking.provider.name}
                       {ranking.recommended && index === 0 && (
                         <Badge className="ml-2 bg-emerald-600">Recommended</Badge>
                       )}
                     </div>
-                    <div className="text-sm text-muted-foreground">{ranking.photographer.email}</div>
+                    <div className="text-sm text-muted-foreground">{ranking.provider.email}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-3xl font-bold text-primary">

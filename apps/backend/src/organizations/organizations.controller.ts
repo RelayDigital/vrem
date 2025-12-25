@@ -67,9 +67,13 @@ export class OrganizationsController {
 
   // Get organization by ID
   @Get(':orgId')
-  getOrganization(@Param('orgId') orgId: string, @Req() req) {
+  getOrganization(
+    @Param('orgId') orgId: string,
+    @Req() req,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     const ctx = req.orgContext as OrgContext;
-    return this.orgs.getOrganizationById(orgId, ctx);
+    return this.orgs.getOrganizationById(orgId, ctx, user);
   }
 
   // List organization members (with user details)

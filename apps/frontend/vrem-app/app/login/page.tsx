@@ -1,8 +1,8 @@
-import { GalleryVerticalEnd } from "lucide-react"
-import Link from "next/link"
+import { GalleryVerticalEnd } from "lucide-react";
+import Link from "next/link";
 
-import { LoginForm } from "@/components/login-form"
-import { LoginMapView } from "@/components/shared/map/LoginMapView"
+import { LoginForm } from "@/components/login-form";
+import { LoginMapView } from "@/components/shared/map/LoginMapView";
 
 export default function LoginPage() {
   return (
@@ -26,5 +26,5 @@ export default function LoginPage() {
         <LoginMapView />
       </div>
     </div>
-  )
+  );
 }
