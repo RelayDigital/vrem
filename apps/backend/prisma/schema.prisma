@@ -4,40 +4,43 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // Connection URL is provided via prisma.config.ts (Supabase direct, non-pooled). connection_limit is enforced in Prisma client options.
 }
 
 model User {
-  id               String                 @id @default(uuid())
-  email            String                 @unique
-  name             String
-  password         String
-  accountType      UserAccountType        @default(AGENT)
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
-  messages         Message[]
-  organizations    OrganizationMember[]
-  editorProjects   Project[]              @relation("EditorProjects")
-  techProjects     Project[]              @relation("TechProjects")
-  managerProjects  Project[]              @relation("ManagerProjects")
-  approvedProjects Project[]              @relation("ApprovedProjects")
-  customers        OrganizationCustomer[]
-  notifications    Notification[]
-
-  // Calendar integrations
+  id                   String                    @id @default(uuid())
+  email                String                    @unique
+  name                 String
+  password             String
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  accountType          UserAccountType           @default(AGENT)
+  messages             Message[]
+  notifications        Notification[]
+  customers            OrganizationCustomer[]
+  organizations        OrganizationMember[]
+  approvedProjects     Project[]                 @relation("ApprovedProjects")
+  editorProjects       Project[]                 @relation("EditorProjects")
+  managerProjects      Project[]                 @relation("ManagerProjects")
+  techProjects         Project[]                 @relation("TechProjects")
+  techCalendarEvents   TechnicianCalendarEvent[] @relation("TechCalendarEvents")
+  availability         UserAvailability[]
+  availabilityStatus   UserAvailabilityStatus?
   calendarIntegrations UserCalendarIntegration[]
   icsFeed              UserIcsFeed?
-  techCalendarEvents   TechnicianCalendarEvent[] @relation("TechCalendarEvents")
-
-  // Availability / Work hours
-  availability       UserAvailability[]
-  availabilityStatus UserAvailabilityStatus?
 }
 
 model Organization {
   id            String                 @id
   name          String
   createdAt     DateTime               @default(now())
+  legalName     String?
+  logoUrl       String?
+  phone         String?
+  primaryEmail  String?
+  serviceArea   Json?
+  slug          String?
+  timezone      String?
+  websiteUrl    String?
   type          OrgType                @default(COMPANY)
   addressLine1  String?
   addressLine2  String?
@@ -47,21 +50,13 @@ model Organization {
   countryCode   String?
   lat           Float?
   lng           Float?
-  legalName     String?
-  logoUrl       String?
-  phone         String?
-  primaryEmail  String?
-  serviceArea   Json?
-  slug          String?
-  timezone      String?
-  websiteUrl    String?
   invitations   Invitation[]
-  members       OrganizationMember[]
-  projects      Project[]
-  customers     OrganizationCustomer[]
   notifications Notification[]
-  packages      ServicePackage[]
+  customers     OrganizationCustomer[]
+  members       OrganizationMember[]
   addOns        PackageAddOn[]
+  projects      Project[]
+  packages      ServicePackage[]
 }
 
 model OrganizationMember {
@@ -100,78 +95,61 @@ model Message {
   user      User               @relation(fields: [userId], references: [id])
 }
 
-enum ProjectChatChannel {
-  TEAM
-  CUSTOMER
-}
-
 model Project {
-  id               String                @id @default(uuid())
-  addressLine1     String?
-  addressLine2     String?
-  city             String?
-  region           String?
-  postalCode       String?
-  countryCode      String?
-  lat              Float?
-  lng              Float?
-  notes            String?
-  scheduledTime    DateTime
-  scheduledEndTime DateTime?
-  status           ProjectStatus         @default(BOOKED)
-  technicianId     String?
-  editorId         String?
-  projectManagerId String?
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  orgId            String
-  customerId       String?
-
-  // Delivery fields
-  deliveryToken        String?              @unique @default(uuid())
-  deliveryEnabledAt    DateTime?
-
-  // Approval fields
-  clientApprovalStatus ClientApprovalStatus @default(PENDING_REVIEW)
-  clientApprovedAt     DateTime?
-  clientApprovedById   String?
-
-  // Payment fields
-  stripePaymentIntentId String?
+  id                    String                    @id @default(uuid())
+  notes                 String?
+  scheduledTime         DateTime
+  status                ProjectStatus             @default(BOOKED)
+  technicianId          String?
+  editorId              String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  orgId                 String
+  customerId            String?
+  projectManagerId      String?
+  addressLine1          String?
+  addressLine2          String?
+  city                  String?
+  region                String?
+  postalCode            String?
+  countryCode           String?
+  lat                   Float?
+  lng                   Float?
+  clientApprovalStatus  ClientApprovalStatus      @default(PENDING_REVIEW)
+  clientApprovedAt      DateTime?
+  clientApprovedById    String?
+  deliveryEnabledAt     DateTime?
+  deliveryToken         String?                   @unique @default(uuid())
   paidAt                DateTime?
   paymentAmount         Int?
   paymentCurrency       String?
-
-  // Calendar sync fields
-  calendarConflict      Boolean               @default(false) // Flag when external event changed
-  calendarConflictNote  String?               // Description of the conflict
-
-  // Relations
-  calendarEvent    CalendarEvent?
-  media            Media[]
-  messages         Message[]
-  editor           User?                 @relation("EditorProjects", fields: [editorId], references: [id])
-  organization     Organization          @relation(fields: [orgId], references: [id])
-  technician       User?                 @relation("TechProjects", fields: [technicianId], references: [id])
-  projectManager   User?                 @relation("ManagerProjects", fields: [projectManagerId], references: [id])
-  customer         OrganizationCustomer? @relation(fields: [customerId], references: [id])
-  clientApprovedBy User?                 @relation("ApprovedProjects", fields: [clientApprovedById], references: [id])
-  notifications    Notification[]
-  pendingOrder     PendingOrder?
-  techCalendarEvents TechnicianCalendarEvent[]
+  stripePaymentIntentId String?
+  calendarConflict      Boolean                   @default(false)
+  calendarConflictNote  String?
+  calendarEvent         CalendarEvent?
+  media                 Media[]
+  messages              Message[]
+  notifications         Notification[]
+  pendingOrder          PendingOrder?
+  clientApprovedBy      User?                     @relation("ApprovedProjects", fields: [clientApprovedById], references: [id])
+  customer              OrganizationCustomer?     @relation(fields: [customerId], references: [id])
+  editor                User?                     @relation("EditorProjects", fields: [editorId], references: [id])
+  organization          Organization              @relation(fields: [orgId], references: [id])
+  projectManager        User?                     @relation("ManagerProjects", fields: [projectManagerId], references: [id])
+  technician            User?                     @relation("TechProjects", fields: [technicianId], references: [id])
+  techCalendarEvents    TechnicianCalendarEvent[]
 }
 
 model OrganizationCustomer {
-  id        String   @id @default(uuid())
-  orgId     String
-  name      String
-  email     String?
-  phone     String?
-  notes     String?
-  userId    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id           String       @id @default(uuid())
+  orgId        String
+  name         String
+  email        String?
+  phone        String?
+  notes        String?
+  userId       String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
   organization Organization @relation(fields: [orgId], references: [id])
   user         User?        @relation(fields: [userId], references: [id])
   projects     Project[]
@@ -189,22 +167,19 @@ model Inquiry {
 }
 
 model CalendarEvent {
-  id             String                  @id @default(uuid())
-  projectId      String                  @unique
-  cronofyEventId String?                 // Legacy Cronofy event ID
-  calendarId     String?                 // Legacy calendar ID
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt @default(now())
-
-  // Nylas-specific fields
-  nylasEventId   String?                 // Nylas event ID
-  nylasCalendarId String?                // Nylas calendar ID
-  nylasGrantId   String?                 // Nylas grant ID (for API calls)
-  lastSyncedAt   DateTime?               // When last synced to external calendar
-  syncStatus     CalendarEventSyncStatus @default(PENDING)
-  lastError      String?                 // Last sync error message
-
-  project        Project  @relation(fields: [projectId], references: [id])
+  id              String                  @id @default(uuid())
+  projectId       String                  @unique
+  cronofyEventId  String?
+  calendarId      String?
+  createdAt       DateTime                @default(now())
+  lastError       String?
+  lastSyncedAt    DateTime?
+  nylasCalendarId String?
+  nylasEventId    String?
+  nylasGrantId    String?
+  syncStatus      CalendarEventSyncStatus @default(PENDING)
+  updatedAt       DateTime                @default(now()) @updatedAt
+  project         Project                 @relation(fields: [projectId], references: [id])
 
   @@index([nylasEventId])
 }
@@ -216,11 +191,184 @@ model Invitation {
   role          OrgRole
   token         String           @unique
   accepted      Boolean          @default(false)
+  createdAt     DateTime         @default(now())
   inviteType    InvitationType   @default(MEMBER)
   status        InvitationStatus @default(PENDING)
-  createdAt     DateTime         @default(now())
   organization  Organization     @relation(fields: [orgId], references: [id])
   notifications Notification[]
+}
+
+model Notification {
+  id           String           @id @default(uuid())
+  userId       String
+  orgId        String
+  type         NotificationType
+  invitationId String?
+  projectId    String?
+  payload      Json?
+  createdAt    DateTime         @default(now())
+  readAt       DateTime?
+  messageId    String?
+  invitation   Invitation?      @relation(fields: [invitationId], references: [id])
+  organization Organization     @relation(fields: [orgId], references: [id])
+  project      Project?         @relation(fields: [projectId], references: [id])
+  user         User             @relation(fields: [userId], references: [id])
+}
+
+model PendingOrder {
+  id                    String             @id @default(uuid())
+  stripeSessionId       String             @unique
+  stripePaymentIntentId String?
+  agentUserId           String
+  agentCustomerId       String
+  providerOrgId         String
+  orderData             Json
+  status                PendingOrderStatus @default(PENDING_PAYMENT)
+  totalAmount           Int
+  currency              String             @default("usd")
+  createdAt             DateTime           @default(now())
+  expiresAt             DateTime
+  completedAt           DateTime?
+  projectId             String?            @unique
+  packageId             String?
+  selectedAddOnIds      String[]           @default([])
+  package               ServicePackage?    @relation(fields: [packageId], references: [id])
+  project               Project?           @relation(fields: [projectId], references: [id])
+
+  @@index([agentUserId])
+  @@index([providerOrgId])
+  @@index([status])
+}
+
+model ServicePackage {
+  id             String         @id @default(uuid())
+  orgId          String
+  name           String
+  description    String?
+  price          Int
+  currency       String         @default("usd")
+  mediaTypes     MediaType[]
+  isActive       Boolean        @default(true)
+  displayOrder   Int            @default(0)
+  turnaroundDays Int?
+  photoCount     Int?
+  videoMinutes   Int?
+  features       String[]       @default([])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  pendingOrders  PendingOrder[]
+  organization   Organization   @relation(fields: [orgId], references: [id])
+
+  @@index([orgId])
+  @@index([isActive])
+}
+
+model PackageAddOn {
+  id           String        @id @default(uuid())
+  orgId        String
+  name         String
+  description  String?
+  price        Int
+  currency     String        @default("usd")
+  category     AddOnCategory @default(OTHER)
+  isActive     Boolean       @default(true)
+  displayOrder Int           @default(0)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  organization Organization  @relation(fields: [orgId], references: [id])
+
+  @@index([orgId])
+  @@index([isActive])
+}
+
+model UserCalendarIntegration {
+  id                String                    @id @default(uuid())
+  userId            String
+  provider          CalendarProvider
+  providerAccountId String?
+  calendarId        String
+  calendarName      String?
+  accessToken       String
+  refreshToken      String?
+  tokenExpiresAt    DateTime?
+  status            CalendarIntegrationStatus @default(PENDING)
+  isPrimary         Boolean                   @default(false)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  lastSyncAt        DateTime?
+  lastSyncError     String?
+  isWriteTarget     Boolean                   @default(false)
+  nylasCalendarId   String?
+  nylasGrantId      String?
+  calendarEvents    TechnicianCalendarEvent[]
+  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, calendarId])
+  @@index([userId])
+  @@index([nylasGrantId])
+}
+
+model UserIcsFeed {
+  id           String    @id @default(uuid())
+  userId       String    @unique
+  feedToken    String    @unique @default(uuid())
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  lastAccessAt DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([feedToken])
+}
+
+model TechnicianCalendarEvent {
+  id              String                   @id @default(uuid())
+  projectId       String
+  technicianId    String
+  integrationId   String?
+  externalEventId String?
+  status          CalendarEventSyncStatus  @default(PENDING)
+  syncedAt        DateTime?
+  lastError       String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  integration     UserCalendarIntegration? @relation(fields: [integrationId], references: [id])
+  project         Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  technician      User                     @relation("TechCalendarEvents", fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, technicianId, integrationId])
+  @@index([technicianId])
+  @@index([projectId])
+}
+
+model UserAvailability {
+  id        String    @id @default(uuid())
+  userId    String
+  dayOfWeek DayOfWeek
+  isEnabled Boolean   @default(true)
+  startTime String    @default("09:00")
+  endTime   String    @default("17:00")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dayOfWeek])
+  @@index([userId])
+}
+
+model UserAvailabilityStatus {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  isAvailable         Boolean  @default(true)
+  availabilityNote    String?
+  autoDeclineBookings Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum ProjectChatChannel {
+  TEAM
+  CUSTOMER
 }
 
 enum UserAccountType {
@@ -300,110 +448,14 @@ enum PendingOrderStatus {
   CANCELLED
 }
 
-model Notification {
-  id           String           @id @default(uuid())
-  userId       String
-  orgId        String
-  type         NotificationType
-  invitationId String?
-  projectId    String?
-  messageId    String?
-  payload      Json?
-  createdAt    DateTime         @default(now())
-  readAt       DateTime?
-
-  user         User             @relation(fields: [userId], references: [id])
-  organization Organization     @relation(fields: [orgId], references: [id])
-  invitation   Invitation?      @relation(fields: [invitationId], references: [id])
-  project      Project?         @relation(fields: [projectId], references: [id])
-}
-
-model PendingOrder {
-  id                    String             @id @default(uuid())
-  stripeSessionId       String             @unique
-  stripePaymentIntentId String?
-  agentUserId           String
-  agentCustomerId       String
-  providerOrgId         String
-  orderData             Json
-  status                PendingOrderStatus @default(PENDING_PAYMENT)
-  totalAmount           Int
-  currency              String             @default("usd")
-  createdAt             DateTime           @default(now())
-  expiresAt             DateTime
-  completedAt           DateTime?
-  projectId             String?            @unique
-  project               Project?           @relation(fields: [projectId], references: [id])
-
-  // Package selection
-  packageId             String?
-  package               ServicePackage?    @relation(fields: [packageId], references: [id])
-  selectedAddOnIds      String[]           @default([])
-
-  @@index([agentUserId])
-  @@index([providerOrgId])
-  @@index([status])
-}
-
-// =============================
-// Service Packages & Add-ons
-// =============================
-
-model ServicePackage {
-  id            String         @id @default(uuid())
-  orgId         String
-  name          String
-  description   String?
-  price         Int            // Price in cents
-  currency      String         @default("usd")
-  mediaTypes    MediaType[]    // Included media types
-  isActive      Boolean        @default(true)
-  displayOrder  Int            @default(0)
-  turnaroundDays Int?          // Expected delivery time
-  photoCount    Int?           // Number of photos included
-  videoMinutes  Int?           // Minutes of video included
-  features      String[]       @default([])  // Feature bullet points
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-
-  organization  Organization   @relation(fields: [orgId], references: [id])
-  pendingOrders PendingOrder[]
-
-  @@index([orgId])
-  @@index([isActive])
-}
-
-model PackageAddOn {
-  id            String       @id @default(uuid())
-  orgId         String
-  name          String
-  description   String?
-  price         Int          // Price in cents
-  currency      String       @default("usd")
-  category      AddOnCategory @default(OTHER)
-  isActive      Boolean      @default(true)
-  displayOrder  Int          @default(0)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-
-  organization  Organization @relation(fields: [orgId], references: [id])
-
-  @@index([orgId])
-  @@index([isActive])
-}
-
 enum AddOnCategory {
-  AERIAL        // Drone photography/video
-  TWILIGHT      // Twilight/dusk shots
-  VIRTUAL_TOUR  // 3D virtual tours
-  FLOORPLAN     // Floor plans
-  RUSH          // Rush delivery
+  AERIAL
+  TWILIGHT
+  VIRTUAL_TOUR
+  FLOORPLAN
+  RUSH
   OTHER
 }
-
-// =============================
-// Calendar Integrations
-// =============================
 
 enum CalendarProvider {
   GOOGLE
@@ -426,74 +478,6 @@ enum CalendarEventSyncStatus {
   DELETED
 }
 
-// Per-user OAuth calendar connections (Nylas-based)
-model UserCalendarIntegration {
-  id                String                    @id @default(uuid())
-  userId            String
-  provider          CalendarProvider
-  providerAccountId String?
-  calendarId        String
-  calendarName      String?
-  accessToken       String                    // Encrypted (for legacy/non-Nylas)
-  refreshToken      String?                   // Encrypted (for legacy/non-Nylas)
-  tokenExpiresAt    DateTime?
-  status            CalendarIntegrationStatus @default(PENDING)
-  isPrimary         Boolean                   @default(false)
-  isWriteTarget     Boolean                   @default(false) // Calendar to write events to
-  createdAt         DateTime                  @default(now())
-  updatedAt         DateTime                  @updatedAt
-  lastSyncAt        DateTime?
-  lastSyncError     String?
-
-  // Nylas-specific fields
-  nylasGrantId      String?                   // Nylas grant ID after OAuth
-  nylasCalendarId   String?                   // Nylas calendar ID
-
-  user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  calendarEvents TechnicianCalendarEvent[]
-
-  @@unique([userId, provider, calendarId])
-  @@index([userId])
-  @@index([nylasGrantId])
-}
-
-// ICS feed per user
-model UserIcsFeed {
-  id           String    @id @default(uuid())
-  userId       String    @unique
-  feedToken    String    @unique @default(uuid())
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  lastAccessAt DateTime?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([feedToken])
-}
-
-// Track events synced to external calendars
-model TechnicianCalendarEvent {
-  id              String                   @id @default(uuid())
-  projectId       String
-  technicianId    String
-  integrationId   String?
-  externalEventId String?
-  status          CalendarEventSyncStatus  @default(PENDING)
-  syncedAt        DateTime?
-  lastError       String?
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-
-  project     Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  technician  User                     @relation("TechCalendarEvents", fields: [technicianId], references: [id], onDelete: Cascade)
-  integration UserCalendarIntegration? @relation(fields: [integrationId], references: [id], onDelete: SetNull)
-
-  @@unique([projectId, technicianId, integrationId])
-  @@index([technicianId])
-  @@index([projectId])
-}
-
-// Day of week enum for availability
 enum DayOfWeek {
   MONDAY
   TUESDAY
@@ -502,34 +486,4 @@ enum DayOfWeek {
   FRIDAY
   SATURDAY
   SUNDAY
-}
-
-// User availability / work hours per day
-model UserAvailability {
-  id        String    @id @default(uuid())
-  userId    String
-  dayOfWeek DayOfWeek
-  isEnabled Boolean   @default(true) // Whether user works this day
-  startTime String    @default("09:00") // HH:mm format
-  endTime   String    @default("17:00") // HH:mm format
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, dayOfWeek])
-  @@index([userId])
-}
-
-// Overall availability status for a user
-model UserAvailabilityStatus {
-  id                 String   @id @default(uuid())
-  userId             String   @unique
-  isAvailable        Boolean  @default(true) // Quick toggle for overall availability
-  availabilityNote   String?  // Optional note (e.g., "On vacation until Jan 15")
-  autoDeclineBookings Boolean @default(false) // Auto-decline new assignments when unavailable
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

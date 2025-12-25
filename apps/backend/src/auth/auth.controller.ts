@@ -7,8 +7,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { UserAccountType } from '@prisma/client';
 import { Public } from './public.decorator';
+import { RegisterDto } from './dto/register.dto';
+import { OAuthLoginDto } from './dto/oauth-login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -17,7 +18,7 @@ export class AuthController {
   @Public()
   @Post('register')
   async register(
-    @Body() body: { email: string; name: string; password: string; accountType: UserAccountType },
+    @Body() body: RegisterDto,
   ) {
     return this.authService.register(
       body.email,
@@ -31,6 +32,26 @@ export class AuthController {
   @Post('login')
   async login(@Body() body: { email: string; password: string }) {
     return this.authService.login(body.email, body.password);
+  }
+
+  @Public()
+  @Post('oauth/google')
+  async oauthGoogle(@Body() body: OAuthLoginDto) {
+    return this.authService.oauthLogin('google', {
+      token: body.token,
+      accountType: body.accountType,
+      name: body.name,
+    });
+  }
+
+  @Public()
+  @Post('oauth/facebook')
+  async oauthFacebook(@Body() body: OAuthLoginDto) {
+    return this.authService.oauthLogin('facebook', {
+      token: body.token,
+      accountType: body.accountType,
+      name: body.name,
+    });
   }
 
   @Get('me')

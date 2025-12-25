@@ -45,11 +45,11 @@ x-org-id: <organization-id>
   "email": "user@example.com",
   "name": "John Doe",
   "password": "password123",
-  "role": "AGENT"
+  "accountType": "AGENT"
 }
 ```
 
-**Valid Roles:** `ADMIN`, `PROJECT_MANAGER`, `TECHNICIAN`, `EDITOR`, `AGENT`
+**Valid Account Types (self-serve):** `AGENT`, `PROVIDER`
 
 **Example:**
 ```bash
@@ -59,7 +59,7 @@ curl -X POST http://localhost:3001/auth/register \
     "email": "agent@example.com",
     "name": "Agent User",
     "password": "password123",
-    "role": "AGENT"
+    "accountType": "AGENT"
   }'
 ```
 
@@ -71,11 +71,30 @@ curl -X POST http://localhost:3001/auth/register \
     "id": "user-id",
     "email": "agent@example.com",
     "name": "Agent User",
-    "role": "AGENT",
+    "accountType": "AGENT",
     "createdAt": "2024-01-01T00:00:00.000Z"
   }
 }
 ```
+
+### OAuth Login / Signup (Google, Facebook)
+
+**POST** `/auth/oauth/google`
+
+**POST** `/auth/oauth/facebook`
+
+**Body:**
+```json
+{
+  "token": "<google-id-token-or-facebook-access-token>",
+  "accountType": "AGENT",
+  "name": "Optional display name"
+}
+```
+
+- Requires provider credentials (Google ID token or Facebook access token).
+- `accountType` supports `AGENT` or `PROVIDER` for self-serve signup.
+- Response shape matches `/auth/login` / `/auth/register`.
 
 ---
 
@@ -1371,4 +1390,3 @@ chmod +x test-api.sh
 - Role-based access control (RBAC) is enforced on most endpoints
 - Project status transitions are validated based on user role
 - Organization membership is checked via `OrgMemberGuard` on protected endpoints (except for agents accessing their own projects)
-

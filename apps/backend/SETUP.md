@@ -32,6 +32,11 @@ DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supaba
 # Authentication
 JWT_SECRET="dev_auth_key"
 
+# OAuth Providers (Optional)
+GOOGLE_CLIENT_ID="your-google-client-id"
+FACEBOOK_APP_ID="your-facebook-app-id"
+FACEBOOK_APP_SECRET="your-facebook-app-secret"
+
 # Server Configuration
 PORT=3001
 
@@ -117,10 +122,10 @@ Create a new user account:
 ```bash
 curl -i -X POST http://localhost:3001/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"agent@example.com", "name":"Agent", "password":"password123", "role":"AGENT"}'
+  -d '{"email":"agent@example.com", "name":"Agent", "password":"password123", "accountType":"AGENT"}'
 ```
 
-Valid roles are: `ADMIN`, `PROJECT_MANAGER`, `TECHNICIAN`, `EDITOR`, `AGENT`
+Valid `accountType` values for self-serve signup are: `AGENT`, `PROVIDER`.
 
 ### 6.3 Login
 

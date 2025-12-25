@@ -5,13 +5,45 @@ import * as bcrypt from 'bcrypt';
 import { OrgRole, OrgType, UserAccountType } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { AuthenticatedUser } from './auth-context';
+import { OAuth2Client } from 'google-auth-library';
 
 @Injectable()
 export class AuthService {
+  private googleClient: OAuth2Client | null;
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
-  ) {}
+  ) {
+    this.googleClient = process.env.GOOGLE_CLIENT_ID
+      ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+      : null;
+  }
+
+  private async finalizeAuth(user: any, name?: string) {
+    // Ensure personal org exists
+    await this.ensurePersonalOrganization(user.id, name || user.name);
+
+    const token = this.jwtService.sign({
+      sub: user.id,
+      role: user.accountType,
+    });
+
+    // Fetch user's first organization membership
+    const membership = await this.prisma.organizationMember.findFirst({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'asc' },
+      select: { orgId: true },
+    });
+
+    return {
+      user: {
+        ...user,
+        organizationId: membership?.orgId || null,
+      },
+      token,
+    };
+  }
 
   private async ensurePersonalOrganization(userId: string, name: string) {
     const existingPersonalMemberships = await this.prisma.organizationMember.findMany({
@@ -54,15 +86,64 @@ export class AuthService {
     return personalOrg;
   }
 
-  async register(email: string, name: string, password: string, role: UserAccountType) {
-    // VALIDATION: role must be one of the defined global roles
+  /**
+   * Create or update a user from an OAuth profile while preserving account intent.
+   */
+  private async upsertUserFromProfile(
+    email: string,
+    name: string,
+    accountTypeIntent: UserAccountType,
+  ) {
     const allowedRoles: UserAccountType[] = [
-      UserAccountType.COMPANY,
       UserAccountType.PROVIDER,
       UserAccountType.AGENT,
+      // COMPANY exists but is not user-facing; keeping allowed for admin/sales flows.
+      UserAccountType.COMPANY,
+    ];
+    const accountTypeToStore = allowedRoles.includes(accountTypeIntent)
+      ? accountTypeIntent
+      : UserAccountType.AGENT;
+
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+
+    if (existing) {
+      const updated = await this.prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          name: existing.name || name,
+          accountType: existing.accountType || accountTypeToStore,
+        },
+      });
+      return updated;
+    }
+
+    const randomPassword = randomUUID();
+    const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+    return this.prisma.user.create({
+      data: {
+        email,
+        name,
+        password: hashedPassword,
+        accountType: accountTypeToStore,
+      },
+    });
+  }
+
+  async register(
+    email: string,
+    name: string,
+    password: string,
+    accountTypeIntent: UserAccountType,
+  ) {
+    const allowedRoles: UserAccountType[] = [
+      UserAccountType.PROVIDER,
+      UserAccountType.AGENT,
+      // COMPANY exists but is not user-facing; keeping allowed for admin/sales flows.
+      UserAccountType.COMPANY,
     ];
 
-    if (!allowedRoles.includes(role)) {
+    if (!allowedRoles.includes(accountTypeIntent)) {
       throw new UnauthorizedException('Invalid role selection');
     }
 
@@ -70,34 +151,22 @@ export class AuthService {
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new UnauthorizedException('Email already registered');
 
+    const accountTypeToStore = accountTypeIntent;
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user with global role
+    // Create user with global role intent
     const user = await this.prisma.user.create({
       data: {
         email,
         name,
         password: hashedPassword,
-        accountType: role, // IMPORTANT: global identity role
+        accountType: accountTypeToStore,
       },
     });
 
-    await this.ensurePersonalOrganization(user.id, name);
-
-    // Create JWT
-    const token = this.jwtService.sign({
-      sub: user.id,
-      role: user.accountType,
-    });
-
-    return {
-      user: {
-        ...user,
-        organizationId: null, // New users have no org yet
-      },
-      token,
-    };
+    return this.finalizeAuth(user, name);
   }
 
   async login(email: string, password: string) {
@@ -107,25 +176,86 @@ export class AuthService {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
-    // Ensure technicians have exactly one personal org
-    await this.ensurePersonalOrganization(user.id, user.name);
+    return this.finalizeAuth(user);
+  }
 
-    const token = this.jwtService.sign({ sub: user.id, role: user.accountType });
+  private async verifyGoogleToken(idToken: string) {
+    if (!this.googleClient) {
+      throw new UnauthorizedException('Google OAuth not configured');
+    }
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+      if (!payload?.email) {
+        throw new UnauthorizedException('Google token missing email');
+      }
+      return {
+        email: payload.email,
+        name: payload.name || payload.email,
+      };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid Google token');
+    }
+  }
 
-    // Fetch user's organization
-    const membership = await this.prisma.organizationMember.findFirst({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'asc' },
-      select: { orgId: true },
-    });
+  private async verifyFacebookToken(accessToken: string) {
+    const appId = process.env.FACEBOOK_APP_ID;
+    const appSecret = process.env.FACEBOOK_APP_SECRET;
+    if (!appId || !appSecret) {
+      throw new UnauthorizedException('Facebook OAuth not configured');
+    }
+
+    const appToken = `${appId}|${appSecret}`;
+
+    const debugUrl = `https://graph.facebook.com/debug_token?input_token=${encodeURIComponent(
+      accessToken,
+    )}&access_token=${encodeURIComponent(appToken)}`;
+    const debugRes = await fetch(debugUrl);
+    const debugJson = await debugRes.json();
+    if (!debugRes.ok || !debugJson?.data?.is_valid) {
+      throw new UnauthorizedException('Invalid Facebook token');
+    }
+
+    const profileRes = await fetch(
+      `https://graph.facebook.com/me?fields=id,name,email&access_token=${encodeURIComponent(
+        accessToken,
+      )}`,
+    );
+    const profile = await profileRes.json();
+
+    if (!profile?.email) {
+      throw new UnauthorizedException('Facebook profile missing email');
+    }
 
     return {
-      user: {
-        ...user,
-        organizationId: membership?.orgId || null,
-      },
-      token,
+      email: profile.email,
+      name: profile.name || profile.email,
     };
+  }
+
+  async oauthLogin(
+    provider: 'google' | 'facebook',
+    dto: {
+      token: string;
+      accountType: UserAccountType;
+      name?: string;
+    },
+  ) {
+    const profile =
+      provider === 'google'
+        ? await this.verifyGoogleToken(dto.token)
+        : await this.verifyFacebookToken(dto.token);
+
+    const user = await this.upsertUserFromProfile(
+      profile.email,
+      dto.name || profile.name || profile.email,
+      dto.accountType,
+    );
+
+    return this.finalizeAuth(user, dto.name || profile.name);
   }
 
   async validateUser(userId: string): Promise<AuthenticatedUser | null> {
