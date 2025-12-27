@@ -100,10 +100,10 @@ class ChatSocket {
     this.typingState.clear();
   }
 
-  async joinProject(projectId: string) {
+  async joinProject(projectId: string, channel: ProjectChatChannel = 'TEAM') {
     if (!this.socket) this.connect();
     return new Promise<void>((resolve, reject) => {
-      this.socket?.emit('joinProject', { projectId }, (resp: any) => {
+      this.socket?.emit('joinProject', { projectId, channel }, (resp: any) => {
         if (resp?.error) {
           reject(new Error(resp.error));
         } else {

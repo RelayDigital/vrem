@@ -236,7 +236,7 @@ export function MessagingProvider({
 
       // Join project room for realtime updates
       if (connected) {
-        chatSocket.joinProject(jobId).catch(() => {
+        chatSocket.joinProject(jobId, channel).catch(() => {
           // silently ignore join errors for now
         });
       }

@@ -147,7 +147,7 @@ export class MessagesGateway
       if (roomTyping.has(userId)) {
         this.clearUserTyping(roomKey, userId);
         const [projectId, channel] = roomKey.split(':');
-        this.server.to(`project:${projectId}`).emit('userTyping', {
+        this.server.to(`project:${projectId}:${channel}`).emit('userTyping', {
           projectId,
           channel,
           userId,
@@ -166,23 +166,32 @@ export class MessagesGateway
 
   @SubscribeMessage('joinProject')
   async handleJoinProject(
-    @MessageBody() data: { projectId: string },
+    @MessageBody() data: { projectId: string; channel?: 'TEAM' | 'CUSTOMER' },
     @ConnectedSocket() client: Socket,
   ) {
     const user = client.data.user as AuthenticatedUser;
     if (!user) return { error: 'Not authenticated' };
 
+    if (!data.channel || (data.channel !== 'TEAM' && data.channel !== 'CUSTOMER')) {
+      return { error: 'Channel is required' };
+    }
+
+    const normalizedChannel =
+      data.channel === 'CUSTOMER' ? 'customer' : 'team';
     const allowed = await this.messagesService.userHasAccessToProject(
       user,
       data.projectId,
+      normalizedChannel,
     );
 
     if (!allowed) {
       return { error: 'Access denied' };
     }
 
-    const room = `project:${data.projectId}`;
-    await client.join(room);
+    const projectRoom = `project:${data.projectId}`;
+    const channelRoom = `project:${data.projectId}:${data.channel ?? 'TEAM'}`;
+    await client.join(projectRoom);
+    await client.join(channelRoom);
 
     // Track which projects this socket is in
     if (!this.userProjectRooms.has(client.id)) {
@@ -191,7 +200,7 @@ export class MessagesGateway
     this.userProjectRooms.get(client.id)!.add(data.projectId);
 
     // Notify others in the room that user joined
-    client.to(room).emit('presenceUpdate', {
+    client.to(projectRoom).emit('presenceUpdate', {
       userId: user.id,
       userName: user.name,
       isOnline: true,
@@ -205,7 +214,7 @@ export class MessagesGateway
       users: presenceList,
     });
 
-    return { joined: room };
+    return { joined: channelRoom };
   }
 
   @SubscribeMessage('sendMessage')
@@ -243,7 +252,7 @@ export class MessagesGateway
     const roomKey = `${data.projectId}:${channel}`;
     if (this.typingUsers.get(roomKey)?.has(user.id)) {
       this.clearUserTyping(roomKey, user.id);
-      this.server.to(`project:${data.projectId}`).emit('userTyping', {
+      this.server.to(`project:${data.projectId}:${channel}`).emit('userTyping', {
         projectId: data.projectId,
         channel,
         userId: user.id,
@@ -252,7 +261,7 @@ export class MessagesGateway
       });
     }
 
-    const room = `project:${data.projectId}`;
+    const room = `project:${data.projectId}:${channel}`;
     this.server.to(room).emit('messageCreated', message);
 
     return message;
@@ -276,7 +285,7 @@ export class MessagesGateway
     if (!allowed) return { error: 'Access denied' };
 
     const roomKey = `${data.projectId}:${data.channel}`;
-    const room = `project:${data.projectId}`;
+    const room = `project:${data.projectId}:${data.channel}`;
 
     if (data.isTyping) {
       this.setUserTyping(roomKey, user.id, user.name, data.projectId, data.channel);
@@ -326,12 +335,12 @@ export class MessagesGateway
     );
 
     if (result.messageIds.length > 0) {
-      const room = `project:${data.projectId}`;
-      this.server.to(room).emit('messagesRead', {
-        messageIds: result.messageIds,
-        readBy: { userId: result.userId, userName: result.userName },
-        readAt: result.readAt.toISOString(),
-      });
+    const room = `project:${data.projectId}:${data.channel}`;
+    this.server.to(room).emit('messagesRead', {
+      messageIds: result.messageIds,
+      readBy: { userId: result.userId, userName: result.userName },
+      readAt: result.readAt.toISOString(),
+    });
     }
 
     return { success: true, markedCount: result.messageIds.length };
@@ -359,7 +368,7 @@ export class MessagesGateway
     // Set auto-clear timeout (5 seconds)
     const timeout = setTimeout(() => {
       this.clearUserTyping(roomKey, userId);
-      this.server.to(`project:${projectId}`).emit('userTyping', {
+      this.server.to(`project:${projectId}:${channel}`).emit('userTyping', {
         projectId,
         channel,
         userId,
