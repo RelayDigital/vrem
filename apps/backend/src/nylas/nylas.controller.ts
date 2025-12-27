@@ -46,12 +46,13 @@ export class NylasController {
   getOAuthUrl(
     @CurrentUser() user: AuthenticatedUser,
     @Query('provider') provider: string,
+    @Query('returnTo') returnTo?: string,
   ): { url: string } {
     if (!provider || !['google', 'microsoft'].includes(provider)) {
       throw new BadRequestException('Provider must be "google" or "microsoft"');
     }
 
-    const url = this.nylas.getOAuthUrl(user.id, provider as 'google' | 'microsoft');
+    const url = this.nylas.getOAuthUrl(user.id, provider as 'google' | 'microsoft', returnTo);
     return { url };
   }
 
@@ -72,7 +73,7 @@ export class NylasController {
     }
 
     try {
-      const { userId } = await this.nylas.handleOAuthCallback(code, state);
+      const { userId, returnTo } = await this.nylas.handleOAuthCallback(code, state);
       this.logger.log(`OAuth completed for user ${userId}`);
 
       // Auto-sync all existing assigned projects to the newly connected calendar
@@ -83,7 +84,12 @@ export class NylasController {
         this.logger.error(`Failed to auto-sync projects for user ${userId}`, error);
       });
 
-      res.redirect(`${FRONTEND_URL}/settings/calendar?success=true`);
+      // Redirect based on where the OAuth flow was started from
+      const redirectUrl = returnTo === 'dashboard'
+        ? `${FRONTEND_URL}/dashboard?calendar_connected=true`
+        : `${FRONTEND_URL}/settings/calendar?success=true`;
+
+      res.redirect(redirectUrl);
     } catch (error) {
       this.logger.error('OAuth callback failed', error);
       res.redirect(`${FRONTEND_URL}/settings/calendar?error=oauth_failed`);

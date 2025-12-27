@@ -413,4 +413,94 @@ export class OrganizationsService {
     const updatedMember = results[results.length - 1];
     return updatedMember;
   }
+
+  /**
+   * Validate an invite code and return organization info.
+   * This is a public endpoint for the onboarding flow.
+   */
+  async validateInviteCode(token: string): Promise<{
+    valid: boolean;
+    organization?: {
+      id: string;
+      name: string;
+      logoUrl?: string;
+      type: OrgType;
+    };
+    role?: OrgRole;
+    inviteType?: InvitationType;
+  }> {
+    const invitation = await this.prisma.invitation.findUnique({
+      where: { token },
+      include: { organization: true },
+    });
+
+    if (!invitation) {
+      return { valid: false };
+    }
+
+    if (invitation.status !== InvitationStatus.PENDING) {
+      return { valid: false };
+    }
+
+    return {
+      valid: true,
+      organization: {
+        id: invitation.organization.id,
+        name: invitation.organization.name,
+        logoUrl: invitation.organization.logoUrl || undefined,
+        type: invitation.organization.type,
+      },
+      role: invitation.role,
+      inviteType: invitation.inviteType,
+    };
+  }
+
+  /**
+   * Get pending invitations for an email address.
+   * Used during onboarding to detect if a user was invited before signing up.
+   */
+  async getPendingInvitationsByEmail(email: string): Promise<{
+    invitations: Array<{
+      id: string;
+      token: string;
+      organization: {
+        id: string;
+        name: string;
+        logoUrl?: string;
+        type: OrgType;
+      };
+      role: OrgRole;
+      inviteType: InvitationType;
+      createdAt: Date;
+    }>;
+  }> {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const invitations = await this.prisma.invitation.findMany({
+      where: {
+        email: normalizedEmail,
+        status: InvitationStatus.PENDING,
+      },
+      include: {
+        organization: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      invitations: invitations.map((inv) => ({
+        id: inv.id,
+        token: inv.token,
+        organization: {
+          id: inv.organization.id,
+          name: inv.organization.name,
+          logoUrl: inv.organization.logoUrl || undefined,
+          type: inv.organization.type,
+        },
+        role: inv.role,
+        inviteType: inv.inviteType,
+        createdAt: inv.createdAt,
+      })),
+    };
+  }
 }

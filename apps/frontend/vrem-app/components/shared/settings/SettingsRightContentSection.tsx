@@ -46,7 +46,7 @@ export const SettingsRightContentSection = forwardRef<
         className={cn("mb-md", showBorder && "border-b pb-md", className)}
       >
         {/* Heading */}
-        <div className="mb-md flex flex-col sm:flex-row items-baseline justify-between">
+        <div className="mb-md flex flex-col sm:flex-row items-baseline justify-between gap-md">
           <H2 className="text-lg border-0">{title}</H2>
           {description && <Muted>{description}</Muted>}
         </div>

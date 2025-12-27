@@ -19,6 +19,8 @@ import { PackagesModule } from './packages/packages.module';
 import { CalendarIntegrationsModule } from './calendar-integrations/calendar-integrations.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { NylasModule } from './nylas/nylas.module';
+import { OtpModule } from './otp/otp.module';
+import { EmailModule } from './email/email.module';
 import { OrgRolesGuard } from './auth/org-roles.guard';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { Reflector } from '@nestjs/core';
@@ -27,8 +29,10 @@ import { PrismaModule } from './prisma/prisma.module';
 @Module({
   imports: [
     PrismaModule,
+    EmailModule,
     UsersModule,
     AuthModule,
+    OtpModule,
     ProjectsModule,
     MediaModule,
     MessagesModule,

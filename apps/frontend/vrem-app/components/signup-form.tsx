@@ -50,30 +50,10 @@ export function SignupForm({
     }
   }
 
-  const promptForOAuthToken = (provider: "google" | "facebook") => {
-    if (typeof window === "undefined") return null
-    return window.prompt(
-      `Paste the ${provider} OAuth token/credential here.\n\n(Connect the real ${provider} button to pass the credential instead of using this prompt.)`
-    )
-  }
-
   const handleOAuth = async (provider: "google" | "facebook") => {
     setOauthError("")
-    try {
-      const token = promptForOAuthToken(provider)
-      if (!token) {
-        setOauthError(`Missing ${provider} token. Please complete the ${provider} sign-in flow.`)
-        return
-      }
-      await loginWithOAuth(provider, {
-        token,
-        accountType,
-        name,
-      })
-    } catch (err) {
-      console.error(`${provider} OAuth failed`, err)
-      setOauthError(`${provider} sign-in failed. Please try again.`)
-    }
+    // TODO: Implement real OAuth flow with Google/Facebook SDK
+    setOauthError(`${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-in is not yet configured. Please use email/password signup.`)
   }
 
   const accountOptions: { value: AccountType; title: string; subtitle: string }[] = [

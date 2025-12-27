@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { ChatMessage } from '../../../types/chat';
+import { ChatMessage, TypingUser, PresenceUser, ReadReceipt, ProjectChatChannel } from '../../../types/chat';
 import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
 import { Button } from '../../ui/button';
 import { Textarea } from '../../ui/textarea';
@@ -41,6 +41,13 @@ interface JobChatProps {
   showInput?: boolean;
   onActiveTabChange?: (tab: 'client' | 'team') => void;
   activeTab?: 'client' | 'team';
+  // Live chat features
+  typingUsers?: TypingUser[];
+  onlineUsers?: PresenceUser[];
+  onTyping?: (channel: ProjectChatChannel) => void;
+  onStopTyping?: (channel: ProjectChatChannel) => void;
+  getMessageReadReceipts?: (messageId: string) => ReadReceipt[];
+  onMessagesVisible?: (messageIds: string[], channel: ProjectChatChannel) => void;
 }
 
 // Format time for message bubbles
@@ -71,6 +78,25 @@ function groupMessagesByDate(messages: ChatMessage[]): Map<string, ChatMessage[]
   return groups;
 }
 
+// Format typing indicator text
+function formatTypingText(users: TypingUser[]): string {
+  if (users.length === 0) return '';
+  if (users.length === 1) return `${users[0].userName} is typing...`;
+  if (users.length === 2) return `${users[0].userName} and ${users[1].userName} are typing...`;
+  return `${users[0].userName} and ${users.length - 1} others are typing...`;
+}
+
+// Typing dots animation component
+function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
+      <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
+      <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" />
+    </span>
+  );
+}
+
 export function JobChat({
   jobId,
   messages,
@@ -83,6 +109,12 @@ export function JobChat({
   showInput = true,
   onActiveTabChange,
   activeTab: controlledActiveTab,
+  typingUsers = [],
+  onlineUsers = [],
+  onTyping,
+  onStopTyping,
+  getMessageReadReceipts,
+  onMessagesVisible,
 }: JobChatProps) {
   const [internalActiveTab, setInternalActiveTab] = useState<'client' | 'team'>('team');
   const activeTab = controlledActiveTab ?? internalActiveTab;
@@ -162,6 +194,28 @@ export function JobChat({
   // Group messages by date
   const messagesByDate = useMemo(() => groupMessagesByDate(sortedMessages), [sortedMessages]);
 
+  // Check if a user is online
+  const isUserOnline = useCallback(
+    (userId: string): boolean => {
+      return onlineUsers.some((u) => u.userId === userId && u.isOnline);
+    },
+    [onlineUsers]
+  );
+
+  // Get read status for a message
+  const getMessageReadStatus = useCallback(
+    (message: ChatMessage): 'sent' | 'delivered' | 'read' => {
+      if (!getMessageReadReceipts) return 'sent';
+      const receipts = getMessageReadReceipts(message.id);
+      // Filter out the message author's own receipts
+      const otherReceipts = receipts.filter((r) => r.userId !== message.userId);
+      if (otherReceipts.length > 0) return 'read';
+      // For now, consider all sent messages as delivered
+      return 'delivered';
+    },
+    [getMessageReadReceipts]
+  );
+
   // Auto-scroll to bottom
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -181,10 +235,24 @@ export function JobChat({
     const channel = activeTab === 'client' ? 'CUSTOMER' : 'TEAM';
     const threadId = replyingTo?.id;
 
+    // Stop typing indicator before sending
+    if (onStopTyping) {
+      onStopTyping(channel);
+    }
+
     onSendMessage(newMessage.trim(), channel, threadId);
     setNewMessage('');
     setReplyingTo(null);
     inputRef.current?.focus();
+  };
+
+  // Handle input change with typing indicator
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNewMessage(e.target.value);
+    if (onTyping && e.target.value.trim()) {
+      const channel = activeTab === 'client' ? 'CUSTOMER' : 'TEAM';
+      onTyping(channel);
+    }
   };
 
   // Handle key press in input
@@ -209,15 +277,21 @@ export function JobChat({
       >
         {/* Avatar for others' messages */}
         {!isOwn && (
-          <Avatar className="h-8 w-8 mr-2 mt-auto mb-1 flex-shrink-0">
-            <AvatarImage src={message.userAvatar} alt={message.userName} />
-            <AvatarFallback className="text-xs bg-muted">
-              {message.userName
-                .split(' ')
-                .map((n) => n[0])
-                .join('')}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative mr-2 mt-auto mb-1 flex-shrink-0">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={message.userAvatar} alt={message.userName} />
+              <AvatarFallback className="text-xs bg-muted">
+                {message.userName
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')}
+              </AvatarFallback>
+            </Avatar>
+            {/* Online presence indicator */}
+            {isUserOnline(message.userId) && (
+              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-background" />
+            )}
+          </div>
         )}
 
         <div className={cn('flex flex-col max-w-[75%]', isOwn ? 'items-end' : 'items-start')}>
@@ -290,11 +364,16 @@ export function JobChat({
               >
                 {formatMessageTime(message.createdAt)}
               </span>
-              {isOwn && (
-                <CheckCheck
-                  className={cn('h-3 w-3', 'text-primary-foreground/70')}
-                />
-              )}
+              {isOwn && (() => {
+                const status = getMessageReadStatus(message);
+                if (status === 'read') {
+                  return <CheckCheck className="h-3 w-3 text-sky-400" />;
+                }
+                if (status === 'delivered') {
+                  return <CheckCheck className="h-3 w-3 text-primary-foreground/70" />;
+                }
+                return <Check className="h-3 w-3 text-primary-foreground/70" />;
+              })()}
             </div>
           </div>
 
@@ -583,6 +662,16 @@ export function JobChat({
         </div>
       )}
 
+      {/* Typing indicator */}
+      {typingUsers.length > 0 && (
+        <div className="px-3 py-2 border-t bg-muted/30 flex items-center gap-2">
+          <TypingDots />
+          <span className="text-xs text-muted-foreground">
+            {formatTypingText(typingUsers)}
+          </span>
+        </div>
+      )}
+
       {/* Message input */}
       {showInput && onSendMessage && (
         <div className="p-3 border-t bg-background">
@@ -595,7 +684,7 @@ export function JobChat({
                   : `Message ${activeTab === 'client' ? 'customer' : 'team'}...`
               }
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={handleKeyPress}
               className="min-h-[40px] max-h-[120px] resize-none"
               rows={1}

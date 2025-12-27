@@ -325,4 +325,71 @@ export class MessagesService {
 
     return { success: true };
   }
+
+  /**
+   * Mark messages as read by a user.
+   * Creates read receipts for the specified messages.
+   */
+  async markMessagesAsRead(
+    userId: string,
+    userName: string,
+    messageIds: string[],
+    projectId: string,
+    channel: 'TEAM' | 'CUSTOMER',
+  ): Promise<{ messageIds: string[]; userId: string; userName: string; readAt: Date }> {
+    // Validate messages belong to the project/channel and are not from this user
+    const messages = await this.prisma.message.findMany({
+      where: {
+        id: { in: messageIds },
+        projectId,
+        channel,
+        userId: { not: userId }, // Don't mark own messages as read
+      },
+      select: { id: true },
+    });
+
+    const validMessageIds = messages.map((m) => m.id);
+
+    if (validMessageIds.length === 0) {
+      return { messageIds: [], userId, userName, readAt: new Date() };
+    }
+
+    // Create read receipts (upsert to handle duplicates)
+    const now = new Date();
+    await this.prisma.$transaction(
+      validMessageIds.map((messageId) =>
+        this.prisma.messageRead.upsert({
+          where: {
+            messageId_userId: { messageId, userId },
+          },
+          create: { messageId, userId, readAt: now },
+          update: { readAt: now },
+        }),
+      ),
+    );
+
+    return {
+      messageIds: validMessageIds,
+      userId,
+      userName,
+      readAt: now,
+    };
+  }
+
+  /**
+   * Get read receipts for a specific message.
+   */
+  async getMessageReadReceipts(messageId: string): Promise<{ userId: string; userName: string; readAt: Date }[]> {
+    const reads = await this.prisma.messageRead.findMany({
+      where: { messageId },
+      include: { user: { select: { name: true } } },
+      orderBy: { readAt: 'asc' },
+    });
+
+    return reads.map((r) => ({
+      userId: r.userId,
+      userName: r.user.name,
+      readAt: r.readAt,
+    }));
+  }
 }

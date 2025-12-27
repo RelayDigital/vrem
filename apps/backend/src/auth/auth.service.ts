@@ -1,11 +1,12 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { OrgRole, OrgType, UserAccountType } from '@prisma/client';
+import { OrgRole, OrgType, UserAccountType, ProviderUseCaseType, InvitationStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { AuthenticatedUser } from './auth-context';
 import { OAuth2Client } from 'google-auth-library';
+import { OtpService } from '../otp/otp.service';
 
 @Injectable()
 export class AuthService {
@@ -14,6 +15,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private otpService: OtpService,
   ) {
     this.googleClient = process.env.GOOGLE_CLIENT_ID
       ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
@@ -305,6 +307,161 @@ export class AuthService {
     return {
       ...safeUser,
       organizationId: membership?.orgId || null,
+    };
+  }
+
+  /**
+   * Register a new user through the onboarding flow.
+   * Validates OTP token, creates user, handles invite codes, and saves use cases.
+   */
+  async registerFromOnboarding(data: {
+    otpToken: string;
+    email: string;
+    name: string;
+    password: string;
+    accountType: UserAccountType;
+    inviteCode?: string;
+    useCases?: ProviderUseCaseType[];
+  }) {
+    // 1. Validate OTP token
+    const tokenResult = await this.otpService.validateToken(data.otpToken);
+
+    // Verify email matches
+    if (tokenResult.email.toLowerCase() !== data.email.toLowerCase()) {
+      throw new BadRequestException('Email does not match verified email');
+    }
+
+    // 2. Check if email is already registered
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: data.email.toLowerCase() },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException('Email is already registered');
+    }
+
+    // 3. Validate account type
+    const allowedRoles: UserAccountType[] = [
+      UserAccountType.PROVIDER,
+      UserAccountType.AGENT,
+    ];
+
+    if (!allowedRoles.includes(data.accountType)) {
+      throw new BadRequestException('Invalid account type');
+    }
+
+    // 4. If invite code provided, validate it
+    let invitation: any = null;
+    if (data.inviteCode) {
+      invitation = await this.prisma.invitation.findUnique({
+        where: { token: data.inviteCode },
+        include: { organization: true },
+      });
+
+      if (!invitation) {
+        throw new BadRequestException('Invalid invite code');
+      }
+
+      if (invitation.status !== InvitationStatus.PENDING) {
+        throw new BadRequestException('Invite code has already been used');
+      }
+
+      // Check if invitation email matches (if specified)
+      if (invitation.email && invitation.email.toLowerCase() !== data.email.toLowerCase()) {
+        throw new BadRequestException('This invite code is for a different email');
+      }
+    }
+
+    // 5. Hash password
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+
+    // 6. Create user in transaction
+    const user = await this.prisma.$transaction(async (tx) => {
+      // Create user
+      const newUser = await tx.user.create({
+        data: {
+          email: data.email.toLowerCase(),
+          name: data.name,
+          password: hashedPassword,
+          accountType: data.accountType,
+        },
+      });
+
+      // Create personal organization
+      const personalOrg = await tx.organization.create({
+        data: {
+          id: randomUUID(),
+          name: `${data.name}'s Workspace`,
+          type: OrgType.PERSONAL,
+        },
+      });
+
+      await tx.organizationMember.create({
+        data: {
+          userId: newUser.id,
+          orgId: personalOrg.id,
+          role: OrgRole.OWNER,
+        },
+      });
+
+      // If invite code, join that organization
+      if (invitation) {
+        await tx.organizationMember.create({
+          data: {
+            userId: newUser.id,
+            orgId: invitation.orgId,
+            role: invitation.role,
+          },
+        });
+
+        // Mark invitation as accepted
+        await tx.invitation.update({
+          where: { id: invitation.id },
+          data: {
+            status: InvitationStatus.ACCEPTED,
+            accepted: true,
+          },
+        });
+      }
+
+      // If provider with use cases, save them
+      if (data.accountType === UserAccountType.PROVIDER && data.useCases?.length) {
+        await tx.providerUseCase.createMany({
+          data: data.useCases.map((useCase) => ({
+            userId: newUser.id,
+            useCase,
+          })),
+        });
+      }
+
+      return newUser;
+    });
+
+    // 7. Mark OTP token as used
+    await this.otpService.markTokenUsed(data.otpToken);
+
+    // 8. Generate JWT token
+    const token = this.jwtService.sign({
+      sub: user.id,
+      role: user.accountType,
+    });
+
+    // Fetch user's first organization membership
+    const membership = await this.prisma.organizationMember.findFirst({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'asc' },
+      select: { orgId: true },
+    });
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        accountType: user.accountType,
+        organizationId: membership?.orgId || null,
+      },
+      token,
     };
   }
 }

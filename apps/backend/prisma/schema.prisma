@@ -15,6 +15,7 @@ model User {
   updatedAt            DateTime                  @updatedAt
   accountType          UserAccountType           @default(AGENT)
   messages             Message[]
+  messageReads         MessageRead[]
   notifications        Notification[]
   customers            OrganizationCustomer[]
   organizations        OrganizationMember[]
@@ -27,6 +28,7 @@ model User {
   availabilityStatus   UserAvailabilityStatus?
   calendarIntegrations UserCalendarIntegration[]
   icsFeed              UserIcsFeed?
+  useCases             ProviderUseCase[]
 }
 
 model Organization {
@@ -84,15 +86,29 @@ model Media {
 }
 
 model Message {
-  id        String             @id @default(uuid())
-  projectId String
+  id           String             @id @default(uuid())
+  projectId    String
+  userId       String
+  content      String
+  timestamp    DateTime           @default(now())
+  channel      ProjectChatChannel @default(TEAM)
+  thread       String?
+  project      Project            @relation(fields: [projectId], references: [id])
+  user         User               @relation(fields: [userId], references: [id])
+  readReceipts MessageRead[]
+}
+
+model MessageRead {
+  id        String   @id @default(uuid())
+  messageId String
   userId    String
-  content   String
-  timestamp DateTime           @default(now())
-  channel   ProjectChatChannel @default(TEAM)
-  thread    String?
-  project   Project            @relation(fields: [projectId], references: [id])
-  user      User               @relation(fields: [userId], references: [id])
+  readAt    DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
 }
 
 model Project {
@@ -486,4 +502,38 @@ enum DayOfWeek {
   FRIDAY
   SATURDAY
   SUNDAY
+}
+
+model EmailOtp {
+  id        String    @id @default(uuid())
+  email     String
+  code      String    // 6-digit code, hashed
+  token     String    @unique // issued on successful verify
+  verified  Boolean   @default(false)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+
+  @@index([email])
+}
+
+model ProviderUseCase {
+  id      String              @id @default(uuid())
+  userId  String
+  useCase ProviderUseCaseType
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, useCase])
+  @@index([userId])
+}
+
+enum ProviderUseCaseType {
+  PHOTOGRAPHY
+  VIDEOGRAPHY
+  DRONE_AERIAL
+  VIRTUAL_TOURS
+  FLOOR_PLANS
+  EDITING
+  STAGING
+  MEASUREMENTS
 }

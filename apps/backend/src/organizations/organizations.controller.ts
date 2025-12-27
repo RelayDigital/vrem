@@ -19,11 +19,32 @@ import { UpdateOrganizationSettingsDto } from './dto/update-organization-setting
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import type { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { OrgContextGuard } from '../auth/org-context.guard';
+import { Public } from '../auth/public.decorator';
 
 @Controller('organizations')
 @UseGuards(JwtAuthGuard, OrgContextGuard)
 export class OrganizationsController {
   constructor(private orgs: OrganizationsService) {}
+
+  /**
+   * Public endpoint to validate an invite code.
+   * Returns organization info if valid.
+   */
+  @Public()
+  @Get('invite/validate/:token')
+  async validateInviteCode(@Param('token') token: string) {
+    return this.orgs.validateInviteCode(token);
+  }
+
+  /**
+   * Public endpoint to check for pending invitations by email.
+   * Used during onboarding to detect if a user was invited.
+   */
+  @Public()
+  @Get('invitations/by-email/:email')
+  async getPendingInvitationsByEmail(@Param('email') email: string) {
+    return this.orgs.getPendingInvitationsByEmail(email);
+  }
 
   @Post()
   async createOrg(

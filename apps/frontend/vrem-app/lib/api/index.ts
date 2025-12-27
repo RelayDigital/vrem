@@ -397,6 +397,69 @@ class ApiClient {
       }
       return this.request<User>('/auth/me');
     },
+    registerOnboarding: async (data: {
+      otpToken: string;
+      email: string;
+      name: string;
+      password: string;
+      accountType: string;
+      inviteCode?: string;
+      useCases?: string[];
+    }) => {
+      if (USE_MOCK_DATA) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return {
+          token: 'mock-token',
+          user: { ...currentUser, ...data, id: 'new-user-id' },
+        };
+      }
+      const payload = {
+        ...data,
+        accountType: (data.accountType || 'AGENT').toUpperCase(),
+      };
+      return this.request<{ token: string; user: User }>('/auth/register/onboarding', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+  };
+
+  // OTP API - Email verification endpoints
+  otp = {
+    send: async (email: string): Promise<{ success: boolean; expiresAt: Date }> => {
+      if (USE_MOCK_DATA) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        console.log('[Mock] OTP code for', email, ': 123456');
+        return { success: true, expiresAt: new Date(Date.now() + 10 * 60 * 1000) };
+      }
+      const result = await this.request<{ success: boolean; expiresAt: string }>('/auth/otp/send', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      });
+      return {
+        ...result,
+        expiresAt: new Date(result.expiresAt),
+      };
+    },
+    verify: async (email: string, code: string): Promise<{ valid: boolean; token: string }> => {
+      if (USE_MOCK_DATA) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        if (code === '123456') {
+          return { valid: true, token: 'mock-otp-token' };
+        }
+        throw new Error('Invalid verification code');
+      }
+      return this.request<{ valid: boolean; token: string }>('/auth/otp/verify', {
+        method: 'POST',
+        body: JSON.stringify({ email, code }),
+      });
+    },
+    checkEmail: async (email: string): Promise<{ registered: boolean }> => {
+      if (USE_MOCK_DATA) {
+        return { registered: false };
+      }
+      return this.request<{ registered: boolean }>(`/auth/otp/check-email/${encodeURIComponent(email)}`);
+    },
   };
 
   // Me API - User-specific endpoints
@@ -583,6 +646,53 @@ class ApiClient {
     getActiveOrganization: (): string | null => {
       if (typeof window === 'undefined') return null;
       return localStorage.getItem('organizationId');
+    },
+    validateInviteCode: async (token: string): Promise<{
+      valid: boolean;
+      organization?: {
+        id: string;
+        name: string;
+        logoUrl?: string;
+        type?: string;
+      };
+      role?: string;
+      inviteType?: string;
+    }> => {
+      if (USE_MOCK_DATA) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        if (token === 'valid-code') {
+          return {
+            valid: true,
+            organization: {
+              id: 'mock-org-id',
+              name: 'Mock Organization',
+            },
+            role: 'TECHNICIAN',
+          };
+        }
+        return { valid: false };
+      }
+      return this.request(`/organizations/invite/validate/${encodeURIComponent(token)}`);
+    },
+    getPendingInvitationsByEmail: async (email: string): Promise<{
+      invitations: Array<{
+        id: string;
+        token: string;
+        organization: {
+          id: string;
+          name: string;
+          logoUrl?: string;
+          type: string;
+        };
+        role: string;
+        inviteType: string;
+        createdAt: string;
+      }>;
+    }> => {
+      if (USE_MOCK_DATA) {
+        return { invitations: [] };
+      }
+      return this.request(`/organizations/invitations/by-email/${encodeURIComponent(email)}`);
     },
   };
 
@@ -1834,9 +1944,15 @@ class ApiClient {
 
     /**
      * Start OAuth flow - returns redirect URL
+     * @param provider - 'google' or 'microsoft'
+     * @param returnTo - optional redirect destination after OAuth ('dashboard' | 'settings')
      */
-    startOAuth: async (provider: 'google' | 'microsoft'): Promise<{ url: string }> => {
-      return this.request(`/nylas/oauth/start?provider=${provider}`);
+    startOAuth: async (provider: 'google' | 'microsoft', returnTo?: string): Promise<{ url: string }> => {
+      const params = new URLSearchParams({ provider });
+      if (returnTo) {
+        params.set('returnTo', returnTo);
+      }
+      return this.request(`/nylas/oauth/start?${params.toString()}`);
     },
 
     /**

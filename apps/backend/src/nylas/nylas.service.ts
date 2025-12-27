@@ -140,12 +140,12 @@ export class NylasService {
   /**
    * Generate OAuth URL for connecting a calendar
    */
-  getOAuthUrl(userId: string, provider: 'google' | 'microsoft'): string {
+  getOAuthUrl(userId: string, provider: 'google' | 'microsoft', returnTo?: string): string {
     if (!this.isConfigured) {
       throw new BadRequestException('Nylas integration is not configured');
     }
 
-    const state = Buffer.from(JSON.stringify({ userId, provider })).toString('base64');
+    const state = Buffer.from(JSON.stringify({ userId, provider, returnTo })).toString('base64');
     const scopes = ['https://www.googleapis.com/auth/calendar'];
 
     const params = new URLSearchParams({
@@ -170,13 +170,13 @@ export class NylasService {
   async handleOAuthCallback(
     code: string,
     state: string,
-  ): Promise<{ userId: string; grantId: string }> {
+  ): Promise<{ userId: string; grantId: string; returnTo?: string }> {
     if (!this.isConfigured) {
       throw new BadRequestException('Nylas integration is not configured');
     }
 
-    // Decode state to get userId and provider
-    let stateData: { userId: string; provider: string };
+    // Decode state to get userId, provider, and optional returnTo
+    let stateData: { userId: string; provider: string; returnTo?: string };
     try {
       stateData = JSON.parse(Buffer.from(state, 'base64').toString());
     } catch {
@@ -251,7 +251,7 @@ export class NylasService {
       },
     });
 
-    return { userId: stateData.userId, grantId: grant_id };
+    return { userId: stateData.userId, grantId: grant_id, returnTo: stateData.returnTo };
   }
 
   /**

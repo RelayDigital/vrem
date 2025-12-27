@@ -7,6 +7,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { AuthorizationService } from './authorization.service';
 import { OrgContextGuard } from './org-context.guard';
 import { OrgRolesGuard } from './org-roles.guard';
+import { OtpModule } from '../otp/otp.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { OrgRolesGuard } from './org-roles.guard';
       secret: process.env.JWT_SECRET || 'dev_auth_key',
       signOptions: { expiresIn: '7d' },
     }),
+    OtpModule,
   ],
   controllers: [AuthController],
   providers: [

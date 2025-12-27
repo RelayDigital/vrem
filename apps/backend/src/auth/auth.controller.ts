@@ -10,6 +10,7 @@ import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
 import { RegisterDto } from './dto/register.dto';
 import { OAuthLoginDto } from './dto/oauth-login.dto';
+import { OnboardingRegisterDto } from './dto/onboarding-register.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -61,5 +62,19 @@ export class AuthController {
     }
 
     return this.authService.me(req.user.id);
+  }
+
+  @Public()
+  @Post('register/onboarding')
+  async registerOnboarding(@Body() body: OnboardingRegisterDto) {
+    return this.authService.registerFromOnboarding({
+      otpToken: body.otpToken,
+      email: body.email,
+      name: body.name,
+      password: body.password,
+      accountType: body.accountType,
+      inviteCode: body.inviteCode,
+      useCases: body.useCases,
+    });
   }
 }

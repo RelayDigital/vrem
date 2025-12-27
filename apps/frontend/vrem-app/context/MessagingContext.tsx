@@ -1,7 +1,17 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { ChatMessage } from '@/types/chat';
+import {
+  ChatMessage,
+  ProjectChatChannel,
+  TypingUser,
+  TypingEvent,
+  PresenceUser,
+  PresenceUpdate,
+  PresenceList,
+  ReadReceipt,
+  MessagesReadEvent,
+} from '@/types/chat';
 import { api } from '@/lib/api';
 import { chatSocket } from '@/lib/chat-socket';
 import { toast } from 'sonner';
@@ -21,6 +31,19 @@ interface MessagingContextType {
   ) => void;
   editMessage: (messageId: string, content: string) => void;
   deleteMessage: (messageId: string) => void;
+
+  // Typing indicators
+  getTypingUsers: (projectId: string, channel: ProjectChatChannel) => TypingUser[];
+  emitTyping: (projectId: string, channel: ProjectChatChannel) => void;
+  stopTyping: (projectId: string, channel: ProjectChatChannel) => void;
+
+  // Presence
+  getOnlineUsers: (projectId: string) => PresenceUser[];
+  isUserOnline: (projectId: string, userId: string) => boolean;
+
+  // Read receipts
+  getMessageReadReceipts: (messageId: string) => ReadReceipt[];
+  markMessagesAsRead: (projectId: string, messageIds: string[], channel: ProjectChatChannel) => void;
 
   // User info (for message creation)
   currentUserId?: string;
@@ -48,6 +71,15 @@ export function MessagingProvider({
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | undefined>(defaultUserAvatar);
   const [connected, setConnected] = useState(false);
 
+  // Typing state: Map<`${projectId}:${channel}`, Map<userId, TypingUser>>
+  const [typingState, setTypingState] = useState<Map<string, Map<string, TypingUser>>>(new Map());
+
+  // Presence state: Map<projectId, Map<userId, PresenceUser>>
+  const [presenceState, setPresenceState] = useState<Map<string, Map<string, PresenceUser>>>(new Map());
+
+  // Read receipts: Map<messageId, ReadReceipt[]>
+  const [readReceipts, setReadReceipts] = useState<Map<string, ReadReceipt[]>>(new Map());
+
   // Establish socket connection on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -69,6 +101,113 @@ export function MessagingProvider({
     };
     chatSocket.onMessage(handler);
     return () => chatSocket.offMessage(handler);
+  }, []);
+
+  // Subscribe to typing events
+  useEffect(() => {
+    const handler = (event: TypingEvent) => {
+      // Don't show our own typing indicator
+      if (event.userId === currentUserId) return;
+
+      const roomKey = `${event.projectId}:${event.channel}`;
+      setTypingState((prev) => {
+        const newState = new Map(prev);
+        const roomTyping = new Map(newState.get(roomKey) || new Map());
+
+        if (event.isTyping) {
+          roomTyping.set(event.userId, {
+            userId: event.userId,
+            userName: event.userName,
+          });
+        } else {
+          roomTyping.delete(event.userId);
+        }
+
+        if (roomTyping.size > 0) {
+          newState.set(roomKey, roomTyping);
+        } else {
+          newState.delete(roomKey);
+        }
+        return newState;
+      });
+    };
+    chatSocket.onTyping(handler);
+    return () => chatSocket.offTyping(handler);
+  }, [currentUserId]);
+
+  // Subscribe to presence updates
+  useEffect(() => {
+    const updateHandler = (event: PresenceUpdate) => {
+      if (!event.projectId) return;
+
+      setPresenceState((prev) => {
+        const newState = new Map(prev);
+        const projectPresence = new Map(newState.get(event.projectId!) || new Map());
+
+        if (event.isOnline) {
+          projectPresence.set(event.userId, {
+            userId: event.userId,
+            userName: event.userName,
+            isOnline: true,
+          });
+        } else {
+          projectPresence.delete(event.userId);
+        }
+
+        newState.set(event.projectId!, projectPresence);
+        return newState;
+      });
+    };
+
+    const listHandler = (event: PresenceList) => {
+      setPresenceState((prev) => {
+        const newState = new Map(prev);
+        const projectPresence = new Map<string, PresenceUser>();
+
+        for (const user of event.users) {
+          projectPresence.set(user.userId, user);
+        }
+
+        newState.set(event.projectId, projectPresence);
+        return newState;
+      });
+    };
+
+    chatSocket.onPresenceUpdate(updateHandler);
+    chatSocket.onPresenceList(listHandler);
+    return () => {
+      chatSocket.offPresenceUpdate(updateHandler);
+      chatSocket.offPresenceList(listHandler);
+    };
+  }, []);
+
+  // Subscribe to read receipt events
+  useEffect(() => {
+    const handler = (event: MessagesReadEvent) => {
+      setReadReceipts((prev) => {
+        const newState = new Map(prev);
+
+        for (const messageId of event.messageIds) {
+          const existing = newState.get(messageId) || [];
+          // Check if this user already has a receipt for this message
+          const hasReceipt = existing.some((r) => r.userId === event.readBy.userId);
+          if (!hasReceipt) {
+            newState.set(messageId, [
+              ...existing,
+              {
+                userId: event.readBy.userId,
+                userName: event.readBy.userName,
+                readAt: new Date(event.readAt),
+              },
+            ]);
+          }
+        }
+
+        return newState;
+      });
+    };
+    chatSocket.onMessagesRead(handler);
+    return () => chatSocket.offMessagesRead(handler);
   }, []);
 
   const getMessagesForJob = useCallback((jobId: string): ChatMessage[] => {
@@ -205,11 +344,64 @@ export function MessagingProvider({
     setCurrentUserAvatar(userAvatar);
   }, []);
 
-  // Load messages from localStorage on mount - REMOVED in favor of API
-  // We now fetch messages per job when needed
-  useEffect(() => {
-    // Optional: Load some initial messages or clear state
-  }, []);
+  // Typing indicator methods
+  const getTypingUsers = useCallback(
+    (projectId: string, channel: ProjectChatChannel): TypingUser[] => {
+      const roomKey = `${projectId}:${channel}`;
+      const roomTyping = typingState.get(roomKey);
+      return roomTyping ? Array.from(roomTyping.values()) : [];
+    },
+    [typingState]
+  );
+
+  const emitTyping = useCallback(
+    (projectId: string, channel: ProjectChatChannel) => {
+      chatSocket.emitTyping(projectId, channel, true);
+    },
+    []
+  );
+
+  const stopTyping = useCallback(
+    (projectId: string, channel: ProjectChatChannel) => {
+      chatSocket.stopTyping(projectId, channel);
+    },
+    []
+  );
+
+  // Presence methods
+  const getOnlineUsers = useCallback(
+    (projectId: string): PresenceUser[] => {
+      const projectPresence = presenceState.get(projectId);
+      return projectPresence ? Array.from(projectPresence.values()) : [];
+    },
+    [presenceState]
+  );
+
+  const isUserOnline = useCallback(
+    (projectId: string, userId: string): boolean => {
+      const projectPresence = presenceState.get(projectId);
+      return projectPresence?.has(userId) ?? false;
+    },
+    [presenceState]
+  );
+
+  // Read receipt methods
+  const getMessageReadReceipts = useCallback(
+    (messageId: string): ReadReceipt[] => {
+      return readReceipts.get(messageId) || [];
+    },
+    [readReceipts]
+  );
+
+  const markMessagesAsRead = useCallback(
+    (projectId: string, messageIds: string[], channel: ProjectChatChannel) => {
+      if (!connected || messageIds.length === 0) return;
+      chatSocket.markMessagesRead(projectId, messageIds, channel).catch((error) => {
+        console.error('Failed to mark messages as read:', error);
+      });
+    },
+    [connected]
+  );
 
   return (
     <MessagingContext.Provider
@@ -220,6 +412,13 @@ export function MessagingProvider({
         sendMessage,
         editMessage,
         deleteMessage,
+        getTypingUsers,
+        emitTyping,
+        stopTyping,
+        getOnlineUsers,
+        isUserOnline,
+        getMessageReadReceipts,
+        markMessagesAsRead,
         currentUserId,
         currentUserName,
         currentUserAvatar,
