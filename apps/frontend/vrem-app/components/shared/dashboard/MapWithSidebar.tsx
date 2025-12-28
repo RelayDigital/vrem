@@ -22,6 +22,8 @@ import {
   X,
   Filter,
   Eye,
+  PanelRightClose,
+  PanelRightOpen,
 } from "lucide-react";
 import { Input } from "../../ui/input";
 import { Search } from "lucide-react";
@@ -113,6 +115,7 @@ export function MapWithSidebar({
     "score",
   ]);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const technicianProviders = useMemo(
     () => providers.filter(isTechnicianProvider),
     [providers]
@@ -700,13 +703,13 @@ export function MapWithSidebar({
     </>
   );
 
+  const isMobile = useIsMobile();
+
   const mapContent = (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 size-full">
-      {/* Map - takes most of the space on desktop, small on mobile */}
+    <div className="flex size-full overflow-hidden relative">
+      {/* Map - takes all available space */}
       <div
-        className={`${
-          useIsMobile() ? "col-span-1" : "md:col-span-3"
-        } overflow-hidden ${fullScreen ? "" : "rounded-md"}`}
+        className={`flex-1 min-w-0 overflow-hidden ${fullScreen ? "" : "rounded-md"}`}
       >
         <MapView
           jobs={mapJobs}
@@ -719,12 +722,12 @@ export function MapWithSidebar({
               ? mapTechnicians.find((p) => p.id === selectedProviderId) || null
               : null
           }
-          disablePopovers={useIsMobile()}
+          disablePopovers={isMobile}
         />
       </div>
 
       {/* Sidebar - Drawer on mobile, Card on desktop */}
-      {useIsMobile() ? (
+      {isMobile ? (
         <>
           {/* Mobile: Drawer Button */}
           <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -738,7 +741,6 @@ export function MapWithSidebar({
               </Button>
             </DrawerTrigger>
             <DrawerContent className="max-h-[90vh]">
-              {/* <DrawerHeader> */}
               <DrawerTitle className="sr-only">
                 {sidebarView === "pending"
                   ? isDispatcherView
@@ -746,7 +748,6 @@ export function MapWithSidebar({
                     : "Pending Jobs"
                   : "Ranked Technicians"}
               </DrawerTitle>
-              {/* </DrawerHeader> */}
               <div className="overflow-y-auto size-full">
                 <Card className="border-0 shadow-none">
                   {pendingAssignmentsContent}
@@ -756,13 +757,45 @@ export function MapWithSidebar({
           </Drawer>
         </>
       ) : (
-        <Card
-          className={`relative col-span-1 bg-background md:border-l border-t md:border-t-0 border-border flex flex-col shrink-0 rounded-none border-x-0! border-b-0! gap-0 flex-1 min-h-0 h-full overflow-hidden ${
-            fullScreen ? "md:p-0! md:pr-4!" : ""
-          }`}
-        >
-          {pendingAssignmentsContent}
-        </Card>
+        <>
+          {/* Desktop Sidebar with collapse toggle for fullscreen mode */}
+          <AnimatePresence initial={false}>
+            {!sidebarCollapsed && (
+              <motion.div
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: "auto", opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                className="h-full overflow-hidden"
+              >
+                <Card
+                  className={`relative w-80 xl:w-96 bg-background border-l border-border flex flex-col shrink-0 rounded-none border-x-0! border-y-0! gap-0 h-full overflow-hidden ${
+                    fullScreen ? "pr-4" : ""
+                  }`}
+                >
+                  {pendingAssignmentsContent}
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Collapse/Expand Toggle Button - only show in fullscreen mode */}
+          {fullScreen && (
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="absolute top-4 right-4 z-10 h-8 w-8 rounded-full shadow-md"
+              title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+            >
+              {sidebarCollapsed ? (
+                <PanelRightOpen className="h-4 w-4" />
+              ) : (
+                <PanelRightClose className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+        </>
       )}
     </div>
   );
