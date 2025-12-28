@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Technician, TechnicianRanking } from "../../../types";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
 import { Badge } from "../../ui/badge";
@@ -62,7 +62,8 @@ export function ProviderCardMinimal({
   onCollapse,
   allowOverride = false,
 }: ProviderCardMinimalProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Use selected prop to control expansion (accordion behavior)
+  const isExpanded = selected ?? false;
   const prevExpandedRef = useRef(isExpanded);
   const isAvailable = ranking ? ranking.availability === 100 : true;
 
@@ -98,8 +99,13 @@ export function ProviderCardMinimal({
       : [];
 
   const handleClick = () => {
-    setIsExpanded(!isExpanded);
-    if (onClick) onClick();
+    // If already expanded, collapse by calling onCollapse
+    // Otherwise, expand by calling onClick
+    if (isExpanded && onCollapse) {
+      onCollapse();
+    } else if (onClick) {
+      onClick();
+    }
   };
 
   return (

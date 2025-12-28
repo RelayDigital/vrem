@@ -170,7 +170,7 @@ export function JobCard({
             "group relative bg-card rounded-xl border-none overflow-hidden transition-all duration-200 w-full h-40",
             "hover:shadow-md",
             onClick ? "cursor-pointer" : "",
-            selected && "ring-2 ring-primary"
+            selected && "ring-0"
           )}
           onClick={onClick}
         >
@@ -198,8 +198,8 @@ export function JobCard({
           {/* Content overlay */}
           <div className="relative z-10 flex flex-col justify-between h-full p-3">
             {/* Top Row - Priority, Order Number, Status, and Actions */}
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-1.5">
+            <div className="relative flex items-start justify-between gap-2">
+              <div className="flex items-center gap-1.5 h-full">
                 {/* Priority Badge */}
                 <Badge
                   variant="secondary"

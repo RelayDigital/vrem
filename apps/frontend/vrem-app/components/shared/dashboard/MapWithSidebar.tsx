@@ -5,14 +5,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "../../ui/use-mobile";
 import { JobRequest, ProviderProfile, ProviderRanking } from "../../../types";
 import { MapView } from "../map";
-import { ProviderCard } from "../../features/provider/ProviderCard";
 import { ProviderCardMinimal } from "../../features/provider/ProviderCardMinimal";
 import { JobCard } from "../jobs/JobCard";
 import { Button } from "../../ui/button";
 import { ScrollArea } from "../../ui/scroll-area";
-import { Badge } from "../../ui/badge";
-import { Spinner } from "../../ui/spinner";
-import { H2, H3, Muted, Small } from "../../ui/typography";
+import { cn } from "../../ui/utils";
+import { H3, Muted, Small } from "../../ui/typography";
 import {
   MapPin,
   ArrowLeft,
@@ -20,7 +18,6 @@ import {
   TrendingUp,
   Plus,
   X,
-  Filter,
   Eye,
   PanelRightClose,
   PanelRightOpen,
@@ -30,7 +27,6 @@ import { Search } from "lucide-react";
 import {
   Drawer,
   DrawerContent,
-  DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
 } from "../../ui/drawer";
@@ -42,6 +38,16 @@ import {
   SelectValue,
 } from "../../ui/select";
 import { Card, CardContent, CardHeader } from "../../ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../../ui/alert-dialog";
 import { getActiveOrgRoleFromMemberships } from "@/hooks/userRoleInfo";
 import { useAuth } from "@/context/auth-context";
 
@@ -123,6 +129,11 @@ export function MapWithSidebar({
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
     null
   );
+  const [pendingOverrideAssignment, setPendingOverrideAssignment] = useState<{
+    technicianId: string;
+    technicianName: string;
+    score: number;
+  } | null>(null);
 
   const { memberships, activeOrganizationId } = useAuth();
   const activeOrgRole = getActiveOrgRoleFromMemberships(memberships, activeOrganizationId);
@@ -160,8 +171,6 @@ export function MapWithSidebar({
       // Drawer stays open on mobile when going back to pending
     }
   };
-
-  const displayProviders = providers ?? [];
 
   // Calculate ranked technicians when in rankings view
   const rankedTechnicians = useMemo(() => {
@@ -286,7 +295,7 @@ export function MapWithSidebar({
     })) as (ProviderRanking & { rank: number })[];
   }, [jobForRankings, technicianProviders, priorityOrder]);
 
-  const handleAssign = async (technicianId: string, score: number) => {
+  const performAssignment = async (technicianId: string, score: number) => {
     setAssigningId(technicianId);
     try {
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -299,6 +308,38 @@ export function MapWithSidebar({
     } finally {
       setAssigningId(null);
     }
+  };
+
+  const handleAssign = (technicianId: string, score: number) => {
+    // Check if technician is unavailable
+    const ranking = rankedTechnicians.find(
+      (r) => r.provider.userId === technicianId
+    );
+    const isAvailable = ranking?.factors.availability === 100;
+
+    // If unavailable and we're overriding, show confirmation dialog
+    if (!isAvailable && canOverrideAvailability) {
+      const technicianName = ranking?.provider.name || "this technician";
+      setPendingOverrideAssignment({ technicianId, technicianName, score });
+      return;
+    }
+
+    // Otherwise proceed with assignment
+    performAssignment(technicianId, score);
+  };
+
+  const handleConfirmOverrideAssignment = () => {
+    if (pendingOverrideAssignment) {
+      performAssignment(
+        pendingOverrideAssignment.technicianId,
+        pendingOverrideAssignment.score
+      );
+      setPendingOverrideAssignment(null);
+    }
+  };
+
+  const handleCancelOverrideAssignment = () => {
+    setPendingOverrideAssignment(null);
   };
 
   const handlePriorityChange = (index: number, newPriority: PriorityFactor) => {
@@ -346,27 +387,6 @@ export function MapWithSidebar({
       ? rankedTechnicians.map((r) => r.provider)
       : technicianProviders;
 
-  // Create a Map of technician rankings for MapView
-  const technicianRankingsMap = useMemo(() => {
-    if (sidebarView !== "rankings" || !jobForRankings) return undefined;
-    const map = new Map<
-      string,
-      {
-        ranking: ProviderRanking["factors"];
-        score: number;
-        recommended: boolean;
-      }
-    >();
-    rankedTechnicians.forEach((r) => {
-      map.set(r.provider.userId, {
-        ranking: r.factors,
-        score: r.score,
-        recommended: r.recommended,
-      });
-    });
-    return map;
-  }, [sidebarView, jobForRankings, rankedTechnicians]);
-
   // Pending Assignments Content (reusable for both Card and Drawer)
   const pendingAssignmentsContent = (
     <>
@@ -386,12 +406,6 @@ export function MapWithSidebar({
                   {pendingJobs.length === 1 ? "job" : "jobs"}
                 </Muted>
               </div>
-              <Badge
-                variant="outline"
-                className="text-orange-600 border-orange-200"
-              >
-                {pendingJobs.length}
-              </Badge>
             </div>
 
             {/* Search */}
@@ -459,7 +473,7 @@ export function MapWithSidebar({
         <>
           {/* Ranked Technicians Header */}
           <CardHeader
-            className={`py-4 px-4 md:px-0! space-y-3 gap-0! md:relative sticky top-0 z-50 bg-background`}
+            className={`py-4 px-4 md:px-0! space-y-3 gap-0! md:relative sticky top-0 z-50 md:z-10 bg-background`}
           >
             <div className="flex items-center gap-2 mb-2">
               <Button
@@ -758,7 +772,27 @@ export function MapWithSidebar({
         </>
       ) : (
         <>
-          {/* Desktop Sidebar with collapse toggle for fullscreen mode */}
+          {/* Sidebar Toggle Button - floats on top of map, moves with sidebar */}
+          {fullScreen && (
+            <Button
+              variant="secondary"
+              size="icon"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className={cn(
+                "absolute top-4 z-20 h-8 w-8 rounded-full shadow-md transition-[right] duration-200 ease-in-out",
+                sidebarCollapsed ? "right-4" : "right-[calc(20rem+1rem)] xl:right-[calc(24rem+1rem)]"
+              )}
+              title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+            >
+              {sidebarCollapsed ? (
+                <PanelRightOpen className="h-4 w-4" />
+              ) : (
+                <PanelRightClose className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+
+          {/* Desktop Sidebar */}
           <AnimatePresence initial={false}>
             {!sidebarCollapsed && (
               <motion.div
@@ -770,7 +804,7 @@ export function MapWithSidebar({
               >
                 <Card
                   className={`relative w-80 xl:w-96 bg-background border-l border-border flex flex-col shrink-0 rounded-none border-x-0! border-y-0! gap-0 h-full overflow-hidden ${
-                    fullScreen ? "pr-4" : ""
+                    fullScreen ? "px-4" : "pl-4"
                   }`}
                 >
                   {pendingAssignmentsContent}
@@ -778,25 +812,36 @@ export function MapWithSidebar({
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* Collapse/Expand Toggle Button - only show in fullscreen mode */}
-          {fullScreen && (
-            <Button
-              variant="secondary"
-              size="icon"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="absolute top-4 right-4 z-10 h-8 w-8 rounded-full shadow-md"
-              title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
-            >
-              {sidebarCollapsed ? (
-                <PanelRightOpen className="h-4 w-4" />
-              ) : (
-                <PanelRightClose className="h-4 w-4" />
-              )}
-            </Button>
-          )}
         </>
       )}
+
+      {/* Override Assignment Confirmation Dialog */}
+      <AlertDialog
+        open={!!pendingOverrideAssignment}
+        onOpenChange={(open) => !open && handleCancelOverrideAssignment()}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Assign Unavailable Technician?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{pendingOverrideAssignment?.technicianName}</strong> is
+              currently marked as unavailable for this date. Are you sure you
+              want to override and assign them to this job?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelOverrideAssignment}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmOverrideAssignment}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Assign Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 
@@ -817,13 +862,9 @@ export function MapWithSidebar({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4 }}
-      className={className || "md:h-[600px] h-[90vh]"}
+      className={className || "w-full aspect-video max-h-[65vh]"}
     >
-      {/* <Card className="relative h-full bg-card rounded-2xl border border-border shadow-sm overflow-hidden gap-0 flex flex-col">
-        <CardContent className="flex-1 flex overflow-hidden p-0!"> */}
       {mapContent}
-      {/* </CardContent>
-      </Card> */}
     </motion.div>
   );
 }

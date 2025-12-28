@@ -67,7 +67,7 @@ export function H4({ children, className, ...props }: TypographyProps) {
 export function P({ children, className, ...props }: TypographyProps) {
   return (
     <p
-      className={cn("leading-7", className)}
+      className={cn("leading-[1.5em]", className)}
       {...props}
     >
       {children}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Check, X, RotateCcw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Check, MoreVertical, RotateCcw, X } from 'lucide-react';
 import {
   Card,
   CardHeader,
@@ -21,6 +21,12 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from '@/components/ui/accordion';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useTour, TRACK_METADATA, getTourSteps } from '@/context/tour-context';
 import { TourTrack } from '@/types';
 import { cn } from '@/lib/utils';
@@ -102,7 +108,7 @@ export function SetupGuideWidget({ className }: SetupGuideWidgetProps) {
     <Card className={cn('overflow-hidden', className)} data-tour="setup-guide">
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
         <CardHeader className="p-4!">
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
               <div>
                 <CardTitle className="text-base font-semibold">
@@ -114,31 +120,30 @@ export function SetupGuideWidget({ className }: SetupGuideWidgetProps) {
                 {/* Progress bar with completion status */}
                 <div className="flex items-center gap-3 mt-1.5">
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {overallProgress.completed}/{overallProgress.total} completed
+                    {overallProgress.completed} / {overallProgress.total} completed
                   </span>
                   <Progress value={overallProgress.percentage} className="h-1.5 w-24" />
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => resetProgress()}
-                title="Reset progress"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => dismissGuide()}
-                title="Dismiss guide"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => resetProgress()}>
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset progress
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => dismissGuide()}>
+                    <X className="h-4 w-4 mr-2" />
+                    Dismiss guide
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                   {isExpanded ? (
@@ -217,8 +222,8 @@ export function SetupGuideWidget({ className }: SetupGuideWidgetProps) {
                                 'w-full text-left px-4 py-2.5 text-sm transition-colors',
                                 'flex items-center gap-3 rounded-none',
                                 isLocked
-                                  ? 'opacity-40 cursor-not-allowed'
-                                  : 'hover:bg-primary/10',
+                                  ? 'opacity-40'
+                                  : 'hover:bg-primary/10 cursor-pointer',
                                 isNextStep && !isLocked && 'text-primary font-medium'
                               )}
                             >
@@ -229,8 +234,8 @@ export function SetupGuideWidget({ className }: SetupGuideWidgetProps) {
                                   isStepCompleted
                                     ? 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400'
                                     : isNextStep
-                                    ? 'border-2 border-primary bg-primary/10'
-                                    : 'border-2 border-muted-foreground/20'
+                                    ? 'border-2 border-primary border-dashed'
+                                    : 'border-2 border-muted-foreground/20 border-dashed'
                                 )}
                               >
                                 {isStepCompleted && <Check className="h-3 w-3" />}
