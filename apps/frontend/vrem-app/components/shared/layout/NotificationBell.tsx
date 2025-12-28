@@ -45,7 +45,7 @@ function isGroupedNotification(n: DisplayNotification): n is GroupedMessageNotif
 
 export function NotificationBell({ className }: NotificationBellProps) {
   const router = useRouter();
-  const { activeOrganizationId, switchOrganization, user } = useAuth();
+  const { activeOrganizationId, switchOrganization, user, memberships } = useAuth();
   const {
     status: tourStatus,
     getOverallProgress,
@@ -363,13 +363,30 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const isCompanyAccount = user?.accountType?.toUpperCase() === "COMPANY";
   const showTourSection = !isTourDismissed && !isCompanyAccount;
 
+  // Find the personal workspace organization
+  const personalOrg = useMemo(() => {
+    return memberships.find(
+      (m) =>
+        m.organization?.type === "PERSONAL" ||
+        (m.organization as any)?.type === "PERSONAL"
+    );
+  }, [memberships]);
+
+  // Switch to personal workspace and navigate to dashboard
+  const switchToPersonalAndNavigate = useCallback(() => {
+    if (personalOrg?.orgId && personalOrg.orgId !== activeOrganizationId) {
+      switchOrganization(personalOrg.orgId);
+    }
+    router.push('/dashboard');
+  }, [personalOrg, activeOrganizationId, switchOrganization, router]);
+
   const handleRestartTour = async () => {
     setIsResettingTour(true);
     try {
       await resetTourProgress();
       await refetchTourStatus();
       setIsOpen(false);
-      router.push('/dashboard');
+      switchToPersonalAndNavigate();
     } catch (error) {
       console.error("Failed to reset tour:", error);
     } finally {
@@ -388,7 +405,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
 
   const handleContinueTour = () => {
     setIsOpen(false);
-    router.push('/dashboard');
+    switchToPersonalAndNavigate();
   };
 
   return (
