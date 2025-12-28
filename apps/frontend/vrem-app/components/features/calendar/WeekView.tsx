@@ -65,10 +65,11 @@ export function WeekView({
   return (
     <ScrollArea className="flex-1 relative">
       <div className="absolute w-full">
-        {/* Mobile: Horizontal scrollable wrapper */}
-        <div className="flex-1 flex flex-col overflow-x-auto md:overflow-x-visible">
+        {/* Horizontal scrollable wrapper - scrolls when day lanes are too narrow */}
+        <div className="flex-1 flex flex-col overflow-x-auto">
           {/* Container that holds both headers and grid, scrolls together */}
-          <div className="min-w-[1200px] md:min-w-0 flex flex-col h-full">
+          {/* Min width ensures each day column has at least ~140px for readability */}
+          <div className="min-w-[980px] flex flex-col h-full">
             {/* Week Day Headers */}
             <div className="sticky top-0 z-10 grid grid-cols-7 border-b bg-muted shrink-0">
               {weekDays.map((day, index) => (
