@@ -306,10 +306,29 @@ export function JobTaskView({
     if (isAgentUser) return true;
     return canReadCustomerChat(effectiveOrgRole);
   }, [effectiveOrgRole, isAgentUser]);
-  
+
+  // Check if this is a PROVIDER in their personal org - they don't need Team Chat
+  // In personal orgs, PROVIDER only communicates with customers (no team to chat with)
+  const isProviderInPersonalOrg = useMemo(() => {
+    const accountTypeUpper = (currentUserAccountType || '').toUpperCase();
+    return accountTypeUpper === 'PROVIDER' && isPersonalOrg;
+  }, [currentUserAccountType, isPersonalOrg]);
+
+  // Show Team Chat only if:
+  // - Not an agent (agents only see Customer Chat)
+  // - Not a PROVIDER in their personal org (no team to chat with)
+  const showTeamChat = !isAgentUser && !isProviderInPersonalOrg;
+
+  // Show chat tabs only if both channels are available
+  // If only one channel, don't show the tabs at all
+  const showChatTabs = showTeamChat && canViewCustomerChat;
+
   // Default chat tab: agents see client chat, EDITOR/TECHNICIAN see team chat only
+  // PROVIDER in personal org defaults to client chat (only option)
   // Use initialChatTab from props (from notifications) if provided
-  const defaultChatTab = isAgentUser ? "client" : (canViewCustomerChat ? "client" : "team");
+  const defaultChatTab = isAgentUser || isProviderInPersonalOrg
+    ? "client"
+    : (canViewCustomerChat ? "client" : "team");
   const [activeChatTab, setActiveChatTab] = useState<"client" | "team">(
     initialChatTab || defaultChatTab
   );
@@ -325,12 +344,16 @@ export function JobTaskView({
   }, [job, messaging, activeChatChannel]);
   
   // Update active chat tab when permissions change (e.g., if user switches orgs)
-  // Also ensure EDITOR/TECHNICIAN can't stay on client tab if they somehow got there
+  // - EDITOR/TECHNICIAN can't stay on client tab if they don't have permission
+  // - PROVIDER in personal org or AGENT can't be on team tab (no team chat available)
   useEffect(() => {
     if (!canViewCustomerChat && activeChatTab === "client") {
       setActiveChatTab("team");
     }
-  }, [canViewCustomerChat, activeChatTab]);
+    if (!showTeamChat && activeChatTab === "team") {
+      setActiveChatTab("client");
+    }
+  }, [canViewCustomerChat, showTeamChat, activeChatTab]);
   const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
   const [threadViewMessage, setThreadViewMessage] = useState<ChatMessage | null>(null);
   const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null);
@@ -2302,7 +2325,7 @@ export function JobTaskView({
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent className="w-48">
                       {/* Forward to Team Chat - available if user can write to team chat */}
-                      {activeChatTab !== "team" && (
+                      {showTeamChat && activeChatTab !== "team" && (
                         <DropdownMenuItem
                           onClick={() => {
                             if (onSendMessage) {
@@ -2702,9 +2725,9 @@ export function JobTaskView({
   ) => {
     const footerContent = (
       <>
-        {/* Chat Type Tabs - Only show when Discussion tab is active */}
-        {activeTab === "discussion" && !isAgentUser && (
-          <div className="flex items-center gap-6 mb-4">
+        {/* Chat Type Tabs - Only show when Discussion tab is active AND both channels available */}
+        {activeTab === "discussion" && showChatTabs && (
+          <div className="flex items-center gap-6 mb-4" data-tour="messaging-tabs">
             {canViewCustomerChat && (
               <Button
                 variant="ghost"
@@ -2724,8 +2747,8 @@ export function JobTaskView({
               </Button>
             )}
 
-            {/* Team Chat tab - hidden for agents (they only see Customer Chat) */}
-            {!isAgentUser && (
+            {/* Team Chat tab - hidden for agents and PROVIDER in personal org */}
+            {showTeamChat && (
               <Button
                 variant="ghost"
                 onClick={() => setActiveChatTab("team")}
@@ -2772,7 +2795,7 @@ export function JobTaskView({
           </div>
         )}
         {/* Editor with Avatar */}
-        <div className="flex flex-col gap-0">
+        <div className="flex flex-col gap-0" data-tour="messaging-compose">
           <div className="flex items-start gap-3">
             <Avatar className="h-8 w-8 shrink-0">
               <AvatarImage src={currentUserAvatar} alt={currentUserName} />
@@ -3648,10 +3671,10 @@ export function JobTaskView({
                 </div>
 
                 {/* Status */}
-                <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
+                <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center" data-tour="job-status-section">
                   Status
                 </div>
-                <div>
+                <div data-tour="job-status-section">
                   <Badge
                     variant="flat"
                     className="flex items-center gap-1.5 mb-1 px-0"
@@ -4115,7 +4138,7 @@ export function JobTaskView({
       </div>
     ) : variant === "dialog" ? (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="md:min-w-[90vw] min-w-[calc(100vw-1rem)] md:max-w-[90vw] md:h-[90vh] h-[calc(100vh-1rem)] md:max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col [&>button]:hidden">
+        <DialogContent data-tour="job-task-view" className="md:min-w-[90vw] min-w-[calc(100vw-1rem)] md:max-w-[90vw] md:h-[90vh] h-[calc(100vh-1rem)] md:max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col [&>button]:hidden">
           <DialogTitle className="sr-only">
             {job.propertyAddress} - {job.clientName}
           </DialogTitle>
@@ -4131,6 +4154,7 @@ export function JobTaskView({
         <SheetContent
           side="right"
           className="w-full sm:max-w-[40vw] md:min-w-[600px] flex flex-col p-0 gap-0"
+          data-tour="job-task-view"
         >
           <SheetTitle className="sr-only">
             {job.propertyAddress} - {job.clientName}

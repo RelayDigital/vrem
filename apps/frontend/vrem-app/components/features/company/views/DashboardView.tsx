@@ -141,12 +141,12 @@ export function CompanyDashboardView({
     <main className="container relative mx-auto">
       <article className="flex flex-col gap-2xl md:gap-3xl px-md">
         {/* Metrics */}
-        <div className="@container w-full mt-md">
+        <div className="@container w-full mt-md" data-tour="dashboard-metrics">
           {/* Content */}
           <MetricsDashboard metrics={displayMetrics} />
         </div>
         {/* Calendar */}
-        <div className="@container w-full">
+        <div className="@container w-full" data-tour="dashboard-calendar">
           {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-lg border-0">Schedule</H2>
@@ -172,7 +172,7 @@ export function CompanyDashboardView({
           </div>
         </div>
         {/* Merged Map and Pending Assignments */}
-        <div className="@container w-full">
+        <div className="@container w-full" data-tour="dashboard-map">
           {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
             {/* <MapPin className="h-5 w-5 text-primary" /> */}
@@ -200,7 +200,7 @@ export function CompanyDashboardView({
           />
         </div>
         {/* Active Jobs */}
-        <div className="@container w-full mb-md">
+        <div className="@container w-full mb-md" data-tour="dashboard-jobs">
           {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-lg">Active Jobs</H2>

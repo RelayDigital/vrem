@@ -261,10 +261,10 @@ export function JobsView({
   // }, []);
 
   return (
-    <main className={cn("container relative mx-auto", activeView === "kanban" ? "h-full flex flex-col" : "")}>
+    <main className={cn("container relative mx-auto", activeView === "kanban" ? "h-full flex flex-col" : "")} data-tour="jobs-view">
       <article className={cn("flex flex-col gap-2xl md:gap-3xl px-md", activeView === "kanban" ? "flex-1 min-h-0" : "")}>
         <div className={cn("@container w-full mt-md mb-md", activeView === "kanban" ? "flex flex-col flex-1 min-h-0" : "")}>
-          <H2 className="text-4xl mb-xs">Jobs</H2>
+          <H2 className="text-4xl mb-xs" data-tour="jobs-header">Jobs</H2>
           
           {activeView === "all" && (
             <div className="mt-0">

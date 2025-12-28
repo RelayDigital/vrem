@@ -410,13 +410,13 @@ export default function SettingsLayout({
           {/* Left Column - Navigation (Desktop only) */}
           <aside className="hidden md:block w-64 shrink-0 md:sticky top-[calc(var(--header-h)+2rem)] h-fit">
             <div className="space-y-2">
-              <div className="mb-6">
+              <div className="mb-6" data-tour="settings-header">
                 <H2 className="text-2xl mb-2">Settings</H2>
                 <Muted className="text-sm">
                   Manage your account settings and preferences.
                 </Muted>
               </div>
-              <nav className="space-y-1">
+              <nav className="space-y-1" data-tour="settings-nav">
                 {filteredSections.map((section) => {
                   const SectionIcon = section.icon;
                   const isOpen = openSections.includes(section.id);
@@ -425,7 +425,10 @@ export default function SettingsLayout({
                     (section.id === "personal" && isProfileActive);
 
                   return (
-                    <div key={section.id}>
+                    <div
+                      key={section.id}
+                      data-tour={section.id === 'organization' ? 'settings-org-section' : undefined}
+                    >
                       <button
                         onClick={() => toggleSection(section.id)}
                         className={cn(
@@ -453,10 +456,17 @@ export default function SettingsLayout({
                         <SidebarMenuSub className="w-full translate-x-0 mx-0 px-0 border-none">
                           {section.items.map((item) => {
                             const isActive = pathname === item.path;
+                            // Add data-tour attributes for specific items
+                            const tourAttr = item.id === 'calendar'
+                              ? 'settings-calendar-link'
+                              : item.id === 'notifications'
+                                ? 'settings-notifications-link'
+                                : undefined;
                             return (
                               <SidebarMenuSubItem
                                 key={item.id}
                                 className="ml-3"
+                                data-tour={tourAttr}
                               >
                                 <SidebarMenuSubButton
                                   asChild
@@ -479,7 +489,7 @@ export default function SettingsLayout({
           </aside>
 
           {/* Right Column - Content */}
-          <div className="@container w-full">
+          <div className="@container w-full" data-tour="settings-content">
             <div className="@container w-full flex flex-col gap-2xl md:gap-3xl">
               {children}
             </div>

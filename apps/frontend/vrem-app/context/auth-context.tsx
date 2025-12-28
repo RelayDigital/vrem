@@ -32,6 +32,7 @@ interface AuthContextType {
       name?: string;
     },
   ) => Promise<void>;
+  completeOnboarding: (response: { token: string; user: any }) => Promise<void>;
   logout: () => void;
   switchOrganization: (orgId: string | null) => void;
 }
@@ -233,6 +234,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const completeOnboarding = async (response: { token: string; user: any }) => {
+    setIsLoading(true);
+    try {
+      // Clear any stale organization data
+      localStorage.removeItem("organizationId");
+      setActiveOrganizationId(null);
+
+      await applyAuthResponse(response);
+    } catch (error) {
+      console.error("Onboarding completion failed:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     // Clear authentication data
     localStorage.removeItem("token");
@@ -267,6 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         loginWithOAuth,
+        completeOnboarding,
         logout,
         switchOrganization,
       }}

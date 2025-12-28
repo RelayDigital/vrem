@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Check, X, ExternalLink, Briefcase, Building2, MessageSquare, CheckCircle } from "lucide-react";
+import { Bell, Check, X, ExternalLink, Briefcase, Building2, MessageSquare, CheckCircle, GraduationCap, RotateCcw, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,7 @@ import { NotificationItem, NotificationType } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
+import { useTour, TRACK_METADATA } from "@/context/tour-context";
 
 interface NotificationBellProps {
   className?: string;
@@ -43,11 +45,19 @@ function isGroupedNotification(n: DisplayNotification): n is GroupedMessageNotif
 
 export function NotificationBell({ className }: NotificationBellProps) {
   const router = useRouter();
-  const { activeOrganizationId, switchOrganization } = useAuth();
+  const { activeOrganizationId, switchOrganization, user } = useAuth();
+  const {
+    status: tourStatus,
+    getOverallProgress,
+    resetProgress: resetTourProgress,
+    dismissGuide: dismissTourGuide,
+    refetchStatus: refetchTourStatus,
+  } = useTour();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+  const [isResettingTour, setIsResettingTour] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -344,6 +354,43 @@ export function NotificationBell({ className }: NotificationBellProps) {
 
   const unreadCount = notifications.filter((n) => !n.readAt).length;
 
+  // Tour progress
+  const tourProgress = getOverallProgress();
+  const isTourComplete = tourStatus?.hasCompletedSetup ?? false;
+  const isTourDismissed = tourStatus?.dismissedGuide ?? false;
+  // Show tour section if not dismissed (even if complete, so user can restart)
+  // COMPANY accounts have human 1-1 onboarding, so don't show the tour in notifications
+  const isCompanyAccount = user?.accountType?.toUpperCase() === "COMPANY";
+  const showTourSection = !isTourDismissed && !isCompanyAccount;
+
+  const handleRestartTour = async () => {
+    setIsResettingTour(true);
+    try {
+      await resetTourProgress();
+      await refetchTourStatus();
+      setIsOpen(false);
+      router.push('/dashboard');
+    } catch (error) {
+      console.error("Failed to reset tour:", error);
+    } finally {
+      setIsResettingTour(false);
+    }
+  };
+
+  const handleDismissTour = async () => {
+    try {
+      await dismissTourGuide();
+      await refetchTourStatus();
+    } catch (error) {
+      console.error("Failed to dismiss tour:", error);
+    }
+  };
+
+  const handleContinueTour = () => {
+    setIsOpen(false);
+    router.push('/dashboard');
+  };
+
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
@@ -365,6 +412,73 @@ export function NotificationBell({ className }: NotificationBellProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
+        {/* Tour Progress Section */}
+        {showTourSection && (
+          <>
+            <div className="p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <GraduationCap className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Setup Guide</span>
+                {isTourComplete && (
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    Complete
+                  </Badge>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={cn("h-6 w-6 p-0", isTourComplete ? "" : "ml-auto")}
+                  onClick={handleDismissTour}
+                  title="Dismiss guide"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              {!isTourComplete && (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Progress value={tourProgress.percentage} className="h-1.5 flex-1" />
+                    <span className="text-xs text-muted-foreground">
+                      {tourProgress.completed}/{tourProgress.total}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full h-8 text-xs"
+                    onClick={handleContinueTour}
+                  >
+                    Continue Setup
+                    <ChevronRight className="h-3 w-3 ml-1" />
+                  </Button>
+                </>
+              )}
+              {isTourComplete && (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="flex-1 h-8 text-xs"
+                    onClick={handleRestartTour}
+                    disabled={isResettingTour}
+                  >
+                    {isResettingTour ? (
+                      <Spinner className="h-3 w-3 mr-1" />
+                    ) : (
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                    )}
+                    Restart Guide
+                  </Button>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-2">
+                You can always restart the guide from Settings.
+              </p>
+            </div>
+            <DropdownMenuSeparator />
+          </>
+        )}
+
         <DropdownMenuLabel className="font-semibold">
           Notifications
         </DropdownMenuLabel>

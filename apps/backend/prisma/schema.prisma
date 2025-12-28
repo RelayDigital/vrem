@@ -29,6 +29,8 @@ model User {
   calendarIntegrations UserCalendarIntegration[]
   icsFeed              UserIcsFeed?
   useCases             ProviderUseCase[]
+  tourProgress         TourProgress[]
+  tourStatus           TourStatus?
 }
 
 model Organization {
@@ -142,6 +144,7 @@ model Project {
   stripePaymentIntentId String?
   calendarConflict      Boolean                   @default(false)
   calendarConflictNote  String?
+  isDemo                Boolean                   @default(false)  // Demo project for tour walkthrough
   calendarEvent         CalendarEvent?
   media                 Media[]
   messages              Message[]
@@ -536,4 +539,42 @@ enum ProviderUseCaseType {
   EDITING
   STAGING
   MEASUREMENTS
+}
+
+// ==================== TOUR / ONBOARDING ====================
+
+enum TourTrack {
+  DASHBOARD_OVERVIEW
+  JOB_MANAGEMENT
+  MESSAGING_CHAT
+  SETTINGS_INTEGRATIONS
+}
+
+model TourProgress {
+  id          String    @id @default(uuid())
+  userId      String
+  tourTrack   TourTrack
+  stepId      String
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  skippedAt   DateTime?
+  startedAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tourTrack, stepId])
+  @@index([userId])
+  @@index([tourTrack])
+}
+
+model TourStatus {
+  id                String     @id @default(uuid())
+  userId            String     @unique
+  hasCompletedSetup Boolean    @default(false)
+  dismissedGuide    Boolean    @default(false)
+  lastActiveTrack   TourTrack?
+  demoProjectId     String?    // Demo project created for tour walkthrough
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

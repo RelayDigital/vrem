@@ -6,6 +6,7 @@ import { JobCreationProvider, useJobCreation } from '@/context/JobCreationContex
 import { MessagingProvider } from '@/context/MessagingContext';
 import { JobManagementProvider, useJobManagement } from '@/context/JobManagementContext';
 import { DispatcherNavigationProvider } from '@/context/DispatcherNavigationContext';
+import { TourProvider } from '@/context/tour-context';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppHeader, MobileMenuDock } from '@/components/shared/layout';
 import { CompanySidebar } from '@/components/features/company/CompanySidebar';
@@ -280,14 +281,16 @@ export default function ProtectedLayout({
           defaultUserName={user?.name}
         >
           <DispatcherNavigationProvider>
-            <LayoutContent
-              user={user}
-              memberships={memberships}
-              activeOrgId={organizationId}
-              uiContext={uiContext}
-            >
-              {children}
-            </LayoutContent>
+            <TourProvider>
+              <LayoutContent
+                user={user}
+                memberships={memberships}
+                activeOrgId={organizationId}
+                uiContext={uiContext}
+              >
+                {children}
+              </LayoutContent>
+            </TourProvider>
             <BackendHealthAlert />
           </DispatcherNavigationProvider>
         </MessagingProvider>

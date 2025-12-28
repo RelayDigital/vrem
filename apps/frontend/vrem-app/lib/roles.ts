@@ -123,16 +123,21 @@ export const getEffectiveOrgRole = (
   activeOrgId: string | null
 ): EffectiveRole | null => {
   if (!user) return null;
-  
+
   const ctx = getUIContext(user, memberships, activeOrgId);
   if (!ctx) return null;
-  
+
   // Map UIContext to legacy EffectiveRole
   if (ctx.showSidebar) {
     return 'COMPANY';
   }
   if (ctx.accountType === 'AGENT') {
     return 'AGENT';
+  }
+  // PROVIDER in their PERSONAL org should see all jobs (they own the business)
+  // Treat them as COMPANY role for job visibility purposes
+  if (ctx.accountType === 'PROVIDER' && ctx.orgType === 'PERSONAL') {
+    return 'COMPANY';
   }
   return 'TECHNICIAN';
 };

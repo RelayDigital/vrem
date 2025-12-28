@@ -29,12 +29,15 @@ import { H2, P } from "@/components/ui/typography";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
+import { SetupGuideWidget } from "../tours/SetupGuideWidget";
+import { useTour } from "@/context/tour-context";
 
 interface AgentJobsViewProps {
   jobs: JobRequest[];
   technicians: Technician[];
   organizationId: string;
   onNewJobClick: () => void;
+  onJobClick?: (job: JobRequest) => void;
 }
 
 export function AgentJobsView({
@@ -42,6 +45,7 @@ export function AgentJobsView({
   technicians,
   organizationId,
   onNewJobClick,
+  onJobClick: onJobClickProp,
 }: AgentJobsViewProps) {
   const { user } = useRequireRole([
     "AGENT",
@@ -51,6 +55,7 @@ export function AgentJobsView({
     "COMPANY",
   ]);
   const router = useRouter();
+  const { shouldShowGuide, isTourActive } = useTour();
   // Use technicians if provided, fallback to technicians for backwards compatibility
   const effectiveTechnicians = technicians || technicians || [];
   // For agents, don't filter by org - customer-assigned projects can belong to any org
@@ -78,7 +83,19 @@ export function AgentJobsView({
   };
 
   const handleJobClick = (job: JobRequest) => {
-    router.push(`/jobs/${job.id}`);
+    if (onJobClickProp) {
+      // Use callback if provided (for sheet/task view during tour)
+      onJobClickProp(job);
+      // Dispatch event to notify tour that task view is opening
+      if (isTourActive) {
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('jobTaskViewOpened', { detail: { id: job.id } }));
+        }, 100);
+      }
+    } else {
+      // Default: navigate to full job page
+      router.push(`/jobs/${job.id}`);
+    }
   };
 
   const getPriorityConfig = (priority: string) => {
@@ -223,16 +240,22 @@ export function AgentJobsView({
   return (
     <main className="container relative mx-auto">
       <article className="flex flex-col gap-2xl md:gap-3xl px-md">
-        {/* Metrics */}
-        <div className="@container w-full mt-md mb-md">
-          <div className="mb-md flex items-baseline justify-between">
+        {/* Setup Guide Widget */}
+        {shouldShowGuide && (
+          <div className="@container w-full mt-md" data-tour="setup-guide">
+            <SetupGuideWidget />
+          </div>
+        )}
+        {/* Header & Stats */}
+        <div className={`@container w-full ${shouldShowGuide ? '' : 'mt-md'} mb-md`} data-tour="agent-dashboard">
+          <div className="mb-md flex items-baseline justify-between" data-tour="agent-header">
             <H2 className="text-4xl mb-xs">My Jobs</H2>
-            <Button variant="default" onClick={onNewJobClick}>
+            <Button variant="default" onClick={onNewJobClick} data-tour="jobs-create-button">
               <Plus className="h-4 w-4 mr-2" />
               Create Order
             </Button>
           </div>
-          <div className="@container w-full mb-md">
+          <div className="@container w-full mb-md" data-tour="agent-stats">
             <JobsStatsBar
               pendingCount={pendingJobs.length}
               assignedCount={assignedJobs.length}
@@ -242,9 +265,9 @@ export function AgentJobsView({
           </div>
 
           {/* Jobs Tabs */}
-          <div className="@container w-full">
+          <div className="@container w-full" data-tour="agent-jobs-list">
             <Tabs defaultValue="all" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-5" data-tour="jobs-tabs">
                 <TabsTrigger value="all">All ({myJobs.length})</TabsTrigger>
                 <TabsTrigger value="pending">
                   Pending ({pendingJobs.length})

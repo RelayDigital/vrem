@@ -194,6 +194,21 @@ export function JobManagementProvider({
     };
   }, [fetchJobs]);
 
+  // Reload jobs when tour demo project changes (created or deleted)
+  useEffect(() => {
+    const handleDemoProjectChange = () => {
+      fetchJobs();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('tourDemoProjectChanged', handleDemoProjectChange as EventListener);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('tourDemoProjectChanged', handleDemoProjectChange as EventListener);
+      }
+    };
+  }, [fetchJobs]);
+
   const upsertProject = useCallback((project: Project) => {
     setProjects((prev) => {
       const exists = prev.some((p) => p.id === project.id);

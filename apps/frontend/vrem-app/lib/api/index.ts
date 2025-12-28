@@ -1,4 +1,4 @@
-import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization, DeliveryResponse, DeliveryComment, MediaType, ServicePackage, PackageAddOn, CreatePackagePayload, CreateAddOnPayload, DayOfWeek } from '@/types';
+import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization, DeliveryResponse, DeliveryComment, MediaType, ServicePackage, PackageAddOn, CreatePackagePayload, CreateAddOnPayload, DayOfWeek, TourTrack, TourStatusResponse, TourTrackProgress, TourProgressStep, UpdateTourProgressRequest } from '@/types';
 import {
   currentUser,
   jobRequests,
@@ -2096,6 +2096,96 @@ class ApiClient {
         };
       }
       return this.request<OrganizationPublicInfo>(`/organizations/${orgId}/public`);
+    },
+  };
+
+  // =============================
+  // Tours / Onboarding API
+  // =============================
+  tours = {
+    /**
+     * Get the current user's overall tour status and progress
+     */
+    getStatus: async (): Promise<TourStatusResponse> => {
+      return this.request<TourStatusResponse>('/tours/status');
+    },
+
+    /**
+     * Get progress for a specific tour track
+     */
+    getTrackProgress: async (track: TourTrack): Promise<TourTrackProgress> => {
+      return this.request<TourTrackProgress>(`/tours/progress/${track}`);
+    },
+
+    /**
+     * Update progress for a specific step
+     */
+    updateProgress: async (data: UpdateTourProgressRequest): Promise<TourProgressStep> => {
+      return this.request<TourProgressStep>('/tours/progress', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
+
+    /**
+     * Mark an entire track as completed
+     */
+    completeTrack: async (track: TourTrack): Promise<{ success: boolean; allTracksComplete: boolean }> => {
+      return this.request(`/tours/complete/${track}`, {
+        method: 'POST',
+      });
+    },
+
+    /**
+     * Skip/dismiss a specific track
+     */
+    skipTrack: async (track: TourTrack): Promise<{ success: boolean }> => {
+      return this.request(`/tours/skip/${track}`, {
+        method: 'POST',
+      });
+    },
+
+    /**
+     * Dismiss the setup guide widget permanently
+     */
+    dismissGuide: async (): Promise<{ success: boolean }> => {
+      return this.request('/tours/dismiss-guide', {
+        method: 'POST',
+      });
+    },
+
+    /**
+     * Reset all tour progress (for testing or re-onboarding)
+     */
+    resetProgress: async (): Promise<{ success: boolean }> => {
+      return this.request('/tours/reset', {
+        method: 'POST',
+      });
+    },
+
+    /**
+     * Create a demo project for tour walkthrough
+     */
+    createDemoProject: async (): Promise<any> => {
+      return this.request('/tours/demo-project', {
+        method: 'POST',
+      });
+    },
+
+    /**
+     * Get the demo project for the current user
+     */
+    getDemoProject: async (): Promise<any | null> => {
+      return this.request('/tours/demo-project');
+    },
+
+    /**
+     * Delete the demo project
+     */
+    deleteDemoProject: async (): Promise<{ success: boolean; message: string }> => {
+      return this.request('/tours/demo-project', {
+        method: 'DELETE',
+      });
     },
   };
 

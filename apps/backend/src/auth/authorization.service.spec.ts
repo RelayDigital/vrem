@@ -76,6 +76,8 @@ describe('AuthorizationService', () => {
     // Calendar sync fields
     calendarConflict: false,
     calendarConflictNote: null,
+    // Demo project field
+    isDemo: false,
     ...overrides,
   });
 

@@ -229,7 +229,7 @@ export function PaginatedJobGrid<T>({
   return (
     <div className="flex flex-col space-y-6">
       {/* Search, Filter, and Sort Bar */}
-      <div className="flex gap-3">
+      <div className="flex gap-3" data-tour="jobs-filters">
         <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/60 " />
           <Input
@@ -304,7 +304,7 @@ export function PaginatedJobGrid<T>({
       {paginatedItems.length > 0 ? (
         <>
           {viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" data-tour="jobs-list">
             {paginatedItems.map((item, index) => (
               <div
                 key={index}
@@ -317,7 +317,7 @@ export function PaginatedJobGrid<T>({
               ))}
             </div>
           ) : renderTableRow ? (
-            <Table>
+            <Table data-tour="jobs-list">
               <TableHeader>
                 <TableRow>
                   <TableHead>Property</TableHead>
@@ -343,7 +343,7 @@ export function PaginatedJobGrid<T>({
               </TableBody>
             </Table>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3" data-tour="jobs-list">
               {paginatedItems.map((item, index) => (
                 <div
                   key={index}
@@ -411,7 +411,7 @@ export function PaginatedJobGrid<T>({
           </div>
         </>
       ) : (
-        <div className="text-center py-12 text-muted-foreground">
+        <div className="text-center py-12 text-muted-foreground" data-tour="jobs-list">
           {emptyIcon && (() => {
             const Icon = emptyIcon;
             return <Icon className="size-16 mx-auto mb-4 text-muted-foreground/40" />;

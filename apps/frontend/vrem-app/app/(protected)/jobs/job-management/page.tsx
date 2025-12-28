@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useRequireRole } from "@/hooks/useRequireRole";
@@ -32,6 +32,7 @@ export default function JobManagementPage() {
   ]);
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
+  const fetchedJobsRef = useRef<Set<string>>(new Set());
   const activeMembership = memberships.find((m) => m.orgId === organizationId);
   const roleUpper = (
     (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
@@ -81,16 +82,21 @@ export default function JobManagementPage() {
   // Other roles can see both TEAM and CUSTOMER channels
   useEffect(() => {
     if (jobManagement.selectedJob) {
+      const jobId = jobManagement.selectedJob.id;
+      // Prevent infinite loop by tracking fetched jobs
+      if (fetchedJobsRef.current.has(jobId)) return;
+      fetchedJobsRef.current.add(jobId);
+
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
       // Agents should only fetch CUSTOMER channel, not TEAM
       if (!isAgent) {
-        messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+        messaging.fetchMessages(jobId, "TEAM", orgId);
       }
       if (canViewCustomerChat) {
-        messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
+        messaging.fetchMessages(jobId, "CUSTOMER", orgId);
       }
     }
-  }, [jobManagement.selectedJob, messaging, canViewCustomerChat, isAgent]);
+  }, [jobManagement.selectedJob?.id, canViewCustomerChat, isAgent]);
 
   if (isLoading) {
     return <JobsLoadingSkeleton />;

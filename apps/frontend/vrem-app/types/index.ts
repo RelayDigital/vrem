@@ -721,3 +721,64 @@ export interface DeliveryResponse {
   };
   canApprove: boolean;
 }
+
+// =============================
+// Tours / Onboarding
+// =============================
+
+export type TourTrack =
+  | "DASHBOARD_OVERVIEW"
+  | "JOB_MANAGEMENT"
+  | "MESSAGING_CHAT"
+  | "SETTINGS_INTEGRATIONS";
+
+export interface TourProgressStep {
+  id: string;
+  userId: string;
+  tourTrack: TourTrack;
+  stepId: string;
+  completed: boolean;
+  completedAt: Date | null;
+  skippedAt: Date | null;
+  startedAt: Date;
+  updatedAt: Date;
+}
+
+export interface TourTrackProgressInfo {
+  completed: number;
+  total: number;
+  started: boolean;
+  finished: boolean;
+}
+
+export interface TourStatusResponse {
+  id: string;
+  userId: string;
+  hasCompletedSetup: boolean;
+  dismissedGuide: boolean;
+  lastActiveTrack: TourTrack | null;
+  createdAt: Date;
+  updatedAt: Date;
+  trackProgress: Record<TourTrack, TourTrackProgressInfo>;
+  overallProgress: {
+    completed: number;
+    total: number;
+    percentage: number;
+  };
+}
+
+export interface TourTrackProgress {
+  tourTrack: TourTrack;
+  steps: TourProgressStep[];
+  completedCount: number;
+  skippedCount: number;
+  totalSteps: number;
+  isComplete: boolean;
+}
+
+export interface UpdateTourProgressRequest {
+  tourTrack: TourTrack;
+  stepId: string;
+  completed?: boolean;
+  skipped?: boolean;
+}

@@ -21,6 +21,7 @@ import { AvailabilityModule } from './availability/availability.module';
 import { NylasModule } from './nylas/nylas.module';
 import { OtpModule } from './otp/otp.module';
 import { EmailModule } from './email/email.module';
+import { ToursModule } from './tours/tours.module';
 import { OrgRolesGuard } from './auth/org-roles.guard';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { Reflector } from '@nestjs/core';
@@ -48,6 +49,7 @@ import { PrismaModule } from './prisma/prisma.module';
     CalendarIntegrationsModule,
     AvailabilityModule,
     NylasModule,
+    ToursModule,
   ],
   controllers: [AppController],
   providers: [AppService, ActiveOrgMiddleware, OrgRolesGuard, JwtAuthGuard, Reflector],

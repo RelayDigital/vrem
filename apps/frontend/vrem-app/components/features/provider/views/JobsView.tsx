@@ -23,7 +23,7 @@ interface JobsViewProps {
 export function JobsView({ upcomingJobs, totalJobs, rating, onTimeRate }: JobsViewProps) {
 
   return (
-    <main className="container mx-auto p-6 h-full space-y-6">
+    <main className="container mx-auto p-6 h-full space-y-6" data-tour="jobs-view">
       {/* Stats */}
       <StatsGrid
         stats={[

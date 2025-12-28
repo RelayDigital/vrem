@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { CalendarView } from "@/components/features/calendar/CalendarView";
@@ -30,6 +30,7 @@ export default function CalendarPage() {
   const jobCreation = useJobCreation();
   const [technicians, setTechnicians] = useState<Technician[]>([]);
   const [loadingTechnicians, setLoadingTechnicians] = useState(false);
+  const fetchedJobsRef = useRef<Set<string>>(new Set());
 
   // Filter jobs based on role
   const displayJobs = useMemo(() => {
@@ -64,10 +65,15 @@ export default function CalendarPage() {
   const isAgent = (user?.accountType || "").toUpperCase() === "AGENT";
   useEffect(() => {
     if (jobManagement.selectedJob) {
+      const jobId = jobManagement.selectedJob.id;
+      // Prevent infinite loop by tracking fetched jobs
+      if (fetchedJobsRef.current.has(jobId)) return;
+      fetchedJobsRef.current.add(jobId);
+
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
       // Agents should only fetch CUSTOMER channel, not TEAM
       if (!isAgent) {
-        messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+        messaging.fetchMessages(jobId, "TEAM", orgId);
       }
       const activeMembership = memberships.find((m) => m.orgId === organizationId);
       const roleUpper = (
@@ -76,10 +82,10 @@ export default function CalendarPage() {
       // Agents can always view customer chat (they ARE the customer)
       const canViewCustomerChat = isAgent || ["OWNER", "ADMIN", "PROJECT_MANAGER"].includes(roleUpper);
       if (canViewCustomerChat) {
-        messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
+        messaging.fetchMessages(jobId, "CUSTOMER", orgId);
       }
     }
-  }, [jobManagement.selectedJob, messaging, memberships, organizationId, isAgent]);
+  }, [jobManagement.selectedJob?.id, memberships, organizationId, isAgent]);
 
   if (isLoading) {
     return <CalendarLoadingSkeleton />;

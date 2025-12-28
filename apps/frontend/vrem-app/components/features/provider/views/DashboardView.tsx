@@ -11,12 +11,11 @@ import { Briefcase } from "lucide-react";
 import { H2 } from "@/components/ui/typography";
 import { EmptyState } from "@/components/common";
 import { jobToCalendarEvent } from "@/lib/calendar-utils";
-import {
-  CalendarEvent,
-  generateTechnicianColors,
-} from "@/types/calendar";
+import { CalendarEvent, generateTechnicianColors } from "@/types/calendar";
 import { StatsGrid } from "@/components/shared/dashboard";
 import { CheckCircle2, Star, TrendingUp } from "lucide-react";
+import { SetupGuideWidget } from "../../tours/SetupGuideWidget";
+import { useTour } from "@/context/tour-context";
 
 interface ProviderDashboardViewProps {
   jobs: JobRequest[]; // Already filtered to assigned jobs
@@ -92,17 +91,14 @@ export function ProviderDashboardView({
     [displayTechnicians]
   );
 
-  const selfTechnician = useMemo(
-    () => {
-      // Use override if provided (for PERSONAL org providers)
-      if (selfTechnicianOverride) return selfTechnicianOverride;
-      // Otherwise try to find in technicians list
-      return currentUserId
-        ? techniciansWithLocation.find((tech) => tech.id === currentUserId)
-        : undefined;
-    },
-    [techniciansWithLocation, currentUserId, selfTechnicianOverride]
-  );
+  const selfTechnician = useMemo(() => {
+    // Use override if provided (for PERSONAL org providers)
+    if (selfTechnicianOverride) return selfTechnicianOverride;
+    // Otherwise try to find in technicians list
+    return currentUserId
+      ? techniciansWithLocation.find((tech) => tech.id === currentUserId)
+      : undefined;
+  }, [techniciansWithLocation, currentUserId, selfTechnicianOverride]);
 
   const calendarTechnicians =
     techniciansWithLocation.length > 0
@@ -149,11 +145,19 @@ export function ProviderDashboardView({
     }
   };
 
+  const { shouldShowGuide } = useTour();
+
   return (
     <main className="container relative mx-auto">
       <article className="flex flex-col gap-2xl md:gap-3xl px-md">
+        {/* Setup Guide Widget */}
+        {shouldShowGuide && (
+          <div className="@container w-full mt-md" data-tour="setup-guide">
+            <SetupGuideWidget />
+          </div>
+        )}
         {/* Metrics */}
-        <div className="@container w-full mt-md">
+        <div className={`@container w-full ${shouldShowGuide ? '' : 'mt-md'}`} data-tour="dashboard-metrics">
           <StatsGrid
             stats={[
               {
@@ -189,7 +193,7 @@ export function ProviderDashboardView({
           />
         </div>
         {/* Calendar */}
-        <div className="@container w-full">
+        <div className="@container w-full" data-tour="dashboard-calendar">
           {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-lg border-0">Schedule</H2>
@@ -215,7 +219,7 @@ export function ProviderDashboardView({
           </div>
         </div>
         {/* Merged Map and Pending Assignments */}
-        <div className="@container w-full">
+        <div className="@container w-full" data-tour="dashboard-map">
           {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-lg border-0">Live Job Map</H2>
@@ -242,7 +246,7 @@ export function ProviderDashboardView({
           />
         </div>
         {/* Active Jobs */}
-        <div className="@container w-full mb-md">
+        <div className="@container w-full mb-md" data-tour="dashboard-jobs">
           {/* Heading and button */}
           <div className="mb-md flex items-baseline justify-between">
             <H2 className="text-lg">Active Jobs</H2>

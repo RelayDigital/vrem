@@ -70,12 +70,41 @@ export class OrganizationsService {
   }
 
   async listUserOrganizations(userId: string) {
-    return this.prisma.organizationMember.findMany({
+    // Get memberships where user is a team member
+    const memberships = await this.prisma.organizationMember.findMany({
       where: { userId },
       include: {
         organization: true,
       },
     });
+
+    // Also get organizations where user is a customer (for AGENT accounts)
+    const customerRelations = await this.prisma.organizationCustomer.findMany({
+      where: { userId },
+      include: {
+        organization: true,
+      },
+    });
+
+    // Convert customer relations to membership-like objects for frontend compatibility
+    const customerMemberships = customerRelations.map((cust) => ({
+      id: `customer-${cust.id}`,
+      userId: cust.userId,
+      orgId: cust.orgId,
+      role: 'CUSTOMER' as const, // Virtual role for customers
+      orgRole: 'CUSTOMER' as const,
+      createdAt: cust.createdAt,
+      organization: cust.organization,
+      isCustomer: true,
+    }));
+
+    // Combine and return, prioritizing memberships over customer relationships
+    const memberOrgIds = new Set(memberships.map((m) => m.orgId));
+    const uniqueCustomerMemberships = customerMemberships.filter(
+      (cm) => !memberOrgIds.has(cm.orgId),
+    );
+
+    return [...memberships, ...uniqueCustomerMemberships];
   }
 
   async createInvite(

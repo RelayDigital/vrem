@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useOnboarding } from "@/context/onboarding-context";
+import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,10 +13,9 @@ import {
 } from "@/components/ui/field";
 import { api } from "@/lib/api";
 import { ArrowLeft, Check, X, Eye, EyeOff } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 export function PasswordStep() {
-  const router = useRouter();
+  const { completeOnboarding } = useAuth();
   const { data, prevStep, setIsLoading, setError, isLoading } = useOnboarding();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -62,32 +62,29 @@ export function PasswordStep() {
         useCases: accountType === "PROVIDER" ? data.useCases : undefined,
       });
 
-      // Store token
-      localStorage.setItem("token", result.token);
-
-      // Set organization if available
-      if (result.user.organizationId) {
-        localStorage.setItem("organizationId", result.user.organizationId);
-      }
-
       // Clear onboarding data from session storage
       sessionStorage.removeItem("onboarding_data");
       sessionStorage.removeItem("onboarding_return");
 
-      // If user chose to connect calendar, start OAuth flow
+      // If user chose to connect calendar, start OAuth flow before completing onboarding
       if (data.calendarConnected) {
         try {
+          // Store token temporarily so OAuth callback can use it
+          localStorage.setItem("token", result.token);
+          if (result.user.organizationId) {
+            localStorage.setItem("organizationId", result.user.organizationId);
+          }
           const { url } = await api.nylas.startOAuth("google", "dashboard");
           window.location.href = url;
-          return; // Don't redirect to dashboard, OAuth will handle it
+          return; // Don't complete onboarding here, OAuth will redirect to dashboard
         } catch (oauthErr) {
-          // If OAuth fails, just go to dashboard - they can connect later
+          // If OAuth fails, continue with normal onboarding completion
           console.error("Failed to start calendar OAuth:", oauthErr);
         }
       }
 
-      // Redirect to dashboard
-      router.push("/dashboard");
+      // Complete onboarding and redirect to dashboard
+      await completeOnboarding(result);
     } catch (err: any) {
       setError(err.message || "Registration failed. Please try again.");
     } finally {

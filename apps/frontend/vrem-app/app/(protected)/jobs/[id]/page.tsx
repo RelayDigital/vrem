@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
@@ -34,6 +34,7 @@ export default function JobDetailPage() {
     (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
   ).toUpperCase();
   const [, setLoadingTechnicians] = useState(false);
+  const fetchedRef = useRef(false);
 
   const jobId = params?.id as string;
 
@@ -83,6 +84,10 @@ export default function JobDetailPage() {
       jobManagement.selectedJob &&
       jobManagement.selectedJob.id === jobId
     ) {
+      // Prevent infinite loop by only fetching once per job
+      if (fetchedRef.current) return;
+      fetchedRef.current = true;
+
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
       // Agents should only fetch CUSTOMER channel, not TEAM
       if (!isAgent) {
@@ -92,7 +97,7 @@ export default function JobDetailPage() {
         messaging.fetchMessages(jobId, "CUSTOMER", orgId);
       }
     }
-  }, [jobManagement.selectedJob, jobId, messaging, canViewCustomerChat, isAgent]);
+  }, [jobManagement.selectedJob?.id, jobId, canViewCustomerChat, isAgent]);
 
   useEffect(() => {
     let cancelled = false;

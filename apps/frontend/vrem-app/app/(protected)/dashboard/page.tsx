@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { CompanyDashboardView } from "@/components/features/company/views/DashboardView";
@@ -38,6 +38,7 @@ export default function DashboardPage() {
   const messaging = useMessaging();
   const jobManagement = useJobManagement();
   const navigation = useDispatcherNavigation();
+  const fetchedJobsRef = useRef<Set<string>>(new Set());
   const [providers, setProviders] = useState<ProviderProfile[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(false);
   const [orgGeocodedCoords, setOrgGeocodedCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -262,16 +263,21 @@ export default function DashboardPage() {
   // Other roles can see both TEAM and CUSTOMER channels
   useEffect(() => {
     if (jobManagement.selectedJob) {
+      const jobId = jobManagement.selectedJob.id;
+      // Prevent infinite loop by tracking fetched jobs
+      if (fetchedJobsRef.current.has(jobId)) return;
+      fetchedJobsRef.current.add(jobId);
+
       const orgId = (jobManagement.selectedJob as any)?.organizationId;
       // Agents should only fetch CUSTOMER channel, not TEAM
       if (!isAgent) {
-        messaging.fetchMessages(jobManagement.selectedJob.id, "TEAM", orgId);
+        messaging.fetchMessages(jobId, "TEAM", orgId);
       }
       if (canViewCustomerChat) {
-        messaging.fetchMessages(jobManagement.selectedJob.id, "CUSTOMER", orgId);
+        messaging.fetchMessages(jobId, "CUSTOMER", orgId);
       }
     }
-  }, [jobManagement.selectedJob, messaging, canViewCustomerChat, isAgent]);
+  }, [jobManagement.selectedJob?.id, canViewCustomerChat, isAgent]);
 
   useEffect(() => {
     let cancelled = false;
@@ -405,6 +411,19 @@ export default function DashboardPage() {
   // AGENT in PERSONAL or TEAM org: Show AgentJobsView (job cards with tabs)
   // Backend already filters to only return projects where agent is customer or project manager
   if (accountType === "AGENT" && !showSidebar) {
+    const handleAgentJobClick = (job: JobRequest) => {
+      jobManagement.selectJob(job);
+      jobManagement.openTaskView(job);
+    };
+    const handleAgentTaskViewClose = jobManagement.handleTaskViewClose;
+    const handleAgentFullScreen = jobManagement.openTaskDialog;
+    const handleAgentTaskDialogClose = jobManagement.handleTaskDialogClose;
+    const handleAgentOpenInNewPage = () => {
+      if (jobManagement.selectedJob) {
+        router.push(`/jobs/${jobManagement.selectedJob.id}`);
+      }
+    };
+
     return (
       <div className="size-full overflow-x-hidden">
         <AgentJobsView
@@ -412,6 +431,73 @@ export default function DashboardPage() {
           technicians={technicians}
           organizationId={user.organizationId || ""}
           onNewJobClick={() => router.push("/booking")}
+          onJobClick={handleAgentJobClick}
+        />
+
+        {/* Job Task View - Sheet */}
+        <JobTaskView
+          job={jobManagement.selectedJob}
+          messages={
+            jobManagement.selectedJob
+              ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
+              : []
+          }
+          currentUserId={user?.id || "current-user-id"}
+          currentUserName={user?.name || "Current User"}
+          currentUserAccountType={user?.accountType}
+          isClient={true}
+          open={jobManagement.showTaskView}
+          onOpenChange={handleAgentTaskViewClose}
+          onSendMessage={(content, channel, threadId) =>
+            messaging.sendMessage(
+              jobManagement.selectedJob?.id || "",
+              content,
+              channel,
+              threadId
+            )
+          }
+          onEditMessage={(messageId, content) =>
+            messaging.editMessage(messageId, content)
+          }
+          onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
+          onStatusChange={() => {}}
+          onAssignTechnician={() => {}}
+          onChangeTechnician={() => {}}
+          variant="sheet"
+          onFullScreen={handleAgentFullScreen}
+          onOpenInNewPage={handleAgentOpenInNewPage}
+        />
+
+        {/* Job Task View - Dialog (Full Screen) */}
+        <JobTaskView
+          job={jobManagement.selectedJob}
+          messages={
+            jobManagement.selectedJob
+              ? messaging.getMessagesForJob(jobManagement.selectedJob.id)
+              : []
+          }
+          currentUserId={user?.id || "current-user-id"}
+          currentUserName={user?.name || "Current User"}
+          currentUserAccountType={user?.accountType}
+          isClient={true}
+          open={jobManagement.showTaskDialog}
+          onOpenChange={handleAgentTaskDialogClose}
+          onSendMessage={(content, channel, threadId) =>
+            messaging.sendMessage(
+              jobManagement.selectedJob?.id || "",
+              content,
+              channel,
+              threadId
+            )
+          }
+          onEditMessage={(messageId, content) =>
+            messaging.editMessage(messageId, content)
+          }
+          onDeleteMessage={(messageId) => messaging.deleteMessage(messageId)}
+          onStatusChange={() => {}}
+          onAssignTechnician={() => {}}
+          onChangeTechnician={() => {}}
+          variant="dialog"
         />
       </div>
     );
@@ -440,7 +526,7 @@ export default function DashboardPage() {
     };
 
     return (
-      <div className="size-full overflow-x-hidden space-y-6">
+      <div className="size-full overflow-x-hidden space-y-6" data-tour="dashboard-header">
         <JobDataBoundary fallback={<DashboardLoadingSkeleton />}>
           <ProviderDashboardView
             jobs={assignedJobs}
@@ -581,7 +667,7 @@ export default function DashboardPage() {
     };
 
     return (
-      <div className="size-full overflow-x-hidden space-y-6">
+      <div className="size-full overflow-x-hidden space-y-6 pt-4" data-tour="dashboard-header">
         {metricsError && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
