@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef } from 'react';
 import {
   ChatMessage,
   ProjectChatChannel,
@@ -70,6 +70,8 @@ export function MessagingProvider({
   const [currentUserName, setCurrentUserName] = useState<string | undefined>(defaultUserName);
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | undefined>(defaultUserAvatar);
   const [connected, setConnected] = useState(false);
+  const lastFetchRef = useRef<Map<string, number>>(new Map());
+  const inFlightFetchRef = useRef<Set<string>>(new Set());
 
   // Typing state: Map<`${projectId}:${channel}`, Map<userId, TypingUser>>
   const [typingState, setTypingState] = useState<Map<string, Map<string, TypingUser>>>(new Map());
@@ -215,11 +217,22 @@ export function MessagingProvider({
   }, [messages]);
 
   const fetchMessages = useCallback(async (jobId: string, channel: 'TEAM' | 'CUSTOMER' = 'TEAM', orgId?: string) => {
+    const cacheKey = `${jobId}:${channel}`;
+    const now = Date.now();
+    const lastFetchedAt = lastFetchRef.current.get(cacheKey);
+    if (lastFetchedAt && now - lastFetchedAt < 5000) {
+      return;
+    }
+    if (inFlightFetchRef.current.has(cacheKey)) {
+      return;
+    }
+    inFlightFetchRef.current.add(cacheKey);
     try {
       if (orgId) {
         api.organizations.setActiveOrganization(orgId);
       }
       const fetchedMessages = await api.chat.getMessages(jobId, channel);
+      lastFetchRef.current.set(cacheKey, Date.now());
       // Convert date strings to Date objects if needed
       const processedMessages = fetchedMessages.map((msg: any) => ({
         ...msg,
@@ -243,6 +256,8 @@ export function MessagingProvider({
     } catch (error) {
       console.error('Error fetching messages:', error);
       // Don't show toast here to avoid spamming if called frequently
+    } finally {
+      inFlightFetchRef.current.delete(cacheKey);
     }
   }, [connected]);
 

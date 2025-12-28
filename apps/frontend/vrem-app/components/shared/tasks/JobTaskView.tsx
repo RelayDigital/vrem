@@ -14,7 +14,7 @@ import {
   Media,
   MediaType,
 } from "../../../types";
-import { ChatMessage } from "../../../types/chat";
+import { ChatMessage, ProjectChatChannel, TypingUser } from "../../../types/chat";
 import {
   Sheet,
   SheetContent,
@@ -166,6 +166,7 @@ import { api } from "@/lib/api";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
 import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 import { useJobManagement } from "@/context/JobManagementContext";
+import { useMessaging } from "@/context/MessagingContext";
 import {
   canEditProject,
   canDeleteProject as canDeleteProjectFn,
@@ -225,6 +226,21 @@ interface JobTaskViewProps {
   initialChatTab?: "client" | "team"; // Initial chat tab to open
 }
 
+const formatTypingText = (users: TypingUser[]): string => {
+  if (users.length === 0) return "";
+  if (users.length === 1) return `${users[0].userName} is typing...`;
+  if (users.length === 2) return `${users[0].userName} and ${users[1].userName} are typing...`;
+  return `${users[0].userName} and ${users.length - 1} others are typing...`;
+};
+
+const TypingDots = () => (
+  <span className="inline-flex items-center gap-0.5">
+    <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
+    <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
+    <span className="w-1.5 h-1.5 rounded-full bg-current animate-bounce" />
+  </span>
+);
+
 export function JobTaskView({
   job,
   technician,
@@ -255,6 +271,7 @@ export function JobTaskView({
 }: JobTaskViewProps) {
   const { activeOrganizationId, activeMembership } = useCurrentOrganization();
   const jobManagement = useJobManagement();
+  const messaging = useMessaging();
   const isAgentUser = (currentUserAccountType || "").toUpperCase() === "AGENT";
   const [activeTab, setActiveTab] = useState<
     "description" | "discussion" | "attachments" | "media"
@@ -296,6 +313,16 @@ export function JobTaskView({
   const [activeChatTab, setActiveChatTab] = useState<"client" | "team">(
     initialChatTab || defaultChatTab
   );
+
+  const activeChatChannel = useMemo<ProjectChatChannel>(() => {
+    if (isAgentUser) return "CUSTOMER";
+    return activeChatTab === "client" ? "CUSTOMER" : "TEAM";
+  }, [activeChatTab, isAgentUser]);
+
+  const typingUsers = useMemo<TypingUser[]>(() => {
+    if (!job) return [];
+    return messaging.getTypingUsers(job.id, activeChatChannel);
+  }, [job, messaging, activeChatChannel]);
   
   // Update active chat tab when permissions change (e.g., if user switches orgs)
   // Also ensure EDITOR/TECHNICIAN can't stay on client tab if they somehow got there
@@ -342,6 +369,7 @@ export function JobTaskView({
   const floorPlanInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const pendingReadReceiptsRef = useRef<Set<string>>(new Set());
   const isMobile = useIsMobile();
 
   // Check if user is the assigned project manager for THIS project
@@ -978,7 +1006,18 @@ export function JobTaskView({
 
     const updateContent = () => {
       const text = messageEditor.getText().trim();
-      setHasEditorContent(text.length > 0);
+      const hasContent = text.length > 0;
+      setHasEditorContent(hasContent);
+
+      if (!job || !messageEditor.isEditable) return;
+      if (activeChatChannel === "CUSTOMER" && !canWriteToCustomerChat) return;
+      if (activeChatChannel === "TEAM" && isClient) return;
+
+      if (hasContent) {
+        messaging.emitTyping(job.id, activeChatChannel);
+      } else {
+        messaging.stopTyping(job.id, activeChatChannel);
+      }
     };
 
     messageEditor.on("update", updateContent);
@@ -991,7 +1030,14 @@ export function JobTaskView({
       messageEditor.off("update", updateContent);
       messageEditor.off("selectionUpdate", updateContent);
     };
-  }, [messageEditor]);
+  }, [
+    messageEditor,
+    job,
+    activeChatChannel,
+    canWriteToCustomerChat,
+    isClient,
+    messaging,
+  ]);
 
   const sanitizeMessageHtml = useCallback((html: string) => {
     if (!html) return html;
@@ -1003,7 +1049,7 @@ export function JobTaskView({
   }, []);
 
   const handleSend = useCallback(() => {
-    if (!messageEditor || !onSendMessage) return;
+    if (!messageEditor || !onSendMessage || !job) return;
 
     const htmlContent = sanitizeMessageHtml(messageEditor.getHTML());
     const textContent = messageEditor.getText().trim();
@@ -1024,6 +1070,7 @@ export function JobTaskView({
     const threadId = replyingTo
       ? (replyingTo.threadId || replyingTo.thread || replyingTo.id)
       : undefined;
+    messaging.stopTyping(job.id, channel);
     onSendMessage(htmlContent, channel, threadId);
     messageEditor.commands.clearContent();
     setReplyingTo(null);
@@ -1035,6 +1082,8 @@ export function JobTaskView({
     activeChatTab,
     replyingTo,
     isAgentUser,
+    job,
+    messaging,
     sanitizeMessageHtml,
     canWriteToCustomerChat,
   ]);
@@ -1865,6 +1914,16 @@ export function JobTaskView({
     return map;
   }, [messages]);
 
+  const userAvatarMap = useMemo(() => {
+    const map = new Map<string, string | undefined>();
+    messages.forEach((m) => {
+      if (m.userAvatar) {
+        map.set(m.userId, m.userAvatar);
+      }
+    });
+    return map;
+  }, [messages]);
+
   // Get all messages in a thread (original + all replies)
   // Deduplicate to prevent duplicate key errors
   const getThreadMessages = useCallback(
@@ -1926,6 +1985,85 @@ export function JobTaskView({
         (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
   }, [teamMessages]);
+
+  const renderReadReceiptsInfo = useCallback(
+    (message: ChatMessage, textClassName: string) => {
+      const receipts = messaging.getMessageReadReceipts(message.id);
+      const otherReceipts = receipts.filter(
+        (receipt) => receipt.userId !== message.userId
+      );
+      if (otherReceipts.length === 0) {
+        return (
+          <div className="flex items-center gap-2">
+            <span className={cn("text-xs", textClassName)}>Not read yet</span>
+          </div>
+        );
+      }
+
+      const sortedReceipts = [...otherReceipts].sort(
+        (a, b) => new Date(b.readAt).getTime() - new Date(a.readAt).getTime()
+      );
+
+      return (
+        <div className="flex flex-col gap-2">
+          {sortedReceipts.map((receipt) => {
+            const avatarUrl = userAvatarMap.get(receipt.userId);
+            return (
+              <div key={receipt.userId} className="flex items-center gap-2">
+                <Avatar className="h-4 w-4 border border-background">
+                  <AvatarImage src={avatarUrl} alt={receipt.userName} />
+                  <AvatarFallback className="text-[9px] bg-muted">
+                    {getInitials(receipt.userName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col">
+                  <span className={cn("text-[11px]", textClassName)}>
+                    {receipt.userName}
+                  </span>
+                  <span className={cn("text-[10px]", textClassName)}>
+                    Read {format(new Date(receipt.readAt), "h:mm a")}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    },
+    [messaging, userAvatarMap]
+  );
+
+  useEffect(() => {
+    pendingReadReceiptsRef.current.clear();
+  }, [job?.id]);
+
+  useEffect(() => {
+    if (!job) return;
+
+    const visibleMessages =
+      activeChatTab === "client" ? flatClientMessages : flatTeamMessages;
+    const unreadIds = visibleMessages
+      .filter((message) => message.userId !== currentUserId)
+      .filter((message) => {
+        if (pendingReadReceiptsRef.current.has(message.id)) return false;
+        const receipts = messaging.getMessageReadReceipts(message.id);
+        return !receipts.some((receipt) => receipt.userId === currentUserId);
+      })
+      .map((message) => message.id);
+
+    if (unreadIds.length > 0) {
+      unreadIds.forEach((id) => pendingReadReceiptsRef.current.add(id));
+      messaging.markMessagesAsRead(job.id, unreadIds, activeChatChannel);
+    }
+  }, [
+    activeChatTab,
+    activeChatChannel,
+    currentUserId,
+    flatClientMessages,
+    flatTeamMessages,
+    job,
+    messaging,
+  ]);
 
   // WhatsApp-style message bubble renderer
   const renderMessageBubble = (
@@ -2207,6 +2345,23 @@ export function JobTaskView({
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
+
+                  {/* Read receipts info */}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    disabled
+                    className="cursor-default focus:bg-transparent"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[11px] text-muted-foreground">
+                        Read by
+                      </span>
+                      {renderReadReceiptsInfo(
+                        message,
+                        "text-muted-foreground"
+                      )}
+                    </div>
+                  </DropdownMenuItem>
 
                   {/* Edit/Delete for own messages */}
                   {isOwnMessage && (
@@ -2608,6 +2763,12 @@ export function JobTaskView({
             >
               Cancel
             </Button>
+          </div>
+        )}
+        {typingUsers.length > 0 && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+            <TypingDots />
+            <span>{formatTypingText(typingUsers)}</span>
           </div>
         )}
         {/* Editor with Avatar */}
