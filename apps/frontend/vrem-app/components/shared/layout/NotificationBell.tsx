@@ -372,12 +372,20 @@ export function NotificationBell({ className }: NotificationBellProps) {
     );
   }, [memberships]);
 
-  // Switch to personal workspace and navigate to dashboard
+  // Switch to personal workspace and navigate to dashboard, then scroll to setup guide
   const switchToPersonalAndNavigate = useCallback(() => {
     if (personalOrg?.orgId && personalOrg.orgId !== activeOrganizationId) {
       switchOrganization(personalOrg.orgId);
     }
     router.push('/dashboard');
+
+    // Scroll to setup guide after navigation and page render
+    setTimeout(() => {
+      const setupGuide = document.querySelector('[data-tour="setup-guide"]');
+      if (setupGuide) {
+        setupGuide.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 500);
   }, [personalOrg, activeOrganizationId, switchOrganization, router]);
 
   const handleRestartTour = async () => {
