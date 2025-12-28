@@ -156,169 +156,163 @@ export function JobCard({
   // Always horizontal on mobile, or if horizontal prop is true
   const isHorizontal = horizontal;
 
-  // Horizontal layout
+  // Horizontal layout - Full bleed image with blur overlay
   if (isHorizontal) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        // whileHover={{ y: -2 }}
         transition={{ duration: 0.2 }}
         className="h-full"
       >
         <Card
           className={cn(
-            "group relative flex flex-row bg-card rounded-lg border-none overflow-hidden transition-all duration-200 w-full",
-            "hover:shadow-xs",
-            onClick ? "cursor-pointer" : ""
+            "group relative bg-card rounded-xl border-none overflow-hidden transition-all duration-200 w-full h-40",
+            "hover:shadow-md",
+            onClick ? "cursor-pointer" : "",
+            selected && "ring-2 ring-primary"
           )}
           onClick={onClick}
         >
-          {/* Media Section */}
-          <CardHeader className="relative flex flex-col justify-between w-32 sm:w-40 aspect-square overflow-hidden p-2!">
+          {/* Full-bleed Background Image or Gradient */}
+          <div className="absolute inset-0">
             {job.propertyImage && job.status === "delivered" ? (
               <ImageWithFallback
                 src={job.propertyImage}
                 alt={job.propertyAddress}
-                className="size-full object-cover absolute top-0 left-0 pointer-events-none group-hover:scale-[1.04] transition-transform duration-200"
+                className="size-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
               />
             ) : (
               <div
                 className={cn(
-                  "size-full absolute top-0 left-0",
+                  "size-full",
                   getStatusGradient(job.status)
                 )}
               />
             )}
+          </div>
 
-            {/* Top Badges */}
-            <div className="flex relative w-full z-10">
-              {/* Priority Badge - Top Left */}
-              <Badge
-                variant="secondary"
-                // className="flex z-10 backdrop-blur-md! bg-card/60!"
-                className={cn(
-                  "flex items-center rounded-full backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200",
-                  priorityConfig.priority === "urgent" &&
-                    "bg-priority-urgent/10 text-priority-urgent",
-                  priorityConfig.priority === "rush" &&
-                    "bg-priority-rush/10 text-priority-rush",
-                  priorityConfig.priority === "standard" &&
-                    "bg-priority-standard/10 text-priority-standard"
-                )}
-              >
-                <PriorityIcon
-                  className={cn(
-                    "size-3.5",
-                    priorityConfig.priority === "urgent" &&
-                      "text-priority-urgent",
-                    priorityConfig.priority === "rush" && "text-priority-rush",
-                    priorityConfig.priority === "standard" &&
-                      "text-priority-standard"
-                  )}
-                />
-              </Badge>
+          {/* Blur overlay for text readability - gradient from transparent to blurred */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
 
-              {/* Order Number Badge */}
-              {job.orderNumber && (
+          {/* Content overlay */}
+          <div className="relative z-10 flex flex-col justify-between h-full p-3">
+            {/* Top Row - Priority, Order Number, Status, and Actions */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                {/* Priority Badge */}
                 <Badge
                   variant="secondary"
-                  // className="flex z-10 backdrop-blur-md! bg-card/60!"
                   className={cn(
-                    "flex items-center rounded-full backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200",
-                    priorityConfig.priority === "urgent" &&
-                      "bg-priority-urgent/10 text-priority-urgent",
-                    priorityConfig.priority === "rush" &&
-                      "bg-priority-rush/10 text-priority-rush",
-                    priorityConfig.priority === "standard" &&
-                      "bg-priority-standard/10 text-priority-standard"
+                    "flex items-center gap-1 rounded-full backdrop-blur-md bg-white/20 border-0 text-white",
+                    priorityConfig.priority === "urgent" && "bg-red-500/30",
+                    priorityConfig.priority === "rush" && "bg-amber-500/30"
                   )}
                 >
-                  <span className="text-[11px] font-medium">
-                    #{job.orderNumber}
+                  <PriorityIcon className="size-3" />
+                  <span className="text-[10px] font-medium">
+                    {priorityConfig.label}
                   </span>
                 </Badge>
-              )}
-            </div>
 
-            {onViewInProjectManagement && (
-              <div className="flex z-10 self-center w-full">
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onViewInProjectManagement) {
-                      onViewInProjectManagement();
-                    }
-                  }}
-                  className="flex items-center rounded-full backdrop-blur-md! hover:bg-card/60! bg-card/60! group-hover:bg-card! transition-colors duration-200"
-                >
-                  <ExternalLink className="size-2.5" />
-                  <span className="sr-only">View in job management</span>
-                </Button>
+                {/* Order Number */}
+                {job.orderNumber && (
+                  <Badge
+                    variant="secondary"
+                    className="rounded-full backdrop-blur-md bg-white/20 border-0 text-white"
+                  >
+                    <span className="text-[10px] font-medium">
+                      #{job.orderNumber}
+                    </span>
+                  </Badge>
+                )}
               </div>
-            )}
-          </CardHeader>
 
-          {/* Content Section - Right Side */}
-          <CardContent className="flex-1 flex flex-col justify-between p-4 min-w-0">
-            <div className="flex-1 space-y-2">
-              {/* Header Row - Status and Media Types */}
-              <div className="flex items-start justify-between gap-2">
+              {/* Right side - Status and View button */}
+              <div className="flex items-center gap-1.5">
+                {/* Status Badge */}
                 <Badge
-                  variant="flat"
-                  className="flex items-center gap-1.5 shrink-0"
+                  variant="secondary"
+                  className="flex items-center gap-1.5 rounded-full backdrop-blur-md bg-white/20 border-0"
                 >
                   <div
                     className={cn(
                       "size-1.5 rounded-full",
                       statusConfig.status === "pending" && "bg-status-pending",
-                      statusConfig.status === "assigned" &&
-                        "bg-status-assigned",
-                      statusConfig.status === "in_progress" &&
-                        "bg-status-in-progress",
+                      statusConfig.status === "assigned" && "bg-status-assigned",
+                      statusConfig.status === "in_progress" && "bg-status-in-progress",
                       statusConfig.status === "editing" && "bg-status-editing",
-                      statusConfig.status === "delivered" &&
-                        "bg-status-delivered",
-                      (statusConfig.status === "cancelled" ||
-                        statusConfig.status === "default") &&
-                        "bg-status-cancelled"
+                      statusConfig.status === "delivered" && "bg-status-delivered",
+                      (statusConfig.status === "cancelled" || statusConfig.status === "default") && "bg-status-cancelled"
                     )}
                   />
-                  <span
-                    className={cn(
-                      "text-xs font-medium",
-                      statusConfig.status === "pending" &&
-                        "text-status-pending",
-                      statusConfig.status === "assigned" &&
-                        "text-status-assigned",
-                      statusConfig.status === "in_progress" &&
-                        "text-status-in-progress",
-                      statusConfig.status === "editing" &&
-                        "text-status-editing",
-                      statusConfig.status === "delivered" &&
-                        "text-status-delivered",
-                      (statusConfig.status === "cancelled" ||
-                        statusConfig.status === "default") &&
-                        "text-status-cancelled"
-                    )}
-                  >
+                  <span className="text-[10px] font-medium text-white">
                     {statusConfig.label}
                   </span>
                 </Badge>
-                <div className="flex items-center gap-1.5 shrink-0">
+
+                {/* View in Project Management */}
+                {onViewInProjectManagement && (
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewInProjectManagement();
+                    }}
+                    className="size-6 rounded-full backdrop-blur-md bg-white/20 border-0 hover:bg-white/30 text-white"
+                  >
+                    <ExternalLink className="size-3" />
+                    <span className="sr-only">View in job management</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom Section - Main Info */}
+            <div className="space-y-1">
+              {/* Address */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <h3 className="text-sm font-semibold text-white leading-tight line-clamp-1 drop-shadow-sm">
+                    {job.propertyAddress}
+                  </h3>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <P className="wrap-break-word">{job.propertyAddress}</P>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Client Name */}
+              <p className="text-xs text-white/70">
+                {job.clientName}
+              </p>
+
+              {/* Bottom Row - Date, Time, Media Types */}
+              <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center gap-3 text-xs text-white/80">
+                  <div className="inline-flex items-center gap-1">
+                    <Calendar className="size-3" />
+                    <span>{formattedDate}</span>
+                  </div>
+                  <div className="inline-flex items-center gap-1">
+                    <Clock className="size-3" />
+                    <span>{job.scheduledTime}</span>
+                  </div>
+                </div>
+
+                {/* Media Types */}
+                <div className="flex items-center gap-1.5">
                   {job.mediaType.map((type) => {
                     const Icon = getMediaIcon(type);
                     return (
                       <Tooltip key={type}>
                         <TooltipTrigger asChild>
-                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                          <div className="p-1 rounded-full backdrop-blur-md bg-white/20">
+                            <Icon className="size-3 text-white" />
+                          </div>
                         </TooltipTrigger>
-                        <TooltipContent
-                          side="top"
-                          className="max-w-xs capitalize"
-                        >
+                        <TooltipContent side="top" className="capitalize">
                           {type}
                         </TooltipContent>
                       </Tooltip>
@@ -326,39 +320,8 @@ export function JobCard({
                   })}
                 </div>
               </div>
-
-              {/* Address/Title */}
-              <div>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <P className="text-[13px] leading-[1.4] text-muted-foreground line-clamp-2">
-                      {job.propertyAddress}
-                    </P>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    <P className="wrap-break-word">{job.propertyAddress}</P>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-
-              {/* Date/Time Row */}
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <div className="inline-flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5" />
-                  <span>{formattedDate}</span>
-                </div>
-                <div className="inline-flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5" />
-                  <span>{job.scheduledTime}</span>
-                </div>
-              </div>
-
-              {/* Client Name */}
-              <P className="text-xs text-muted-foreground italic">
-                {job.clientName}
-              </P>
             </div>
-          </CardContent>
+          </div>
         </Card>
       </motion.div>
     );
