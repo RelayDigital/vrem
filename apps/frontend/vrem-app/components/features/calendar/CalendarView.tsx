@@ -272,11 +272,11 @@ export function CalendarView({
         onCreateJob={onCreateJob}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 min-[2560px]:grid-cols-7! overflow-hidden relative h-full">
-        {/* Main Calendar Area */}
-        <div className="col-span-1 md:col-span-4 min-[2560px]:col-span-6! overflow-auto">{renderView()}</div>
+      <div className="flex overflow-hidden relative h-full">
+        {/* Main Calendar Area - takes all available space */}
+        <div className="flex-1 min-w-0 overflow-auto">{renderView()}</div>
 
-        {/* Right Sidebar */}
+        {/* Right Sidebar - fixed width on desktop, drawer on mobile */}
         {useIsMobile() ? (
           <Drawer open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <DrawerTrigger asChild>
@@ -296,10 +296,8 @@ export function CalendarView({
             </DrawerContent>
           </Drawer>
         ) : (
-          <div className="lg:col-span-1 relative">
-            <div className="relative border-l bg-background flex flex-col self-start size-full overflow-hidden">
-              {sidebarContent}
-            </div>
+          <div className="w-72 xl:w-80 shrink-0 border-l bg-background overflow-hidden">
+            {sidebarContent}
           </div>
         )}
       </div>
