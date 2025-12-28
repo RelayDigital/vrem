@@ -135,7 +135,8 @@ export function CalendarRightSidebar({
   };
 
   return (
-    <div className="p-4 space-y-6 size-full">
+    <ScrollArea className="size-full">
+      <div className="p-4 space-y-6">
       {/* Mini Month Calendar */}
       <div>
         <H3 className="mb-3 hidden md:block">Mini Calendar</H3>
@@ -361,6 +362,7 @@ export function CalendarRightSidebar({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ScrollArea>
   );
 }
