@@ -109,6 +109,11 @@ export class AuthService {
     const existing = await this.prisma.user.findUnique({ where: { email } });
 
     if (existing) {
+      // Check if account is deactivated
+      if (existing.deactivatedAt) {
+        throw new UnauthorizedException('Your account has been deactivated. Please contact support to reactivate.');
+      }
+
       const updated = await this.prisma.user.update({
         where: { id: existing.id },
         data: {
@@ -174,6 +179,11 @@ export class AuthService {
   async login(email: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) throw new UnauthorizedException('Invalid credentials');
+
+    // Check if account is deactivated
+    if (user.deactivatedAt) {
+      throw new UnauthorizedException('Your account has been deactivated. Please contact support to reactivate.');
+    }
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
@@ -268,10 +278,14 @@ export class AuthService {
         email: true,
         name: true,
         accountType: true,
+        deactivatedAt: true,
       },
     });
 
     if (!user) return null;
+
+    // Deactivated users should not be able to access the system
+    if (user.deactivatedAt) return null;
 
     const personalOrg = await this.prisma.organizationMember.findFirst({
       where: { userId, organization: { type: OrgType.PERSONAL } },
@@ -280,7 +294,10 @@ export class AuthService {
     });
 
     return {
-      ...user,
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      accountType: user.accountType,
       personalOrgId: personalOrg?.orgId || null,
     };
   }

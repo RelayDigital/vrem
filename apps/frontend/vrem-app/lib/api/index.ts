@@ -492,6 +492,49 @@ class ApiClient {
       });
       return user;
     },
+
+    /**
+     * Deactivate the current user's account
+     * Requires password confirmation
+     */
+    deactivateAccount: async (password: string) => {
+      if (USE_MOCK_DATA) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        return { success: true, message: 'Account deactivated (mock)' };
+      }
+      return this.request<{ id: string; email: string; name: string; deactivatedAt: string }>('/users/me/deactivate', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      });
+    },
+
+    /**
+     * Reactivate the current user's account
+     */
+    reactivateAccount: async () => {
+      if (USE_MOCK_DATA) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        return { success: true, message: 'Account reactivated (mock)' };
+      }
+      return this.request<{ id: string; email: string; name: string; deactivatedAt: null }>('/users/me/reactivate', {
+        method: 'POST',
+      });
+    },
+
+    /**
+     * Permanently delete the current user's account
+     * This action cannot be undone
+     */
+    deleteAccount: async (password: string) => {
+      if (USE_MOCK_DATA) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        return { success: true, message: 'Account deleted (mock)' };
+      }
+      return this.request<{ success: boolean; message: string }>('/users/me', {
+        method: 'DELETE',
+        body: JSON.stringify({ password }),
+      });
+    },
   };
 
   organizations = {

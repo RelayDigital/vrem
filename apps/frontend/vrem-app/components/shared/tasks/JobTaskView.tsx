@@ -793,6 +793,13 @@ export function JobTaskView({
       const orgId = activeOrganizationId || job?.organizationId;
       if (!orgId || !open) return;
       api.organizations.setActiveOrganization(orgId);
+
+      // AGENT users are customers of the organization, not members
+      // They don't have permission to list org members, so skip those calls
+      if (isAgentUser) {
+        return;
+      }
+
       try {
         const customersPromise = canAssignCustomer
           ? api.customers.list()
@@ -821,7 +828,7 @@ export function JobTaskView({
       }
     };
     void loadData();
-  }, [activeOrganizationId, job?.organizationId, open]);
+  }, [activeOrganizationId, job?.organizationId, open, isAgentUser]);
 
   useEffect(() => {
     if (job?.media && job.media.length > 0) {

@@ -12,13 +12,26 @@ import { toast } from "sonner";
 import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
 import { api } from "@/lib/api";
 import { useTour } from "@/context/tour-context";
-import { GraduationCap, RotateCcw } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
+import { GraduationCap, RotateCcw, AlertTriangle, UserX, Trash2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function AccountPage() {
   const router = useRouter();
+  const { logout } = useAuth();
   const { user, isLoading } = useRequireRole([
     "COMPANY",
     "AGENT",
@@ -36,6 +49,14 @@ export default function AccountPage() {
   const [email, setEmail] = useState(user?.email || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isResettingTour, setIsResettingTour] = useState(false);
+
+  // Danger zone state
+  const [deactivatePassword, setDeactivatePassword] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [isDeactivating, setIsDeactivating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
     setName(user?.name || "");
@@ -58,6 +79,50 @@ export default function AccountPage() {
       console.error("Failed to reset tour:", error);
     } finally {
       setIsResettingTour(false);
+    }
+  };
+
+  const handleDeactivateAccount = async () => {
+    if (!deactivatePassword) {
+      toast.error("Please enter your password to confirm");
+      return;
+    }
+
+    setIsDeactivating(true);
+    try {
+      await api.users.deactivateAccount(deactivatePassword);
+      toast.success("Your account has been deactivated");
+      setShowDeactivateDialog(false);
+      setDeactivatePassword("");
+      logout();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to deactivate account"
+      );
+    } finally {
+      setIsDeactivating(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) {
+      toast.error("Please enter your password to confirm");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await api.users.deleteAccount(deletePassword);
+      toast.success("Your account has been permanently deleted");
+      setShowDeleteDialog(false);
+      setDeletePassword("");
+      logout();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete account"
+      );
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -163,6 +228,150 @@ export default function AccountPage() {
             )}
             {isTourComplete || isTourDismissed ? "Restart Setup Guide" : "Reset Progress"}
           </Button>
+        </div>
+
+        {/* Danger Zone Section */}
+        <div className="space-y-4 md:col-span-2 pt-6 border-t border-destructive/20">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <Label className="text-base text-destructive">Danger Zone</Label>
+          </div>
+
+          <Muted className="text-sm">
+            These actions are irreversible. Please proceed with caution.
+          </Muted>
+
+          <div className="flex flex-col gap-3">
+            {/* Deactivate Account */}
+            <div className="flex items-center justify-between p-4 border border-destructive/20 rounded-lg">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <UserX className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">Deactivate account</span>
+                </div>
+                <Muted className="text-xs mt-1">
+                  Temporarily disable your account. You can reactivate it later.
+                </Muted>
+              </div>
+              <AlertDialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    Deactivate
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Deactivate your account?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Your account will be temporarily disabled. You won&apos;t be able to
+                      log in until you reactivate it. Your data will be preserved.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <div className="py-4">
+                    <Label htmlFor="deactivate-password" className="text-sm font-medium">
+                      Enter your password to confirm
+                    </Label>
+                    <Input
+                      id="deactivate-password"
+                      type="password"
+                      placeholder="Your password"
+                      value={deactivatePassword}
+                      onChange={(e) => setDeactivatePassword(e.target.value)}
+                      className="mt-2"
+                    />
+                  </div>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setDeactivatePassword("")}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <Button
+                      variant="destructive"
+                      onClick={handleDeactivateAccount}
+                      disabled={isDeactivating || !deactivatePassword}
+                    >
+                      {isDeactivating ? (
+                        <Spinner className="h-4 w-4 mr-2" />
+                      ) : null}
+                      Deactivate Account
+                    </Button>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+
+            {/* Delete Account */}
+            <div className="flex items-center justify-between p-4 border border-destructive/20 rounded-lg bg-destructive/5">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                  <span className="font-medium text-sm text-destructive">Delete account</span>
+                </div>
+                <Muted className="text-xs mt-1">
+                  Permanently delete your account and all associated data. This cannot be undone.
+                </Muted>
+              </div>
+              <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-destructive">
+                      Delete your account permanently?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. Your account, personal workspace, and all
+                      associated data will be permanently deleted. You will be removed from
+                      all organizations you are a member of.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <div className="py-4 space-y-3">
+                    <div className="p-3 bg-destructive/10 rounded-md">
+                      <p className="text-sm text-destructive font-medium">
+                        Before proceeding, please note:
+                      </p>
+                      <ul className="text-xs text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+                        <li>All your projects in your personal workspace will be deleted</li>
+                        <li>Your membership in organizations will be removed</li>
+                        <li>You cannot be the sole owner of an organization</li>
+                        <li>This action is immediate and irreversible</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <Label htmlFor="delete-password" className="text-sm font-medium">
+                        Enter your password to confirm
+                      </Label>
+                      <Input
+                        id="delete-password"
+                        type="password"
+                        placeholder="Your password"
+                        value={deletePassword}
+                        onChange={(e) => setDeletePassword(e.target.value)}
+                        className="mt-2"
+                      />
+                    </div>
+                  </div>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setDeletePassword("")}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <Button
+                      variant="destructive"
+                      onClick={handleDeleteAccount}
+                      disabled={isDeleting || !deletePassword}
+                    >
+                      {isDeleting ? (
+                        <Spinner className="h-4 w-4 mr-2" />
+                      ) : null}
+                      Delete Account Forever
+                    </Button>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
         </div>
       </div>
     </SettingsRightContentSection>

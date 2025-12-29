@@ -323,15 +323,15 @@ export function NotificationBell({ className }: NotificationBellProps) {
         const channelLabel = notification.messageChannel === "CUSTOMER" ? "Customer" : "Team";
         const projectInfo = notification.projectAddress || (notification.projectId ? `Project ${notification.projectId.substring(0, 8)}...` : '');
         if (notification.messagePreview) {
-          // Strip HTML tags and decode entities for plain text display
+          // Decode entities first, then strip HTML tags for plain text display
           const plainText = notification.messagePreview
-            .replace(/<[^>]*>/g, '') // Remove HTML tags
             .replace(/&nbsp;/g, ' ') // Replace non-breaking spaces
             .replace(/&amp;/g, '&')  // Decode ampersands
             .replace(/&lt;/g, '<')   // Decode less than
             .replace(/&gt;/g, '>')   // Decode greater than
             .replace(/&quot;/g, '"') // Decode quotes
             .replace(/&#39;/g, "'")  // Decode apostrophes
+            .replace(/<[^>]*>/g, '') // Remove HTML tags (after decoding entities)
             .trim();
           const truncated = plainText.substring(0, 50);
           const projectPrefix = projectInfo ? `${projectInfo} • ` : '';

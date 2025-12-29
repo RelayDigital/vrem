@@ -54,12 +54,25 @@ export function OrganizationSwitcher({
 
   const orderedMemberships = useMemo(() => {
     const personalFirst = personalOrg ? [personalOrg] : [];
-    const otherMemberships = memberships.filter(
-      (membership) => !isPersonalOrg(membership)
-    );
+
+    // Filter out COMPANY orgs where AGENT users are only customers
+    const otherMemberships = memberships.filter((membership) => {
+      if (isPersonalOrg(membership)) return false;
+
+      // For AGENT users, hide COMPANY orgs where they are only a CUSTOMER
+      if (user?.accountType === "AGENT") {
+        const isCompanyOrg = membership.organization?.type === "COMPANY";
+        const isCustomerRole = membership.role === "CUSTOMER" || membership.orgRole === "CUSTOMER";
+        if (isCompanyOrg && isCustomerRole) {
+          return false;
+        }
+      }
+
+      return true;
+    });
 
     return [...personalFirst, ...otherMemberships];
-  }, [memberships, personalOrg]);
+  }, [memberships, personalOrg, user?.accountType]);
 
   // Use sidebar hook - must be called unconditionally (React rules)
   // The header is within SidebarProvider in dispatcher layout, so this is safe

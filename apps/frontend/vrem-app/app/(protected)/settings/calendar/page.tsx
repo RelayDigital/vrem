@@ -101,6 +101,7 @@ const DAYS_ORDER: DayOfWeek[] = [
 export default function CalendarSettingsPage() {
   const { user, isLoading } = useRequireRole([
     "COMPANY",
+    "PROVIDER",
     "AGENT",
     "TECHNICIAN",
     "EDITOR",
@@ -108,6 +109,9 @@ export default function CalendarSettingsPage() {
   ]);
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // AGENT users can connect calendars but don't need availability/work hours settings
+  const isAgentUser = user?.accountType === "AGENT";
   const [icsFeed, setIcsFeed] = useState<IcsFeed | null>(null);
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -417,59 +421,148 @@ export default function CalendarSettingsPage() {
 
   return (
     <div className="space-y-8">
-      {/* Availability Status Section */}
-      <SettingsRightContentSection
-        id="availability-status"
-        title="Availability Status"
-        description="Control your overall availability for job assignments."
-      >
-        <div className="space-y-6">
-          {/* Main Availability Toggle */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label>Available for work</Label>
-              <Muted className="text-xs">
-                When disabled, you won't receive new job assignments.
-              </Muted>
+      {/* Availability Status Section - Hidden for AGENT users */}
+      {!isAgentUser && (
+        <SettingsRightContentSection
+          id="availability-status"
+          title="Availability Status"
+          description="Control your overall availability for job assignments."
+        >
+          <div className="space-y-6">
+            {/* Main Availability Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label>Available for work</Label>
+                <Muted className="text-xs">
+                  When disabled, you won't receive new job assignments.
+                </Muted>
+              </div>
+              <Switch
+                checked={availability?.status.isAvailable ?? true}
+                onCheckedChange={handleAvailabilityToggle}
+                disabled={isSavingAvailability}
+              />
             </div>
-            <Switch
-              checked={availability?.status.isAvailable ?? true}
-              onCheckedChange={handleAvailabilityToggle}
-              disabled={isSavingAvailability}
-            />
-          </div>
 
-          {/* Auto-decline Toggle */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label>Auto-decline new assignments</Label>
-              <Muted className="text-xs">
-                Automatically decline new job assignments when you're unavailable.
-              </Muted>
+            {/* Auto-decline Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label>Auto-decline new assignments</Label>
+                <Muted className="text-xs">
+                  Automatically decline new job assignments when you're unavailable.
+                </Muted>
+              </div>
+              <Switch
+                checked={availability?.status.autoDeclineBookings ?? false}
+                onCheckedChange={handleAutoDeclineToggle}
+                disabled={isSavingAvailability}
+              />
             </div>
-            <Switch
-              checked={availability?.status.autoDeclineBookings ?? false}
-              onCheckedChange={handleAutoDeclineToggle}
-              disabled={isSavingAvailability}
-            />
-          </div>
 
-          {/* Availability Note */}
-          <div className="space-y-3">
-            <Label htmlFor="availability-note">Availability Note</Label>
-            <Textarea
-              id="availability-note"
-              placeholder="e.g., On vacation until Jan 15"
-              value={availabilityNote}
-              onChange={(e) => setAvailabilityNote(e.target.value)}
-              className="resize-none"
-              rows={2}
-            />
-            <div className="flex justify-end">
+            {/* Availability Note */}
+            <div className="space-y-3">
+              <Label htmlFor="availability-note">Availability Note</Label>
+              <Textarea
+                id="availability-note"
+                placeholder="e.g., On vacation until Jan 15"
+                value={availabilityNote}
+                onChange={(e) => setAvailabilityNote(e.target.value)}
+                className="resize-none"
+                rows={2}
+              />
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveNote}
+                  disabled={isSavingAvailability || availabilityNote === (availability?.status.availabilityNote || "")}
+                >
+                  {isSavingAvailability ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Note"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </SettingsRightContentSection>
+      )}
+
+      {/* Work Hours Section - Hidden for AGENT users */}
+      {!isAgentUser && (
+        <SettingsRightContentSection
+          id="work-hours"
+          title="Work Hours"
+          description="Set your regular working hours for each day of the week."
+        >
+          <div className="space-y-4">
+            <Alert>
+              <Clock className="h-4 w-4" />
+              <AlertTitle>Schedule your availability</AlertTitle>
+              <AlertDescription>
+                Jobs will only be assigned during your working hours. Disable days you don't work.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-3">
+              {DAYS_ORDER.map((day) => {
+                const dayWorkHour = workHours.find((wh) => wh.dayOfWeek === day);
+                if (!dayWorkHour) return null;
+
+                return (
+                  <div
+                    key={day}
+                    className="flex items-center gap-4 p-3 rounded-lg border bg-card"
+                  >
+                    <div className="w-28 flex items-center gap-3">
+                      <Switch
+                        checked={dayWorkHour.isEnabled}
+                        onCheckedChange={(checked) =>
+                          handleWorkHourChange(day, "isEnabled", checked)
+                        }
+                      />
+                      <span className={dayWorkHour.isEnabled ? "font-medium" : "text-muted-foreground"}>
+                        {DAY_LABELS[day]}
+                      </span>
+                    </div>
+
+                    {dayWorkHour.isEnabled ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Input
+                          type="time"
+                          value={dayWorkHour.startTime}
+                          onChange={(e) =>
+                            handleWorkHourChange(day, "startTime", e.target.value)
+                          }
+                          className="w-32"
+                        />
+                        <span className="text-muted-foreground">to</span>
+                        <Input
+                          type="time"
+                          value={dayWorkHour.endTime}
+                          onChange={(e) =>
+                            handleWorkHourChange(day, "endTime", e.target.value)
+                          }
+                          className="w-32"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex-1 text-muted-foreground text-sm">
+                        Not working
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end pt-4">
               <Button
-                size="sm"
-                onClick={handleSaveNote}
-                disabled={isSavingAvailability || availabilityNote === (availability?.status.availabilityNote || "")}
+                onClick={handleSaveWorkHours}
+                disabled={isSavingAvailability}
               >
                 {isSavingAvailability ? (
                   <>
@@ -477,98 +570,13 @@ export default function CalendarSettingsPage() {
                     Saving...
                   </>
                 ) : (
-                  "Save Note"
+                  "Save Work Hours"
                 )}
               </Button>
             </div>
           </div>
-        </div>
-      </SettingsRightContentSection>
-
-      {/* Work Hours Section */}
-      <SettingsRightContentSection
-        id="work-hours"
-        title="Work Hours"
-        description="Set your regular working hours for each day of the week."
-      >
-        <div className="space-y-4">
-          <Alert>
-            <Clock className="h-4 w-4" />
-            <AlertTitle>Schedule your availability</AlertTitle>
-            <AlertDescription>
-              Jobs will only be assigned during your working hours. Disable days you don't work.
-            </AlertDescription>
-          </Alert>
-
-          <div className="space-y-3">
-            {DAYS_ORDER.map((day) => {
-              const dayWorkHour = workHours.find((wh) => wh.dayOfWeek === day);
-              if (!dayWorkHour) return null;
-
-              return (
-                <div
-                  key={day}
-                  className="flex items-center gap-4 p-3 rounded-lg border bg-card"
-                >
-                  <div className="w-28 flex items-center gap-3">
-                    <Switch
-                      checked={dayWorkHour.isEnabled}
-                      onCheckedChange={(checked) =>
-                        handleWorkHourChange(day, "isEnabled", checked)
-                      }
-                    />
-                    <span className={dayWorkHour.isEnabled ? "font-medium" : "text-muted-foreground"}>
-                      {DAY_LABELS[day]}
-                    </span>
-                  </div>
-
-                  {dayWorkHour.isEnabled ? (
-                    <div className="flex items-center gap-2 flex-1">
-                      <Input
-                        type="time"
-                        value={dayWorkHour.startTime}
-                        onChange={(e) =>
-                          handleWorkHourChange(day, "startTime", e.target.value)
-                        }
-                        className="w-32"
-                      />
-                      <span className="text-muted-foreground">to</span>
-                      <Input
-                        type="time"
-                        value={dayWorkHour.endTime}
-                        onChange={(e) =>
-                          handleWorkHourChange(day, "endTime", e.target.value)
-                        }
-                        className="w-32"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex-1 text-muted-foreground text-sm">
-                      Not working
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex justify-end pt-4">
-            <Button
-              onClick={handleSaveWorkHours}
-              disabled={isSavingAvailability}
-            >
-              {isSavingAvailability ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Work Hours"
-              )}
-            </Button>
-          </div>
-        </div>
-      </SettingsRightContentSection>
+        </SettingsRightContentSection>
+      )}
 
       {/* Connected Calendars Section */}
       {nylasConfigured && (

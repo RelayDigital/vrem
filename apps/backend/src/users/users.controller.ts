@@ -12,40 +12,102 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { AccountActionDto } from './dto/account-action.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OrgContextGuard } from '../auth/org-context.guard';
 import { OrgRolesGuard } from '../auth/org-roles.guard';
 import { OrgRoles } from '../auth/org-roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/auth-context';
 import { UserAccountType } from '@prisma/client';
 
+/**
+ * User account management endpoints
+ *
+ * /me/* endpoints - Authenticated user managing their own account
+ * Other endpoints - Admin-level access for managing users
+ */
 @Controller('users')
-@UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
-@OrgRoles('OWNER', 'ADMIN')
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
+  // =============================
+  // Self-service account endpoints
+  // =============================
+
+  /**
+   * Deactivate the current user's account
+   * Requires password confirmation
+   */
+  @Post('me/deactivate')
+  @UseGuards(JwtAuthGuard)
+  deactivateMyAccount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AccountActionDto,
+  ) {
+    return this.usersService.deactivateAccount(user.id, dto.password);
+  }
+
+  /**
+   * Reactivate the current user's account
+   * Only works if account was previously deactivated
+   */
+  @Post('me/reactivate')
+  @UseGuards(JwtAuthGuard)
+  reactivateMyAccount(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.reactivateAccount(user.id);
+  }
+
+  /**
+   * Permanently delete the current user's account
+   * Requires password confirmation
+   * This action cannot be undone
+   */
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  deleteMyAccount(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AccountActionDto,
+  ) {
+    return this.usersService.deleteAccount(user.id, dto.password);
+  }
+
+  // =============================
+  // Admin endpoints
+  // =============================
+
   @Post()
+  @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
+  @OrgRoles('OWNER', 'ADMIN')
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
   }
 
   @Get()
+  @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
+  @OrgRoles('OWNER', 'ADMIN')
   findAll(@Query('role') role?: string) {
     if (role) return this.usersService.findByRole(role as UserAccountType);
     return this.usersService.findAll();
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
+  @OrgRoles('OWNER', 'ADMIN')
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
+  @OrgRoles('OWNER', 'ADMIN')
   update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return this.usersService.update(id, dto);
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
+  @OrgRoles('OWNER', 'ADMIN')
   delete(@Param('id') id: string) {
     return this.usersService.delete(id);
   }

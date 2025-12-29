@@ -44,7 +44,8 @@ interface SettingsSection {
     id: string;
     label: string;
     path: string;
-    roles?: string[]; // If not specified, available to all
+    roles?: string[]; // If not specified, available to all org roles
+    accountTypes?: string[]; // If specified, only show for these account types (AGENT, PROVIDER, COMPANY)
   }[];
 }
 
@@ -253,15 +254,25 @@ export default function SettingsLayout({
   };
 
   const isItemAllowed = (item: SettingsSection["items"][0]) => {
-    if (!item.roles) return true; // Available to all
     if (!user || !uiContext) return false;
-    
+
+    // Check account type restriction first
+    if (item.accountTypes) {
+      const accountTypeUpper = (uiContext.accountType || '').toString().toUpperCase();
+      if (!item.accountTypes.some(t => t.toUpperCase() === accountTypeUpper)) {
+        return false;
+      }
+    }
+
+    // If no role restriction, allow the item
+    if (!item.roles) return true;
+
     // For company orgs, check if user has the required role
     if (uiContext.showSidebar) {
       const roleUpper = (uiContext.orgRole || '').toString().toUpperCase();
       return item.roles.some(r => r.toUpperCase() === roleUpper);
     }
-    
+
     // For personal/team orgs, agents don't have org-level permissions
     return false;
   };

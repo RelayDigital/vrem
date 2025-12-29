@@ -13,6 +13,7 @@ model User {
   password             String
   createdAt            DateTime                  @default(now())
   updatedAt            DateTime                  @updatedAt
+  deactivatedAt        DateTime?                 // Account deactivation timestamp (soft delete)
   accountType          UserAccountType           @default(AGENT)
   messages             Message[]
   messageReads         MessageRead[]

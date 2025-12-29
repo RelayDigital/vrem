@@ -26,6 +26,195 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { P } from "@/components/ui/typography";
 import { useAuth } from "@/context/auth-context";
 import { useProjectPermissions } from "@/hooks/useProjectPermissions";
+import { useMemo } from "react";
+
+// Aurora/Mesh gradient color palettes for each status
+// Using mid-tone base colors to ensure visibility against both light and dark backgrounds
+const getAuroraColors = (status: string) => {
+  switch (status) {
+    case "pending":
+      return {
+        base: "bg-amber-100 dark:bg-amber-900",
+        primary: "bg-amber-400/60",
+        secondary: "bg-orange-400/50",
+        accent: "bg-yellow-300/45",
+        highlight: "bg-amber-500/40",
+      };
+    case "assigned":
+      return {
+        base: "bg-blue-100 dark:bg-blue-900",
+        primary: "bg-blue-400/60",
+        secondary: "bg-indigo-400/50",
+        accent: "bg-cyan-300/45",
+        highlight: "bg-blue-500/40",
+      };
+    case "in_progress":
+      return {
+        base: "bg-violet-100 dark:bg-violet-900",
+        primary: "bg-violet-400/60",
+        secondary: "bg-purple-400/50",
+        accent: "bg-fuchsia-300/45",
+        highlight: "bg-indigo-500/40",
+      };
+    case "editing":
+      return {
+        base: "bg-pink-100 dark:bg-pink-900",
+        primary: "bg-pink-400/60",
+        secondary: "bg-rose-400/50",
+        accent: "bg-fuchsia-300/45",
+        highlight: "bg-pink-500/40",
+      };
+    case "delivered":
+      return {
+        base: "bg-emerald-100 dark:bg-emerald-900",
+        primary: "bg-emerald-400/60",
+        secondary: "bg-teal-400/50",
+        accent: "bg-green-300/45",
+        highlight: "bg-emerald-500/40",
+      };
+    case "cancelled":
+    default:
+      return {
+        base: "bg-slate-200 dark:bg-slate-800",
+        primary: "bg-slate-400/60",
+        secondary: "bg-gray-400/50",
+        accent: "bg-zinc-300/45",
+        highlight: "bg-slate-500/40",
+      };
+  }
+};
+
+// Simple seeded random number generator based on string
+const seededRandom = (seed: string) => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  // Return a function that generates deterministic "random" values
+  return () => {
+    hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b);
+    hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35);
+    hash = (hash ^ (hash >>> 16)) >>> 0;
+    return (hash % 1000) / 1000;
+  };
+};
+
+// Aurora gradient component - mesh-style gradient with blurred color blobs
+// Moved outside JobCard to prevent recreation on each render
+const AuroraGradient = ({ status, jobId, className }: { status: string; jobId: string; className?: string }) => {
+  const colors = getAuroraColors(status);
+
+  // Generate stable random values based on job ID (deterministic)
+  // Blobs can appear anywhere in the container - not confined to zones
+  const randomValues = useMemo(() => {
+    const rand = seededRandom(jobId);
+
+    // Each blob can appear anywhere: -30% to 50% allows blobs to extend past edges
+    // This ensures colors aren't always in the same spots
+    const randomPosition = () => ({
+      top: `${-30 + rand() * 80}%`,
+      left: `${-30 + rand() * 80}%`,
+    });
+
+    return {
+      // Blob 1 - primary (large, anywhere)
+      blob1: {
+        ...randomPosition(),
+        width: `${65 + rand() * 15}%`,
+        height: `${65 + rand() * 15}%`,
+      },
+      // Blob 2 - secondary (large, anywhere)
+      blob2: {
+        ...randomPosition(),
+        width: `${60 + rand() * 15}%`,
+        height: `${60 + rand() * 15}%`,
+      },
+      // Blob 3 - accent (medium, anywhere)
+      blob3: {
+        ...randomPosition(),
+        width: `${40 + rand() * 15}%`,
+        height: `${40 + rand() * 15}%`,
+      },
+      // Blob 4 - highlight (smaller, anywhere)
+      blob4: {
+        ...randomPosition(),
+        width: `${25 + rand() * 12}%`,
+        height: `${25 + rand() * 12}%`,
+      },
+      // Rotation for organic feel
+      rotation1: rand() * 60,
+      rotation2: rand() * 60,
+      rotation3: rand() * 60,
+      rotation4: rand() * 60,
+    };
+  }, [jobId]);
+
+  return (
+    <div className={cn("absolute inset-0 overflow-hidden", colors.base, className)}>
+      {/* Primary blob */}
+      <div
+        className={cn(
+          "absolute rounded-full blur-3xl",
+          colors.primary
+        )}
+        style={{
+          top: randomValues.blob1.top,
+          left: randomValues.blob1.left,
+          width: randomValues.blob1.width,
+          height: randomValues.blob1.height,
+          transform: `rotate(${randomValues.rotation1}deg)`,
+        }}
+      />
+
+      {/* Secondary blob */}
+      <div
+        className={cn(
+          "absolute rounded-full blur-3xl",
+          colors.secondary
+        )}
+        style={{
+          top: randomValues.blob2.top,
+          left: randomValues.blob2.left,
+          width: randomValues.blob2.width,
+          height: randomValues.blob2.height,
+          transform: `rotate(${randomValues.rotation2}deg)`,
+        }}
+      />
+
+      {/* Accent blob */}
+      <div
+        className={cn(
+          "absolute rounded-full blur-2xl",
+          colors.accent
+        )}
+        style={{
+          top: randomValues.blob3.top,
+          left: randomValues.blob3.left,
+          width: randomValues.blob3.width,
+          height: randomValues.blob3.height,
+          transform: `rotate(${randomValues.rotation3}deg)`,
+        }}
+      />
+
+      {/* Highlight blob */}
+      <div
+        className={cn(
+          "absolute rounded-full blur-2xl",
+          colors.highlight
+        )}
+        style={{
+          top: randomValues.blob4.top,
+          left: randomValues.blob4.left,
+          width: randomValues.blob4.width,
+          height: randomValues.blob4.height,
+          transform: `rotate(${randomValues.rotation4}deg)`,
+        }}
+      />
+    </div>
+  );
+};
 
 interface JobCardProps {
   job: JobRequest;
@@ -107,25 +296,6 @@ export function JobCard({
     }
   };
 
-  const getStatusGradient = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-gradient-to-br from-status-pending/20 via-status-pending/15 to-status-pending/10";
-      case "assigned":
-        return "bg-gradient-to-br from-status-assigned/20 via-status-assigned/15 to-status-assigned/10";
-      case "in_progress":
-        return "bg-gradient-to-br from-status-in-progress/20 via-status-in-progress/15 to-status-in-progress/10";
-      case "editing":
-        return "bg-gradient-to-br from-status-editing/20 via-status-editing/15 to-status-editing/10";
-      case "delivered":
-        return "bg-gradient-to-br from-status-delivered/20 via-status-delivered/15 to-status-delivered/10";
-      case "cancelled":
-        return "bg-gradient-to-br from-status-cancelled/20 via-status-cancelled/15 to-status-cancelled/10";
-      default:
-        return "bg-gradient-to-br from-status-cancelled/20 via-status-cancelled/15 to-status-cancelled/10";
-    }
-  };
-
   // Map JobRequest fields to Project-compatible shape for permission check
   const projectForPermissions = {
     projectManagerId: job.projectManagerId ?? undefined,
@@ -162,19 +332,19 @@ export function JobCard({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        whileHover={{ y: -2 }}
         transition={{ duration: 0.2 }}
         className="h-full"
       >
         <Card
           className={cn(
-            "group relative bg-card rounded-xl border-none overflow-hidden transition-all duration-200 w-full h-40",
-            "hover:shadow-md",
+            "group relative bg-transparent rounded-md border-none overflow-hidden transition-all duration-200 w-full h-40",
             onClick ? "cursor-pointer" : "",
             selected && "ring-0"
           )}
           onClick={onClick}
         >
-          {/* Full-bleed Background Image or Gradient */}
+          {/* Full-bleed Background Image or Aurora Gradient */}
           <div className="absolute inset-0">
             {job.propertyImage && job.status === "delivered" ? (
               <ImageWithFallback
@@ -183,17 +353,12 @@ export function JobCard({
                 className="size-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
               />
             ) : (
-              <div
-                className={cn(
-                  "size-full",
-                  getStatusGradient(job.status)
-                )}
-              />
+              <AuroraGradient status={job.status} jobId={job.id} className="group-hover:scale-[1.02] transition-transform duration-300 pointer-events-none" />
             )}
           </div>
 
           {/* Blur overlay for text readability - gradient from transparent to blurred */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-card/90 via-card/70 to-transparent" />
 
           {/* Content overlay */}
           <div className="relative z-10 flex flex-col justify-between h-full p-3">
@@ -204,13 +369,31 @@ export function JobCard({
                 <Badge
                   variant="secondary"
                   className={cn(
-                    "flex items-center gap-1 rounded-full backdrop-blur-md bg-white/20 border-0 text-white",
-                    priorityConfig.priority === "urgent" && "bg-red-500/30",
-                    priorityConfig.priority === "rush" && "bg-amber-500/30"
+                    "flex items-center gap-1 rounded-full backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200",
+                    priorityConfig.priority === "urgent" &&
+                      "bg-priority-urgent/10 text-priority-urgent",
+                    priorityConfig.priority === "rush" &&
+                      "bg-priority-rush/10 text-priority-rush",
+                    priorityConfig.priority === "standard" &&
+                      "bg-priority-standard/10 text-priority-standard"
                   )}
                 >
-                  <PriorityIcon className="size-3" />
-                  <span className="text-[10px] font-medium">
+                  <PriorityIcon
+                    className={cn(
+                      "size-3",
+                      priorityConfig.priority === "urgent" && "text-priority-urgent",
+                      priorityConfig.priority === "rush" && "text-priority-rush",
+                      priorityConfig.priority === "standard" && "text-priority-standard"
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "text-[10px] font-medium",
+                      priorityConfig.priority === "urgent" && "text-priority-urgent",
+                      priorityConfig.priority === "rush" && "text-priority-rush",
+                      priorityConfig.priority === "standard" && "text-priority-standard"
+                    )}
+                  >
                     {priorityConfig.label}
                   </span>
                 </Badge>
@@ -219,7 +402,15 @@ export function JobCard({
                 {job.orderNumber && (
                   <Badge
                     variant="secondary"
-                    className="rounded-full backdrop-blur-md bg-white/20 border-0 text-white"
+                    className={cn(
+                      "rounded-full backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200",
+                      priorityConfig.priority === "urgent" &&
+                        "bg-priority-urgent/10 text-priority-urgent",
+                      priorityConfig.priority === "rush" &&
+                        "bg-priority-rush/10 text-priority-rush",
+                      priorityConfig.priority === "standard" &&
+                        "bg-priority-standard/10 text-priority-standard"
+                    )}
                   >
                     <span className="text-[10px] font-medium">
                       #{job.orderNumber}
@@ -233,7 +424,7 @@ export function JobCard({
                 {/* Status Badge */}
                 <Badge
                   variant="secondary"
-                  className="flex items-center gap-1.5 rounded-full backdrop-blur-md bg-white/20 border-0"
+                  className="flex items-center gap-1.5 rounded-full backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200"
                 >
                   <div
                     className={cn(
@@ -246,7 +437,17 @@ export function JobCard({
                       (statusConfig.status === "cancelled" || statusConfig.status === "default") && "bg-status-cancelled"
                     )}
                   />
-                  <span className="text-[10px] font-medium text-white">
+                  <span
+                    className={cn(
+                      "text-[10px] font-medium",
+                      statusConfig.status === "pending" && "text-status-pending",
+                      statusConfig.status === "assigned" && "text-status-assigned",
+                      statusConfig.status === "in_progress" && "text-status-in-progress",
+                      statusConfig.status === "editing" && "text-status-editing",
+                      statusConfig.status === "delivered" && "text-status-delivered",
+                      (statusConfig.status === "cancelled" || statusConfig.status === "default") && "text-status-cancelled"
+                    )}
+                  >
                     {statusConfig.label}
                   </span>
                 </Badge>
@@ -255,12 +456,11 @@ export function JobCard({
                 {onViewInProjectManagement && (
                   <Button
                     size="icon"
-                    variant="secondary"
                     onClick={(e) => {
                       e.stopPropagation();
                       onViewInProjectManagement();
                     }}
-                    className="size-6 rounded-full backdrop-blur-md bg-white/20 border-0 hover:bg-white/30 text-white"
+                    className="size-6 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80 active:scale-[0.97]"
                   >
                     <ExternalLink className="size-3" />
                     <span className="sr-only">View in job management</span>
@@ -274,7 +474,7 @@ export function JobCard({
               {/* Address */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <h3 className="text-sm font-semibold text-white leading-tight line-clamp-1 drop-shadow-sm">
+                  <h3 className="text-sm font-semibold text-foreground leading-tight line-clamp-1">
                     {job.propertyAddress}
                   </h3>
                 </TooltipTrigger>
@@ -284,13 +484,13 @@ export function JobCard({
               </Tooltip>
 
               {/* Client Name */}
-              <p className="text-xs text-white/70">
+              <p className="text-xs text-muted-foreground">
                 {job.clientName}
               </p>
 
               {/* Bottom Row - Date, Time, Media Types */}
               <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-3 text-xs text-white/80">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <div className="inline-flex items-center gap-1">
                     <Calendar className="size-3" />
                     <span>{formattedDate}</span>
@@ -308,8 +508,8 @@ export function JobCard({
                     return (
                       <Tooltip key={type}>
                         <TooltipTrigger asChild>
-                          <div className="p-1 rounded-full backdrop-blur-md bg-white/20">
-                            <Icon className="size-3 text-white" />
+                          <div className="p-1 rounded-full backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200">
+                            <Icon className="size-3 text-muted-foreground" />
                           </div>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="capitalize">
@@ -338,8 +538,7 @@ export function JobCard({
     >
       <Card
         className={cn(
-          "group relative flex flex-col bg-card rounded-md border-none overflow-hidden transition-all duration-200 size-full",
-          "hover:shadow-xs"
+          "group relative flex flex-col bg-transparent rounded-md border-none overflow-hidden transition-all duration-200 size-full",
           // selected
           //   ? "border-primary ring-2 ring-primary/20"
           //   : "",
@@ -347,7 +546,7 @@ export function JobCard({
         onClick={onClick}
       >
         {/* Media Section */}
-        <CardHeader className="relative flex flex-col justify-between w-full aspect-video overflow-hidden p-2!">
+        <CardHeader className="relative flex flex-col justify-between w-full aspect-video shrink-0 overflow-hidden p-2! rounded-b-md">
           {job.propertyImage && job.status === "delivered" ? (
             <ImageWithFallback
               src={job.propertyImage}
@@ -355,12 +554,7 @@ export function JobCard({
               className="size-full object-cover absolute top-0 left-0 pointer-events-none group-hover:scale-[1.04] transition-transform duration-200"
             />
           ) : (
-            <div
-              className={cn(
-                "size-full absolute top-0 left-0",
-                getStatusGradient(job.status)
-              )}
-            />
+            <AuroraGradient status={job.status} jobId={job.id} className="group-hover:scale-[1.04] transition-transform duration-300 pointer-events-none" />
           )}
 
           {/* Top Badges */}
@@ -532,7 +726,7 @@ export function JobCard({
 
             {/* Specs Row - Media Types */}
             <div className="flex items-center gap-2">
-              {job.mediaType.map((type, index) => {
+              {job.mediaType.map((type) => {
                 const Icon = getMediaIcon(type);
                 return (
                   <div key={type} className="inline-flex items-center gap-1">
@@ -553,17 +747,14 @@ export function JobCard({
             </div>
           </div>
           {/* Address Text */}
-          <div className="mb-2">
-            {/* <Tooltip>
-              <TooltipTrigger asChild> */}
+          <div className="space-y-1 mb-2">
             <P className="text-[13px] leading-[1.4] text-muted-foreground line-clamp-2">
               {job.propertyAddress}
             </P>
-            {/* </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs">
-                <P className="wrap-break-word">{job.propertyAddress}</P>
-              </TooltipContent>
-            </Tooltip> */}
+            {/* Customer Name - below address */}
+            <p className="text-xs text-muted-foreground">
+              {job.clientName}
+            </p>
           </div>
 
           {/* Date/Time Row */}
@@ -580,13 +771,6 @@ export function JobCard({
                 {job.scheduledTime}
               </span>
             </div>
-          </div>
-
-          {/* Listing Attribution - Customer Name */}
-          <div className="mt-1">
-            <P className="text-[11px] leading-[1.4] text-muted-foreground italic">
-              Customer: {job.clientName}
-            </P>
           </div>
 
           {/* Requirements/Notes */}
