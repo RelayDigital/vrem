@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { JobRequest, Technician } from "../../../types";
 import { ChatMessage } from "../../../types/chat";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
@@ -8,15 +8,18 @@ import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { format } from "date-fns";
 import {
-  Flag,
-  MessageSquare,
-  Link as LinkIcon,
-  CheckSquare2,
   MoreHorizontal,
   Star,
   AlertCircle,
   Clock,
   Zap,
+  Calendar,
+  Camera,
+  Video,
+  Plane,
+  Box,
+  FileImage,
+  Compass,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -35,10 +38,130 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "../../ui/hover-card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "../../ui/tooltip";
 import { cn } from "../../../lib/utils";
-import { H3, P } from "@/components/ui/typography";
-import { useAuth } from "@/context/auth-context";
+import { P } from "@/components/ui/typography";
 import { useProjectPermissions } from "@/hooks/useProjectPermissions";
+
+// Aurora/Mesh gradient color palettes for each status
+const getAuroraColors = (status: string) => {
+  switch (status) {
+    case "pending":
+      return {
+        base: "bg-amber-100 dark:bg-amber-900",
+        primary: "bg-amber-400/60",
+        secondary: "bg-orange-400/50",
+        accent: "bg-yellow-300/45",
+        highlight: "bg-amber-500/40",
+      };
+    case "assigned":
+      return {
+        base: "bg-blue-100 dark:bg-blue-900",
+        primary: "bg-blue-400/60",
+        secondary: "bg-indigo-400/50",
+        accent: "bg-cyan-300/45",
+        highlight: "bg-blue-500/40",
+      };
+    case "in_progress":
+      return {
+        base: "bg-violet-100 dark:bg-violet-900",
+        primary: "bg-violet-400/60",
+        secondary: "bg-purple-400/50",
+        accent: "bg-fuchsia-300/45",
+        highlight: "bg-indigo-500/40",
+      };
+    case "editing":
+      return {
+        base: "bg-pink-100 dark:bg-pink-900",
+        primary: "bg-pink-400/60",
+        secondary: "bg-rose-400/50",
+        accent: "bg-fuchsia-300/45",
+        highlight: "bg-pink-500/40",
+      };
+    case "delivered":
+      return {
+        base: "bg-emerald-100 dark:bg-emerald-900",
+        primary: "bg-emerald-400/60",
+        secondary: "bg-teal-400/50",
+        accent: "bg-green-300/45",
+        highlight: "bg-emerald-500/40",
+      };
+    case "cancelled":
+    default:
+      return {
+        base: "bg-slate-200 dark:bg-slate-800",
+        primary: "bg-slate-400/60",
+        secondary: "bg-gray-400/50",
+        accent: "bg-zinc-300/45",
+        highlight: "bg-slate-500/40",
+      };
+  }
+};
+
+// Simple seeded random number generator based on string
+const seededRandom = (seed: string) => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return () => {
+    hash = Math.imul(hash ^ (hash >>> 16), 0x85ebca6b);
+    hash = Math.imul(hash ^ (hash >>> 13), 0xc2b2ae35);
+    hash = (hash ^ (hash >>> 16)) >>> 0;
+    return (hash % 1000) / 1000;
+  };
+};
+
+// Aurora gradient component for kanban cards
+const AuroraGradientKanban = ({ status, jobId, className }: { status: string; jobId: string; className?: string }) => {
+  const colors = getAuroraColors(status);
+
+  const randomValues = useMemo(() => {
+    const rand = seededRandom(jobId);
+    const randomPosition = () => ({
+      top: `${-30 + rand() * 80}%`,
+      left: `${-30 + rand() * 80}%`,
+    });
+
+    return {
+      blob1: { ...randomPosition(), width: `${65 + rand() * 15}%`, height: `${65 + rand() * 15}%` },
+      blob2: { ...randomPosition(), width: `${60 + rand() * 15}%`, height: `${60 + rand() * 15}%` },
+      blob3: { ...randomPosition(), width: `${40 + rand() * 15}%`, height: `${40 + rand() * 15}%` },
+      blob4: { ...randomPosition(), width: `${25 + rand() * 12}%`, height: `${25 + rand() * 12}%` },
+      rotation1: rand() * 60,
+      rotation2: rand() * 60,
+      rotation3: rand() * 60,
+      rotation4: rand() * 60,
+    };
+  }, [jobId]);
+
+  return (
+    <div className={cn("absolute inset-0 overflow-hidden", colors.base, className)}>
+      <div className={cn("absolute rounded-full blur-3xl", colors.primary)} style={{ ...randomValues.blob1, transform: `rotate(${randomValues.rotation1}deg)` }} />
+      <div className={cn("absolute rounded-full blur-3xl", colors.secondary)} style={{ ...randomValues.blob2, transform: `rotate(${randomValues.rotation2}deg)` }} />
+      <div className={cn("absolute rounded-full blur-2xl", colors.accent)} style={{ ...randomValues.blob3, transform: `rotate(${randomValues.rotation3}deg)` }} />
+      <div className={cn("absolute rounded-full blur-2xl", colors.highlight)} style={{ ...randomValues.blob4, transform: `rotate(${randomValues.rotation4}deg)` }} />
+    </div>
+  );
+};
+
+// Get media type icon
+const getMediaIcon = (type: string) => {
+  const normalizedType = type.toLowerCase();
+  if (normalizedType.includes("photo")) return Camera;
+  if (normalizedType.includes("video")) return Video;
+  if (normalizedType.includes("drone") || normalizedType.includes("aerial")) return Plane;
+  if (normalizedType.includes("3d") || normalizedType.includes("matterport")) return Box;
+  if (normalizedType.includes("floor")) return FileImage;
+  if (normalizedType.includes("virtual") || normalizedType.includes("tour")) return Compass;
+  return Camera;
+};
 
 interface JobCardKanbanProps {
   job: JobRequest;
@@ -186,8 +309,7 @@ export function JobCardKanban({
   const cardContent = (
     <div
       className={cn(
-        "group relative w-full max-w-full rounded-md bg-card px-4 py-4 transition-all duration-200 space-y-2",
-        "hover:shadow-xs",
+        "group relative w-full max-w-full rounded-md overflow-hidden transition-all duration-200",
         onClick || onJobClick ? "cursor-pointer" : ""
       )}
       onClick={(e) => {
@@ -216,284 +338,252 @@ export function JobCardKanban({
         }
       }}
     >
-          {/* Status Pill Row */}
-          <div className="flex items-center justify-between">
+      {/* Aurora Gradient Background */}
+      <AuroraGradientKanban
+        status={job.status}
+        jobId={job.id}
+        className="group-hover:scale-[1.02] transition-transform duration-300 pointer-events-none"
+      />
+
+      {/* Blur overlay for text readability */}
+      <div className="absolute inset-0 bg-gradient-to-b from-card/80 via-card/60 to-card/90" />
+
+      {/* Content overlay */}
+      <div className="relative z-10 flex flex-col justify-between h-full p-3 space-y-3">
+        {/* Top Row - Priority, Order Number, Status */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Priority Badge */}
             <Badge
-              variant="muted"
-              className="inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 py-1"
-              style={{
-                backgroundColor: statusConfig.bgColor,
-                color: statusConfig.textColor,
-              }}
+              variant="secondary"
+              className={cn(
+                "flex items-center gap-1 rounded-full backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200",
+                priorityConfig.priority === "urgent" && "bg-priority-urgent/10 text-priority-urgent",
+                priorityConfig.priority === "rush" && "bg-priority-rush/10 text-priority-rush",
+                priorityConfig.priority === "standard" && "bg-priority-standard/10 text-priority-standard"
+              )}
             >
-              <div
-                className="h-1.5 w-1.5 rounded-full"
-                style={{
-                  backgroundColor: statusConfig.dotColor,
-                }}
-              />
-              <span className="text-xs font-medium leading-[1.4]">
-                {statusConfig.label}
-              </span>
-            </Badge>
-            {priorityConfig.label !== "Standard" && (
-              <Badge
-                variant="muted"
+              <PriorityIcon
                 className={cn(
-                  "inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 py-1",
-                  priorityConfig.priority === "urgent" &&
-                    "bg-priority-urgent/10 text-priority-urgent",
-                  priorityConfig.priority === "rush" &&
-                    "bg-priority-rush/10 text-priority-rush",
-                  priorityConfig.priority === "standard" &&
-                    "bg-priority-standard/10 text-priority-standard"
+                  "size-3",
+                  priorityConfig.priority === "urgent" && "text-priority-urgent",
+                  priorityConfig.priority === "rush" && "text-priority-rush",
+                  priorityConfig.priority === "standard" && "text-priority-standard"
+                )}
+              />
+              <span
+                className={cn(
+                  "text-[10px] font-medium",
+                  priorityConfig.priority === "urgent" && "text-priority-urgent",
+                  priorityConfig.priority === "rush" && "text-priority-rush",
+                  priorityConfig.priority === "standard" && "text-priority-standard"
                 )}
               >
-                <PriorityIcon
-                  className={cn(
-                    "size-3.5",
-                    priorityConfig.priority === "urgent" &&
-                      "text-priority-urgent",
-                    priorityConfig.priority === "rush" && "text-priority-rush",
-                    priorityConfig.priority === "standard" &&
-                      "text-priority-standard"
-                  )}
-                />
-                {/* <span
-                  className={cn(
-                    "text-[11px] font-medium hidden sm:inline",
-                    priorityConfig.priority === "urgent" &&
-                      "text-priority-urgent",
-                    priorityConfig.priority === "rush" && "text-priority-rush",
-                    priorityConfig.priority === "standard" &&
-                      "text-priority-standard"
-                  )}
-                >
-                  {priorityConfig.label}
-                </span> */}
-              </Badge>
-            )}
+                {priorityConfig.label}
+              </span>
+            </Badge>
 
             {/* Order Number */}
             {job.orderNumber && (
-              <span className="text-xs font-medium text-muted-foreground ml-auto mr-2">
-                #{job.orderNumber}
-              </span>
+              <Badge
+                variant="secondary"
+                className="rounded-full backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200"
+              >
+                <span className="text-[10px] font-medium">#{job.orderNumber}</span>
+              </Badge>
             )}
+          </div>
 
-            <div 
+          {/* Right side - Status and More button */}
+          <div className="flex items-center gap-1.5">
+            {/* Status Badge */}
+            <Badge
+              variant="secondary"
+              className="flex items-center gap-1.5 rounded-full backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200"
+            >
+              <div
+                className={cn(
+                  "size-1.5 rounded-full",
+                  job.status === "pending" && "bg-status-pending",
+                  job.status === "assigned" && "bg-status-assigned",
+                  job.status === "in_progress" && "bg-status-in-progress",
+                  job.status === "editing" && "bg-status-editing",
+                  job.status === "delivered" && "bg-status-delivered",
+                  job.status === "cancelled" && "bg-status-cancelled"
+                )}
+              />
+              <span
+                className={cn(
+                  "text-[10px] font-medium",
+                  job.status === "pending" && "text-status-pending",
+                  job.status === "assigned" && "text-status-assigned",
+                  job.status === "in_progress" && "text-status-in-progress",
+                  job.status === "editing" && "text-status-editing",
+                  job.status === "delivered" && "text-status-delivered",
+                  job.status === "cancelled" && "text-status-cancelled"
+                )}
+              >
+                {statusConfig.label}
+              </span>
+            </Badge>
+
+            {/* More options dropdown */}
+            <div
               className="relative z-50"
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-              onPointerDown={(e) => {
-                e.stopPropagation();
-              }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-              }}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
             >
               <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    variant="muted"
+                    variant="ghost"
                     size="icon"
-                    className="h-6 w-6 rounded-full"
+                    className="h-6 w-6 rounded-full backdrop-blur-md! bg-card/60! hover:bg-card! transition-colors duration-200"
                     data-dropdown-trigger="true"
                   >
-                    <MoreHorizontal className="h-4 w-4" />
+                    <MoreHorizontal className="h-3.5 w-3.5" />
                     <span className="sr-only">More options</span>
                   </Button>
                 </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="z-10000"
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                }}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                {onJobClick && (
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setDropdownOpen(false);
-                      onJobClick();
-                    }}
-                  >
-                    View Details
-                  </DropdownMenuItem>
-                )}
-                {onViewRankings &&
-                  (job.status === "pending" || job.status === "assigned") &&
-                  !job.assignedTechnicianId &&
-                  canAssignTechnician && (
-                    <DropdownMenuItem
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        setDropdownOpen(false);
-                        onViewRankings();
-                      }}
-                    >
+                <DropdownMenuContent
+                  align="end"
+                  className="z-10000"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  {onJobClick && (
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setDropdownOpen(false); onJobClick(); }}>
+                      View Details
+                    </DropdownMenuItem>
+                  )}
+                  {onViewRankings && (job.status === "pending" || job.status === "assigned") && !job.assignedTechnicianId && canAssignTechnician && (
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setDropdownOpen(false); onViewRankings(); }}>
                       Find Technician
                     </DropdownMenuItem>
                   )}
-                {onChangeTechnician &&
-                  job.assignedTechnicianId &&
-                  (job.status === "assigned" || job.status === "in_progress") &&
-                  canAssignTechnician && (
-                    <DropdownMenuItem
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        setDropdownOpen(false);
-                        onChangeTechnician();
-                      }}
-                    >
+                  {onChangeTechnician && job.assignedTechnicianId && (job.status === "assigned" || job.status === "in_progress") && canAssignTechnician && (
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setDropdownOpen(false); onChangeTechnician(); }}>
                       Change Technician
                     </DropdownMenuItem>
                   )}
-              </DropdownMenuContent>
+                </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
-
-          {/* Card Body */}
-          <div className="space-y-1">
-            <H3 className="line-clamp-2 text-sm font-semibold leading-[1.4] text-foreground">
-              {job.propertyAddress}
-            </H3>
-            {job.requirements && (
-              <P className="line-clamp-2 text-xs leading-normal text-muted-foreground">
-                {job.requirements}
-              </P>
-            )}
-          </div>
-
-          {/* Footer Row */}
-          <div className="flex items-center justify-between gap-4">
-            {/* Assignees */}
-            {assignees.length > 0 && (
-              <div className="flex items-center gap-2">
-                <div className="flex -space-x-2">
-                  {assignees.slice(0, 3).map((assignee, index) => (
-                    <HoverCard key={assignee.id}>
-                      <HoverCardTrigger asChild>
-                        <div className="cursor-pointer">
-                          <Avatar
-                            className="h-6 w-6 border-2 border-card"
-                            style={{ zIndex: assignees.length - index }}
-                          >
-                            <AvatarImage
-                              src={assignee.avatar}
-                              alt={assignee.name}
-                            />
-                            <AvatarFallback className="text-[10px] bg-muted text-muted-foreground">
-                              {assignee.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                        </div>
-                      </HoverCardTrigger>
-                      <HoverCardContent className="w-80 p-0" align="start">
-                        <div className="p-4 space-y-3">
-                          {/* Header */}
-                          <div className="flex items-center gap-3">
-                            <Avatar className="size-12 border-2 border-background">
-                              <AvatarImage
-                                src={assignee.avatar}
-                                alt={assignee.name}
-                              />
-                              <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                                {assignee.name
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 mb-1">
-                                <span className="font-semibold text-sm truncate">
-                                  {assignee.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-0.5">
-                                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                                  <span className="text-xs text-foreground">
-                                    {assignee.rating.overall}
-                                  </span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {assignee.reliability.totalJobs} jobs
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          {/* Stats */}
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
-                              <span className="text-muted-foreground">
-                                On-time
-                              </span>
-                              <span className="text-foreground font-medium">
-                                {(
-                                  assignee.reliability.onTimeRate * 100
-                                ).toFixed(0)}
-                                %
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
-                              <span className="text-muted-foreground">
-                                Delivery
-                              </span>
-                              <span className="text-foreground font-medium">
-                                {assignee.reliability.averageDeliveryTime}h
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </HoverCardContent>
-                    </HoverCard>
-                  ))}
-                  {assignees.length > 3 && (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-card bg-muted text-[10px] font-medium text-muted-foreground">
-                      +{assignees.length - 3}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Date */}
-            <span className="text-xs leading-[1.4] text-muted-foreground">
-              {formattedDate}
-            </span>
-            {/* Comments */}
-            {commentsCount > 0 && (
-              <div className="inline-flex items-center gap-1.5">
-                <span className="text-xs leading-[1.4] text-muted-foreground">
-                  {commentsCount}
-                </span>
-                <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-            )}
-            {/* <div className="inline-flex items-center gap-1.5">
-          <LinkIcon className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs leading-[1.4] text-muted-foreground">
-            {linksCount} Links
-          </span>
         </div>
-        <div className="inline-flex items-center gap-1.5">
-          <CheckSquare2 className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs leading-[1.4] text-muted-foreground">
-            {checklistProgress.done}/{checklistProgress.total}
-          </span>
-        </div> */}
+
+        {/* Middle Section - Address and Client */}
+        <div className="space-y-1 flex-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h3 className="text-sm font-semibold text-foreground leading-tight line-clamp-2">
+                {job.propertyAddress}
+              </h3>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs">
+              <P className="wrap-break-word">{job.propertyAddress}</P>
+            </TooltipContent>
+          </Tooltip>
+          {job.clientName && (
+            <p className="text-xs text-muted-foreground line-clamp-1">
+              {job.clientName}
+            </p>
+          )}
+        </div>
+
+        {/* Bottom Row - Date, Time, Media Types, Assignee */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="inline-flex items-center gap-1">
+              <Calendar className="size-3" />
+              <span>{formattedDate}</span>
+            </div>
+            {job.scheduledTime && (
+              <div className="inline-flex items-center gap-1">
+                <Clock className="size-3" />
+                <span>{job.scheduledTime}</span>
+              </div>
+            )}
           </div>
+
+          <div className="flex items-center gap-1.5">
+            {/* Media Types */}
+            {job.mediaType && job.mediaType.length > 0 && (
+              <div className="flex items-center gap-1">
+                {job.mediaType.slice(0, 3).map((type) => {
+                  const Icon = getMediaIcon(type);
+                  return (
+                    <Tooltip key={type}>
+                      <TooltipTrigger asChild>
+                        <div className="p-1 rounded-full backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200">
+                          <Icon className="size-3 text-muted-foreground" />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="capitalize">
+                        {type}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+                {job.mediaType.length > 3 && (
+                  <span className="text-[10px] text-muted-foreground">+{job.mediaType.length - 3}</span>
+                )}
+              </div>
+            )}
+
+            {/* Assignee Avatar */}
+            {assignees.length > 0 && (
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <div className="cursor-pointer">
+                    <Avatar className="h-6 w-6 border-2 border-card">
+                      <AvatarImage src={assignees[0].avatar} alt={assignees[0].name} />
+                      <AvatarFallback className="text-[10px] bg-muted text-muted-foreground">
+                        {assignees[0].name.split(" ").map((n) => n[0]).join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                </HoverCardTrigger>
+                <HoverCardContent className="w-80 p-0" align="end">
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="size-12 border-2 border-background">
+                        <AvatarImage src={assignees[0].avatar} alt={assignees[0].name} />
+                        <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                          {assignees[0].name.split(" ").map((n) => n[0]).join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="font-semibold text-sm truncate">{assignees[0].name}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-0.5">
+                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                            <span className="text-xs text-foreground">{assignees[0].rating.overall}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{assignees[0].reliability.totalJobs} jobs</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                        <span className="text-muted-foreground">On-time</span>
+                        <span className="text-foreground font-medium">{(assignees[0].reliability.onTimeRate * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                        <span className="text-muted-foreground">Delivery</span>
+                        <span className="text-foreground font-medium">{assignees[0].reliability.averageDeliveryTime}h</span>
+                      </div>
+                    </div>
+                  </div>
+                </HoverCardContent>
+              </HoverCard>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 

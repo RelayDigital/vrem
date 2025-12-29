@@ -1,150 +1,84 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Button } from "../../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
 import { Badge } from "../../ui/badge";
-import { Textarea } from "../../ui/textarea";
 import { Label } from "../../ui/label";
-import { Input } from "../../ui/input";
-import { Checkbox } from "../../ui/checkbox";
 import { H2, H3, Small, Muted, Large } from "../../ui/typography";
 import { ProviderProfile } from "../../../types";
-import { CheckCircle2, ExternalLink, XCircle } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { api } from "@/lib/api";
+
+type ProviderUseCase =
+  | "PHOTOGRAPHY"
+  | "VIDEOGRAPHY"
+  | "DRONE_AERIAL"
+  | "VIRTUAL_TOURS"
+  | "FLOOR_PLANS"
+  | "EDITING"
+  | "STAGING"
+  | "MEASUREMENTS";
+
+const USE_CASE_CONFIG: Record<ProviderUseCase, { label: string; icon: string }> = {
+  PHOTOGRAPHY: { label: "Photography", icon: "📷" },
+  VIDEOGRAPHY: { label: "Videography", icon: "🎬" },
+  DRONE_AERIAL: { label: "Drone/Aerial", icon: "🚁" },
+  VIRTUAL_TOURS: { label: "Virtual Tours", icon: "🏠" },
+  FLOOR_PLANS: { label: "Floor Plans", icon: "📐" },
+  EDITING: { label: "Editing", icon: "🖼️" },
+  STAGING: { label: "Virtual Staging", icon: "🛋️" },
+  MEASUREMENTS: { label: "Measurements", icon: "📏" },
+};
 
 interface ProfileEditorProps {
   provider: ProviderProfile;
-  onSave: (updates: Partial<ProviderProfile>) => void | Promise<void>;
+  onSave?: (updates: Partial<ProviderProfile>) => void | Promise<void>;
   organizationSettingsPath?: string;
 }
 
 export function ProfileEditor({
   provider,
-  onSave,
   organizationSettingsPath,
 }: ProfileEditorProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [profileData, setProfileData] = useState({
-    bio: provider.bio || "",
-    services: provider.services,
-    phone: provider.phone || "",
-    homeLocation: {
-      lat: provider.homeLocation?.lat ?? 51.0447,
-      lng: provider.homeLocation?.lng ?? -114.0719,
-      address: {
-        street: provider.homeLocation?.address.street || "",
-        city: provider.homeLocation?.address.city || "",
-        stateProvince: provider.homeLocation?.address.stateProvince || "",
-        country: provider.homeLocation?.address.country || "",
-        postalCode: provider.homeLocation?.address.postalCode || "",
-      },
-    },
-  });
-  const [isSaving, setIsSaving] = useState(false);
+  const [useCases, setUseCases] = useState<ProviderUseCase[]>([]);
+  const [isLoadingServices, setIsLoadingServices] = useState(true);
 
   useEffect(() => {
-    setProfileData({
-      bio: provider.bio || "",
-      services: provider.services,
-      phone: provider.phone || "",
-      homeLocation: {
-        lat: provider.homeLocation?.lat ?? 51.0447,
-        lng: provider.homeLocation?.lng ?? -114.0719,
-        address: {
-          street: provider.homeLocation?.address.street || "",
-          city: provider.homeLocation?.address.city || "",
-          stateProvince: provider.homeLocation?.address.stateProvince || "",
-          country: provider.homeLocation?.address.country || "",
-          postalCode: provider.homeLocation?.address.postalCode || "",
-        },
-      },
-    });
-  }, [provider]);
+    const loadUseCases = async () => {
+      try {
+        const data = await api.users.getUseCases();
+        setUseCases(data as ProviderUseCase[]);
+      } catch (error) {
+        console.error("Failed to load use cases:", error);
+      } finally {
+        setIsLoadingServices(false);
+      }
+    };
+
+    loadUseCases();
+  }, []);
 
   const addressDisplay = useMemo(() => {
     const { street, city, stateProvince, postalCode, country } =
-      profileData.homeLocation.address;
+      provider.homeLocation?.address || {};
     const parts = [street, city, stateProvince, postalCode, country].filter(
       Boolean
     );
     return parts.join(", ");
-  }, [
-    profileData.homeLocation.address.street,
-    profileData.homeLocation.address.city,
-    profileData.homeLocation.address.stateProvince,
-    profileData.homeLocation.address.postalCode,
-    profileData.homeLocation.address.country,
-  ]);
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      await onSave(profileData);
-      setIsEditing(false);
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  }, [provider.homeLocation?.address]);
 
   return (
     <main className="container relative mx-auto">
       <article className="flex flex-col gap-2xl md:gap-3xl px-md">
         <div className="@container w-full mt-md mb-md">
-          {/* Heading and button */}
+          {/* Heading */}
           <div className="mb-md flex items-baseline justify-between">
-            <H2 className="text-lg border-0">My Profile</H2>
-            {!isEditing ? (
-              <Button
-                variant="flat"
-                className="px-0"
-                onClick={() => setIsEditing(true)}
-              >
-                Edit Profile
-              </Button>
-            ) : (
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className=""
-                  onClick={() => {
-                    setIsEditing(false);
-                    setProfileData({
-                      bio: provider.bio || "",
-                      services: provider.services,
-                      phone: provider.phone || "",
-                      homeLocation: {
-                        lat: provider.homeLocation?.lat ?? 51.0447,
-                        lng: provider.homeLocation?.lng ?? -114.0719,
-                        address: {
-                          street:
-                            provider.homeLocation?.address.street || "",
-                          city: provider.homeLocation?.address.city || "",
-                          stateProvince:
-                            provider.homeLocation?.address.stateProvince || "",
-                          country: provider.homeLocation?.address.country || "",
-                          postalCode:
-                            provider.homeLocation?.address.postalCode || "",
-                        },
-                      },
-                    });
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="default"
-                  className=""
-                  disabled={isSaving}
-                  onClick={handleSave}
-                >
-                  {isSaving ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            )}
+            <H2 className="text-lg border-0">Profile</H2>
           </div>
 
-          {/* Profile Editor */}
+          {/* Profile View */}
           <div className="space-y-6">
             {/* Basic Info */}
             <div className="flex items-start gap-6">
@@ -176,28 +110,17 @@ export function ProfileEditor({
             </div>
 
             {/* Bio */}
-            <div className="space-y-2">
-              <Label>Bio</Label>
-              {isEditing ? (
-                <Textarea
-                  value={profileData.bio}
-                  onChange={(e) =>
-                    setProfileData({ ...profileData, bio: e.target.value })
-                  }
-                  placeholder="Tell clients about your experience and specialties..."
-                  rows={4}
-                />
-              ) : (
-                <Small className="text-muted-foreground">
-                  {provider.bio || "No bio added yet"}
-                </Small>
-              )}
-            </div>
+            {provider.bio && (
+              <div className="space-y-2">
+                <Label>About</Label>
+                <Small className="text-muted-foreground">{provider.bio}</Small>
+              </div>
+            )}
 
             {/* Location */}
             <div className="space-y-3 pt-6 border-t">
               <div className="flex items-center justify-between">
-                <Label>Location &amp; Address</Label>
+                <Label>Location</Label>
                 {organizationSettingsPath && (
                   <Button
                     variant="flat"
@@ -212,136 +135,12 @@ export function ProfileEditor({
                   </Button>
                 )}
               </div>
-
-              {isEditing ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      value={profileData.phone}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          phone: e.target.value,
-                        })
-                      }
-                      placeholder="+1 (555) 123-4567"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="street">Street Address</Label>
-                    <Input
-                      id="street"
-                      value={profileData.homeLocation.address.street}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          homeLocation: {
-                            ...profileData.homeLocation,
-                            address: {
-                              ...profileData.homeLocation.address,
-                              street: e.target.value,
-                            },
-                          },
-                        })
-                      }
-                      placeholder="123 Main Street"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      value={profileData.homeLocation.address.city}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          homeLocation: {
-                            ...profileData.homeLocation,
-                            address: {
-                              ...profileData.homeLocation.address,
-                              city: e.target.value,
-                            },
-                          },
-                        })
-                      }
-                      placeholder="City"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="stateProvince">State / Province</Label>
-                    <Input
-                      id="stateProvince"
-                      value={profileData.homeLocation.address.stateProvince}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          homeLocation: {
-                            ...profileData.homeLocation,
-                            address: {
-                              ...profileData.homeLocation.address,
-                              stateProvince: e.target.value,
-                            },
-                          },
-                        })
-                      }
-                      placeholder="State / Province"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="postalCode">Postal Code</Label>
-                    <Input
-                      id="postalCode"
-                      value={profileData.homeLocation.address.postalCode}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          homeLocation: {
-                            ...profileData.homeLocation,
-                            address: {
-                              ...profileData.homeLocation.address,
-                              postalCode: e.target.value,
-                            },
-                          },
-                        })
-                      }
-                      placeholder="Postal Code"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Input
-                      id="country"
-                      value={profileData.homeLocation.address.country}
-                      onChange={(e) =>
-                        setProfileData({
-                          ...profileData,
-                          homeLocation: {
-                            ...profileData.homeLocation,
-                            address: {
-                              ...profileData.homeLocation.address,
-                              country: e.target.value,
-                            },
-                          },
-                        })
-                      }
-                      placeholder="Country"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <div className="text-foreground">
-                    {profileData.phone || "No phone provided"}
-                  </div>
-                  <div>{addressDisplay || "No address saved yet"}</div>
-                  <Muted className="text-xs">
-                    Location is pulled from your personal organization settings.
-                  </Muted>
-                </div>
-              )}
+              <div className="space-y-1 text-sm text-muted-foreground">
+                {provider.phone && (
+                  <div className="text-foreground">{provider.phone}</div>
+                )}
+                <div>{addressDisplay || "No address available"}</div>
+              </div>
             </div>
 
             {/* Performance Stats */}
@@ -362,48 +161,59 @@ export function ProfileEditor({
               </div>
             </div>
 
-            {/* Services */}
+            {/* Services Offered */}
             <div className="space-y-3 pt-6 border-t">
-              <Label>Services Offered</Label>
-              <div className="grid grid-cols-2 gap-3">
-                {Object.entries(profileData.services).map(
-                  ([service, enabled]) => (
-                    <div
-                      key={service}
-                      className={`p-4 rounded-xl border-2 transition-all ${
-                        enabled
-                          ? "border-primary bg-accent"
-                          : "border-border bg-card"
-                      } ${isEditing ? "cursor-pointer" : ""}`}
-                      onClick={() => {
-                        if (isEditing) {
-                          setProfileData({
-                            ...profileData,
-                            services: {
-                              ...profileData.services,
-                              [service]: !enabled,
-                            },
-                          });
-                        }
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm capitalize">
-                          {service.replace(/([A-Z])/g, " $1").trim()}
-                        </span>
-                        {isEditing ? (
-                          <Checkbox checked={enabled} />
-                        ) : enabled ? (
-                          <CheckCircle2 className="h-5 w-5 text-primary" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-muted-foreground/40" />
-                        )}
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
+              <Label>Services</Label>
+              {isLoadingServices ? (
+                <Muted className="text-sm">Loading services...</Muted>
+              ) : useCases.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {useCases.map((useCase) => {
+                    const config = USE_CASE_CONFIG[useCase];
+                    if (!config) return null;
+                    return (
+                      <Badge
+                        key={useCase}
+                        variant="secondary"
+                        className="flex items-center gap-1.5 px-3 py-1.5"
+                      >
+                        {config.icon}
+                        <span>{config.label}</span>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Muted className="text-sm">No services listed</Muted>
+              )}
             </div>
+
+            {/* Notable Works / Portfolio */}
+            {provider.portfolio && provider.portfolio.length > 0 && (
+              <div className="space-y-3 pt-6 border-t">
+                <Label>Notable Works</Label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {provider.portfolio.map((imageUrl, index) => (
+                    <a
+                      key={index}
+                      href={imageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group relative aspect-[4/3] rounded-lg overflow-hidden bg-muted border border-border hover:border-primary transition-colors"
+                    >
+                      <img
+                        src={imageUrl}
+                        alt={`Portfolio item ${index + 1}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                        <ExternalLink className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </article>

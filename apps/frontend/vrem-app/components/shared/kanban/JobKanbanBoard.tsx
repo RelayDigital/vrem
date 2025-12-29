@@ -199,7 +199,7 @@ export function JobKanbanBoard({
                           id={jobItem.id}
                           name={jobItem.name}
                           column={jobItem.column}
-                          className="p-0 w-full"
+                          className="p-0 w-full border-none shadow-none hover:translate-y-[-2px] transition-transform duration-200"
                           disabled={!canDrag}
                         >
                           <JobCardKanban

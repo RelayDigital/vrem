@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -272,6 +273,7 @@ export function JobTaskView({
   const { activeOrganizationId, activeMembership } = useCurrentOrganization();
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
+  const isMessagesLoading = job ? messaging.isLoadingMessages(job.id) : false;
   const isAgentUser = (currentUserAccountType || "").toUpperCase() === "AGENT";
   const [activeTab, setActiveTab] = useState<
     "description" | "discussion" | "attachments" | "media"
@@ -3933,7 +3935,37 @@ export function JobTaskView({
                 {activeTab === "discussion" && (
                   <div className="flex flex-col gap-4">
                     {/* Chat Content - WhatsApp Style */}
-                    {activeChatTab === "client" ? (
+                    {isMessagesLoading ? (
+                      <div className="flex flex-col gap-4 py-4 min-h-[400px]">
+                        {/* Loading skeletons - alternating left/right to mimic chat */}
+                        <div className="flex gap-3">
+                          <Skeleton className="size-8 rounded-full shrink-0" />
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-24" />
+                            <Skeleton className="h-16 w-64 rounded-xl" />
+                          </div>
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                          <div className="space-y-2 flex flex-col items-end">
+                            <Skeleton className="h-4 w-20" />
+                            <Skeleton className="h-12 w-48 rounded-xl" />
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <Skeleton className="size-8 rounded-full shrink-0" />
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-28" />
+                            <Skeleton className="h-20 w-72 rounded-xl" />
+                          </div>
+                        </div>
+                        <div className="flex gap-3 justify-end">
+                          <div className="space-y-2 flex flex-col items-end">
+                            <Skeleton className="h-4 w-16" />
+                            <Skeleton className="h-10 w-40 rounded-xl" />
+                          </div>
+                        </div>
+                      </div>
+                    ) : activeChatTab === "client" ? (
                       <ScrollArea className="flex-1 pr-2 min-h-[400px]">
                         <div>
                           {flatClientMessages.length === 0 ? (

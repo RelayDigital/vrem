@@ -623,6 +623,7 @@ export interface ServicePackage {
   photoCount: number | null;
   videoMinutes: number | null;
   features: string[];
+  images: string[]; // URLs for package showcase images
   createdAt: Date;
   updatedAt: Date;
 }
@@ -651,6 +652,7 @@ export interface CreatePackagePayload {
   photoCount?: number;
   videoMinutes?: number;
   features?: string[];
+  images?: string[];
   displayOrder?: number;
 }
 

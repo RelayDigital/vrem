@@ -36,6 +36,7 @@ import { mediaTypeOptions, toggleMediaType } from '../../../shared/jobs/utils';
 import { ToggleGroup, ToggleGroupItem } from "../../../ui/toggle-group";
 import type { AddOnWithQuantity } from './PackageSelectionStep';
 import { AvailabilityTimeSlots } from './AvailabilityTimeSlots';
+import { BorderBeam } from '@/components/ui/border-beam';
 
 interface DetailsStepProps {
   selectedAddress: string;
@@ -544,10 +545,13 @@ export function DetailsStep({
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            <Button onClick={onNext} className="flex-1 bg-primary">
-              {isAgentFlow ? 'Review Order' : 'Find Technician'}
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
+            <div className="relative flex-1">
+              <Button onClick={onNext} className="w-full bg-primary">
+                {isAgentFlow ? 'Review Order' : 'Find Technician'}
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+              <BorderBeam size={40} duration={3} borderWidth={1.5} />
+            </div>
           </div>
         </div>
       </div>

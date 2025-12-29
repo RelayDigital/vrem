@@ -228,7 +228,7 @@ export function CompanySidebar() {
           "--header-height": "var(--header-h)",
         } as React.CSSProperties
       }
-      className={`**:data-[slot=sidebar-container]:top-(--header-height)! **:data-[slot=sidebar-container]:h-[calc(100vh-var(--header-height))]! **:data-[slot=sidebar-container]:bottom-auto! mt-[var(--header-h)] h-[calc(100vh-var(--header-h))] `}
+      className={`**:data-[slot=sidebar-container]:top-(--header-height)! **:data-[slot=sidebar-container]:h-[calc(100vh-var(--header-height))]! **:data-[slot=sidebar-container]:bottom-auto! mt-[var(--header-h)] h-[calc(100vh-var(--header-h))] border-none!`}
     >
       <SidebarContent className="pl-1.5">
         <SidebarGroup>

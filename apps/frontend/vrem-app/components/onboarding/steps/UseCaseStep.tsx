@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { ArrowLeft, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BorderBeam } from "@/components/ui/border-beam";
 
 interface UseCaseOption {
   value: ProviderUseCase;
@@ -87,14 +88,19 @@ export function UseCaseStep() {
         selected
       </p>
 
-      <Button
-        type="button"
-        className="w-full"
-        onClick={handleContinue}
-        disabled={isLoading || data.useCases.length === 0}
-      >
-        Continue
-      </Button>
+      <div className="relative">
+        <Button
+          type="button"
+          className="w-full"
+          onClick={handleContinue}
+          disabled={isLoading || data.useCases.length === 0}
+        >
+          Continue
+        </Button>
+        {data.useCases.length > 0 && !isLoading && (
+          <BorderBeam size={40} duration={3} borderWidth={1.5} />
+        )}
+      </div>
 
       <Button
         type="button"

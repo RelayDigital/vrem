@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { ArrowLeft } from "lucide-react";
+import { BorderBeam } from "@/components/ui/border-beam";
 
 export function NameStep() {
   const { data, updateData, nextStep, prevStep, isLoading } = useOnboarding();
@@ -57,13 +58,18 @@ export function NameStep() {
         )}
 
         <Field>
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading || !name.trim()}
-          >
-            Continue
-          </Button>
+          <div className="relative">
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading || !name.trim()}
+            >
+              Continue
+            </Button>
+            {name.trim() && !isLoading && (
+              <BorderBeam size={40} duration={3} borderWidth={1.5} />
+            )}
+          </div>
         </Field>
 
         <Button

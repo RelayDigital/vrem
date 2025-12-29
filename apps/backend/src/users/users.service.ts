@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
-import { UserAccountType } from '@prisma/client';
+import { UserAccountType, ProviderUseCaseType } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -239,5 +239,59 @@ export class UsersService {
 
       return { success: true, message: 'Account deleted successfully' };
     });
+  }
+
+  /**
+   * Get the use cases (services) for a user
+   */
+  async getUseCases(userId: string): Promise<ProviderUseCaseType[]> {
+    const useCases = await this.prisma.providerUseCase.findMany({
+      where: { userId },
+      select: { useCase: true },
+    });
+
+    return useCases.map((uc) => uc.useCase);
+  }
+
+  /**
+   * Update the use cases (services) for a user
+   * Replaces all existing use cases with the new set
+   */
+  async updateUseCases(
+    userId: string,
+    useCases: ProviderUseCaseType[],
+  ): Promise<ProviderUseCaseType[]> {
+    // Verify user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, accountType: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Only providers can have use cases
+    if (user.accountType !== UserAccountType.PROVIDER) {
+      throw new BadRequestException('Only provider accounts can have use cases');
+    }
+
+    // Use a transaction to replace all use cases
+    await this.prisma.$transaction(async (tx) => {
+      // Delete existing use cases
+      await tx.providerUseCase.deleteMany({
+        where: { userId },
+      });
+
+      // Create new use cases
+      await tx.providerUseCase.createMany({
+        data: useCases.map((useCase) => ({
+          userId,
+          useCase,
+        })),
+      });
+    });
+
+    return useCases;
   }
 }

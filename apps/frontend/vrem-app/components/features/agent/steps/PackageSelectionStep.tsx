@@ -1,12 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { H1, P } from '@/components/ui/typography';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+  type CarouselApi,
+} from '@/components/ui/carousel';
 import {
   Package,
   CheckCircle2,
@@ -19,10 +28,17 @@ import {
   Sparkles,
   Plus,
   Minus,
+  ImageIcon,
 } from 'lucide-react';
 import { ServicePackage, PackageAddOn, AddOnCategory, MediaType } from '@/types';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { BorderBeam } from '@/components/ui/border-beam';
 
 // Add-on with quantity for the booking flow
 export interface AddOnWithQuantity {
@@ -74,6 +90,84 @@ function getAddOnCategoryLabel(category: AddOnCategory): string {
   }
 }
 
+type SubStep = 'package' | 'addons';
+
+// Package image carousel component
+function PackageImageCarousel({ images }: { images: string[] }) {
+  const [api, setApi] = useState<CarouselApi>();
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    if (!api) return;
+
+    setCurrent(api.selectedScrollSnap());
+    api.on('select', () => {
+      setCurrent(api.selectedScrollSnap());
+    });
+  }, [api]);
+
+  if (images.length === 0) {
+    return (
+      <div className="aspect-video bg-muted rounded-t-lg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <ImageIcon className="size-8" />
+          <span className="text-xs">No images</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <Carousel setApi={setApi} className="w-full">
+        <CarouselContent className="ml-0">
+          {images.map((url, index) => (
+            <CarouselItem key={index} className="pl-0">
+              <div className="aspect-video relative overflow-hidden rounded-t-lg">
+                <img
+                  src={url}
+                  alt={`Package image ${index + 1}`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="225"%3E%3Crect fill="%23f0f0f0" width="400" height="225"/%3E%3Ctext x="200" y="112" text-anchor="middle" dy=".3em" fill="%23999"%3EImage unavailable%3C/text%3E%3C/svg%3E';
+                  }}
+                />
+              </div>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        {images.length > 1 && (
+          <>
+            <CarouselPrevious className="left-2 size-7 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <CarouselNext className="right-2 size-7 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </>
+        )}
+      </Carousel>
+      {/* Dots indicator */}
+      {images.length > 1 && (
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
+          {images.map((_, index) => (
+            <button
+              key={index}
+              onClick={(e) => {
+                e.stopPropagation();
+                api?.scrollTo(index);
+              }}
+              className={cn(
+                'size-1.5 rounded-full transition-all',
+                current === index
+                  ? 'bg-white w-3'
+                  : 'bg-white/50 hover:bg-white/75'
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PackageSelectionStep({
   providerOrgId,
   providerName,
@@ -90,6 +184,9 @@ export function PackageSelectionStep({
   const [selectedPkg, setSelectedPkg] = useState<ServicePackage | null>(null);
   // Map of addOnId -> quantity (0 means not selected)
   const [addOnQuantities, setAddOnQuantities] = useState<Record<string, number>>(selectedAddOnQuantities);
+
+  // Sub-step state: 'package' or 'addons'
+  const [subStep, setSubStep] = useState<SubStep>('package');
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +209,10 @@ export function PackageSelectionStep({
             const pkg = pkgs.find(p => p.id === selectedPackageId);
             if (pkg) {
               setSelectedPkg(pkg);
+              // If package was already selected, go to add-ons step
+              if (ons.length > 0) {
+                setSubStep('addons');
+              }
             }
           }
         }
@@ -138,21 +239,20 @@ export function PackageSelectionStep({
     setSelectedPkg(pkg);
   };
 
+  const handlePackageContinue = () => {
+    if (!selectedPkg) return;
+    if (addOns.length > 0) {
+      setSubStep('addons');
+    } else {
+      // No add-ons available, proceed directly
+      handleFinalContinue();
+    }
+  };
+
   const handleQuantityChange = (addOnId: string, delta: number) => {
     setAddOnQuantities(prev => {
       const current = prev[addOnId] || 0;
       const newQty = Math.max(0, current + delta);
-      if (newQty === 0) {
-        const { [addOnId]: _, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [addOnId]: newQty };
-    });
-  };
-
-  const setQuantity = (addOnId: string, qty: number) => {
-    setAddOnQuantities(prev => {
-      const newQty = Math.max(0, qty);
       if (newQty === 0) {
         const { [addOnId]: _, ...rest } = prev;
         return rest;
@@ -170,7 +270,7 @@ export function PackageSelectionStep({
     return selectedPkg.price + addOnTotal;
   };
 
-  const handleContinue = () => {
+  const handleFinalContinue = () => {
     if (!selectedPkg) return;
     // Build add-ons with quantities (only those with qty > 0)
     const addOnsWithQty: AddOnWithQuantity[] = addOns
@@ -178,6 +278,10 @@ export function PackageSelectionStep({
       .map(a => ({ addOn: a, quantity: addOnQuantities[a.id] }));
     const total = calculateTotal();
     onPackageSelect(selectedPkg, addOnsWithQty, total);
+  };
+
+  const handleBackFromAddons = () => {
+    setSubStep('package');
   };
 
   // Loading state
@@ -283,245 +387,321 @@ export function PackageSelectionStep({
   const total = calculateTotal();
 
   return (
-    <motion.div
-      key="package-selection"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="flex flex-col items-center container mx-auto px-6 py-12 min-h-full"
-    >
-      <div
-        className="w-full container mx-auto space-y-8"
-        style={{ maxWidth: '1024px' }}
-      >
-        {/* Header */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="text-center space-y-3"
-        >
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-full text-foreground/90 text-sm mb-2">
-            <Package className="h-4 w-4" />
-            <span>{providerName}</span>
-          </div>
-          <H1 className="text-4xl md:text-5xl font-bold text-foreground">
-            Choose Your Package
-          </H1>
-          <P className="text-lg text-muted-foreground">
-            Select a photography package and optional add-ons
-          </P>
-        </motion.div>
-
-        {/* Package cards */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6"
-        >
-          {packages.map((pkg) => {
-            const isSelected = selectedPkg?.id === pkg.id;
-
-            return (
-              <Card
-                key={pkg.id}
-                className={cn(
-                  'cursor-pointer transition-all duration-200 hover:shadow-md relative',
-                  'border-2',
-                  isSelected
-                    ? 'border-primary bg-primary/5 shadow-md'
-                    : 'border-border hover:border-primary/50'
-                )}
-                onClick={() => handlePackageClick(pkg)}
-              >
-                {isSelected && (
-                  <div className="absolute -top-3 -right-3">
-                    <div className="bg-primary text-primary-foreground rounded-full p-1">
-                      <CheckCircle2 className="h-5 w-5" />
-                    </div>
-                  </div>
-                )}
-                <CardContent className="p-6 space-y-4">
-                  {/* Package name and price */}
-                  <div>
-                    <h3 className="font-semibold text-xl">{pkg.name}</h3>
-                    <div className="text-3xl font-bold text-primary mt-2">
-                      {formatPrice(pkg.price, pkg.currency)}
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  {pkg.description && (
-                    <P className="text-sm text-muted-foreground">{pkg.description}</P>
-                  )}
-
-                  {/* Media types */}
-                  <div className="flex flex-wrap gap-2">
-                    {pkg.mediaTypes.map((type) => {
-                      const Icon = getMediaTypeIcon(type);
-                      return (
-                        <Badge key={type} variant="secondary" className="gap-1">
-                          <Icon className="h-3 w-3" />
-                          {type}
-                        </Badge>
-                      );
-                    })}
-                  </div>
-
-                  {/* Features */}
-                  <div className="space-y-2 pt-2 border-t border-border">
-                    {pkg.turnaroundDays && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>{pkg.turnaroundDays} day turnaround</span>
-                      </div>
-                    )}
-                    {pkg.photoCount && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Camera className="h-4 w-4" />
-                        <span>Up to {pkg.photoCount} photos</span>
-                      </div>
-                    )}
-                    {pkg.videoMinutes && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Video className="h-4 w-4" />
-                        <span>{pkg.videoMinutes} min video</span>
-                      </div>
-                    )}
-                    {pkg.features.slice(0, 3).map((feature, i) => (
-                      <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Sparkles className="h-4 w-4" />
-                        <span>{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </motion.div>
-
-        {/* Add-ons section */}
-        {addOns.length > 0 && selectedPkg && (
+    <div className="flex flex-col h-full container mx-auto px-6 py-8" style={{ maxWidth: '1024px' }}>
+      <AnimatePresence mode="wait">
+        {subStep === 'package' && (
           <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="space-y-4"
+            key="package-step"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="flex flex-col h-full"
           >
-            <h2 className="text-xl font-semibold text-center">Optional Add-ons</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {addOns.map((addOn) => {
-                const quantity = addOnQuantities[addOn.id] || 0;
-                const isSelected = quantity > 0;
-                return (
-                  <Card
-                    key={addOn.id}
-                    className={cn(
-                      'transition-all duration-200',
-                      'border',
-                      isSelected
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
-                    )}
-                  >
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{addOn.name}</span>
-                            <span className="font-semibold text-primary">
-                              +{formatPrice(addOn.price, addOn.currency)}
-                            </span>
-                          </div>
-                          <Badge variant="outline" className="mt-1 text-xs">
-                            {getAddOnCategoryLabel(addOn.category)}
-                          </Badge>
-                          {addOn.description && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {addOn.description}
-                            </p>
-                          )}
-                        </div>
-                        {/* Quantity controls */}
-                        <div className="flex items-center justify-between pt-2 border-t border-border">
-                          <span className="text-sm text-muted-foreground">Quantity</span>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleQuantityChange(addOn.id, -1);
-                              }}
-                              disabled={quantity === 0}
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <span className="w-8 text-center font-medium">{quantity}</span>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleQuantityChange(addOn.id, 1);
-                              }}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        {isSelected && (
-                          <div className="text-right text-sm font-medium text-primary">
-                            Subtotal: {formatPrice(addOn.price * quantity, addOn.currency)}
-                          </div>
+            {/* Header */}
+            <div className="text-center space-y-3 shrink-0 pb-6">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-full text-foreground/90 text-sm mb-2">
+                <Package className="h-4 w-4" />
+                <span>{providerName}</span>
+              </div>
+              <H1 className="text-4xl md:text-5xl font-bold text-foreground">
+                Choose Your Package
+              </H1>
+              <P className="text-lg text-muted-foreground">
+                Select a photography package for your property
+              </P>
+            </div>
+
+            {/* Scrollable package cards */}
+            <div className="flex-1 min-h-0">
+              <ScrollArea className="h-full">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pb-4">
+                  {packages.map((pkg) => {
+                    const isSelected = selectedPkg?.id === pkg.id;
+
+                    return (
+                      <Card
+                        key={pkg.id}
+                        className={cn(
+                          'group cursor-pointer transition-all duration-200 hover:shadow-md relative overflow-hidden',
+                          'border-2',
+                          isSelected
+                            ? 'border-primary bg-primary/5 shadow-md'
+                            : 'border-border hover:border-primary/50'
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                        onClick={() => handlePackageClick(pkg)}
+                      >
+                        {/* Image carousel */}
+                        {pkg.images && pkg.images.length > 0 && (
+                          <PackageImageCarousel images={pkg.images} />
+                        )}
+
+                        <CardContent className={cn(
+                          "p-6 space-y-4",
+                          pkg.images && pkg.images.length > 0 && "pt-4"
+                        )}>
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 z-10">
+                              <div className="bg-primary text-primary-foreground rounded-full p-1 shadow-md">
+                                <CheckCircle2 className="h-5 w-5" />
+                              </div>
+                            </div>
+                          )}
+                          {/* Package name and price */}
+                          <div>
+                            <h3 className="font-semibold text-xl">{pkg.name}</h3>
+                            <div className="text-3xl font-bold text-primary mt-2">
+                              {formatPrice(pkg.price, pkg.currency)}
+                            </div>
+                          </div>
+
+                          {/* Description */}
+                          {pkg.description && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <P className="text-sm text-muted-foreground line-clamp-2 cursor-default">{pkg.description}</P>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-xs">
+                                <p>{pkg.description}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+
+                          {/* Media types */}
+                          <div className="flex flex-wrap gap-2">
+                            {pkg.mediaTypes.map((type) => {
+                              const Icon = getMediaTypeIcon(type);
+                              return (
+                                <Badge key={type} variant="secondary" className="gap-1">
+                                  <Icon className="h-3 w-3" />
+                                  {type}
+                                </Badge>
+                              );
+                            })}
+                          </div>
+
+                          {/* Features */}
+                          <div className="pt-2 border-t border-border">
+                            {/* Fixed deliverables */}
+                            <div className="space-y-1.5">
+                              {pkg.turnaroundDays && (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Clock className="size-4 shrink-0" />
+                                  <span>{pkg.turnaroundDays} day turnaround</span>
+                                </div>
+                              )}
+                              {pkg.photoCount && (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Camera className="size-4 shrink-0" />
+                                  <span>Up to {pkg.photoCount} photos</span>
+                                </div>
+                              )}
+                              {pkg.videoMinutes && (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <Video className="size-4 shrink-0" />
+                                  <span>{pkg.videoMinutes} min video</span>
+                                </div>
+                              )}
+                            </div>
+                            {/* Scrollable features list */}
+                            {pkg.features.length > 0 && (
+                              <div className="mt-2 max-h-24 overflow-y-auto space-y-1.5">
+                                {pkg.features.map((feature, i) => (
+                                  <Tooltip key={i}>
+                                    <TooltipTrigger asChild>
+                                      <div className="flex items-center gap-2 text-sm text-muted-foreground cursor-default">
+                                        <Sparkles className="size-4 shrink-0" />
+                                        <span className="truncate">{feature}</span>
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" className="max-w-xs">
+                                      <p>{feature}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </div>
+
+            {/* Navigation */}
+            <div className="flex justify-between items-center pt-6 border-t border-border shrink-0">
+              <div>
+                {onBack && (
+                  <Button variant="outline" onClick={onBack}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-4">
+                {selectedPkg && (
+                  <div className="text-right">
+                    <P className="text-sm text-muted-foreground">Package Price</P>
+                    <div className="text-xl font-bold text-foreground">
+                      {formatPrice(selectedPkg.price, selectedPkg.currency)}
+                    </div>
+                  </div>
+                )}
+                <div className="relative">
+                  <Button
+                    size="lg"
+                    onClick={handlePackageContinue}
+                    disabled={!selectedPkg}
+                  >
+                    {addOns.length > 0 ? 'Continue to Add-ons' : 'Continue'}
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                  {selectedPkg && (
+                    <BorderBeam size={40} duration={3} borderWidth={1.5} />
+                  )}
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
 
-        {/* Total and Navigation */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="flex flex-col items-center gap-4 pt-6 border-t border-border"
-        >
-          {selectedPkg && (
-            <div className="text-center">
-              <P className="text-muted-foreground">Estimated Total</P>
-              <div className="text-4xl font-bold text-foreground">
-                {formatPrice(total, selectedPkg.currency)}
+        {subStep === 'addons' && selectedPkg && (
+          <motion.div
+            key="addons-step"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="flex flex-col h-full"
+          >
+            {/* Header */}
+            <div className="text-center space-y-3 shrink-0 pb-6">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-full text-foreground/90 text-sm mb-2">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <span>{selectedPkg.name}</span>
+                <span className="text-muted-foreground">•</span>
+                <span className="font-medium">{formatPrice(selectedPkg.price, selectedPkg.currency)}</span>
+              </div>
+              <H1 className="text-4xl md:text-5xl font-bold text-foreground">
+                Enhance Your Package
+              </H1>
+              <P className="text-lg text-muted-foreground">
+                Add optional services to your booking
+              </P>
+            </div>
+
+            {/* Scrollable add-on cards */}
+            <div className="flex-1 min-h-0">
+              <ScrollArea className="h-full">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
+                  {addOns.map((addOn) => {
+                    const quantity = addOnQuantities[addOn.id] || 0;
+                    const isSelected = quantity > 0;
+                    return (
+                      <Card
+                        key={addOn.id}
+                        className={cn(
+                          'transition-all duration-200',
+                          'border',
+                          isSelected
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/50'
+                        )}
+                      >
+                        <CardContent className="p-4">
+                          <div className="space-y-3">
+                            <div>
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">{addOn.name}</span>
+                                <span className="font-semibold text-primary">
+                                  +{formatPrice(addOn.price, addOn.currency)}
+                                </span>
+                              </div>
+                              <Badge variant="outline" className="mt-1 text-xs">
+                                {getAddOnCategoryLabel(addOn.category)}
+                              </Badge>
+                              {addOn.description && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2 cursor-default">
+                                      {addOn.description}
+                                    </p>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" className="max-w-xs">
+                                    <p>{addOn.description}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                            {/* Quantity controls */}
+                            <div className="flex items-center justify-between pt-2 border-t border-border">
+                              <span className="text-sm text-muted-foreground">Quantity</span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleQuantityChange(addOn.id, -1);
+                                  }}
+                                  disabled={quantity === 0}
+                                >
+                                  <Minus className="h-4 w-4" />
+                                </Button>
+                                <span className="w-8 text-center font-medium">{quantity}</span>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleQuantityChange(addOn.id, 1);
+                                  }}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <div className="text-right text-sm font-medium text-primary">
+                                Subtotal: {formatPrice(addOn.price * quantity, addOn.currency)}
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </div>
+
+            {/* Navigation with total */}
+            <div className="flex justify-between items-center pt-6 border-t border-border shrink-0">
+              <Button variant="outline" onClick={handleBackFromAddons}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Change Package
+              </Button>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <P className="text-sm text-muted-foreground">Estimated Total</P>
+                  <div className="text-2xl font-bold text-foreground">
+                    {formatPrice(total, selectedPkg.currency)}
+                  </div>
+                </div>
+                <div className="relative">
+                  <Button size="lg" onClick={handleFinalContinue}>
+                    Continue
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                  <BorderBeam size={40} duration={3} borderWidth={1.5} />
+                </div>
               </div>
             </div>
-          )}
-
-          <div className="flex gap-4">
-            {onBack && (
-              <Button variant="outline" onClick={onBack}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-            )}
-            <Button
-              size="lg"
-              onClick={handleContinue}
-              disabled={!selectedPkg}
-            >
-              Continue
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          </div>
-        </motion.div>
-      </div>
-    </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

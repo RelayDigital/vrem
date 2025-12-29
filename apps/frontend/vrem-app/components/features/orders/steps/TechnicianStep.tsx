@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Technician } from '@/types';
 import { cn } from '@/lib/utils';
+import { BorderBeam } from '@/components/ui/border-beam';
 
 interface TechnicianStepProps {
   technicians: Technician[];
@@ -232,14 +233,19 @@ export function TechnicianStep({
             <SkipForward className="h-4 w-4 mr-2" />
             Skip
           </Button>
-          <Button
-            onClick={handleContinue}
-            disabled={!selected}
-            className="flex-1 bg-primary"
-          >
-            Continue
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
+          <div className="relative flex-1">
+            <Button
+              onClick={handleContinue}
+              disabled={!selected}
+              className="w-full bg-primary"
+            >
+              Continue
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+            {selected && (
+              <BorderBeam size={40} duration={3} borderWidth={1.5} />
+            )}
+          </div>
         </div>
       </div>
     </motion.div>

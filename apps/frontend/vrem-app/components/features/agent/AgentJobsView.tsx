@@ -267,7 +267,7 @@ export function AgentJobsView({
           {/* Jobs Tabs */}
           <div className="@container w-full" data-tour="agent-jobs-list">
             <Tabs defaultValue="all" className="w-full">
-              <TabsList className="grid w-full grid-cols-5" data-tour="jobs-tabs">
+              <TabsList className="grid w-full grid-cols-5 rounded-md" data-tour="jobs-tabs">
                 <TabsTrigger value="all">All ({myJobs.length})</TabsTrigger>
                 <TabsTrigger value="pending">
                   Pending ({pendingJobs.length})

@@ -11,6 +11,7 @@ model User {
   email                String                    @unique
   name                 String
   password             String
+  avatarUrl            String?                   // Profile picture URL
   createdAt            DateTime                  @default(now())
   updatedAt            DateTime                  @updatedAt
   deactivatedAt        DateTime?                 // Account deactivation timestamp (soft delete)
@@ -274,6 +275,7 @@ model ServicePackage {
   photoCount     Int?
   videoMinutes   Int?
   features       String[]       @default([])
+  images         String[]       @default([]) // URLs for package showcase images
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   pendingOrders  PendingOrder[]

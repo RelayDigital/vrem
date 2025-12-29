@@ -25,6 +25,7 @@ import {
 import { H2, Muted } from "@/components/ui/typography";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { AvatarUploader } from "@/components/shared/AvatarUploader";
 import { SettingsRightContentSection } from "@/components/shared/settings/SettingsRightContentSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -40,6 +41,7 @@ export default function OrganizationGeneralPage() {
     useOrganizationSettings();
 
   // Form state
+  const [logoUrl, setLogoUrl] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [legalName, setLegalName] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -51,13 +53,12 @@ export default function OrganizationGeneralPage() {
   const [region, setRegion] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [countryCode, setCountryCode] = useState("");
-  const [lat, setLat] = useState("");
-  const [lng, setLng] = useState("");
   const [timezone, setTimezone] = useState("");
 
   // Initialize form from organization data
   useEffect(() => {
     if (organization) {
+      setLogoUrl((organization as any).logoUrl || "");
       setDisplayName(organization.name || "");
       setLegalName((organization as any).legalName || "");
       setWebsiteUrl((organization as any).websiteUrl || "");
@@ -69,18 +70,6 @@ export default function OrganizationGeneralPage() {
       setRegion((organization as any).region || "");
       setPostalCode((organization as any).postalCode || "");
       setCountryCode((organization as any).countryCode || "");
-      setLat(
-        (organization as any).lat !== undefined &&
-          (organization as any).lat !== null
-          ? String((organization as any).lat)
-          : ""
-      );
-      setLng(
-        (organization as any).lng !== undefined &&
-          (organization as any).lng !== null
-          ? String((organization as any).lng)
-          : ""
-      );
       setTimezone((organization as any).timezone || "");
     }
   }, [organization]);
@@ -100,27 +89,21 @@ export default function OrganizationGeneralPage() {
         .filter(Boolean)
         .join(", ");
 
-      let nextLat = lat ? parseFloat(lat) : undefined;
-      let nextLng = lng ? parseFloat(lng) : undefined;
-      const needsGeocode =
-        (!nextLat && nextLat !== 0) || (!nextLng && nextLng !== 0);
+      // Always geocode from address when available
+      let nextLat: number | undefined;
+      let nextLng: number | undefined;
 
-      if (fullAddress && needsGeocode) {
+      if (fullAddress) {
         const coords = await geocodeAddress(fullAddress);
         if (coords) {
           nextLat = coords.lat;
           nextLng = coords.lng;
-          setLat(String(coords.lat));
-          setLng(String(coords.lng));
-        } else {
-          toast.error(
-            "Unable to geocode address. Please confirm the address or enter coordinates manually."
-          );
         }
       }
 
       await save({
         name: displayName,
+        logoUrl: logoUrl || undefined,
         legalName: legalName || undefined,
         websiteUrl: websiteUrl || undefined,
         primaryEmail: primaryEmail || undefined,
@@ -193,8 +176,28 @@ export default function OrganizationGeneralPage() {
         </div>
       ) : (
       <form onSubmit={handleSubmit}>
-        {/* General Information */}
+        {/* Organization Logo */}
+        <div className="space-y-3 mb-md pb-md border-b">
+          <Label className="text-base">Organization Logo</Label>
+          <AvatarUploader
+            currentUrl={logoUrl}
+            fallback={displayName?.charAt(0).toUpperCase() || "O"}
+            onUpload={async (url) => {
+              setLogoUrl(url);
+              toast.success("Logo uploaded - click Save Changes to apply");
+            }}
+            onRemove={async () => {
+              setLogoUrl("");
+              toast.success("Logo removed - click Save Changes to apply");
+            }}
+            size="lg"
+          />
+          <Muted className="text-xs">
+            Upload your organization's logo for branding
+          </Muted>
+        </div>
 
+        {/* General Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-lg mb-md border-b pb-md">
           {/* Display Name */}
           <div className="space-y-2">
@@ -328,28 +331,6 @@ export default function OrganizationGeneralPage() {
               value={countryCode}
               onChange={(e) => setCountryCode(e.target.value)}
               placeholder="CA"
-            />
-          </div>
-        </div>
-
-        {/* Coordinates */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="lat">Latitude (optional)</Label>
-            <Input
-              id="lat"
-              value={lat}
-              onChange={(e) => setLat(e.target.value)}
-              placeholder="51.0447"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="lng">Longitude (optional)</Label>
-            <Input
-              id="lng"
-              value={lng}
-              onChange={(e) => setLng(e.target.value)}
-              placeholder="-114.0719"
             />
           </div>
         </div>

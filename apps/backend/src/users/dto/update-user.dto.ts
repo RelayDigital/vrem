@@ -11,6 +11,10 @@ export class UpdateUserDto {
   name?: string;
 
   @IsOptional()
+  @IsString()
+  avatarUrl?: string;
+
+  @IsOptional()
   @IsEnum(UserAccountType)
   accountType?: UserAccountType;
 }

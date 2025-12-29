@@ -12,6 +12,7 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateUseCasesDto } from './dto/update-use-cases.dto';
 import { AccountActionDto } from './dto/account-action.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OrgContextGuard } from '../auth/org-context.guard';
@@ -70,6 +71,29 @@ export class UsersController {
     @Body() dto: AccountActionDto,
   ) {
     return this.usersService.deleteAccount(user.id, dto.password);
+  }
+
+  /**
+   * Get the current user's use cases (services they provide)
+   * Only applicable for PROVIDER accounts
+   */
+  @Get('me/use-cases')
+  @UseGuards(JwtAuthGuard)
+  getMyUseCases(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.getUseCases(user.id);
+  }
+
+  /**
+   * Update the current user's use cases (services they provide)
+   * Only applicable for PROVIDER accounts
+   */
+  @Patch('me/use-cases')
+  @UseGuards(JwtAuthGuard)
+  updateMyUseCases(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateUseCasesDto,
+  ) {
+    return this.usersService.updateUseCases(user.id, dto.useCases);
   }
 
   // =============================

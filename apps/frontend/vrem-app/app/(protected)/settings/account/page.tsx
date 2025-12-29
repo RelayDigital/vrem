@@ -13,7 +13,9 @@ import { SettingsRightContentSection } from "@/components/shared/settings/Settin
 import { api } from "@/lib/api";
 import { useTour } from "@/context/tour-context";
 import { useAuth } from "@/context/auth-context";
-import { GraduationCap, RotateCcw, AlertTriangle, UserX, Trash2 } from "lucide-react";
+import { GraduationCap, RotateCcw, AlertTriangle, UserX, Trash2, User2 } from "lucide-react";
+import { AvatarUploader } from "@/components/shared/AvatarUploader";
+import { ServicesEditor } from "@/components/shared/settings/ServicesEditor";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
@@ -158,7 +160,31 @@ export default function AccountPage() {
     >
       {/* Content */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
-        <div className="space-y-2 md:col-span-2">
+        {/* Profile Picture */}
+        <div className="space-y-3 md:col-span-2">
+          <div className="flex items-center gap-2">
+            <User2 className="h-5 w-5 text-muted-foreground" />
+            <Label className="text-base">Profile Picture</Label>
+          </div>
+          <AvatarUploader
+            currentUrl={user.avatarUrl}
+            fallback={user.name?.charAt(0).toUpperCase() || "U"}
+            onUpload={async (url) => {
+              await api.users.update(user.id, { avatarUrl: url });
+              toast.success("Profile picture updated");
+              // Trigger a page refresh to update the avatar
+              window.location.reload();
+            }}
+            onRemove={async () => {
+              await api.users.update(user.id, { avatarUrl: "" });
+              toast.success("Profile picture removed");
+              window.location.reload();
+            }}
+            size="lg"
+          />
+        </div>
+
+        <div className="space-y-2 md:col-span-2 pt-4 border-t">
           <Label htmlFor="name">Name</Label>
           <Input
             id="name"
@@ -180,6 +206,13 @@ export default function AccountPage() {
           />
           <Muted className="text-xs">Email cannot be changed</Muted>
         </div>
+
+        {/* Services Section - Only for Provider accounts */}
+        {user.accountType === "PROVIDER" && (
+          <div className="md:col-span-2 pt-4 border-t">
+            <ServicesEditor />
+          </div>
+        )}
 
         {/* Setup Guide Section */}
         <div className="space-y-3 md:col-span-2 pt-4 border-t" data-tour="settings-tour-section">

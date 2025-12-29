@@ -20,6 +20,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BorderBeam } from '@/components/ui/border-beam';
 
 interface ServiceStepProps {
   mediaTypes: string[];
@@ -218,14 +219,19 @@ export function ServiceStep({
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <Button
-            onClick={handleContinue}
-            disabled={!isValid}
-            className="flex-1 bg-primary"
-          >
-            Continue
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
+          <div className="relative flex-1">
+            <Button
+              onClick={handleContinue}
+              disabled={!isValid}
+              className="w-full bg-primary"
+            >
+              Continue
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+            {isValid && (
+              <BorderBeam size={40} duration={3} borderWidth={1.5} />
+            )}
+          </div>
         </div>
       </div>
     </motion.div>

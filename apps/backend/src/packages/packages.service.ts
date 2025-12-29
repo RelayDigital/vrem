@@ -75,6 +75,7 @@ export class PackagesService {
         photoCount: dto.photoCount,
         videoMinutes: dto.videoMinutes,
         features: dto.features || [],
+        images: dto.images || [],
         displayOrder: dto.displayOrder || 0,
       },
     });
@@ -107,6 +108,7 @@ export class PackagesService {
         photoCount: dto.photoCount,
         videoMinutes: dto.videoMinutes,
         features: dto.features,
+        images: dto.images,
         displayOrder: dto.displayOrder,
       },
     });

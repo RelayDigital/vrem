@@ -196,8 +196,6 @@ class ApiClient {
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
-      // Required for ngrok free tier to bypass browser warning interstitial
-      'ngrok-skip-browser-warning': 'true',
       ...options.headers,
     };
 
@@ -533,6 +531,33 @@ class ApiClient {
       return this.request<{ success: boolean; message: string }>('/users/me', {
         method: 'DELETE',
         body: JSON.stringify({ password }),
+      });
+    },
+
+    /**
+     * Get the current user's use cases (services they provide)
+     * Only applicable for PROVIDER accounts
+     */
+    getUseCases: async (): Promise<string[]> => {
+      if (USE_MOCK_DATA) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        return ['PHOTOGRAPHY', 'VIDEOGRAPHY'];
+      }
+      return this.request<string[]>('/users/me/use-cases');
+    },
+
+    /**
+     * Update the current user's use cases (services they provide)
+     * Only applicable for PROVIDER accounts
+     */
+    updateUseCases: async (useCases: string[]): Promise<string[]> => {
+      if (USE_MOCK_DATA) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        return useCases;
+      }
+      return this.request<string[]>('/users/me/use-cases', {
+        method: 'PATCH',
+        body: JSON.stringify({ useCases }),
       });
     },
   };

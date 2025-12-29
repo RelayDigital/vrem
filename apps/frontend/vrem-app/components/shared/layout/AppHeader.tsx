@@ -99,7 +99,7 @@ export function AppHeader({
   };
 
   return (
-    <header className="sticky top-0 z-50 flex items-center border-b bg-card/80 backdrop-blur-xl shadow-sm w-full pl-2 pr-4 h-header-h">
+    <header className="sticky top-0 z-50 flex items-center border-none! border-b bg-card/80 backdrop-blur-xl w-full pl-2 pr-4 h-header-h">
       <div className="w-full max-w-full">
         <div className="flex items-center justify-between">
           {/* Left side: Logo/Org Switcher */}

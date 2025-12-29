@@ -6,6 +6,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useMemo,
   ReactNode,
   useRef,
 } from 'react';
@@ -87,6 +88,9 @@ interface TourContextType {
   // Guide visibility - true when setup guide widget should be shown
   shouldShowGuide: boolean;
 
+  // Tour step context for filtering steps based on org
+  tourStepContext: TourStepContext;
+
   // Track progress helpers
   getTrackProgress: (track: TourTrack) => TourTrackProgressInfo | null;
   getOverallProgress: () => { completed: number; total: number; percentage: number };
@@ -108,16 +112,54 @@ interface TourContextType {
 
 const TourContext = createContext<TourContextType | undefined>(undefined);
 
+// Context for determining which tour steps to show
+export interface TourStepContext {
+  accountType?: User['accountType'];
+  orgType?: 'PERSONAL' | 'TEAM' | 'COMPANY';
+  orgRole?: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+}
+
 // Get role-specific tour steps - exported for use in SetupGuideWidget
-export function getTourSteps(track: TourTrack, accountType?: User['accountType']): TourStepConfig[] {
+// In PERSONAL orgs, COMPANY-specific steps are never shown (everyone sees PROVIDER guide)
+// In COMPANY orgs, COMPANY-specific steps only shown for OWNER/ADMIN roles
+export function getTourSteps(track: TourTrack, context?: TourStepContext): TourStepConfig[] {
   const allSteps = DEFAULT_TOUR_STEPS[track];
 
-  if (!accountType) return allSteps;
+  if (!context?.accountType) return allSteps;
 
-  // Filter steps based on account type
+  const { accountType, orgType, orgRole } = context;
+
+  // In PERSONAL orgs, COMPANY and PROVIDER users should see the PROVIDER guide
+  // This ensures everyone gets the same experience in their personal workspace
+  const effectiveAccountType = orgType === 'PERSONAL' && accountType === 'COMPANY'
+    ? 'PROVIDER'
+    : accountType;
+
+  // Filter steps based on account type and org context
   return allSteps.filter(step => {
     if (!step.allowedAccountTypes) return true;
-    return step.allowedAccountTypes.includes(accountType as 'AGENT' | 'PROVIDER' | 'COMPANY');
+
+    // Check if this step is for COMPANY accounts only
+    const isCompanyOnlyStep = step.allowedAccountTypes.length === 1 && step.allowedAccountTypes[0] === 'COMPANY';
+
+    if (isCompanyOnlyStep) {
+      // In PERSONAL orgs, never show COMPANY-specific steps
+      if (orgType === 'PERSONAL') {
+        return false;
+      }
+
+      // In COMPANY orgs, only show if user has elevated role
+      if (orgType === 'COMPANY') {
+        const hasElevatedRole = orgRole === 'OWNER' || orgRole === 'ADMIN';
+        return hasElevatedRole;
+      }
+
+      // Default: don't show COMPANY-only steps
+      return false;
+    }
+
+    // For non-COMPANY-only steps, check if effective account type is allowed
+    return step.allowedAccountTypes.includes(effectiveAccountType as 'AGENT' | 'PROVIDER' | 'COMPANY');
   });
 }
 
@@ -399,7 +441,28 @@ const DEFAULT_TOUR_STEPS: Record<TourTrack, TourStepConfig[]> = {
 export function TourProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, activeOrganizationId } = useAuth();
+  const { user, activeOrganizationId, memberships } = useAuth();
+
+  // Derive tour step context from current auth state
+  const tourStepContext: TourStepContext = useMemo(() => {
+    if (!user || !activeOrganizationId || !memberships) {
+      return { accountType: user?.accountType };
+    }
+
+    const activeMembership = memberships.find(m => m.orgId === activeOrganizationId);
+    if (!activeMembership) {
+      return { accountType: user.accountType };
+    }
+
+    const orgType = (activeMembership.organization?.type || 'PERSONAL') as 'PERSONAL' | 'TEAM' | 'COMPANY';
+    const orgRole = (activeMembership.orgRole || activeMembership.role || 'MEMBER') as 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+
+    return {
+      accountType: user.accountType,
+      orgType,
+      orgRole,
+    };
+  }, [user, activeOrganizationId, memberships]);
 
   const [status, setStatus] = useState<TourStatusResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -470,13 +533,37 @@ export function TourProvider({ children }: { children: ReactNode }) {
     return status?.trackProgress?.[track] ?? null;
   }, [status]);
 
-  // Get overall progress
+  // All tour tracks
+  const TOUR_TRACKS: TourTrack[] = [
+    'DASHBOARD_OVERVIEW',
+    'JOB_MANAGEMENT',
+    'MESSAGING_CHAT',
+    'SETTINGS_INTEGRATIONS',
+  ];
+
+  // Get overall progress - calculate based on filtered steps for current context
   const getOverallProgress = useCallback(() => {
-    if (!status?.overallProgress) {
-      return { completed: 0, total: 20, percentage: 0 };
-    }
-    return status.overallProgress;
-  }, [status]);
+    // Calculate totals based on visible steps for current context
+    const visibleTracksProgress = TOUR_TRACKS.reduce(
+      (acc, track) => {
+        const steps = getTourSteps(track, tourStepContext);
+        if (steps.length === 0) return acc; // Skip tracks with no steps for this context
+        const trackProgress = status?.trackProgress?.[track];
+        return {
+          completed: acc.completed + (trackProgress?.completed ?? 0),
+          total: acc.total + steps.length,
+        };
+      },
+      { completed: 0, total: 0 }
+    );
+
+    return {
+      ...visibleTracksProgress,
+      percentage: visibleTracksProgress.total > 0
+        ? Math.round((visibleTracksProgress.completed / visibleTracksProgress.total) * 100)
+        : 0,
+    };
+  }, [status, tourStepContext]);
 
   // Convert our step config to driver.js steps
   const convertToDriverSteps = useCallback((steps: TourStepConfig[]): DriveStep[] => {
@@ -529,7 +616,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   // Actually start the tour (after navigation if needed)
   const executeTour = useCallback((track: TourTrack, startFromStep: number = 0) => {
-    const steps = getTourSteps(track, user?.accountType);
+    const steps = getTourSteps(track, tourStepContext);
     if (!steps || steps.length === 0) {
       toast.error('Tour steps not configured');
       return;
@@ -807,7 +894,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
               // Mark current step as completed
               const track = currentTrackRef.current!;
-              const steps = getTourSteps(track, user?.accountType);
+              const steps = getTourSteps(track, tourStepContext);
               const currentIndex = driverRef.current?.getState()?.activeIndex || 0;
               const stepConfig = steps[currentIndex];
 
@@ -856,7 +943,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
   const skipStep = useCallback(() => {
     if (driverRef.current && activeTour) {
-      const steps = getTourSteps(activeTour, user?.accountType);
+      const steps = getTourSteps(activeTour, tourStepContext);
       const stepConfig = steps[activeStepIndex];
 
       // Mark as skipped
@@ -959,6 +1046,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
         activeStepIndex,
         isTourActive,
         shouldShowGuide,
+        tourStepContext,
         getTrackProgress,
         getOverallProgress,
         startTour,

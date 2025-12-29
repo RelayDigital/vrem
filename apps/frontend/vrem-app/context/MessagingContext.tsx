@@ -21,6 +21,7 @@ interface MessagingContextType {
   messages: ChatMessage[];
   getMessagesForJob: (jobId: string) => ChatMessage[];
   fetchMessages: (jobId: string, channel?: 'TEAM' | 'CUSTOMER', orgId?: string) => Promise<void>;
+  isLoadingMessages: (jobId: string) => boolean;
 
   // Message handlers
   sendMessage: (
@@ -70,6 +71,7 @@ export function MessagingProvider({
   const [currentUserName, setCurrentUserName] = useState<string | undefined>(defaultUserName);
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | undefined>(defaultUserAvatar);
   const [connected, setConnected] = useState(false);
+  const [loadingJobs, setLoadingJobs] = useState<Set<string>>(new Set());
   const lastFetchRef = useRef<Map<string, number>>(new Map());
   const inFlightFetchRef = useRef<Set<string>>(new Set());
 
@@ -216,6 +218,10 @@ export function MessagingProvider({
     return messages.filter((msg) => msg.jobId === jobId);
   }, [messages]);
 
+  const isLoadingMessages = useCallback((jobId: string): boolean => {
+    return loadingJobs.has(jobId);
+  }, [loadingJobs]);
+
   const fetchMessages = useCallback(async (jobId: string, channel: 'TEAM' | 'CUSTOMER' = 'TEAM', orgId?: string) => {
     const cacheKey = `${jobId}:${channel}`;
     const now = Date.now();
@@ -227,6 +233,10 @@ export function MessagingProvider({
       return;
     }
     inFlightFetchRef.current.add(cacheKey);
+
+    // Set loading state
+    setLoadingJobs((prev) => new Set(prev).add(jobId));
+
     try {
       if (orgId) {
         api.organizations.setActiveOrganization(orgId);
@@ -258,6 +268,12 @@ export function MessagingProvider({
       // Don't show toast here to avoid spamming if called frequently
     } finally {
       inFlightFetchRef.current.delete(cacheKey);
+      // Clear loading state
+      setLoadingJobs((prev) => {
+        const next = new Set(prev);
+        next.delete(jobId);
+        return next;
+      });
     }
   }, [connected]);
 
@@ -424,6 +440,7 @@ export function MessagingProvider({
         messages,
         getMessagesForJob,
         fetchMessages,
+        isLoadingMessages,
         sendMessage,
         editMessage,
         deleteMessage,

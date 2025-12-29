@@ -163,6 +163,14 @@ export function ProviderStep({
               You are not yet a customer of any media companies. You must be
               added as a customer by a company before you can place orders here.
             </P>
+            <div className="pt-4 border-t border-border mt-6">
+              <Muted className="text-sm max-w-lg mx-auto">
+                <span className="font-medium text-foreground/80">Coming Soon:</span>{' '}
+                An open marketplace where you can place orders without needing to be part of a
+                company organization. Providers will be automatically matched and assigned to
+                fulfill your orders based on availability and location.
+              </Muted>
+            </div>
           </motion.div>
 
           <motion.div

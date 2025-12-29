@@ -10,6 +10,7 @@ export class CreatePackageDto {
   photoCount?: number;
   videoMinutes?: number;
   features?: string[];
+  images?: string[];
   displayOrder?: number;
 }
 
@@ -24,5 +25,6 @@ export class UpdatePackageDto {
   photoCount?: number;
   videoMinutes?: number;
   features?: string[];
+  images?: string[];
   displayOrder?: number;
 }

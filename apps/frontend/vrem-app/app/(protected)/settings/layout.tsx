@@ -81,24 +81,6 @@ const settingsSections: SettingsSection[] = [
         path: "/settings/organization/general",
         roles: ["OWNER", "ADMIN"],
       },
-      {
-        id: "members",
-        label: "Members",
-        path: "/settings/organization/members",
-        roles: ["OWNER", "ADMIN"],
-      },
-      {
-        id: "billing",
-        label: "Billing",
-        path: "/settings/organization/billing",
-        roles: ["OWNER", "ADMIN"],
-      },
-      {
-        id: "integrations",
-        label: "Integrations",
-        path: "/settings/organization/integrations",
-        roles: ["OWNER", "ADMIN"],
-      },
     ],
   },
   {

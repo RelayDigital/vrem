@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/field";
 import { api } from "@/lib/api";
 import Link from "next/link";
+import { BorderBeam } from "@/components/ui/border-beam";
 
 export function EmailStep() {
   const { data, updateData, nextStep, setIsLoading, setError, isLoading } =
@@ -71,9 +72,14 @@ export function EmailStep() {
         </Field>
 
         <Field>
-          <Button type="submit" className="w-full" disabled={isLoading || !email}>
-            {isLoading ? "Sending code..." : "Continue"}
-          </Button>
+          <div className="relative">
+            <Button type="submit" className="w-full" disabled={isLoading || !email}>
+              {isLoading ? "Sending code..." : "Continue"}
+            </Button>
+            {email && !isLoading && (
+              <BorderBeam size={40} duration={3} borderWidth={1.5} />
+            )}
+          </div>
         </Field>
 
         <p className="text-center text-sm text-muted-foreground">

@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { FileUploaderRegular } from "@uploadcare/react-uploader/next";
+import "@uploadcare/react-uploader/core.css";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,10 +46,17 @@ import {
   Camera,
   Video,
   FileText,
-  Plane,
   Clock,
   Sparkles,
   AlertCircle,
+  X,
+  Check,
+  ChevronUp,
+  ChevronDown,
+  DollarSign,
+  Image,
+  Film,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -75,33 +84,33 @@ function parsePriceInput(value: string): number {
 }
 
 const MEDIA_TYPE_OPTIONS = [
-  { value: MediaType.PHOTO, label: "Photography", icon: Camera },
-  { value: MediaType.VIDEO, label: "Video", icon: Video },
-  { value: MediaType.FLOORPLAN, label: "Floor Plan", icon: FileText },
-  { value: MediaType.DOCUMENT, label: "Document", icon: FileText },
+  { value: MediaType.PHOTO, label: "Photography", icon: Camera, description: "Professional photos" },
+  { value: MediaType.VIDEO, label: "Video", icon: Video, description: "Video production" },
+  { value: MediaType.FLOORPLAN, label: "Floor Plan", icon: Layers, description: "2D/3D floor plans" },
+  { value: MediaType.DOCUMENT, label: "Document", icon: FileText, description: "Documents & reports" },
 ];
 
 const CURRENCY_OPTIONS = [
-  { value: "usd", label: "USD ($)", symbol: "$" },
-  { value: "eur", label: "EUR (€)", symbol: "€" },
-  { value: "gbp", label: "GBP (£)", symbol: "£" },
-  { value: "cad", label: "CAD ($)", symbol: "$" },
-  { value: "aud", label: "AUD ($)", symbol: "$" },
-  { value: "nzd", label: "NZD ($)", symbol: "$" },
-  { value: "chf", label: "CHF", symbol: "CHF " },
-  { value: "jpy", label: "JPY (¥)", symbol: "¥" },
-  { value: "inr", label: "INR (₹)", symbol: "₹" },
-  { value: "mxn", label: "MXN ($)", symbol: "$" },
-  { value: "brl", label: "BRL (R$)", symbol: "R$" },
+  { value: "usd", label: "USD", symbol: "$" },
+  { value: "eur", label: "EUR", symbol: "€" },
+  { value: "gbp", label: "GBP", symbol: "£" },
+  { value: "cad", label: "CAD", symbol: "$" },
+  { value: "aud", label: "AUD", symbol: "$" },
+  { value: "nzd", label: "NZD", symbol: "$" },
+  { value: "chf", label: "CHF", symbol: "CHF" },
+  { value: "jpy", label: "JPY", symbol: "¥" },
+  { value: "inr", label: "INR", symbol: "₹" },
+  { value: "mxn", label: "MXN", symbol: "$" },
+  { value: "brl", label: "BRL", symbol: "R$" },
 ];
 
 const ADD_ON_CATEGORY_OPTIONS = [
-  { value: AddOnCategory.AERIAL, label: "Aerial/Drone" },
-  { value: AddOnCategory.TWILIGHT, label: "Twilight" },
-  { value: AddOnCategory.VIRTUAL_TOUR, label: "3D Virtual Tour" },
-  { value: AddOnCategory.FLOORPLAN, label: "Floor Plan" },
-  { value: AddOnCategory.RUSH, label: "Rush Delivery" },
-  { value: AddOnCategory.OTHER, label: "Other" },
+  { value: AddOnCategory.AERIAL, label: "Aerial/Drone", icon: "🚁" },
+  { value: AddOnCategory.TWILIGHT, label: "Twilight", icon: "🌅" },
+  { value: AddOnCategory.VIRTUAL_TOUR, label: "3D Virtual Tour", icon: "🏠" },
+  { value: AddOnCategory.FLOORPLAN, label: "Floor Plan", icon: "📐" },
+  { value: AddOnCategory.RUSH, label: "Rush Delivery", icon: "⚡" },
+  { value: AddOnCategory.OTHER, label: "Other", icon: "✨" },
 ];
 
 interface PackageFormData {
@@ -113,7 +122,8 @@ interface PackageFormData {
   turnaroundDays: string;
   photoCount: string;
   videoMinutes: string;
-  features: string;
+  features: string[];
+  images: string[];
   isActive: boolean;
 }
 
@@ -135,7 +145,8 @@ const defaultPackageForm: PackageFormData = {
   turnaroundDays: "",
   photoCount: "",
   videoMinutes: "",
-  features: "",
+  features: [],
+  images: [],
   isActive: true,
 };
 
@@ -152,6 +163,380 @@ function getCurrencySymbol(currency: string): string {
   return CURRENCY_OPTIONS.find((c) => c.value === currency)?.symbol || "$";
 }
 
+// Feature list editor component
+function FeatureListEditor({
+  features,
+  onChange,
+}: {
+  features: string[];
+  onChange: (features: string[]) => void;
+}) {
+  const [newFeature, setNewFeature] = useState("");
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  const handleAddFeature = () => {
+    if (newFeature.trim()) {
+      onChange([...features, newFeature.trim()]);
+      setNewFeature("");
+    }
+  };
+
+  const handleRemoveFeature = (index: number) => {
+    onChange(features.filter((_, i) => i !== index));
+  };
+
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return;
+    const newFeatures = [...features];
+    [newFeatures[index - 1], newFeatures[index]] = [newFeatures[index], newFeatures[index - 1]];
+    onChange(newFeatures);
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index === features.length - 1) return;
+    const newFeatures = [...features];
+    [newFeatures[index], newFeatures[index + 1]] = [newFeatures[index + 1], newFeatures[index]];
+    onChange(newFeatures);
+  };
+
+  const handleStartEdit = (index: number) => {
+    setEditingIndex(index);
+    setEditValue(features[index]);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingIndex !== null && editValue.trim()) {
+      const newFeatures = [...features];
+      newFeatures[editingIndex] = editValue.trim();
+      onChange(newFeatures);
+    }
+    setEditingIndex(null);
+    setEditValue("");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setEditValue("");
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddFeature();
+    }
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSaveEdit();
+    } else if (e.key === "Escape") {
+      handleCancelEdit();
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Existing features */}
+      {features.length > 0 && (
+        <div className="space-y-2">
+          {features.map((feature, index) => (
+            <div
+              key={index}
+              className="group flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2 border border-transparent hover:border-border transition-colors"
+            >
+              {/* Reorder buttons */}
+              <div className="flex flex-col -my-1">
+                <button
+                  type="button"
+                  onClick={() => handleMoveUp(index)}
+                  disabled={index === 0}
+                  className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronUp className="size-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMoveDown(index)}
+                  disabled={index === features.length - 1}
+                  className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronDown className="size-3" />
+                </button>
+              </div>
+
+              {/* Feature text or edit input */}
+              {editingIndex === index ? (
+                <div className="flex-1 flex items-center gap-2">
+                  <Input
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={handleEditKeyDown}
+                    className="h-8 text-sm"
+                    autoFocus
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={handleSaveEdit}
+                  >
+                    <Check className="size-4 text-green-600" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={handleCancelEdit}
+                  >
+                    <X className="size-4 text-muted-foreground" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <span className="flex-1 text-sm">{feature}</span>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => handleStartEdit(index)}
+                    >
+                      <Pencil className="size-3.5 text-muted-foreground" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => handleRemoveFeature(index)}
+                    >
+                      <X className="size-3.5 text-destructive" />
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add new feature */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Plus className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Add a feature (e.g., Professional editing)"
+            value={newFeature}
+            onChange={(e) => setNewFeature(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="pl-9"
+          />
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleAddFeature}
+          disabled={!newFeature.trim()}
+        >
+          Add
+        </Button>
+      </div>
+
+      {features.length === 0 && (
+        <p className="text-xs text-muted-foreground text-center py-2">
+          No features added yet. Features help customers understand what's included.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Image list editor component
+function ImageListEditor({
+  images,
+  onChange,
+}: {
+  images: string[];
+  onChange: (images: string[]) => void;
+}) {
+  const handleRemoveImage = (index: number) => {
+    onChange(images.filter((_, i) => i !== index));
+  };
+
+  const handleMoveLeft = (index: number) => {
+    if (index === 0) return;
+    const newImages = [...images];
+    [newImages[index - 1], newImages[index]] = [newImages[index], newImages[index - 1]];
+    onChange(newImages);
+  };
+
+  const handleMoveRight = (index: number) => {
+    if (index === images.length - 1) return;
+    const newImages = [...images];
+    [newImages[index], newImages[index + 1]] = [newImages[index + 1], newImages[index]];
+    onChange(newImages);
+  };
+
+  const handleUploadSuccess = (info: any) => {
+    if (!info?.allEntries) return;
+
+    const successfulUploads = info.allEntries
+      .filter((entry: any) => entry.status === "success" && entry.cdnUrl)
+      .map((entry: any) => entry.cdnUrl as string)
+      .filter((url: string) => !images.includes(url)); // Prevent duplicates
+
+    if (successfulUploads.length > 0) {
+      onChange([...images, ...successfulUploads]);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Image grid */}
+      {images.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          {images.map((url, index) => (
+            <div
+              key={index}
+              className="group relative aspect-video rounded-lg overflow-hidden border bg-muted"
+            >
+              <img
+                src={url}
+                alt={`Package image ${index + 1}`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23f0f0f0' width='100' height='100'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' fill='%23999'%3EError%3C/text%3E%3C/svg%3E";
+                }}
+              />
+              {/* Overlay controls */}
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => handleMoveLeft(index)}
+                  disabled={index === 0}
+                >
+                  <ChevronUp className="size-4 -rotate-90" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => handleMoveRight(index)}
+                  disabled={index === images.length - 1}
+                >
+                  <ChevronDown className="size-4 -rotate-90" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => handleRemoveImage(index)}
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+              {/* First image badge */}
+              {index === 0 && (
+                <div className="absolute top-1 left-1 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded">
+                  Cover
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Upload button */}
+      <div className="flex justify-center">
+        <FileUploaderRegular
+          pubkey={process.env.NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY || "dbf470d49c954f9f6143"}
+          classNameUploader="uc-light uc-gray"
+          sourceList="local, camera, url, gdrive, dropbox"
+          userAgentIntegration="llm-nextjs"
+          filesViewMode="grid"
+          useCloudImageEditor={false}
+          multiple={true}
+          accept="image/*"
+          onChange={handleUploadSuccess}
+        />
+      </div>
+
+      {images.length === 0 && (
+        <p className="text-xs text-muted-foreground text-center">
+          Upload images to showcase this package. The first image will be used as the cover.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Media type selector component
+function MediaTypeSelector({
+  selected,
+  onChange,
+}: {
+  selected: MediaType[];
+  onChange: (types: MediaType[]) => void;
+}) {
+  const toggle = (type: MediaType) => {
+    if (selected.includes(type)) {
+      onChange(selected.filter((t) => t !== type));
+    } else {
+      onChange([...selected, type]);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {MEDIA_TYPE_OPTIONS.map((option) => {
+        const Icon = option.icon;
+        const isSelected = selected.includes(option.value);
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => toggle(option.value)}
+            className={cn(
+              "flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left",
+              isSelected
+                ? "border-primary bg-primary/5"
+                : "border-muted hover:border-muted-foreground/30"
+            )}
+          >
+            <div
+              className={cn(
+                "flex items-center justify-center size-10 rounded-lg",
+                isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
+              )}
+            >
+              <Icon className="size-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-sm">{option.label}</div>
+              <div className="text-xs text-muted-foreground truncate">
+                {option.description}
+              </div>
+            </div>
+            {isSelected && (
+              <Check className="size-5 text-primary shrink-0" />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function PackagesManager() {
   const [packages, setPackages] = useState<ServicePackage[]>([]);
   const [addOns, setAddOns] = useState<PackageAddOn[]>([]);
@@ -162,7 +547,9 @@ export function PackagesManager() {
   const [packageDialogOpen, setPackageDialogOpen] = useState(false);
   const [editingPackage, setEditingPackage] = useState<ServicePackage | null>(null);
   const [packageForm, setPackageForm] = useState<PackageFormData>(defaultPackageForm);
+  const [initialPackageForm, setInitialPackageForm] = useState<PackageFormData>(defaultPackageForm);
   const [isSavingPackage, setIsSavingPackage] = useState(false);
+  const [discardPackageDialogOpen, setDiscardPackageDialogOpen] = useState(false);
 
   // Add-on dialog state
   const [addOnDialogOpen, setAddOnDialogOpen] = useState(false);
@@ -215,16 +602,34 @@ export function PackagesManager() {
     };
   }, []);
 
+  // Check if package form has unsaved changes
+  const hasPackageChanges = useCallback(() => {
+    return (
+      packageForm.name !== initialPackageForm.name ||
+      packageForm.description !== initialPackageForm.description ||
+      packageForm.price !== initialPackageForm.price ||
+      packageForm.currency !== initialPackageForm.currency ||
+      packageForm.turnaroundDays !== initialPackageForm.turnaroundDays ||
+      packageForm.photoCount !== initialPackageForm.photoCount ||
+      packageForm.videoMinutes !== initialPackageForm.videoMinutes ||
+      packageForm.isActive !== initialPackageForm.isActive ||
+      JSON.stringify(packageForm.mediaTypes) !== JSON.stringify(initialPackageForm.mediaTypes) ||
+      JSON.stringify(packageForm.features) !== JSON.stringify(initialPackageForm.features) ||
+      JSON.stringify(packageForm.images) !== JSON.stringify(initialPackageForm.images)
+    );
+  }, [packageForm, initialPackageForm]);
+
   // Package handlers
   const handleCreatePackage = () => {
     setEditingPackage(null);
     setPackageForm(defaultPackageForm);
+    setInitialPackageForm(defaultPackageForm);
     setPackageDialogOpen(true);
   };
 
   const handleEditPackage = (pkg: ServicePackage) => {
     setEditingPackage(pkg);
-    setPackageForm({
+    const formData: PackageFormData = {
       name: pkg.name,
       description: pkg.description || "",
       price: (pkg.price / 100).toFixed(2),
@@ -233,10 +638,26 @@ export function PackagesManager() {
       turnaroundDays: pkg.turnaroundDays?.toString() || "",
       photoCount: pkg.photoCount?.toString() || "",
       videoMinutes: pkg.videoMinutes?.toString() || "",
-      features: pkg.features.join("\n"),
+      features: pkg.features || [],
+      images: pkg.images || [],
       isActive: pkg.isActive,
-    });
+    };
+    setPackageForm(formData);
+    setInitialPackageForm(formData);
     setPackageDialogOpen(true);
+  };
+
+  const handlePackageDialogClose = (open: boolean) => {
+    if (!open && hasPackageChanges()) {
+      setDiscardPackageDialogOpen(true);
+    } else {
+      setPackageDialogOpen(open);
+    }
+  };
+
+  const handleDiscardPackageChanges = () => {
+    setDiscardPackageDialogOpen(false);
+    setPackageDialogOpen(false);
   };
 
   const handleSavePackage = async () => {
@@ -270,10 +691,8 @@ export function PackagesManager() {
         videoMinutes: packageForm.videoMinutes
           ? parseInt(packageForm.videoMinutes)
           : undefined,
-        features: packageForm.features
-          .split("\n")
-          .map((f) => f.trim())
-          .filter(Boolean),
+        features: packageForm.features.filter(Boolean),
+        images: packageForm.images.filter(Boolean),
       };
 
       if (editingPackage) {
@@ -399,15 +818,6 @@ export function PackagesManager() {
     }
   };
 
-  const toggleMediaType = (type: MediaType) => {
-    setPackageForm((prev) => ({
-      ...prev,
-      mediaTypes: prev.mediaTypes.includes(type)
-        ? prev.mediaTypes.filter((t) => t !== type)
-        : [...prev.mediaTypes, type],
-    }));
-  };
-
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -481,11 +891,14 @@ export function PackagesManager() {
               {packages.map((pkg) => (
                 <Card
                   key={pkg.id}
-                  className={cn(!pkg.isActive && "opacity-60")}
+                  className={cn(
+                    "group hover:shadow-md transition-shadow",
+                    !pkg.isActive && "opacity-60"
+                  )}
                 >
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                           <h3 className="font-semibold text-lg">{pkg.name}</h3>
                           {!pkg.isActive && (
@@ -493,52 +906,64 @@ export function PackagesManager() {
                           )}
                         </div>
                         {pkg.description && (
-                          <p className="text-sm text-muted-foreground mb-3">
+                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
                             {pkg.description}
                           </p>
                         )}
                         <div className="flex flex-wrap gap-2 mb-3">
-                          {pkg.mediaTypes.map((type) => (
-                            <Badge key={type} variant="outline">
-                              {type}
-                            </Badge>
-                          ))}
+                          {pkg.mediaTypes.map((type) => {
+                            const option = MEDIA_TYPE_OPTIONS.find(o => o.value === type);
+                            const Icon = option?.icon || Camera;
+                            return (
+                              <Badge key={type} variant="outline" className="gap-1.5">
+                                <Icon className="size-3" />
+                                {option?.label || type}
+                              </Badge>
+                            );
+                          })}
                         </div>
                         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                           {pkg.turnaroundDays && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
+                            <span className="flex items-center gap-1.5">
+                              <Clock className="size-4" />
                               {pkg.turnaroundDays} day turnaround
                             </span>
                           )}
                           {pkg.photoCount && (
-                            <span className="flex items-center gap-1">
-                              <Camera className="h-4 w-4" />
+                            <span className="flex items-center gap-1.5">
+                              <Image className="size-4" />
                               {pkg.photoCount} photos
                             </span>
                           )}
                           {pkg.videoMinutes && (
-                            <span className="flex items-center gap-1">
-                              <Video className="h-4 w-4" />
+                            <span className="flex items-center gap-1.5">
+                              <Film className="size-4" />
                               {pkg.videoMinutes} min video
+                            </span>
+                          )}
+                          {pkg.features.length > 0 && (
+                            <span className="flex items-center gap-1.5">
+                              <Sparkles className="size-4" />
+                              {pkg.features.length} features
                             </span>
                           )}
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="text-2xl font-bold">
+                      <div className="flex flex-col items-end gap-3">
+                        <div className="text-2xl font-bold text-primary">
                           {formatPrice(pkg.price, pkg.currency)}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={() => handleEditPackage(pkg)}
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-4 w-4 mr-1" />
+                            Edit
                           </Button>
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={() =>
                               handleDeleteClick("package", pkg.id, pkg.name)
@@ -583,71 +1008,80 @@ export function PackagesManager() {
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
-              {addOns.map((addOn) => (
-                <Card
-                  key={addOn.id}
-                  className={cn(!addOn.isActive && "opacity-60")}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-medium">{addOn.name}</h4>
-                          {!addOn.isActive && (
-                            <Badge variant="secondary" className="text-xs">
-                              Inactive
+              {addOns.map((addOn) => {
+                const categoryOption = ADD_ON_CATEGORY_OPTIONS.find(
+                  (c) => c.value === addOn.category
+                );
+                return (
+                  <Card
+                    key={addOn.id}
+                    className={cn(
+                      "group hover:shadow-md transition-shadow",
+                      !addOn.isActive && "opacity-60"
+                    )}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex gap-3">
+                          <div className="flex items-center justify-center size-10 rounded-lg bg-muted text-lg shrink-0">
+                            {categoryOption?.icon || "✨"}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-medium">{addOn.name}</h4>
+                              {!addOn.isActive && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Inactive
+                                </Badge>
+                              )}
+                            </div>
+                            <Badge variant="outline" className="text-xs mb-2">
+                              {categoryOption?.label || "Other"}
                             </Badge>
-                          )}
+                            {addOn.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-2">
+                                {addOn.description}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <Badge variant="outline" className="text-xs mb-2">
-                          {
-                            ADD_ON_CATEGORY_OPTIONS.find(
-                              (c) => c.value === addOn.category
-                            )?.label
-                          }
-                        </Badge>
-                        {addOn.description && (
-                          <p className="text-sm text-muted-foreground">
-                            {addOn.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="font-semibold">
-                          +{formatPrice(addOn.price, addOn.currency)}
-                        </div>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditAddOn(addOn)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              handleDeleteClick("addon", addOn.id, addOn.name)
-                            }
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="font-semibold text-primary">
+                            +{formatPrice(addOn.price, addOn.currency)}
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditAddOn(addOn)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                handleDeleteClick("addon", addOn.id, addOn.name)
+                              }
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
       </Tabs>
 
       {/* Package Dialog */}
-      <Dialog open={packageDialogOpen} onOpenChange={setPackageDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+      <Dialog open={packageDialogOpen} onOpenChange={handlePackageDialogClose}>
+        <DialogContent className="max-w-2xl max-h-[90vh] !flex !flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
             <DialogTitle>
               {editingPackage ? "Edit Package" : "Create Package"}
             </DialogTitle>
@@ -658,196 +1092,227 @@ export function PackagesManager() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-6 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="pkg-name">Package Name *</Label>
-              <Input
-                id="pkg-name"
-                placeholder="e.g., Standard Photography Package"
-                value={packageForm.name}
-                onChange={(e) =>
-                  setPackageForm((prev) => ({ ...prev, name: e.target.value }))
-                }
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="pkg-description">Description</Label>
-              <Textarea
-                id="pkg-description"
-                placeholder="Describe what's included in this package..."
-                value={packageForm.description}
-                onChange={(e) =>
-                  setPackageForm((prev) => ({
-                    ...prev,
-                    description: e.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="pkg-price">Price *</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={packageForm.currency}
-                  onValueChange={(value) =>
-                    setPackageForm((prev) => ({ ...prev, currency: value }))
-                  }
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CURRENCY_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    {getCurrencySymbol(packageForm.currency)}
-                  </span>
+          <div className="flex-1 min-h-0 overflow-y-auto px-6">
+            <div className="grid gap-6 py-6">
+              {/* Basic Info */}
+              <div className="space-y-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="pkg-name">Package Name *</Label>
                   <Input
-                    id="pkg-price"
-                    type="text"
-                    placeholder="0.00"
-                    className="pl-8"
-                    value={packageForm.price}
+                    id="pkg-name"
+                    placeholder="e.g., Standard Photography Package"
+                    value={packageForm.name}
                     onChange={(e) =>
-                      setPackageForm((prev) => ({
-                        ...prev,
-                        price: e.target.value,
-                      }))
+                      setPackageForm((prev) => ({ ...prev, name: e.target.value }))
                     }
                   />
                 </div>
-              </div>
-            </div>
 
-            <div className="grid gap-2">
-              <Label>Media Types *</Label>
-              <div className="flex flex-wrap gap-2">
-                {MEDIA_TYPE_OPTIONS.map((option) => {
-                  const Icon = option.icon;
-                  const isSelected = packageForm.mediaTypes.includes(
-                    option.value
-                  );
-                  return (
-                    <Button
-                      key={option.value}
-                      type="button"
-                      variant={isSelected ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => toggleMediaType(option.value)}
+                <div className="grid gap-2">
+                  <Label htmlFor="pkg-description">Description</Label>
+                  <Textarea
+                    id="pkg-description"
+                    placeholder="Describe what's included in this package..."
+                    value={packageForm.description}
+                    onChange={(e) =>
+                      setPackageForm((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              {/* Pricing */}
+              <div className="space-y-4 pt-4 border-t">
+                <Label className="text-base font-medium">Pricing</Label>
+                <div className="grid gap-2">
+                  <div className="flex gap-2">
+                    <Select
+                      value={packageForm.currency}
+                      onValueChange={(value) =>
+                        setPackageForm((prev) => ({ ...prev, currency: value }))
+                      }
                     >
-                      <Icon className="h-4 w-4 mr-1" />
-                      {option.label}
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Optional Details Section */}
-            <div className="space-y-4 pt-4 border-t border-border">
-              <div className="flex items-center gap-2">
-                <Label className="text-muted-foreground text-sm">Optional Details</Label>
-                <span className="text-xs text-muted-foreground">(leave blank if not applicable)</span>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="pkg-turnaround" className="text-sm">Turnaround (days)</Label>
-                  <Input
-                    id="pkg-turnaround"
-                    type="number"
-                    min="1"
-                    placeholder="Optional"
-                    value={packageForm.turnaroundDays}
-                    onChange={(e) =>
-                      setPackageForm((prev) => ({
-                        ...prev,
-                        turnaroundDays: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="pkg-photos" className="text-sm">Photo Count</Label>
-                  <Input
-                    id="pkg-photos"
-                    type="number"
-                    min="1"
-                    placeholder="Optional"
-                    value={packageForm.photoCount}
-                    onChange={(e) =>
-                      setPackageForm((prev) => ({
-                        ...prev,
-                        photoCount: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="pkg-video" className="text-sm">Video (minutes)</Label>
-                  <Input
-                    id="pkg-video"
-                    type="number"
-                    min="1"
-                    placeholder="Optional"
-                    value={packageForm.videoMinutes}
-                    onChange={(e) =>
-                      setPackageForm((prev) => ({
-                        ...prev,
-                        videoMinutes: e.target.value,
-                      }))
-                    }
-                  />
+                      <SelectTrigger className="w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CURRENCY_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.symbol} {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        {getCurrencySymbol(packageForm.currency)}
+                      </span>
+                      <Input
+                        id="pkg-price"
+                        type="text"
+                        placeholder="0.00"
+                        className="pl-8 text-lg font-medium"
+                        value={packageForm.price}
+                        onChange={(e) =>
+                          setPackageForm((prev) => ({
+                            ...prev,
+                            price: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="pkg-features" className="text-sm">Features (one per line, optional)</Label>
-              <Textarea
-                id="pkg-features"
-                placeholder="Professional editing&#10;24-hour turnaround&#10;Unlimited revisions"
-                rows={4}
-                value={packageForm.features}
-                onChange={(e) =>
-                  setPackageForm((prev) => ({
-                    ...prev,
-                    features: e.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            {editingPackage && (
-              <div className="flex items-center justify-between border-t pt-4">
-                <div>
-                  <Label htmlFor="pkg-active">Active</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Inactive packages won't be shown to agents
-                  </p>
-                </div>
-                <Switch
-                  id="pkg-active"
-                  checked={packageForm.isActive}
-                  onCheckedChange={(checked) =>
-                    setPackageForm((prev) => ({ ...prev, isActive: checked }))
+              {/* Media Types */}
+              <div className="space-y-4 pt-4 border-t">
+                <Label className="text-base font-medium">Media Types *</Label>
+                <p className="text-sm text-muted-foreground -mt-2">
+                  Select the types of media included in this package
+                </p>
+                <MediaTypeSelector
+                  selected={packageForm.mediaTypes}
+                  onChange={(types) =>
+                    setPackageForm((prev) => ({ ...prev, mediaTypes: types }))
                   }
                 />
               </div>
-            )}
+
+              {/* Deliverables */}
+              <div className="space-y-4 pt-4 border-t">
+                <Label className="text-base font-medium">Deliverables</Label>
+                <p className="text-sm text-muted-foreground -mt-2">
+                  Specify what customers will receive (leave blank if not applicable)
+                </p>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="pkg-turnaround" className="text-sm flex items-center gap-2">
+                      <Clock className="size-4 text-muted-foreground" />
+                      Turnaround
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="pkg-turnaround"
+                        type="number"
+                        min="1"
+                        placeholder="—"
+                        value={packageForm.turnaroundDays}
+                        onChange={(e) =>
+                          setPackageForm((prev) => ({
+                            ...prev,
+                            turnaroundDays: e.target.value,
+                          }))
+                        }
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                        days
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="pkg-photos" className="text-sm flex items-center gap-2">
+                      <Image className="size-4 text-muted-foreground" />
+                      Photos
+                    </Label>
+                    <Input
+                      id="pkg-photos"
+                      type="number"
+                      min="1"
+                      placeholder="—"
+                      value={packageForm.photoCount}
+                      onChange={(e) =>
+                        setPackageForm((prev) => ({
+                          ...prev,
+                          photoCount: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="pkg-video" className="text-sm flex items-center gap-2">
+                      <Film className="size-4 text-muted-foreground" />
+                      Video
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="pkg-video"
+                        type="number"
+                        min="1"
+                        placeholder="—"
+                        value={packageForm.videoMinutes}
+                        onChange={(e) =>
+                          setPackageForm((prev) => ({
+                            ...prev,
+                            videoMinutes: e.target.value,
+                          }))
+                        }
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                        min
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Features */}
+              <div className="space-y-4 pt-4 border-t">
+                <Label className="text-base font-medium">Features</Label>
+                <p className="text-sm text-muted-foreground -mt-2">
+                  List the key features and benefits of this package
+                </p>
+                <FeatureListEditor
+                  features={packageForm.features}
+                  onChange={(features) =>
+                    setPackageForm((prev) => ({ ...prev, features }))
+                  }
+                />
+              </div>
+
+              {/* Package Images */}
+              <div className="space-y-4 pt-4 border-t">
+                <Label className="text-base font-medium">Package Images</Label>
+                <p className="text-sm text-muted-foreground -mt-2">
+                  Add images to showcase this package. Agents will see these when browsing.
+                </p>
+                <ImageListEditor
+                  images={packageForm.images}
+                  onChange={(images) =>
+                    setPackageForm((prev) => ({ ...prev, images }))
+                  }
+                />
+              </div>
+
+              {/* Status (only for editing) */}
+              {editingPackage && (
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <div>
+                    <Label htmlFor="pkg-active" className="text-base font-medium">Active</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Inactive packages won't be shown to agents
+                    </p>
+                  </div>
+                  <Switch
+                    id="pkg-active"
+                    checked={packageForm.isActive}
+                    onCheckedChange={(checked) =>
+                      setPackageForm((prev) => ({ ...prev, isActive: checked }))
+                    }
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="px-6 py-4 border-t shrink-0">
             <Button
               variant="outline"
-              onClick={() => setPackageDialogOpen(false)}
+              onClick={() => handlePackageDialogClose(false)}
             >
               Cancel
             </Button>
@@ -861,6 +1326,24 @@ export function PackagesManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Discard Package Changes Confirmation */}
+      <AlertDialog open={discardPackageDialogOpen} onOpenChange={setDiscardPackageDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Are you sure you want to discard them?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDiscardPackageChanges}>
+              Discard changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Add-on Dialog */}
       <Dialog open={addOnDialogOpen} onOpenChange={setAddOnDialogOpen}>
@@ -906,7 +1389,10 @@ export function PackagesManager() {
                 <SelectContent>
                   {ADD_ON_CATEGORY_OPTIONS.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                      <span className="flex items-center gap-2">
+                        <span>{option.icon}</span>
+                        {option.label}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -937,13 +1423,13 @@ export function PackagesManager() {
                     setAddOnForm((prev) => ({ ...prev, currency: value }))
                   }
                 >
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-28">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {CURRENCY_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                        {option.symbol} {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

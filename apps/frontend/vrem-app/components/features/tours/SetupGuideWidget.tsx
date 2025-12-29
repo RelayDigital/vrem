@@ -30,7 +30,7 @@ import {
 import { useTour, TRACK_METADATA, getTourSteps } from '@/context/tour-context';
 import { TourTrack } from '@/types';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/context/auth-context';
+import { ShineBorder } from '@/components/ui/shine-border';
 
 interface SetupGuideWidgetProps {
   className?: string;
@@ -44,12 +44,12 @@ const TOUR_TRACKS: TourTrack[] = [
 ];
 
 export function SetupGuideWidget({ className }: SetupGuideWidgetProps) {
-  const { user } = useAuth();
   const {
     status,
     isLoading,
     error,
     isTourActive,
+    tourStepContext,
     getTrackProgress,
     startTourFromStep,
     dismissGuide,
@@ -84,11 +84,11 @@ export function SetupGuideWidget({ className }: SetupGuideWidgetProps) {
     return null;
   }
 
-  // Calculate progress based on visible tracks only (filtered by account type)
+  // Calculate progress based on visible tracks only (filtered by account type and org context)
   const visibleTracksProgress = TOUR_TRACKS.reduce(
     (acc, track) => {
-      const steps = getTourSteps(track, user?.accountType);
-      if (steps.length === 0) return acc; // Skip tracks with no steps for this account type
+      const steps = getTourSteps(track, tourStepContext);
+      if (steps.length === 0) return acc; // Skip tracks with no steps for this context
       const trackProgress = getTrackProgress(track);
       return {
         completed: acc.completed + (trackProgress?.completed ?? 0),
@@ -105,8 +105,13 @@ export function SetupGuideWidget({ className }: SetupGuideWidgetProps) {
   };
 
   return (
-    <Card className={cn('overflow-hidden', className)} data-tour="setup-guide">
-      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+    <Card className={cn('relative overflow-hidden rounded-lg', className)} data-tour="setup-guide">
+      <ShineBorder
+        shineColor={["#6366f1", "#a855f7", "#ec4899"]}
+        borderWidth={1}
+        duration={10}
+      />
+        <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
         <CardHeader className="p-4!">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
@@ -122,7 +127,11 @@ export function SetupGuideWidget({ className }: SetupGuideWidgetProps) {
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {overallProgress.completed} / {overallProgress.total} completed
                   </span>
-                  <Progress value={overallProgress.percentage} className="h-1.5 w-24" />
+                  <Progress
+                    value={overallProgress.percentage}
+                    className="h-1.5 w-24"
+                    indicatorClassName={overallProgress.percentage === 100 ? "bg-green-500" : undefined}
+                  />
                 </div>
               </div>
             </div>
@@ -171,7 +180,7 @@ export function SetupGuideWidget({ className }: SetupGuideWidgetProps) {
                 const metadata = TRACK_METADATA[track];
                 const isTrackComplete = trackProgress?.finished ?? false;
                 const completedCount = trackProgress?.completed ?? 0;
-                const steps = getTourSteps(track, user?.accountType);
+                const steps = getTourSteps(track, tourStepContext);
 
                 // Skip tracks with no steps for this account type
                 if (steps.length === 0) {
@@ -254,7 +263,7 @@ export function SetupGuideWidget({ className }: SetupGuideWidgetProps) {
             </Accordion>
           </CardContent>
         </CollapsibleContent>
-      </Collapsible>
+        </Collapsible>
     </Card>
   );
 }

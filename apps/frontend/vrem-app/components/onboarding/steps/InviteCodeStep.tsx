@@ -13,6 +13,7 @@ import {
 import { api } from "@/lib/api";
 import { ArrowLeft, Building2, CheckCircle2, XCircle, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BorderBeam } from "@/components/ui/border-beam";
 
 export function InviteCodeStep() {
   const { data, updateData, nextStep, prevStep, isLoading, setIsLoading } =
@@ -169,13 +170,18 @@ export function InviteCodeStep() {
         )}
 
         <Field>
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading || (code && !validationResult?.valid)}
-          >
-            {validationResult?.valid ? "Continue" : "Continue without code"}
-          </Button>
+          <div className="relative">
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading || Boolean(code && !validationResult?.valid)}
+            >
+              {validationResult?.valid ? "Continue" : "Continue without code"}
+            </Button>
+            {!isLoading && !(code && !validationResult?.valid) && (
+              <BorderBeam size={40} duration={3} borderWidth={1.5} />
+            )}
+          </div>
         </Field>
 
         {code && !validationResult?.valid && (

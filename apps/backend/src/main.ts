@@ -16,10 +16,10 @@ async function bootstrap() {
     'http://localhost:3001',
   ].filter(Boolean);
 
-  // Add ngrok URL if configured
-  const ngrokUrl = process.env.PRODUCTION_API_URL;
-  if (ngrokUrl) {
-    allowedOrigins.push(ngrokUrl);
+  // Add production URL if configured
+  const productionUrl = process.env.PRODUCTION_API_URL;
+  if (productionUrl) {
+    allowedOrigins.push(productionUrl);
   }
 
   app.enableCors({
@@ -36,10 +36,6 @@ async function bootstrap() {
       if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
         return callback(null, true);
       }
-      // Allow ngrok origins
-      if (origin.includes('ngrok')) {
-        return callback(null, true);
-      }
       console.warn(`CORS blocked origin: ${origin}`);
       return callback(null, false);
     },
@@ -48,7 +44,6 @@ async function bootstrap() {
       'Content-Type',
       'Authorization',
       'x-org-id',
-      'ngrok-skip-browser-warning', // Required for ngrok free tier
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });

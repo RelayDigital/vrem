@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Customer } from '@/types';
 import { cn } from '@/lib/utils';
+import { BorderBeam } from '@/components/ui/border-beam';
 
 interface CustomerStepProps {
   customers: Customer[];
@@ -251,14 +252,19 @@ export function CustomerStep({
               >
                 Cancel
               </Button>
-              <Button
-                className="flex-1"
-                disabled={!isValidNewCustomer}
-                onClick={handleCreateNew}
-              >
-                Create & Continue
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
+              <div className="relative flex-1">
+                <Button
+                  className="w-full"
+                  disabled={!isValidNewCustomer}
+                  onClick={handleCreateNew}
+                >
+                  Create & Continue
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+                {isValidNewCustomer && (
+                  <BorderBeam size={40} duration={3} borderWidth={1.5} />
+                )}
+              </div>
             </div>
           </div>
         )}
