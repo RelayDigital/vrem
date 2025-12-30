@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSignUp } from "@clerk/nextjs";
 import { useOnboarding } from "@/context/onboarding-context";
 import { useAuth } from "@/context/auth-context";
 import { Button } from "@/components/ui/button";
@@ -13,9 +14,11 @@ import {
 } from "@/components/ui/field";
 import { api } from "@/lib/api";
 import { ArrowLeft, Check, X, Eye, EyeOff } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function PasswordStep() {
-  const { completeOnboarding } = useAuth();
+  const { signUp, setActive } = useSignUp();
+  const router = useRouter();
   const { data, prevStep, setIsLoading, setError, isLoading } = useOnboarding();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -37,6 +40,11 @@ export function PasswordStep() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!signUp || !setActive) {
+      setError("Authentication not initialized. Please refresh the page.");
+      return;
+    }
+
     if (!allRequirementsMet) {
       setError("Please meet all password requirements");
       return;
@@ -51,42 +59,81 @@ export function PasswordStep() {
     setIsLoading(true);
 
     try {
-      const accountType = data.accountType || "AGENT"; // Default to AGENT if not set
-      const result = await api.auth.registerOnboarding({
-        otpToken: data.otpToken,
-        email: data.email,
-        name: data.name,
+      const accountType = data.accountType || "AGENT";
+
+      // Split name into first and last name for Clerk
+      const nameParts = data.name.trim().split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      // Step 1: Create Clerk account
+      const signUpResult = await signUp.create({
+        emailAddress: data.email,
         password,
-        accountType,
-        inviteCode: data.inviteCode || undefined,
-        useCases: accountType === "PROVIDER" ? data.useCases : undefined,
+        firstName,
+        lastName,
+        unsafeMetadata: {
+          accountType,
+          inviteCode: data.inviteCode || undefined,
+          useCases: accountType === "PROVIDER" ? data.useCases : undefined,
+        },
       });
 
-      // Clear onboarding data from session storage
-      sessionStorage.removeItem("onboarding_data");
-      sessionStorage.removeItem("onboarding_return");
+      if (signUpResult.status === "complete") {
+        // Set the active session
+        await setActive({ session: signUpResult.createdSessionId });
 
-      // If user chose to connect calendar, start OAuth flow before completing onboarding
-      if (data.calendarConnected) {
-        try {
-          // Store token temporarily so OAuth callback can use it
-          localStorage.setItem("token", result.token);
-          if (result.user.organizationId) {
-            localStorage.setItem("organizationId", result.user.organizationId);
+        // Clear onboarding data from session storage
+        sessionStorage.removeItem("onboarding_data");
+        sessionStorage.removeItem("onboarding_return");
+
+        // If user chose to connect calendar, start OAuth flow
+        if (data.calendarConnected) {
+          try {
+            const { url } = await api.nylas.startOAuth("google", "dashboard");
+            window.location.href = url;
+            return;
+          } catch (oauthErr) {
+            console.error("Failed to start calendar OAuth:", oauthErr);
           }
-          const { url } = await api.nylas.startOAuth("google", "dashboard");
-          window.location.href = url;
-          return; // Don't complete onboarding here, OAuth will redirect to dashboard
-        } catch (oauthErr) {
-          // If OAuth fails, continue with normal onboarding completion
-          console.error("Failed to start calendar OAuth:", oauthErr);
         }
-      }
 
-      // Complete onboarding and redirect to dashboard
-      await completeOnboarding(result);
+        // Redirect to dashboard
+        router.push("/dashboard");
+      } else if (signUpResult.status === "missing_requirements") {
+        // Log what's missing for debugging
+        console.log("Sign-up missing requirements:", {
+          status: signUpResult.status,
+          missingFields: signUpResult.missingFields,
+          unverifiedFields: signUpResult.unverifiedFields,
+          verifications: signUpResult.verifications,
+        });
+
+        // Handle different missing requirements
+        if (signUpResult.unverifiedFields?.includes("email_address")) {
+          setError("Email verification required. Please disable 'Verify at sign-up' for Email in Clerk dashboard.");
+        } else if (signUpResult.missingFields?.length) {
+          setError(`Missing required fields: ${signUpResult.missingFields.join(", ")}`);
+        } else {
+          setError(`Registration incomplete. Check Clerk dashboard settings. Missing: ${JSON.stringify(signUpResult.unverifiedFields || signUpResult.missingFields || "unknown")}`);
+        }
+      } else {
+        console.log("Sign-up status:", signUpResult.status, signUpResult);
+        setError(`Registration incomplete: ${signUpResult.status}`);
+      }
     } catch (err: any) {
-      setError(err.message || "Registration failed. Please try again.");
+      console.error("Registration failed:", err);
+      // Handle Clerk-specific errors
+      if (err.errors) {
+        const clerkError = err.errors[0];
+        if (clerkError?.code === "form_identifier_exists") {
+          setError("An account with this email already exists. Please log in instead.");
+        } else {
+          setError(clerkError?.message || "Registration failed. Please try again.");
+        }
+      } else {
+        setError(err.message || "Registration failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -94,6 +141,9 @@ export function PasswordStep() {
 
   return (
     <form onSubmit={handleSubmit}>
+      {/* Hidden CAPTCHA element for Clerk bot protection */}
+      <div id="clerk-captcha" />
+
       <FieldGroup>
         <div className="flex flex-col items-center gap-2 text-center mb-6">
           <h1 className="text-2xl font-bold">Create your password</h1>

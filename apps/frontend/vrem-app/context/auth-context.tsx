@@ -7,6 +7,7 @@ import {
   useState,
   ReactNode,
 } from "react";
+import { useSignIn, useSignUp, useClerk, useAuth as useClerkAuth } from "@clerk/nextjs";
 import { User, OrganizationMember } from "@/types";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
@@ -33,7 +34,7 @@ interface AuthContextType {
     },
   ) => Promise<void>;
   completeOnboarding: (response: { token: string; user: any }) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   switchOrganization: (orgId: string | null) => void;
 }
 
@@ -48,6 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+
+  // Clerk hooks
+  const { signIn, setActive: setActiveSignIn } = useSignIn();
+  const { signUp, setActive: setActiveSignUp } = useSignUp();
+  const { signOut } = useClerk();
+  const { isSignedIn, isLoaded: isClerkLoaded, getToken } = useClerkAuth();
 
   const normalizeUser = (u: any): User => {
     // accountType is always one of: AGENT, PROVIDER, COMPANY
@@ -65,54 +72,132 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  // Sync with Clerk auth state
   useEffect(() => {
     const initAuth = async () => {
-      const storedToken = localStorage.getItem("token");
-      if (storedToken) {
-        setToken(storedToken);
+      // Wait for Clerk to finish loading before processing auth state
+      if (!isClerkLoaded) {
+        return; // Keep isLoading: true until Clerk is ready
+      }
+
+      // If signed in with Clerk, get the token and sync with backend
+      if (isSignedIn) {
         try {
-          const user = await api.auth.me();
-          setUser(normalizeUser(user));
-          const orgs = await api.organizations.listMine();
-          setMemberships(orgs);
-          const storedOrg = api.organizations.getActiveOrganization();
-          // Validate stored org is in user's memberships
-          const isValidStoredOrg = storedOrg && orgs.some((m) => m.orgId === storedOrg);
+          const clerkToken = await getToken();
+          if (clerkToken) {
+            // Store Clerk token for API calls
+            localStorage.setItem("token", clerkToken);
+            setToken(clerkToken);
 
-          // If stored org is invalid, clear it immediately
-          if (storedOrg && !isValidStoredOrg) {
-            localStorage.removeItem("organizationId");
-          }
+            // Sync user with backend (backend will validate Clerk token and return/create user)
+            const user = await api.auth.me();
+            setUser(normalizeUser(user));
 
-          const personal = orgs.find(
-            (m) =>
-              m.organization?.type === "PERSONAL" ||
-              (m.organization as any)?.type === "PERSONAL"
-          );
-          const resolvedOrgId =
-            (isValidStoredOrg ? storedOrg : null) ||
-            personal?.orgId ||
-            orgs[0]?.orgId ||
-            null;
-          if (resolvedOrgId) {
-            api.organizations.setActiveOrganization(resolvedOrgId);
+            const orgs = await api.organizations.listMine();
+            setMemberships(orgs);
+
+            const storedOrg = api.organizations.getActiveOrganization();
+            const isValidStoredOrg = storedOrg && orgs.some((m) => m.orgId === storedOrg);
+
+            if (storedOrg && !isValidStoredOrg) {
+              localStorage.removeItem("organizationId");
+            }
+
+            const personal = orgs.find(
+              (m) =>
+                m.organization?.type === "PERSONAL" ||
+                (m.organization as any)?.type === "PERSONAL"
+            );
+            const resolvedOrgId =
+              (isValidStoredOrg ? storedOrg : null) ||
+              personal?.orgId ||
+              orgs[0]?.orgId ||
+              null;
+            if (resolvedOrgId) {
+              api.organizations.setActiveOrganization(resolvedOrgId);
+            }
+            setActiveOrganizationId(resolvedOrgId);
           }
-          setActiveOrganizationId(resolvedOrgId);
         } catch (error) {
-          console.error("Failed to fetch user:", error);
-          // Clear all auth data on error
+          console.error("Failed to sync with backend:", error);
           localStorage.removeItem("token");
           localStorage.removeItem("organizationId");
           setToken(null);
+          setUser(null);
           setMemberships([]);
           setActiveOrganizationId(null);
         }
+      } else if (isSignedIn === false) {
+        // Clerk says not signed in, clear local state
+        localStorage.removeItem("token");
+        localStorage.removeItem("organizationId");
+        setToken(null);
+        setUser(null);
+        setMemberships([]);
+        setActiveOrganizationId(null);
       }
       setIsLoading(false);
     };
 
     initAuth();
-  }, []);
+  }, [isClerkLoaded, isSignedIn, getToken]);
+
+  // Refresh Clerk token periodically to prevent expiration (tokens expire in ~60s)
+  useEffect(() => {
+    if (!isClerkLoaded || !isSignedIn) {
+      return;
+    }
+
+    const refreshToken = async () => {
+      try {
+        const freshToken = await getToken();
+        if (freshToken) {
+          localStorage.setItem("token", freshToken);
+          setToken(freshToken);
+          // Notify API client that token has been refreshed
+          window.dispatchEvent(new CustomEvent("auth-token-refreshed"));
+        }
+      } catch (error) {
+        console.error("Failed to refresh Clerk token:", error);
+      }
+    };
+
+    // Refresh token every 30 seconds (Clerk tokens expire in ~60s, give ample buffer)
+    const intervalId = setInterval(refreshToken, 30 * 1000);
+
+    // Also refresh immediately in case the stored token is stale
+    refreshToken();
+
+    // Listen for auth-token-expired events from API client and refresh token
+    const handleTokenExpired = () => {
+      console.log("Token expired event received, refreshing token...");
+      refreshToken();
+    };
+    window.addEventListener("auth-token-expired", handleTokenExpired);
+
+    // Refresh token when tab becomes visible again (browser pauses intervals when tab is inactive)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        console.log("Tab became visible, refreshing token...");
+        refreshToken();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Also refresh on window focus (backup for visibility change)
+    const handleWindowFocus = () => {
+      console.log("Window focused, refreshing token...");
+      refreshToken();
+    };
+    window.addEventListener("focus", handleWindowFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("auth-token-expired", handleTokenExpired);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, [isClerkLoaded, isSignedIn, getToken]);
 
   useEffect(() => {
     const handleOrganizationUpdated = (event: Event) => {
@@ -167,16 +252,97 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (credentials: { email: string; password: string }) => {
+    // If already signed in, just redirect to dashboard
+    if (isSignedIn) {
+      router.push("/dashboard");
+      return;
+    }
+
+    if (!signIn || !setActiveSignIn) {
+      throw new Error("Clerk not initialized");
+    }
+
     setIsLoading(true);
     try {
       // Clear any stale organization data before login to prevent 403 errors
       localStorage.removeItem("organizationId");
       setActiveOrganizationId(null);
 
-      const response = await api.auth.login(credentials);
-      await applyAuthResponse(response);
-    } catch (error) {
+      // In development, use backend sign-in token to bypass Clerk's email verification requirement
+      // In production, only test accounts (@example.com) use this flow
+      const isTestAccount = credentials.email.toLowerCase().endsWith("@example.com");
+      const isDevelopment = process.env.NODE_ENV !== "production";
+
+      if (isDevelopment || isTestAccount) {
+        // Get sign-in token from backend
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/test-login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(credentials),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || "Login failed");
+        }
+
+        const { token: signInToken } = await response.json();
+
+        // Use the sign-in token to complete sign-in with Clerk
+        const result = await signIn.create({
+          strategy: "ticket",
+          ticket: signInToken,
+        });
+
+        if (result.status === "complete") {
+          await setActiveSignIn({ session: result.createdSessionId });
+          router.push("/dashboard");
+          return;
+        } else {
+          throw new Error(`Sign-in incomplete: ${result.status}`);
+        }
+      }
+
+      // Normal Clerk sign-in flow (production only, non-test accounts)
+      const result = await signIn.create({
+        identifier: credentials.email,
+        password: credentials.password,
+      });
+
+      if (result.status === "complete") {
+        // Set the active session - this will trigger the useEffect to sync with backend
+        await setActiveSignIn({ session: result.createdSessionId });
+        router.push("/dashboard");
+      } else if (result.status === "needs_second_factor") {
+        // Clerk is requiring a second factor (e.g., email code, TOTP)
+        console.log("Sign-in requires second factor:", {
+          status: result.status,
+          supportedSecondFactors: result.supportedSecondFactors,
+          firstFactorVerification: result.firstFactorVerification,
+        });
+        throw new Error(
+          "This account requires email verification. Please check your email for a verification code."
+        );
+      } else if (result.status === "needs_first_factor") {
+        console.log("Sign-in needs first factor:", result.supportedFirstFactors);
+        throw new Error("Sign-in requires additional verification. Please try again.");
+      } else {
+        // Handle other statuses
+        console.log("Sign-in requires additional steps:", result.status, result);
+        throw new Error(`Sign-in incomplete: ${result.status}`);
+      }
+    } catch (error: any) {
       console.error("Login failed:", error);
+      // Handle "already signed in" error gracefully
+      if (error.errors?.[0]?.code === "session_exists" ||
+          error.message?.includes("already signed in")) {
+        router.push("/dashboard");
+        return;
+      }
+      // Clerk errors have a specific structure
+      if (error.errors) {
+        throw new Error(error.errors[0]?.message || "Login failed");
+      }
       throw error;
     } finally {
       setIsLoading(false);
@@ -189,16 +355,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string;
     accountType: User['accountType'];
   }) => {
+    // If already signed in, just redirect to dashboard
+    if (isSignedIn) {
+      router.push("/dashboard");
+      return;
+    }
+
+    if (!signUp || !setActiveSignUp) {
+      throw new Error("Clerk not initialized");
+    }
+
     setIsLoading(true);
     try {
       // Clear any stale organization data before registration
       localStorage.removeItem("organizationId");
       setActiveOrganizationId(null);
 
-      const response = await api.auth.register(data);
-      await applyAuthResponse(response);
-    } catch (error) {
+      // Split name into first and last name for Clerk
+      const nameParts = data.name.trim().split(" ");
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      // Use Clerk's sign-up flow
+      const result = await signUp.create({
+        emailAddress: data.email,
+        password: data.password,
+        firstName,
+        lastName,
+        unsafeMetadata: {
+          accountType: data.accountType,
+        },
+      });
+
+      if (result.status === "complete") {
+        // Set the active session - this will trigger the useEffect to sync with backend
+        await setActiveSignUp({ session: result.createdSessionId });
+        router.push("/dashboard");
+      } else if (result.status === "missing_requirements") {
+        // Email verification might be required
+        // Check if email verification is needed
+        if (result.unverifiedFields?.includes("email_address")) {
+          // Prepare email verification
+          await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+          // You'll need to show a verification code input in your UI
+          throw new Error("EMAIL_VERIFICATION_REQUIRED");
+        }
+        throw new Error(`Registration incomplete: ${result.status}`);
+      } else {
+        throw new Error(`Registration incomplete: ${result.status}`);
+      }
+    } catch (error: any) {
       console.error("Registration failed:", error);
+      if (error.errors) {
+        throw new Error(error.errors[0]?.message || "Registration failed");
+      }
       throw error;
     } finally {
       setIsLoading(false);
@@ -213,21 +423,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name?: string;
     },
   ) => {
+    // If already signed in, just redirect to dashboard
+    if (isSignedIn) {
+      router.push("/dashboard");
+      return;
+    }
+
+    if (!signIn) {
+      throw new Error("Clerk not initialized");
+    }
+
     setIsLoading(true);
     try {
       // Clear any stale organization data before login to prevent 403 errors
       localStorage.removeItem("organizationId");
       setActiveOrganizationId(null);
 
-      const response = await api.auth.oauthLogin(provider, {
-        accountType: payload.accountType || "AGENT",
-        token: payload.token,
-        name: payload.name,
-      });
+      // Map provider to Clerk's OAuth strategy
+      const strategy = provider === 'google' ? 'oauth_google' : 'oauth_facebook';
 
-      await applyAuthResponse(response);
-    } catch (error) {
+      // Initiate OAuth flow with Clerk
+      // This will redirect to the provider's OAuth page
+      await signIn.authenticateWithRedirect({
+        strategy,
+        redirectUrl: '/sso-callback',
+        redirectUrlComplete: '/dashboard',
+      });
+    } catch (error: any) {
       console.error("OAuth login failed:", error);
+      if (error.errors) {
+        throw new Error(error.errors[0]?.message || "OAuth login failed");
+      }
       throw error;
     } finally {
       setIsLoading(false);
@@ -250,8 +476,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
-    // Clear authentication data
+  const logout = async () => {
+    try {
+      // Sign out from Clerk
+      await signOut();
+    } catch (error) {
+      console.error("Clerk signout error:", error);
+    }
+
+    // Clear local authentication data
     localStorage.removeItem("token");
     localStorage.removeItem("organizationId");
     setToken(null);

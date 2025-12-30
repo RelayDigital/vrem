@@ -12,6 +12,7 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUseCasesDto } from './dto/update-use-cases.dto';
 import { AccountActionDto } from './dto/account-action.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -35,6 +36,19 @@ export class UsersController {
   // =============================
   // Self-service account endpoints
   // =============================
+
+  /**
+   * Update the current user's profile (name, avatar)
+   * Self-service endpoint - no org context required
+   */
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  updateMyProfile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.usersService.update(user.id, dto);
+  }
 
   /**
    * Deactivate the current user's account

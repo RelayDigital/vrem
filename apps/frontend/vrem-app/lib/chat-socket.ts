@@ -252,7 +252,7 @@ class ChatSocket {
       jobId: msg.projectId,
       userId: msg.userId,
       userName: msg.user?.name || 'Unknown User',
-      userAvatar: msg.user?.avatar,
+      userAvatar: msg.user?.avatarUrl,
       content: msg.content,
       createdAt: new Date(msg.timestamp || msg.createdAt || new Date()),
       channel,

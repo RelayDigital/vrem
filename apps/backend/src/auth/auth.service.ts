@@ -7,10 +7,12 @@ import { randomUUID } from 'crypto';
 import { AuthenticatedUser } from './auth-context';
 import { OAuth2Client } from 'google-auth-library';
 import { OtpService } from '../otp/otp.service';
+import { createClerkClient } from '@clerk/backend';
 
 @Injectable()
 export class AuthService {
   private googleClient: OAuth2Client | null;
+  private clerkClient: ReturnType<typeof createClerkClient> | null;
 
   constructor(
     private prisma: PrismaService,
@@ -19,6 +21,9 @@ export class AuthService {
   ) {
     this.googleClient = process.env.GOOGLE_CLIENT_ID
       ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+      : null;
+    this.clerkClient = process.env.CLERK_SECRET_KEY
+      ? createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY })
       : null;
   }
 
@@ -314,16 +319,73 @@ export class AuthService {
     // Strip password from response
     const { password, ...safeUser } = user;
 
-    // Fetch user's organization
-    const membership = await this.prisma.organizationMember.findFirst({
+    // Fetch all organization memberships with org details
+    const memberships = await this.prisma.organizationMember.findMany({
       where: { userId: user.id },
+      include: {
+        organization: true,
+      },
       orderBy: { createdAt: 'asc' },
-      select: { orgId: true },
     });
+
+    // Find personal org
+    const personalMembership = memberships.find(
+      (m) => m.organization.type === 'PERSONAL',
+    );
+
+    // For AGENT users, also get organizations where they're a customer
+    let customerOrganizations: Array<{
+      orgId: string;
+      orgName: string;
+      orgType: string;
+      customerId: string;
+      createdAt: Date;
+    }> = [];
+
+    if (user.accountType === 'AGENT') {
+      const customerRelations = await this.prisma.organizationCustomer.findMany({
+        where: { userId: user.id },
+        include: {
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+            },
+          },
+        },
+      });
+
+      customerOrganizations = customerRelations.map((c) => ({
+        orgId: c.organization.id,
+        orgName: c.organization.name,
+        orgType: c.organization.type,
+        customerId: c.id,
+        createdAt: c.createdAt,
+      }));
+    }
 
     return {
       ...safeUser,
-      organizationId: membership?.orgId || null,
+      // Keep organizationId for backwards compatibility (first/personal org)
+      organizationId: personalMembership?.orgId || memberships[0]?.orgId || null,
+      // Full membership data
+      memberships: memberships.map((m) => ({
+        id: m.id,
+        orgId: m.orgId,
+        role: m.role,
+        createdAt: m.createdAt,
+        organization: {
+          id: m.organization.id,
+          name: m.organization.name,
+          type: m.organization.type,
+          logoUrl: m.organization.logoUrl,
+        },
+      })),
+      // Personal org reference
+      personalOrgId: personalMembership?.orgId || null,
+      // Customer access for agents
+      customerOrganizations,
     };
   }
 
@@ -480,5 +542,66 @@ export class AuthService {
       },
       token,
     };
+  }
+
+  /**
+   * Get a Clerk sign-in token that bypasses email verification.
+   * In development: works for all accounts.
+   * In production: only works for @example.com test accounts.
+   */
+  async getTestAccountSignInToken(email: string, password: string): Promise<{ token: string }> {
+    const isTestAccount = email.endsWith('@example.com');
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    // In production, only allow test accounts
+    if (isProduction && !isTestAccount) {
+      throw new BadRequestException('This endpoint is only for test accounts in production');
+    }
+
+    if (!this.clerkClient) {
+      throw new BadRequestException('Clerk not configured');
+    }
+
+    // Find user in our database first
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Verify password
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Get the Clerk user
+    if (!user.clerkUserId) {
+      throw new BadRequestException('User not linked to Clerk');
+    }
+
+    // Verify password with Clerk too
+    try {
+      const verified = await this.clerkClient.users.verifyPassword({
+        userId: user.clerkUserId,
+        password,
+      });
+      if (!verified.verified) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+    } catch (err: any) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Create a sign-in token
+    const signInToken = await this.clerkClient.signInTokens.createSignInToken({
+      userId: user.clerkUserId,
+      expiresInSeconds: 60,
+    });
+
+    if (!signInToken.token) {
+      throw new BadRequestException('Failed to create sign-in token');
+    }
+
+    return { token: signInToken.token };
   }
 }

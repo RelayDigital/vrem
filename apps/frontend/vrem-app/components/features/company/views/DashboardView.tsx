@@ -139,7 +139,7 @@ export function CompanyDashboardView({
 
   return (
     <main className="container relative mx-auto">
-      <article className="flex flex-col gap-2xl md:gap-3xl px-md">
+      <article className="flex flex-col gap-2xl md:gap-3xl px-md" data-tour="dashboard-article">
         {/* Metrics */}
         <div className="@container w-full mt-md" data-tour="dashboard-metrics">
           {/* Content */}

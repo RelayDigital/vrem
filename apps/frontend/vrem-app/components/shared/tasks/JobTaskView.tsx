@@ -413,12 +413,15 @@ export function JobTaskView({
   }, [effectiveOrgRole, job?.projectManagerId, currentUserId]);
 
   // Permission: Can assign technician/editor to this project
-  const canAssignTechnicianOrEditor = canEditThisProject;
+  // In PERSONAL orgs for PROVIDERs (solo operators), hide assignment UI - they ARE the technician
+  const canAssignTechnicianOrEditor = canEditThisProject && !isProviderInPersonalOrg;
   
-  // Permission: Can assign project manager (only OWNER/ADMIN)
+  // Permission: Can assign project manager (only OWNER/ADMIN, not for solo providers in PERSONAL orgs)
   const canAssignProjectManager = useMemo(() => {
+    // PERSONAL_OWNER doesn't need PM assignment - they are the solo operator
+    if (isProviderInPersonalOrg) return false;
     return isAdmin(effectiveOrgRole);
-  }, [effectiveOrgRole]);
+  }, [effectiveOrgRole, isProviderInPersonalOrg]);
   
   // Permission: Can assign team members (same as edit)
   const canAssignTeamMembers = canEditThisProject;
@@ -3428,8 +3431,8 @@ export function JobTaskView({
                   </>
                 )}
 
-                {/* Project Manager Assigned - hide if agent and unassigned */}
-                {(!isAgentUser || projectManagerDisplayName !== "Unassigned") && (
+                {/* Project Manager Assigned - hide if agent and unassigned, or if solo provider */}
+                {!isProviderInPersonalOrg && (!isAgentUser || projectManagerDisplayName !== "Unassigned") && (
                   <>
                     <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                       PM Assigned
@@ -3509,8 +3512,8 @@ export function JobTaskView({
                   </>
                 )}
 
-                {/* Technician Assigned - hide if agent and unassigned */}
-                {(!isAgentUser || displayTechnician) && (
+                {/* Technician Assigned - hide if agent and unassigned, or if solo provider */}
+                {!isProviderInPersonalOrg && (!isAgentUser || displayTechnician) && (
                   <>
                     <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                       Tech Assigned
@@ -3589,8 +3592,8 @@ export function JobTaskView({
                   </>
                 )}
 
-                {/* Editor Assigned - hide if agent and unassigned */}
-                {(!isAgentUser || editorDisplayName !== "Unassigned") && (
+                {/* Editor Assigned - hide if agent and unassigned, or if solo provider */}
+                {!isProviderInPersonalOrg && (!isAgentUser || editorDisplayName !== "Unassigned") && (
                   <>
                     <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                       Editor Assigned

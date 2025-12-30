@@ -19,9 +19,48 @@ const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
 
 class ApiClient {
   private baseUrl: string;
+  private isRefreshingToken: boolean = false;
+  private tokenRefreshPromise: Promise<string | null> | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
+  }
+
+  // Wait for token refresh and return the new token
+  private waitForTokenRefresh(): Promise<string | null> {
+    if (this.tokenRefreshPromise) {
+      return this.tokenRefreshPromise;
+    }
+
+    this.isRefreshingToken = true;
+    this.tokenRefreshPromise = new Promise((resolve) => {
+      // Listen for token refresh completion
+      const handleTokenRefreshed = () => {
+        const newToken = localStorage.getItem('token');
+        cleanup();
+        resolve(newToken);
+      };
+
+      // Timeout after 5 seconds
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        resolve(null);
+      }, 5000);
+
+      const cleanup = () => {
+        window.removeEventListener('auth-token-refreshed', handleTokenRefreshed);
+        clearTimeout(timeoutId);
+        this.isRefreshingToken = false;
+        this.tokenRefreshPromise = null;
+      };
+
+      window.addEventListener('auth-token-refreshed', handleTokenRefreshed, { once: true });
+    });
+
+    // Dispatch event to trigger token refresh
+    window.dispatchEvent(new CustomEvent('auth-token-expired'));
+
+    return this.tokenRefreshPromise;
   }
 
   private normalizeProject(project: any): Project {
@@ -190,7 +229,7 @@ class ApiClient {
     };
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const orgId = typeof window !== 'undefined' ? localStorage.getItem('organizationId') : null;
 
@@ -262,7 +301,21 @@ class ApiClient {
         responseBody = `Failed to parse response body: ${e}`;
       }
 
-      // Log error details
+      // For 401 errors on first attempt, try token refresh before logging error
+      if (response.status === 401 && !isRetry && typeof window !== 'undefined') {
+        // Token may have expired - attempt refresh and retry silently
+        console.debug('[API] 401 received, attempting token refresh...');
+        const newToken = await this.waitForTokenRefresh();
+
+        if (newToken) {
+          console.debug('[API] Token refreshed, retrying request...');
+          return this.request<T>(endpoint, options, true);
+        } else {
+          console.warn('[API] Token refresh failed or timed out');
+        }
+      }
+
+      // Log error details (only after retry fails or for non-401 errors)
       console.error('[API Error]', {
         endpoint,
         fullUrl,
@@ -273,6 +326,7 @@ class ApiClient {
         hasAuthorization: hasAuth,
         hasOrgId: hasOrgId,
         orgId: orgId || 'none',
+        wasRetry: isRetry,
       });
 
       // Track persistent API errors (non-401 errors that indicate backend issues)
@@ -282,22 +336,13 @@ class ApiClient {
           : typeof responseBody === 'string' && responseBody
           ? responseBody
           : response.statusText;
-        
+
         const issueMessage = `${method} ${endpoint} failed: ${response.status} ${errorMessage}`;
-        
+
         // Dispatch event for backend health monitoring
         window.dispatchEvent(new CustomEvent('backend-api-error', {
           detail: { message: issueMessage }
         }));
-      }
-
-      if (response.status === 401) {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('token');
-          localStorage.removeItem('organizationId');
-          // Optional: Redirect to login or dispatch event
-          // window.location.href = '/login'; 
-        }
       }
 
       // Create error with status code and backend message
@@ -306,7 +351,7 @@ class ApiClient {
         : typeof responseBody === 'string' && responseBody
         ? responseBody
         : response.statusText;
-      
+
       const error = new Error(`API Error [${response.status}]: ${errorMessage}`);
       (error as any).status = response.status;
       (error as any).responseBody = responseBody;
@@ -479,12 +524,17 @@ class ApiClient {
   };
 
   users = {
-    update: async (id: string, payload: Partial<Pick<User, 'name' | 'avatarUrl'>>) => {
+    /**
+     * Update the current user's profile (name, avatar)
+     * Uses the self-service /users/me endpoint - ID is not needed
+     */
+    update: async (_id: string, payload: Partial<Pick<User, 'name' | 'avatarUrl'>>) => {
       if (USE_MOCK_DATA) {
         await new Promise((resolve) => setTimeout(resolve, 300));
-        return { ...currentUser, id, ...payload };
+        return { ...currentUser, ...payload };
       }
-      const user = await this.request<User>(`/users/${id}`, {
+      // Use self-service endpoint - backend uses authenticated user from token
+      const user = await this.request<User>('/users/me', {
         method: 'PATCH',
         body: JSON.stringify(payload),
       });
@@ -1201,7 +1251,7 @@ class ApiClient {
         jobId: msg.projectId,
         userId: msg.userId,
         userName: msg.user?.name || 'Unknown User',
-        userAvatar: msg.user?.avatar,
+        userAvatar: msg.user?.avatarUrl,
         content: msg.content,
         createdAt: msg.timestamp || msg.createdAt, // Handle both potential field names
         channel: msg.channel || 'TEAM',
@@ -1236,7 +1286,7 @@ class ApiClient {
         jobId: msg.projectId,
         userId: msg.userId,
         userName: msg.user?.name || 'Unknown User',
-        userAvatar: msg.user?.avatar,
+        userAvatar: msg.user?.avatarUrl,
         content: msg.content,
         createdAt: msg.timestamp || msg.createdAt,
         channel: msg.channel || channel,

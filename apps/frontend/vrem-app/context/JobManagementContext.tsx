@@ -209,6 +209,37 @@ export function JobManagementProvider({
     };
   }, [fetchJobs]);
 
+  // Close sheet when a job is deleted externally (e.g., demo project cleanup)
+  useEffect(() => {
+    const handleJobDeleted = (event: CustomEvent<{ jobId: string }>) => {
+      const deletedJobId = event.detail?.jobId;
+      if (!deletedJobId) return;
+
+      // If the deleted job is currently selected, close the sheet
+      setSelectedJob((prev) => {
+        if (prev?.id === deletedJobId) {
+          setShowTaskView(false);
+          setShowTaskDialog(false);
+          setShowRankings(false);
+          return null;
+        }
+        return prev;
+      });
+
+      // Remove from projects list
+      setProjects((prev) => prev.filter((p) => p.id !== deletedJobId));
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('jobDeleted', handleJobDeleted as EventListener);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('jobDeleted', handleJobDeleted as EventListener);
+      }
+    };
+  }, []);
+
   const upsertProject = useCallback((project: Project) => {
     setProjects((prev) => {
       const exists = prev.some((p) => p.id === project.id);
@@ -387,6 +418,10 @@ export function JobManagementProvider({
   const openTaskView = useCallback((job: JobRequest) => {
     setSelectedJob(job);
     setShowTaskView(true);
+    // Dispatch event for tour context to detect when task view is opened
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('jobTaskViewOpened', { detail: { id: job.id } }));
+    }
   }, []);
 
   const closeTaskView = useCallback(() => {

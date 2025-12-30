@@ -8,7 +8,9 @@ datasource db {
 
 model User {
   id                   String                    @id @default(uuid())
+  clerkUserId          String?                   @unique // Clerk external user ID
   email                String                    @unique
+  emailVerifiedAt      DateTime?                 // When email was verified (set on Clerk signup)
   name                 String
   password             String
   avatarUrl            String?                   // Profile picture URL

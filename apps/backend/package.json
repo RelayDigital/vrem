@@ -19,9 +19,11 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:test-org": "node dist/src/scripts/seed-test-org.js",
-    "seed:test-org:ts": "npx ts-node -r tsconfig-paths/register src/scripts/seed-test-org.ts"
+    "seed:test-org:ts": "npx ts-node -r tsconfig-paths/register src/scripts/seed-test-org.ts",
+    "migrate:clerk": "npx ts-node -r tsconfig-paths/register src/scripts/migrate-users-to-clerk.ts"
   },
   "dependencies": {
+    "@clerk/backend": "^2.29.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/jwt": "^11.0.1",
@@ -42,6 +44,7 @@
     "google-auth-library": "^9.15.1",
     "ical-generator": "^10.0.0",
     "passport": "^0.7.0",
+    "passport-custom": "^1.1.1",
     "passport-jwt": "^4.0.1",
     "prisma": "^7.1.0",
     "reflect-metadata": "^0.2.2",

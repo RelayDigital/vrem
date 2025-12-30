@@ -113,25 +113,35 @@ export function canChangeProjectCustomer(orgRole: EffectiveOrgRole | null): bool
 
 /**
  * Check if user can assign a technician to a project.
- * Same rules as canEditProject.
+ * Same rules as canEditProject, EXCEPT:
+ * - PERSONAL_OWNER cannot assign technician (they ARE the technician in solo operations)
  */
 export function canAssignTechnician(
   orgRole: EffectiveOrgRole | null,
   project: Pick<Project, 'projectManagerId'> | null,
   userId: string | null,
 ): boolean {
+  // PERSONAL_OWNER doesn't need assignment UI - they are the solo operator
+  if (orgRole === 'PERSONAL_OWNER') {
+    return false;
+  }
   return canEditProject(orgRole, project, userId);
 }
 
 /**
  * Check if user can assign an editor to a project.
- * Same rules as canEditProject.
+ * Same rules as canEditProject, EXCEPT:
+ * - PERSONAL_OWNER cannot assign editor (they handle editing in solo operations)
  */
 export function canAssignEditor(
   orgRole: EffectiveOrgRole | null,
   project: Pick<Project, 'projectManagerId'> | null,
   userId: string | null,
 ): boolean {
+  // PERSONAL_OWNER doesn't need assignment UI - they are the solo operator
+  if (orgRole === 'PERSONAL_OWNER') {
+    return false;
+  }
   return canEditProject(orgRole, project, userId);
 }
 

@@ -239,7 +239,7 @@ export function AgentJobsView({
 
   return (
     <main className="container relative mx-auto">
-      <article className="flex flex-col gap-2xl md:gap-3xl px-md">
+      <article className="flex flex-col gap-2xl md:gap-3xl px-md" data-tour="dashboard-article">
         {/* Setup Guide Widget */}
         {shouldShowGuide && (
           <div className="@container w-full mt-md" data-tour="setup-guide">

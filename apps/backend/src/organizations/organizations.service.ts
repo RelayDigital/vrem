@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
@@ -19,12 +20,16 @@ import {
 import { randomUUID } from 'crypto';
 import { AuthorizationService } from '../auth/authorization.service';
 import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class OrganizationsService {
+  private readonly logger = new Logger(OrganizationsService.name);
+
   constructor(
     private prisma: PrismaService,
     private authorization: AuthorizationService,
+    private emailService: EmailService,
   ) {}
 
   async createOrganization(
@@ -136,12 +141,13 @@ export class OrganizationsService {
       },
     });
 
-    // If the invited user already exists, create a notification for them
+    // Check if the invited user already exists
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
     });
 
     if (existingUser) {
+      // Create in-app notification for existing users
       const notificationType =
         inviteType === InvitationType.CUSTOMER
           ? NotificationType.INVITATION_CUSTOMER
@@ -155,6 +161,22 @@ export class OrganizationsService {
           invitationId: invitation.id,
         },
       });
+    }
+
+    // Send invitation email (for both existing and new users)
+    try {
+      await this.emailService.sendInvitationEmail(
+        dto.email,
+        inviter.name,
+        ctx.org.name,
+        token,
+        !!existingUser,
+        inviteType,
+      );
+      this.logger.log(`Invitation email sent to ${dto.email} for org ${ctx.org.id}`);
+    } catch (emailError) {
+      // Log but don't fail the invitation if email fails
+      this.logger.error(`Failed to send invitation email to ${dto.email}:`, emailError);
     }
 
     return invitation;

@@ -50,6 +50,61 @@ export class EmailService {
   }
 
   /**
+   * Send an organization invitation email.
+   * For existing users, they can accept via the app.
+   * For new users, includes a signup link with the invite code.
+   */
+  async sendInvitationEmail(
+    to: string,
+    inviterName: string,
+    organizationName: string,
+    inviteToken: string,
+    isExistingUser: boolean,
+    inviteType: 'MEMBER' | 'CUSTOMER' = 'MEMBER',
+  ): Promise<boolean> {
+    const appUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const inviteUrl = isExistingUser
+      ? `${appUrl}/dashboard?invite=${inviteToken}`
+      : `${appUrl}/signup?invite=${inviteToken}`;
+
+    const roleDescription =
+      inviteType === 'CUSTOMER'
+        ? 'as a customer'
+        : 'to join their team';
+
+    const subject = `You've been invited to ${organizationName} on VREM`;
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #333; font-size: 24px; margin-bottom: 24px;">
+          You're invited!
+        </h1>
+        <p style="color: #666; font-size: 16px; line-height: 1.5;">
+          <strong>${inviterName}</strong> has invited you ${roleDescription} at <strong>${organizationName}</strong>.
+        </p>
+        <div style="margin: 32px 0;">
+          <a href="${inviteUrl}"
+             style="display: inline-block; background: #18181b; color: white; padding: 12px 24px;
+                    border-radius: 6px; text-decoration: none; font-weight: 500;">
+            ${isExistingUser ? 'Accept Invitation' : 'Sign Up & Accept'}
+          </a>
+        </div>
+        <p style="color: #666; font-size: 14px; line-height: 1.5;">
+          ${isExistingUser ? 'You can also accept this invitation from your notifications in the app.' : 'Create your account to get started with VREM.'}
+        </p>
+        <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;" />
+        <p style="color: #a1a1aa; font-size: 12px;">
+          If you didn't expect this invitation, you can safely ignore this email.
+        </p>
+        <p style="color: #a1a1aa; font-size: 12px;">
+          VREM - Visual Real Estate Media
+        </p>
+      </div>
+    `;
+
+    return this.sendEmail(to, subject, html);
+  }
+
+  /**
    * Generic email sending method.
    */
   async sendEmail(to: string, subject: string, html: string): Promise<boolean> {

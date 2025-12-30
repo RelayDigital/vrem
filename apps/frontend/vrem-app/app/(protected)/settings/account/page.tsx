@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { Muted } from "@/components/ui/typography";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,7 @@ import {
 export default function AccountPage() {
   const router = useRouter();
   const { logout } = useAuth();
+  const { user: clerkUser } = useUser();
   const { user, isLoading } = useRequireRole([
     "COMPANY",
     "AGENT",
@@ -139,7 +141,21 @@ export default function AccountPage() {
   const handleSave = async () => {
     try {
       setIsSaving(true);
+
+      // Update backend database
       await api.users.update(user.id, { name });
+
+      // Also sync name to Clerk
+      if (clerkUser && name !== user.name) {
+        const nameParts = name.trim().split(" ");
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ") || "";
+        await clerkUser.update({
+          firstName,
+          lastName,
+        });
+      }
+
       toast.success("Account settings saved successfully");
     } catch (error) {
       toast.error(
@@ -170,13 +186,38 @@ export default function AccountPage() {
             currentUrl={user.avatarUrl}
             fallback={user.name?.charAt(0).toUpperCase() || "U"}
             onUpload={async (url) => {
+              // Update backend database
               await api.users.update(user.id, { avatarUrl: url });
+
+              // Also sync to Clerk profile
+              if (clerkUser) {
+                try {
+                  // Fetch the image and upload to Clerk
+                  const response = await fetch(url);
+                  const blob = await response.blob();
+                  const file = new File([blob], "avatar.jpg", { type: blob.type });
+                  await clerkUser.setProfileImage({ file });
+                } catch (error) {
+                  console.warn("Failed to sync avatar to Clerk:", error);
+                }
+              }
+
               toast.success("Profile picture updated");
-              // Trigger a page refresh to update the avatar
               window.location.reload();
             }}
             onRemove={async () => {
+              // Update backend database
               await api.users.update(user.id, { avatarUrl: "" });
+
+              // Also remove from Clerk profile
+              if (clerkUser) {
+                try {
+                  await clerkUser.setProfileImage({ file: null });
+                } catch (error) {
+                  console.warn("Failed to remove avatar from Clerk:", error);
+                }
+              }
+
               toast.success("Profile picture removed");
               window.location.reload();
             }}

@@ -83,6 +83,8 @@ export class ToursService {
         total: totalSteps,
         percentage: Math.round((totalCompleted / totalSteps) * 100),
       },
+      // Flag for frontend to detect orphaned demo projects
+      hasDemoProject: !!status.demoProjectId,
     };
   }
 
@@ -318,9 +320,16 @@ export class ToursService {
       let editorId: string | undefined;
       let customerId: string | undefined;
 
+      // Check if this is a PERSONAL org (solo provider)
+      const isPersonalOrg = org.type === 'PERSONAL';
+
       // AGENT accounts are customers - use their OrganizationCustomer ID
       if (user?.accountType === 'AGENT' || orgCustomer) {
         customerId = orgCustomer?.id;
+      } else if (isPersonalOrg && user?.accountType === 'PROVIDER') {
+        // PROVIDER in PERSONAL org - they are the technician (solo operator)
+        // Assign them as technician so they see the project and can work on it
+        technicianId = userId;
       } else if (membership) {
         const role = membership.role;
         if (role === 'OWNER' || role === 'ADMIN' || role === 'PROJECT_MANAGER') {

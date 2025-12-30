@@ -77,4 +77,15 @@ export class AuthController {
       useCases: body.useCases,
     });
   }
+
+  /**
+   * Get a Clerk sign-in token for test accounts.
+   * This bypasses Clerk's email verification requirement.
+   * Only works for @example.com emails in non-production.
+   */
+  @Public()
+  @Post('test-login')
+  async testLogin(@Body() body: { email: string; password: string }) {
+    return this.authService.getTestAccountSignInToken(body.email, body.password);
+  }
 }

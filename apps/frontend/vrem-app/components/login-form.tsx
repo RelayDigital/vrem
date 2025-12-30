@@ -38,8 +38,11 @@ export function LoginForm({
 
   const handleOAuth = async (provider: "google" | "facebook") => {
     setOauthError("")
-    // TODO: Implement real OAuth flow with Google/Facebook SDK
-    setOauthError(`${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-in is not yet configured. Please use email/password login.`)
+    try {
+      await loginWithOAuth(provider, { token: "" })
+    } catch (err: any) {
+      setOauthError(err.message || `${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-in failed. Please try again.`)
+    }
   }
 
   return (
@@ -68,12 +71,12 @@ export function LoginForm({
         <Field>
           <div className="flex items-center">
             <FieldLabel htmlFor="password">Password</FieldLabel>
-            <a
-              href="#"
+            <Link
+              href="/forgot-password"
               className="ml-auto text-sm underline-offset-4 hover:underline"
             >
               Forgot your password?
-            </a>
+            </Link>
           </div>
           <Input
             id="password"

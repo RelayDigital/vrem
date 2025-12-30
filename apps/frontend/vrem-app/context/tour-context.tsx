@@ -169,7 +169,7 @@ const DEFAULT_TOUR_STEPS: Record<TourTrack, TourStepConfig[]> = {
     // AGENT-specific steps
     {
       id: 'agent-welcome',
-      targetSelector: '[data-tour="setup-guide"], [data-tour="agent-dashboard"]',
+      targetSelector: '[data-tour="dashboard-article"]',
       title: 'Welcome to Your Dashboard!',
       description: 'This is your central hub for ordering and tracking real estate media. Let\'s take a quick tour.',
       placement: 'bottom',
@@ -210,7 +210,7 @@ const DEFAULT_TOUR_STEPS: Record<TourTrack, TourStepConfig[]> = {
     // PROVIDER-specific steps
     {
       id: 'dashboard-welcome',
-      targetSelector: '[data-tour="setup-guide"], [data-tour="dashboard-metrics"]',
+      targetSelector: '[data-tour="dashboard-article"]',
       title: 'Welcome to Your Dashboard!',
       description: 'This is your central hub for managing all your real estate media projects. Let\'s take a quick tour.',
       placement: 'bottom',
@@ -506,17 +506,40 @@ export function TourProvider({ children }: { children: ReactNode }) {
       setError(null);
       const data = await api.tours.getStatus();
       setStatus(data);
+
+      // If backend has a demo project but no tour is active locally, clean it up
+      // This handles cases where cleanup failed previously
+      if (data.hasDemoProject && !isTourActive && !hasDemoProjectRef.current) {
+        console.log('Found orphaned demo project, cleaning up...');
+        const orphanedProjectId = data.demoProjectId;
+        try {
+          await api.tours.deleteDemoProject();
+          // Dispatch jobDeleted event so sheet closes if this job was selected
+          if (orphanedProjectId && typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('jobDeleted', { detail: { jobId: orphanedProjectId } }));
+          }
+          // Refresh jobs to remove the demo project from the list
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('tourDemoProjectChanged'));
+          }
+        } catch (cleanupErr) {
+          console.error('Failed to cleanup orphaned demo project:', cleanupErr);
+        }
+      }
     } catch (err: any) {
       console.error('Failed to fetch tour status:', err);
       setError(err.message || 'Failed to load tour status');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isTourActive]);
 
   useEffect(() => {
     fetchStatus();
   }, [fetchStatus]);
+
+  // Track if we've already auto-started the tour for this session
+  const hasAutoStartedRef = useRef(false);
 
   // Cleanup on unmount - ensure demo project is removed if component unmounts
   useEffect(() => {
@@ -603,10 +626,15 @@ export function TourProvider({ children }: { children: ReactNode }) {
   // Cleanup demo project
   const cleanupDemoProject = useCallback(async () => {
     if (hasDemoProjectRef.current) {
+      const projectId = demoProjectIdRef.current;
       try {
         await api.tours.deleteDemoProject();
         hasDemoProjectRef.current = false;
         demoProjectIdRef.current = null;
+        // Dispatch jobDeleted event so JobManagementContext can close the sheet
+        if (projectId && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('jobDeleted', { detail: { jobId: projectId } }));
+        }
         triggerJobRefresh();
       } catch (err) {
         console.error('Failed to delete demo project:', err);
@@ -858,6 +886,36 @@ export function TourProvider({ children }: { children: ReactNode }) {
   const startTourFromStep = useCallback((track: TourTrack, stepIndex: number) => {
     startTour(track, stepIndex);
   }, [startTour]);
+
+  // Auto-start tour for new users on dashboard
+  useEffect(() => {
+    // Only auto-start once per session
+    if (hasAutoStartedRef.current) return;
+
+    // Wait for status to load
+    if (isLoading || !status) return;
+
+    // Check if user is on dashboard
+    if (pathname !== '/dashboard') return;
+
+    // Check if tour hasn't been dismissed or completed
+    if (status.dismissedGuide || status.hasCompletedSetup) return;
+
+    // Check if this is a new user (no progress on any track)
+    const hasAnyProgress = Object.values(status.trackProgress || {}).some(
+      (track) => track && (track.completed > 0 || track.finished)
+    );
+
+    // If no progress, auto-start the dashboard overview tour after a short delay
+    if (!hasAnyProgress) {
+      hasAutoStartedRef.current = true;
+      // Delay to let the page fully render
+      const timer = setTimeout(() => {
+        startTour('DASHBOARD_OVERVIEW');
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, status, pathname, startTour]);
 
   // Handle navigation completion - start pending tour
   useEffect(() => {

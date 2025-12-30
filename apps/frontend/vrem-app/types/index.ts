@@ -47,6 +47,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  emailVerifiedAt?: Date | string | null;
   avatarUrl?: string;
   organizationId?: string | null;
   organizationType?: OrgType;
@@ -767,6 +768,10 @@ export interface TourStatusResponse {
     total: number;
     percentage: number;
   };
+  /** Flag indicating if a demo project exists (for orphan cleanup) */
+  hasDemoProject?: boolean;
+  /** ID of the demo project if one exists */
+  demoProjectId?: string | null;
 }
 
 export interface TourTrackProgress {
