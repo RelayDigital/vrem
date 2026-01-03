@@ -54,6 +54,9 @@ interface DetailsStepProps {
   technicianId?: string;
   // Optional: duration in minutes for slot generation
   estimatedDuration?: number;
+  // Scheduling mode: 'scheduled' (specific time) or 'requested' (let provider choose)
+  schedulingMode?: 'scheduled' | 'requested';
+  onSchedulingModeChange?: (mode: 'scheduled' | 'requested') => void;
 }
 
 function formatPrice(cents: number, currency: string = "usd"): string {
@@ -75,6 +78,8 @@ export function DetailsStep({
   totalPrice = 0,
   technicianId,
   estimatedDuration = 60,
+  schedulingMode = 'scheduled',
+  onSchedulingModeChange,
 }: DetailsStepProps) {
   // Determine if we're in agent flow (provider already selected with package)
   const isAgentFlow = !!selectedProviderName;
@@ -82,6 +87,25 @@ export function DetailsStep({
 
   // Track whether to show manual time picker or availability slots
   const showAvailabilitySlots = !!technicianId;
+
+  // Track internal scheduling mode if parent doesn't control it
+  const [internalMode, setInternalMode] = useState<'scheduled' | 'requested'>(schedulingMode);
+  const effectiveMode = onSchedulingModeChange ? schedulingMode : internalMode;
+  const handleModeChange = (mode: 'scheduled' | 'requested') => {
+    if (onSchedulingModeChange) {
+      onSchedulingModeChange(mode);
+    } else {
+      setInternalMode(mode);
+    }
+    // Clear date/time if switching to requested
+    if (mode === 'requested') {
+      onJobDetailsChange({
+        ...jobDetails,
+        scheduledDate: '',
+        scheduledTime: '',
+      });
+    }
+  };
 
   // Parse the selected date from jobDetails for the availability component
   const selectedDate = jobDetails.scheduledDate
@@ -155,7 +179,58 @@ export function DetailsStep({
             {hasPackageSelected ? "Schedule your shoot" : "Tell us about the shoot"}
           </H2>
 
-          {/* Shoot Date and Time */}
+          {/* Scheduling Mode Toggle - Only show in agent flow */}
+          {isAgentFlow && (
+            <div className="space-y-3">
+              <Label className="text-sm">How would you like to schedule?</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('scheduled')}
+                  className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                    effectiveMode === 'scheduled'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg ${effectiveMode === 'scheduled' ? 'bg-primary' : 'bg-muted'}`}>
+                    <CalendarIcon className={`h-5 w-5 ${effectiveMode === 'scheduled' ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">Pick a specific time</div>
+                    <div className="text-sm text-muted-foreground">Choose your preferred date and time</div>
+                  </div>
+                  {effectiveMode === 'scheduled' && (
+                    <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('requested')}
+                  className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                    effectiveMode === 'requested'
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg ${effectiveMode === 'requested' ? 'bg-primary' : 'bg-muted'}`}>
+                    <Clock className={`h-5 w-5 ${effectiveMode === 'requested' ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium">Request scheduling</div>
+                    <div className="text-sm text-muted-foreground">Let the provider contact you to schedule</div>
+                  </div>
+                  {effectiveMode === 'requested' && (
+                    <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Shoot Date and Time - Only show when picking specific time */}
+          {effectiveMode === 'scheduled' && (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label>Shoot Date *</Label>
@@ -418,6 +493,25 @@ export function DetailsStep({
                 technicianId={technicianId}
                 durationMins={estimatedDuration}
               />
+            </div>
+          )}
+          </>
+          )}
+
+          {/* Requested Scheduling Info */}
+          {effectiveMode === 'requested' && isAgentFlow && (
+            <div className="bg-muted/50 rounded-xl p-4 border border-border">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                  <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <div className="font-medium">Scheduling to be arranged</div>
+                  <div className="text-sm text-muted-foreground mt-0.5">
+                    {selectedProviderName} will contact you to schedule the shoot at a mutually convenient time.
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

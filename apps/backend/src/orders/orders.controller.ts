@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
   UseGuards,
   Req,
@@ -71,6 +72,22 @@ export class OrdersController {
   ) {
     const ctx = req.orgContext as OrgContext;
     return this.ordersService.listOrders(ctx, user);
+  }
+
+  /**
+   * Cancel an order as the customer (agent).
+   * Only allows cancellation if the user is the customer of the project.
+   * DELETE /orders/:projectId/cancel
+   *
+   * Note: Uses only JwtAuthGuard (not OrgContextGuard) since agents aren't org members.
+   */
+  @Delete(':projectId/cancel')
+  @UseGuards(JwtAuthGuard)
+  async cancelOrder(
+    @Param('projectId') projectId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.ordersService.cancelOrderAsCustomer(projectId, user);
   }
 }
 

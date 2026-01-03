@@ -35,6 +35,11 @@ export enum OrderPriority {
   URGENT = 'urgent',
 }
 
+export enum SchedulingMode {
+  SCHEDULED = 'scheduled',  // Specific time picked
+  REQUESTED = 'requested',  // Provider to schedule
+}
+
 export class CreateOrderDto {
   // Provider organization (for agent flow)
   // When set, the order is created for this COMPANY org and the agent becomes the customer
@@ -93,6 +98,11 @@ export class CreateOrderDto {
   @IsNumber()
   estimatedDuration?: number;
 
+  // Scheduling mode: 'scheduled' (specific time) or 'requested' (let provider choose)
+  @IsOptional()
+  @IsEnum(SchedulingMode)
+  schedulingMode?: SchedulingMode;
+
   // Service details
   @IsArray()
   @IsString({ each: true })
@@ -132,5 +142,11 @@ export class CreateOrderDto {
   @IsOptional()
   @IsObject()
   addOnQuantities?: Record<string, number>;
+
+  // Idempotency key for duplicate prevention
+  // Client should generate a unique key for each order attempt
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
 }
 

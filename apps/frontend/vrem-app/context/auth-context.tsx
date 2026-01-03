@@ -110,7 +110,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               }
             }
 
-            const orgs = await api.organizations.listMine();
+            // Agents don't have org memberships - skip listMine for them
+            const isAgent = user?.accountType?.toUpperCase() === 'AGENT';
+            let orgs: any[] = [];
+            if (!isAgent) {
+              orgs = await api.organizations.listMine();
+            }
             setMemberships(orgs);
 
             const storedOrg = api.organizations.getActiveOrganization();
@@ -132,6 +137,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               null;
             if (resolvedOrgId) {
               api.organizations.setActiveOrganization(resolvedOrgId);
+            } else if (isAgent) {
+              // Agents don't need org context - clear any stale org ID
+              api.organizations.setActiveOrganization(null as any);
             }
             setActiveOrganizationId(resolvedOrgId);
           }
@@ -247,8 +255,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applyAuthResponse = async (response: { token: string; user: any }) => {
     localStorage.setItem("token", response.token);
     setToken(response.token);
-    setUser(normalizeUser(response.user));
-    const orgs = await api.organizations.listMine();
+    const normalizedUser = normalizeUser(response.user);
+    setUser(normalizedUser);
+
+    // Agents don't have org memberships - skip listMine for them
+    const isAgent = normalizedUser?.accountType?.toUpperCase() === 'AGENT';
+    let orgs: any[] = [];
+    if (!isAgent) {
+      orgs = await api.organizations.listMine();
+    }
     setMemberships(orgs);
 
     // Find the best organization to use (prefer personal org, then first available)
@@ -263,6 +278,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       null;
     if (resolvedOrgId) {
       api.organizations.setActiveOrganization(resolvedOrgId);
+    } else if (isAgent) {
+      // Agents don't need org context - clear any stale org ID
+      api.organizations.setActiveOrganization(null as any);
     }
     setActiveOrganizationId(resolvedOrgId);
     router.push("/dashboard");

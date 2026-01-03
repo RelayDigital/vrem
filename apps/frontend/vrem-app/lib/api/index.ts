@@ -1462,12 +1462,16 @@ class ApiClient {
       lng?: number;
       scheduledTime: string;
       estimatedDuration?: number;
+      // Scheduling mode: 'scheduled' (specific time) or 'requested' (let provider choose)
+      schedulingMode?: 'scheduled' | 'requested';
       mediaTypes: string[];
       priority: 'standard' | 'rush' | 'urgent';
       notes?: string;
       technicianId?: string;
       editorId?: string;
       projectManagerId?: string;
+      // Idempotency key for duplicate prevention
+      idempotencyKey?: string;
     }): Promise<{
       project: Project;
       customer: any;
@@ -1552,6 +1556,16 @@ class ApiClient {
       } | null;
     }> => {
       return this.request(`/orders/status/${sessionId}`);
+    },
+
+    /**
+     * Cancel or delete an order as the customer (agent).
+     * PENDING jobs without a technician are deleted, others are cancelled.
+     */
+    cancel: async (projectId: string): Promise<{ success: boolean; action: 'deleted' | 'cancelled' }> => {
+      return this.request(`/orders/${projectId}/cancel`, {
+        method: 'DELETE',
+      });
     },
   };
 

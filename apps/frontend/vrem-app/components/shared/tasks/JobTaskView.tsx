@@ -438,6 +438,35 @@ export function JobTaskView({
     return canDeleteProjectFn(effectiveOrgRole);
   }, [effectiveOrgRole]);
 
+  // Permission: Can agent delete/cancel their order
+  // - PENDING jobs without technician: can delete directly
+  // - PENDING with technician, BOOKED, SHOOTING, EDITING: can cancel only
+  // - CANCELLED: can delete (cleanup)
+  // - DELIVERED: cannot modify
+  const agentCanModifyOrder = useMemo(() => {
+    if (!isAgentUser || !job) return { canDelete: false, canCancel: false };
+    const status = job.status?.toLowerCase();
+    const hasTechnician = !!job.technicianId;
+
+    // Delivered jobs cannot be modified
+    if (status === 'delivered') {
+      return { canDelete: false, canCancel: false };
+    }
+
+    // Cancelled jobs can be deleted (cleanup)
+    if (status === 'cancelled') {
+      return { canDelete: true, canCancel: false };
+    }
+
+    // PENDING without technician = can delete directly
+    if (status === 'pending' && !hasTechnician) {
+      return { canDelete: true, canCancel: false };
+    }
+
+    // Assigned jobs (PENDING with tech, BOOKED, SHOOTING, EDITING) = can cancel only
+    return { canDelete: false, canCancel: true };
+  }, [isAgentUser, job?.status, job?.technicianId]);
+
   // Permission: Can write to customer chat (OWNER/ADMIN, assigned PM, or linked agent customer)
   const canWriteToCustomerChat = useMemo(() => {
     const projectForPermission = job ? {
@@ -2718,6 +2747,22 @@ export function JobTaskView({
                   </DropdownMenuItem>
                 </>
               )}
+              {/* Agent delete/cancel order option */}
+              {(agentCanModifyOrder.canDelete || agentCanModifyOrder.canCancel) && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setDeleteProjectDialogOpen(true);
+                    }}
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {agentCanModifyOrder.canDelete ? "Delete order" : "Cancel order"}
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
           <TooltipProvider>
@@ -3763,7 +3808,7 @@ export function JobTaskView({
                 )}
 
                 {/* Delivery Link - for agents when delivery is enabled */}
-                {isAgentUser && job?.deliveryToken && (
+                {isAgentUser && job?.status?.toLowerCase() === "delivered" && job?.deliveryToken && (
                   <>
                     <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                       Delivery
@@ -4266,17 +4311,26 @@ export function JobTaskView({
 
   return (
     <>
-      {/* Delete Project Confirmation Dialog */}
+      {/* Delete/Cancel Project Confirmation Dialog */}
       <AlertDialog
         open={deleteProjectDialogOpen}
         onOpenChange={setDeleteProjectDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete job</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isAgentUser
+                ? agentCanModifyOrder.canDelete
+                  ? "Delete order"
+                  : "Cancel order"
+                : "Delete job"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove the job and its data. Are you sure
-              you want to continue?
+              {isAgentUser
+                ? agentCanModifyOrder.canDelete
+                  ? "This will permanently remove this order. Are you sure you want to continue?"
+                  : "This will cancel your order. The provider will be notified. Are you sure you want to continue?"
+                : "This will permanently remove the job and its data. Are you sure you want to continue?"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -4284,7 +4338,7 @@ export function JobTaskView({
               onClick={() => setDeleteProjectDialogOpen(false)}
               disabled={isDeletingProject}
             >
-              Cancel
+              Go back
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteProject}
@@ -4294,7 +4348,11 @@ export function JobTaskView({
               {isDeletingProject && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Delete job
+              {isAgentUser
+                ? agentCanModifyOrder.canDelete
+                  ? "Delete order"
+                  : "Cancel order"
+                : "Delete job"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

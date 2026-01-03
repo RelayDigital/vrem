@@ -457,7 +457,8 @@ enum MediaType {
 }
 
 enum ProjectStatus {
-  BOOKED
+  PENDING    // Scheduling requested - awaiting time confirmation
+  BOOKED     // Specific time scheduled
   SHOOTING
   EDITING
   DELIVERED

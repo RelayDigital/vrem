@@ -30,6 +30,8 @@ export interface AgentJobData extends Partial<JobRequest> {
   addOnIds?: string[];
   addOnQuantities?: Record<string, number>; // addOnId -> quantity
   totalPrice?: number;
+  // Scheduling mode: 'scheduled' (specific time) or 'requested' (let provider choose)
+  schedulingMode?: 'scheduled' | 'requested';
 }
 
 interface AgentBookingFlowProps {
@@ -94,6 +96,9 @@ export function AgentBookingFlow({
     requirements: '',
   });
 
+  // Scheduling mode: 'scheduled' (specific time) or 'requested' (let provider choose)
+  const [schedulingMode, setSchedulingMode] = useState<'scheduled' | 'requested'>('scheduled');
+
   const handleProviderSelect = (provider: CustomerOrganization) => {
     setSelectedProvider(provider);
     // Reset package selection when provider changes
@@ -136,9 +141,12 @@ export function AgentBookingFlow({
   };
 
   const handleDetailsComplete = () => {
-    if (!jobDetails.scheduledDate || !jobDetails.scheduledTime) {
-      toast.error('Please select a date and time');
-      return;
+    // Only require date/time when in 'scheduled' mode
+    if (schedulingMode === 'scheduled') {
+      if (!jobDetails.scheduledDate || !jobDetails.scheduledTime) {
+        toast.error('Please select a date and time');
+        return;
+      }
     }
     // Only require media type selection if no package is selected
     if (!selectedPackage && jobDetails.mediaTypes.length === 0) {
@@ -206,6 +214,8 @@ export function AgentBookingFlow({
       addOnIds,
       addOnQuantities,
       totalPrice,
+      // Include scheduling mode
+      schedulingMode,
     };
 
     onJobCreate(job);
@@ -219,6 +229,7 @@ export function AgentBookingFlow({
     setSelectedAddOns([]);
     setTotalPrice(0);
     setAddressComponents({});
+    setSchedulingMode('scheduled');
     setJobDetails({
       clientName: '',
       scheduledDate: '',
@@ -325,6 +336,8 @@ export function AgentBookingFlow({
             selectedPackage={selectedPackage}
             selectedAddOns={selectedAddOns}
             totalPrice={totalPrice}
+            schedulingMode={schedulingMode}
+            onSchedulingModeChange={setSchedulingMode}
           />
         )}
 
@@ -343,6 +356,7 @@ export function AgentBookingFlow({
             onBack={handleBackFromConfirm}
             // Pass provider info for display
             selectedProvider={selectedProvider}
+            schedulingMode={schedulingMode}
           />
         )}
       </AnimatePresence>

@@ -533,7 +533,8 @@ export type NotificationType =
   | "INVITATION_CUSTOMER"
   | "PROJECT_ASSIGNED"
   | "NEW_MESSAGE"
-  | "PROJECT_APPROVED";
+  | "PROJECT_APPROVED"
+  | "PROJECT_DELIVERED";
 
 export type ProjectAssignedRole =
   | "TECHNICIAN"
@@ -565,6 +566,9 @@ export interface NotificationItem {
 
   // For PROJECT_APPROVED notifications
   approverName?: string;
+
+  // For PROJECT_DELIVERED notifications
+  deliveryToken?: string;
 }
 
 export interface OrganizationPublicInfo {

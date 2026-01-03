@@ -36,6 +36,8 @@ interface TechnicianSelectionStepProps {
   onBack: () => void;
   // Agent flow: pre-selected provider
   selectedProvider?: CustomerOrganization | null;
+  // Scheduling mode: 'scheduled' (specific time) or 'requested' (let provider choose)
+  schedulingMode?: 'scheduled' | 'requested';
 }
 
 export function TechnicianSelectionStep({
@@ -50,11 +52,13 @@ export function TechnicianSelectionStep({
   onTechnicianSelect,
   onBack,
   selectedProvider,
+  schedulingMode = 'scheduled',
 }: TechnicianSelectionStepProps) {
   const effectiveTechnicians = technicians || [];
-  
+
   // Agent flow: provider is pre-selected, show confirmation UI
   const isAgentFlow = !!selectedProvider;
+  const isRequestedScheduling = schedulingMode === 'requested';
 
   return (
     <motion.div
@@ -118,7 +122,11 @@ export function TechnicianSelectionStep({
               <div>
                 <div className="text-xs text-muted-foreground/80">Date & Time</div>
                 <div className="text-sm text-foreground">
-                  {jobDetails.scheduledDate} at {jobDetails.scheduledTime}
+                  {isRequestedScheduling ? (
+                    <span className="text-amber-600 dark:text-amber-400">To be scheduled by provider</span>
+                  ) : (
+                    <>{jobDetails.scheduledDate} at {jobDetails.scheduledTime}</>
+                  )}
                 </div>
               </div>
             </div>

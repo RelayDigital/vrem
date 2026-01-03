@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Check, X, ExternalLink, Briefcase, Building2, MessageSquare, CheckCircle, GraduationCap, RotateCcw, ChevronRight } from "lucide-react";
+import { Bell, Check, X, ExternalLink, Briefcase, Building2, MessageSquare, CheckCircle, GraduationCap, RotateCcw, ChevronRight, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -153,6 +153,13 @@ export function NotificationBell({ className }: NotificationBellProps) {
       console.error("Failed to mark notification as read:", error);
     }
 
+    // For PROJECT_DELIVERED, navigate to delivery page using token
+    if (notification.type === "PROJECT_DELIVERED" && notification.deliveryToken) {
+      router.push(`/delivery/${notification.deliveryToken}`);
+      setIsOpen(false);
+      return;
+    }
+
     // Switch organization if needed
     if (notification.orgId && notification.orgId !== activeOrganizationId) {
       switchOrganization(notification.orgId);
@@ -282,6 +289,8 @@ export function NotificationBell({ className }: NotificationBellProps) {
         return <MessageSquare className="h-4 w-4 text-green-500" />;
       case "PROJECT_APPROVED":
         return <CheckCircle className="h-4 w-4 text-emerald-500" />;
+      case "PROJECT_DELIVERED":
+        return <Package className="h-4 w-4 text-primary" />;
       default:
         return <Building2 className="h-4 w-4 text-purple-500" />;
     }
@@ -299,6 +308,8 @@ export function NotificationBell({ className }: NotificationBellProps) {
         return `New message in project`;
       case "PROJECT_APPROVED":
         return `Project approved`;
+      case "PROJECT_DELIVERED":
+        return `Your media is ready`;
       default:
         return "Notification";
     }
@@ -344,6 +355,10 @@ export function NotificationBell({ className }: NotificationBellProps) {
         return notification.approverName
           ? `Approved by ${notification.approverName}${notification.projectAddress ? ` - ${notification.projectAddress}` : ''}`
           : notification.projectAddress || 'Project delivery approved';
+      case "PROJECT_DELIVERED":
+        return notification.projectAddress
+          ? `${notification.orgName} has delivered your media for ${notification.projectAddress}`
+          : `${notification.orgName} has delivered your media`;
       default:
         return "";
     }
@@ -652,7 +667,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
                           onClick={() => handleViewProject(notification)}
                         >
                           <ExternalLink className="h-3 w-3 mr-1" />
-                          View Project
+                          {notification.type === "PROJECT_DELIVERED" ? "View Delivery" : "View Project"}
                         </Button>
                       )}
                     </div>

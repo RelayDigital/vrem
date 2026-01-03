@@ -194,6 +194,21 @@ export function JobManagementProvider({
     };
   }, [fetchJobs]);
 
+  // Reload jobs when a new order is created
+  useEffect(() => {
+    const handleOrderCreated = () => {
+      fetchJobs();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('orderCreated', handleOrderCreated as EventListener);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('orderCreated', handleOrderCreated as EventListener);
+      }
+    };
+  }, [fetchJobs]);
+
   // Reload jobs when tour demo project changes (created or deleted)
   useEffect(() => {
     const handleDemoProjectChange = () => {
@@ -341,24 +356,32 @@ export function JobManagementProvider({
 
   const deleteJob = useCallback(
     async (jobId: string): Promise<void> => {
+      const isAgent = userRole?.toUpperCase() === 'AGENT';
       try {
-        await api.projects.delete(jobId);
+        // Agents use the orders.cancel API (cancels/deletes as customer)
+        // Company users use the projects.delete API (deletes as org member)
+        if (isAgent) {
+          const result = await api.orders.cancel(jobId);
+          toast.success(result.action === 'deleted' ? "Order deleted" : "Order cancelled");
+        } else {
+          await api.projects.delete(jobId);
+          toast.success("Job deleted");
+        }
         setProjects((prev) => prev.filter((p) => p.id !== jobId));
         setSelectedJob((prev) => (prev?.id === jobId ? null : prev));
         setShowTaskView(false);
         setShowTaskDialog(false);
         setShowRankings(false);
-        toast.success("Job deleted");
         window.dispatchEvent(
           new CustomEvent("jobDeleted", { detail: { jobId } })
         );
       } catch (error) {
-        console.error("Failed to delete project", error);
-        toast.error("Failed to delete project");
+        console.error("Failed to delete/cancel project", error);
+        toast.error(isAgent ? "Failed to cancel order" : "Failed to delete project");
         throw error;
       }
     },
-    []
+    [userRole]
   );
 
   const createJob = useCallback(async (job: Partial<Project>): Promise<Project> => {

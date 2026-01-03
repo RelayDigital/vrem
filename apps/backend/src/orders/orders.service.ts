@@ -5,7 +5,7 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
-import { Prisma, OrgType, CalendarEvent, PendingOrderStatus } from '@prisma/client';
+import { Prisma, OrgType, CalendarEvent, PendingOrderStatus, ProjectStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CronofyService } from '../cronofy/cronofy.service';
 import { AuthorizationService } from '../auth/authorization.service';
@@ -14,7 +14,7 @@ import { PackagesService } from '../packages/packages.service';
 import { NylasService } from '../nylas/nylas.service';
 import { CalendarSyncService } from '../nylas/calendar-sync.service';
 import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
-import { CreateOrderDto } from './dto/create-order.dto';
+import { CreateOrderDto, SchedulingMode } from './dto/create-order.dto';
 import { OrderResult } from './dto/order-result.dto';
 import { FRONTEND_URL } from '../config/urls.config';
 
@@ -104,6 +104,10 @@ export class OrdersService {
     // Geocode address if lat/lng not provided
     const addressData = await this.resolveAddress(dto);
 
+    // Determine project status based on scheduling mode
+    const isRequestedScheduling = dto.schedulingMode === SchedulingMode.REQUESTED;
+    const projectStatus = isRequestedScheduling ? ProjectStatus.PENDING : ProjectStatus.BOOKED;
+
     // Execute transaction
     return this.prisma.$transaction(async (tx) => {
       // Create project under the provider org with the agent as customer
@@ -111,6 +115,7 @@ export class OrdersService {
         data: {
           orgId: dto.providerOrgId!,
           customerId: customerRelation.id,
+          status: projectStatus,
           addressLine1: addressData.addressLine1,
           addressLine2: addressData.addressLine2,
           city: addressData.city,
@@ -185,6 +190,10 @@ export class OrdersService {
     // Geocode address if lat/lng not provided
     const addressData = await this.resolveAddress(dto);
 
+    // Determine project status based on scheduling mode
+    const isRequestedScheduling = dto.schedulingMode === SchedulingMode.REQUESTED;
+    const projectStatus = isRequestedScheduling ? ProjectStatus.PENDING : ProjectStatus.BOOKED;
+
     // Execute transaction
     const result = await this.prisma.$transaction(async (tx) => {
       // Step 1: Resolve or create customer
@@ -202,6 +211,7 @@ export class OrdersService {
         data: {
           orgId: ctx.org.id,
           customerId: customer?.id || null,
+          status: projectStatus,
           addressLine1: addressData.addressLine1,
           addressLine2: addressData.addressLine2,
           city: addressData.city,
@@ -680,6 +690,82 @@ export class OrdersService {
       checkoutUrl: session.url!,
       sessionId: session.id,
     };
+  }
+
+  /**
+   * Cancel or delete an order as the customer (agent).
+   * Only the customer who placed the order can cancel/delete it.
+   *
+   * - PENDING jobs without a technician: Can be fully deleted (hard delete)
+   * - PENDING/BOOKED/SHOOTING/EDITING jobs with technician: Can be cancelled (soft cancel)
+   * - CANCELLED jobs: Can be deleted (cleanup)
+   * - DELIVERED jobs: Cannot be modified
+   */
+  async cancelOrderAsCustomer(
+    projectId: string,
+    user: AuthenticatedUser,
+  ): Promise<{ success: boolean; action: 'deleted' | 'cancelled' }> {
+    // Find the project
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        customer: true,
+        calendarEvent: true,
+      },
+    });
+
+    if (!project) {
+      throw new BadRequestException('Project not found');
+    }
+
+    // Verify the user is the customer of this project
+    if (!project.customer || project.customer.userId !== user.id) {
+      throw new ForbiddenException('You can only cancel your own orders');
+    }
+
+    // Don't allow modification of delivered projects
+    if (project.status === 'DELIVERED') {
+      throw new BadRequestException(
+        'Cannot modify a project that has been delivered',
+      );
+    }
+
+    // Determine if this is a delete or cancel:
+    // - PENDING without technician = delete
+    // - CANCELLED = delete (cleanup)
+    // - Otherwise = cancel
+    const canDelete =
+      (project.status === 'PENDING' && !project.technicianId) ||
+      project.status === 'CANCELLED';
+
+    if (canDelete) {
+      // Hard delete the project and related records
+      await this.prisma.$transaction(async (tx) => {
+        // Delete calendar event if exists
+        if (project.calendarEvent) {
+          await tx.calendarEvent.delete({
+            where: { id: project.calendarEvent.id },
+          });
+        }
+
+        // Delete the project
+        await tx.project.delete({
+          where: { id: projectId },
+        });
+      });
+
+      this.logger.log(`Order ${projectId} deleted by customer ${user.id}`);
+      return { success: true, action: 'deleted' };
+    } else {
+      // Soft cancel - update status to CANCELLED
+      await this.prisma.project.update({
+        where: { id: projectId },
+        data: { status: 'CANCELLED' },
+      });
+
+      this.logger.log(`Order ${projectId} cancelled by customer ${user.id}`);
+      return { success: true, action: 'cancelled' };
+    }
   }
 }
 
