@@ -1880,6 +1880,28 @@ class ApiClient {
 
       return response.json();
     },
+
+    /**
+     * Retry a failed artifact (admin only - requires OWNER/ADMIN/PROJECT_MANAGER role)
+     */
+    retryArtifact: async (artifactId: string): Promise<{ success: boolean; artifactId: string }> => {
+      const response = await fetch(`${API_URL}${API_PREFIX}/delivery/admin/retry-artifact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-org-id': localStorage.getItem('orgId') || '',
+        },
+        body: JSON.stringify({ artifactId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || 'Failed to retry artifact');
+      }
+
+      return response.json();
+    },
   };
 
   // =============================

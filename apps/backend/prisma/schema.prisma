@@ -92,22 +92,27 @@ model Media {
 }
 
 model DownloadArtifact {
-  id            String                 @id @default(cuid())
-  projectId     String
-  type          DownloadArtifactType   @default(ALL_MEDIA)
-  status        DownloadArtifactStatus @default(PENDING)
-  key           String?                // Storage key (e.g., Uploadcare UUID)
-  cdnUrl        String?                // CDN URL to download the artifact
-  filename      String?                // Suggested filename for download
-  size          Int?                   // File size in bytes
-  mediaHash     String?                // Hash of media IDs to detect changes
-  error         String?                // Error message if generation failed
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-  expiresAt     DateTime?              // When the artifact should be deleted
-  project       Project                @relation(fields: [projectId], references: [id])
+  id                  String                 @id @default(cuid())
+  projectId           String
+  type                DownloadArtifactType   @default(ALL_MEDIA)
+  status              DownloadArtifactStatus @default(PENDING)
+  key                 String?                // Storage key (e.g., Uploadcare UUID)
+  cdnUrl              String?                // CDN URL to download the artifact
+  filename            String?                // Suggested filename for download
+  size                Int?                   // File size in bytes
+  mediaHash           String?                // Hash of media IDs to detect changes
+  error               String?                // Error message if generation failed
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  expiresAt           DateTime?              // When the artifact should be deleted
+  // Job runner fields for durability
+  processingStartedAt DateTime?              // When a worker started processing (for timeout detection)
+  workerToken         String?                // Unique token held by processing worker (for lock ownership)
+  retryCount          Int                    @default(0) // Number of retry attempts
+  project             Project                @relation(fields: [projectId], references: [id])
 
   @@index([projectId, type, status])
+  @@index([status, processingStartedAt]) // For finding stuck/timed-out jobs
 }
 
 enum DownloadArtifactType {

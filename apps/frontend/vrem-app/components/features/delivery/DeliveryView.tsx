@@ -8,7 +8,13 @@ import { DeliveryApproval } from './DeliveryApproval';
 import { DeliveryComments } from './DeliveryComments';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Download, Loader2, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -198,8 +204,8 @@ export function DeliveryView({ delivery: initialDelivery, token }: DeliveryViewP
       case 'error':
         return (
           <>
-            <AlertCircle className="h-4 w-4 mr-2 text-red-600" />
-            Retry Download
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry Download Preparation
           </>
         );
       default:
@@ -240,14 +246,31 @@ export function DeliveryView({ delivery: initialDelivery, token }: DeliveryViewP
       <main className="container max-w-7xl mx-auto px-4 py-8">
         {/* Actions bar - only show download button if enabled and media exists */}
         {delivery.downloadEnabled && delivery.media.length > 0 && (
-          <div className="flex justify-end mb-6">
-            <Button
-              onClick={handleDownloadAll}
-              disabled={['preparing', 'generating', 'ready'].includes(downloadState)}
-              variant={downloadState === 'error' ? 'destructive' : 'outline'}
-            >
-              {getDownloadButtonContent()}
-            </Button>
+          <div className="flex flex-col items-end gap-2 mb-6">
+            {downloadState === 'error' && errorMessage && (
+              <div className="text-sm text-destructive flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                {errorMessage}
+              </div>
+            )}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={handleDownloadAll}
+                    disabled={['preparing', 'generating', 'ready'].includes(downloadState)}
+                    variant={downloadState === 'error' ? 'destructive' : 'outline'}
+                  >
+                    {getDownloadButtonContent()}
+                  </Button>
+                </TooltipTrigger>
+                {downloadState === 'error' && (
+                  <TooltipContent>
+                    <p>Click to try again. The download will be prepared fresh.</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </div>
         )}
 

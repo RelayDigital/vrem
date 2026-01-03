@@ -70,3 +70,7 @@ export class RequestChangesDto {
 export class DownloadAllDto {
   mediaTypes?: MediaType[];
 }
+
+export class RetryArtifactDto {
+  artifactId: string;
+}

@@ -3,19 +3,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ProjectChatChannel, MediaType, ClientApprovalStatus, DownloadArtifactStatus, DownloadArtifactType } from '@prisma/client';
 import { DeliveryResponseDto, MediaDto, CommentDto } from './dto/delivery-response.dto';
-import archiver from 'archiver';
 import * as crypto from 'crypto';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 
 @Injectable()
 export class DeliveryService {
   private readonly logger = new Logger(DeliveryService.name);
-
-  // Configuration for zip generation
-  private readonly ZIP_CONCURRENCY_LIMIT = 5; // Max concurrent file downloads
-  private readonly FILE_DOWNLOAD_TIMEOUT_MS = 30000; // 30 seconds per file
 
   // Storage configuration - checked once at startup
   private readonly storageConfigured: boolean;
@@ -45,51 +37,6 @@ export class DeliveryService {
    */
   isStorageConfigured(): boolean {
     return this.storageConfigured;
-  }
-
-  /**
-   * Fetch a file with timeout.
-   */
-  private async fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-      const response = await fetch(url, { signal: controller.signal });
-      return response;
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-
-  /**
-   * Process items with limited concurrency.
-   */
-  private async processWithConcurrency<T, R>(
-    items: T[],
-    limit: number,
-    processor: (item: T) => Promise<R>,
-  ): Promise<R[]> {
-    const results: R[] = [];
-    const executing: Promise<void>[] = [];
-
-    for (const item of items) {
-      const promise = processor(item).then((result) => {
-        results.push(result);
-      });
-
-      const e = promise.then(() => {
-        executing.splice(executing.indexOf(e), 1);
-      });
-      executing.push(e);
-
-      if (executing.length >= limit) {
-        await Promise.race(executing);
-      }
-    }
-
-    await Promise.all(executing);
-    return results;
   }
 
   /**
@@ -535,7 +482,8 @@ export class DeliveryService {
       };
     }
 
-    // Create new artifact and start generation
+    // Create new artifact in PENDING status
+    // The ArtifactWorkerService will pick it up and process it
     const artifact = await this.prisma.downloadArtifact.create({
       data: {
         projectId: project.id,
@@ -546,10 +494,7 @@ export class DeliveryService {
       },
     });
 
-    // Start generation asynchronously (don't await)
-    this.generateZipArtifact(artifact.id, project, media).catch((error) => {
-      this.logger.error(`Failed to generate zip artifact ${artifact.id}:`, error);
-    });
+    this.logger.log(`Created artifact ${artifact.id} for project ${project.id} (pending worker pickup)`);
 
     return {
       status: artifact.status,
@@ -588,173 +533,5 @@ export class DeliveryService {
       filename: artifact.filename || undefined,
       error: artifact.error || undefined,
     };
-  }
-
-  /**
-   * Generate zip artifact and upload to storage.
-   * This runs asynchronously with limited concurrency and per-file timeout.
-   */
-  private async generateZipArtifact(
-    artifactId: string,
-    project: {
-      id: string;
-      addressLine1: string | null;
-      city: string | null;
-      organization: { name: string };
-    },
-    media: { id: string; key: string; cdnUrl: string | null; filename: string }[],
-  ): Promise<void> {
-    const tempDir = os.tmpdir();
-    const tempZipPath = path.join(tempDir, `${artifactId}.zip`);
-
-    try {
-      // Update status to GENERATING
-      await this.prisma.downloadArtifact.update({
-        where: { id: artifactId },
-        data: { status: DownloadArtifactStatus.GENERATING },
-      });
-
-      // Download files with limited concurrency and timeout
-      type DownloadResult = { filename: string; buffer: Buffer } | null;
-
-      const downloadResults = await this.processWithConcurrency<
-        typeof media[number],
-        DownloadResult
-      >(
-        media,
-        this.ZIP_CONCURRENCY_LIMIT,
-        async (m): Promise<DownloadResult> => {
-          const url = m.cdnUrl || `https://ucarecdn.com/${m.key}/`;
-          try {
-            const response = await this.fetchWithTimeout(url, this.FILE_DOWNLOAD_TIMEOUT_MS);
-            if (response.ok) {
-              const arrayBuffer = await response.arrayBuffer();
-              const buffer = Buffer.from(arrayBuffer);
-              const safeFilename = m.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-              return { filename: safeFilename, buffer };
-            } else {
-              this.logger.warn(`Failed to fetch media ${m.id}: HTTP ${response.status}`);
-              return null;
-            }
-          } catch (error: any) {
-            if (error.name === 'AbortError') {
-              this.logger.warn(`Timeout fetching media ${m.id} after ${this.FILE_DOWNLOAD_TIMEOUT_MS}ms`);
-            } else {
-              this.logger.warn(`Failed to fetch media ${m.id}:`, error.message);
-            }
-            return null;
-          }
-        },
-      );
-
-      // Filter successful downloads
-      const successfulDownloads = downloadResults.filter((r): r is NonNullable<typeof r> => r !== null);
-
-      if (successfulDownloads.length === 0) {
-        throw new Error('No media files could be downloaded');
-      }
-
-      this.logger.log(
-        `Downloaded ${successfulDownloads.length}/${media.length} files for artifact ${artifactId}`,
-      );
-
-      // Create zip archive from downloaded buffers
-      const archive = archiver('zip', { zlib: { level: 5 } });
-      const output = fs.createWriteStream(tempZipPath);
-
-      await new Promise<void>((resolve, reject) => {
-        output.on('close', resolve);
-        output.on('error', reject);
-        archive.on('error', reject);
-
-        archive.pipe(output);
-
-        // Add all downloaded files to archive
-        for (const { filename, buffer } of successfulDownloads) {
-          archive.append(buffer, { name: filename });
-        }
-
-        archive.finalize();
-      });
-
-      // Get file size
-      const stats = fs.statSync(tempZipPath);
-      const fileSize = stats.size;
-
-      // Generate filename using address as primary name
-      const addressParts = [project.addressLine1, project.city, project.organization.name].filter(Boolean);
-      const address = addressParts.length > 0
-        ? addressParts.join('_').replace(/[^a-zA-Z0-9_-]/g, '_')
-        : project.id;
-      const filename = `${address}.zip`;
-
-      // Upload to Uploadcare if configured
-      let cdnUrl: string | undefined;
-      let storageKey: string | undefined;
-
-      const publicKey = process.env.UPLOADCARE_PUBLIC_KEY;
-      const privateKey = process.env.UPLOADCARE_PRIVATE_KEY;
-
-      if (publicKey && privateKey) {
-        try {
-          const fileData = fs.readFileSync(tempZipPath);
-          const formData = new FormData();
-          formData.append('UPLOADCARE_PUB_KEY', publicKey);
-          formData.append('UPLOADCARE_STORE', '1');
-          formData.append('file', new Blob([fileData]), filename);
-
-          const uploadResponse = await fetch('https://upload.uploadcare.com/base/', {
-            method: 'POST',
-            body: formData,
-          });
-
-          if (uploadResponse.ok) {
-            const uploadResult = await uploadResponse.json();
-            storageKey = uploadResult.file;
-            cdnUrl = `https://ucarecdn.com/${storageKey}/${encodeURIComponent(filename)}`;
-          } else {
-            throw new Error(`Upload failed: ${uploadResponse.statusText}`);
-          }
-        } catch (uploadError: any) {
-          this.logger.error(`Failed to upload zip to Uploadcare:`, uploadError);
-          throw uploadError;
-        }
-      } else {
-        // Fallback: Use the temp file URL (not recommended for production)
-        this.logger.warn('Uploadcare not configured, zip download will use streaming fallback');
-        throw new Error('Storage provider not configured');
-      }
-
-      // Update artifact with success
-      await this.prisma.downloadArtifact.update({
-        where: { id: artifactId },
-        data: {
-          status: DownloadArtifactStatus.READY,
-          key: storageKey,
-          cdnUrl,
-          filename,
-          size: fileSize,
-        },
-      });
-    } catch (error: any) {
-      // Update artifact with error
-      await this.prisma.downloadArtifact.update({
-        where: { id: artifactId },
-        data: {
-          status: DownloadArtifactStatus.FAILED,
-          error: error.message || 'Unknown error',
-        },
-      });
-      throw error;
-    } finally {
-      // Clean up temp file
-      try {
-        if (fs.existsSync(tempZipPath)) {
-          fs.unlinkSync(tempZipPath);
-        }
-      } catch (cleanupError) {
-        this.logger.warn(`Failed to clean up temp file ${tempZipPath}:`, cleanupError);
-      }
-    }
   }
 }

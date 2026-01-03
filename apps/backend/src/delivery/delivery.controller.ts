@@ -6,20 +6,30 @@ import {
   Body,
   Req,
   UseGuards,
+  NotFoundException,
+  BadRequestException,
+  Headers,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { DeliveryService } from './delivery.service';
+import { ArtifactWorkerService } from './artifact-worker.service';
 import { Public } from '../auth/public.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OrgContextGuard } from '../auth/org-context.guard';
+import { OrgRolesGuard } from '../auth/org-roles.guard';
+import { OrgRoles } from '../auth/org-roles.decorator';
 import { DeliveryCustomerGuard } from './delivery-customer.guard';
 import { DeliveryCommentGuard } from './delivery-comment.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth-context';
-import { DownloadAllDto, AddCommentDto, RequestChangesDto } from './dto/delivery-response.dto';
+import { DownloadAllDto, AddCommentDto, RequestChangesDto, RetryArtifactDto } from './dto/delivery-response.dto';
 
 @Controller('delivery')
 export class DeliveryController {
-  constructor(private readonly deliveryService: DeliveryService) {}
+  constructor(
+    private readonly deliveryService: DeliveryService,
+    private readonly artifactWorker: ArtifactWorkerService,
+  ) {}
 
   /**
    * PUBLIC: Get delivery data by token.
@@ -118,5 +128,60 @@ export class DeliveryController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.deliveryService.addComment(token, user.id, dto.content);
+  }
+
+  // =============================
+  // Admin / Internal Endpoints
+  // =============================
+
+  /**
+   * ADMIN: Retry a failed artifact generation.
+   * Only OWNER, ADMIN, or PROJECT_MANAGER roles can retry artifacts.
+   * The artifact must belong to a project in the user's org.
+   */
+  @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
+  @OrgRoles('PERSONAL_OWNER', 'OWNER', 'ADMIN', 'PROJECT_MANAGER')
+  @Post('admin/retry-artifact')
+  async retryArtifact(@Body() dto: RetryArtifactDto) {
+    try {
+      const result = await this.artifactWorker.retryFailedArtifact(dto.artifactId);
+      if (!result) {
+        throw new NotFoundException('Artifact not found');
+      }
+      return { success: true, artifactId: result };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  /**
+   * INTERNAL: Cron-like endpoint for processing pending artifacts.
+   * For serverless deployments, this can be called periodically by an external scheduler.
+   * Protected by a secret token in the Authorization header.
+   */
+  @Public()
+  @Throttle({ default: { ttl: 60000, limit: 12 } }) // Max 12 calls per minute
+  @Post('internal/process-artifacts')
+  async processArtifacts(@Headers('authorization') authHeader?: string) {
+    // Validate internal API token
+    const expectedToken = process.env.INTERNAL_API_TOKEN;
+    if (!expectedToken) {
+      throw new NotFoundException('Not found'); // Hide endpoint when not configured
+    }
+
+    const providedToken = authHeader?.replace('Bearer ', '');
+    if (providedToken !== expectedToken) {
+      throw new NotFoundException('Not found'); // Don't reveal this is an auth failure
+    }
+
+    const result = await this.artifactWorker.poll();
+    return {
+      success: true,
+      processed: result.processed,
+      recovered: result.recovered,
+    };
   }
 }
