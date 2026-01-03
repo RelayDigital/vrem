@@ -8,6 +8,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { InquiriesService } from './inquires.service';
 import { CreateInquiryDto } from './dto/create-inquiry.dto';
 import { UpdateInquiryDto } from './dto/update-inquiry.dto';
@@ -24,6 +25,8 @@ export class InquiriesController {
   constructor(private readonly inquiriesService: InquiriesService) {}
 
   // Public: leads submit inquiries (no auth required)
+  // Rate limit: 10 inquiries per minute per IP (prevent spam)
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Public()
   @Post()
   createInquiry(@Body() dto: CreateInquiryDto) {

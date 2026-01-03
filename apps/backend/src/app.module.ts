@@ -1,4 +1,6 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
@@ -26,9 +28,11 @@ import { OrgRolesGuard } from './auth/org-roles.guard';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { Reflector } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
+import { THROTTLE_CONFIG } from './config/throttle.config';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot(THROTTLE_CONFIG),
     PrismaModule,
     EmailModule,
     UsersModule,
@@ -52,7 +56,18 @@ import { PrismaModule } from './prisma/prisma.module';
     ToursModule,
   ],
   controllers: [AppController],
-  providers: [AppService, ActiveOrgMiddleware, OrgRolesGuard, JwtAuthGuard, Reflector],
+  providers: [
+    AppService,
+    ActiveOrgMiddleware,
+    OrgRolesGuard,
+    JwtAuthGuard,
+    Reflector,
+    // Global rate limiting guard
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

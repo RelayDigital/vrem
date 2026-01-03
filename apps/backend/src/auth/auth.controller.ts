@@ -5,7 +5,9 @@ import {
   Post,
   Req,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
 import { RegisterDto } from './dto/register.dto';
@@ -16,6 +18,8 @@ import { OnboardingRegisterDto } from './dto/onboarding-register.dto';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  // Rate limit: 3 registrations per minute per IP
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Public()
   @Post('register')
   async register(
@@ -29,12 +33,16 @@ export class AuthController {
     );
   }
 
+  // Rate limit: 5 login attempts per minute per IP
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Public()
   @Post('login')
   async login(@Body() body: { email: string; password: string }) {
     return this.authService.login(body.email, body.password);
   }
 
+  // Rate limit: 10 OAuth attempts per minute per IP
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Public()
   @Post('oauth/google')
   async oauthGoogle(@Body() body: OAuthLoginDto) {
@@ -45,6 +53,8 @@ export class AuthController {
     });
   }
 
+  // Rate limit: 10 OAuth attempts per minute per IP
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Public()
   @Post('oauth/facebook')
   async oauthFacebook(@Body() body: OAuthLoginDto) {
@@ -64,6 +74,8 @@ export class AuthController {
     return this.authService.me(req.user.id);
   }
 
+  // Rate limit: 3 registrations per minute per IP
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Public()
   @Post('register/onboarding')
   async registerOnboarding(@Body() body: OnboardingRegisterDto) {
@@ -80,12 +92,16 @@ export class AuthController {
 
   /**
    * Get a Clerk sign-in token for test accounts.
-   * This bypasses Clerk's email verification requirement.
-   * Only works for @example.com emails in non-production.
+   * DISABLED in production - only available in development.
    */
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Public()
   @Post('test-login')
   async testLogin(@Body() body: { email: string; password: string }) {
+    // Completely disable in production
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('This endpoint is disabled in production');
+    }
     return this.authService.getTestAccountSignInToken(body.email, body.password);
   }
 }

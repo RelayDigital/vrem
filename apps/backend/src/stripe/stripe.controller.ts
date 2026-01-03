@@ -6,9 +6,11 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import Stripe from 'stripe';
 import { StripeService } from './stripe.service';
 import { OrderFulfillmentService } from './order-fulfillment.service';
+import { Public } from '../auth/public.decorator';
 
 @Controller('webhooks')
 export class StripeWebhookController {
@@ -19,6 +21,10 @@ export class StripeWebhookController {
     private orderFulfillment: OrderFulfillmentService,
   ) {}
 
+  // Webhook endpoints must be public (no auth) but protected by signature verification
+  // Skip rate limiting since Stripe controls the request frequency
+  @Public()
+  @SkipThrottle()
   @Post('stripe')
   async handleStripeWebhook(
     @Req() req: any,

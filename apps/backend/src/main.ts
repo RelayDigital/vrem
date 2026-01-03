@@ -1,10 +1,17 @@
 import { NestFactory } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { OrgContextGuard } from './auth/org-context.guard';
 import { FRONTEND_URL } from './config/urls.config';
+import { validateEnvironment } from './config/env.validation';
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
+
+  // Validate environment variables before starting
+  validateEnvironment();
+
   const app = await NestFactory.create(AppModule, {
     rawBody: true, // Enable raw body for Stripe webhook verification
   });
@@ -32,11 +39,12 @@ async function bootstrap() {
       if (allowedOrigins.some(allowed => origin.startsWith(allowed.replace(/\/$/, '')))) {
         return callback(null, true);
       }
-      // Allow any localhost origin in development
-      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      // Allow any localhost origin in development only
+      const isProduction = process.env.NODE_ENV === 'production';
+      if (!isProduction && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
         return callback(null, true);
       }
-      console.warn(`CORS blocked origin: ${origin}`);
+      logger.warn(`CORS blocked origin: ${origin}`);
       return callback(null, false);
     },
     credentials: true,

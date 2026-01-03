@@ -10,6 +10,7 @@ import {
   StreamableFile,
   Header,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { DeliveryService } from './delivery.service';
 import { Public } from '../auth/public.decorator';
@@ -29,6 +30,8 @@ export class DeliveryController {
    * Token grants view access to project, media, comments, and approval status.
    * If user is authenticated, determines if they can approve.
    */
+  // Rate limit: 30 requests per minute per IP (generous for page loads)
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   @Public()
   @UseGuards(JwtAuthGuard) // Still runs but allows public access - populates user if authenticated
   @Get(':token')
@@ -41,6 +44,8 @@ export class DeliveryController {
   /**
    * PUBLIC: Get comments for a delivery by token.
    */
+  // Rate limit: 30 requests per minute per IP
+  @Throttle({ default: { ttl: 60000, limit: 30 } })
   @Public()
   @Get(':token/comments')
   async getComments(@Param('token') token: string) {
@@ -52,6 +57,8 @@ export class DeliveryController {
    * Returns artifact status and URL when ready.
    * Client should poll download-status endpoint if not immediately ready.
    */
+  // Rate limit: 5 download requests per minute per IP (expensive operation)
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Public()
   @Post(':token/download-request')
   async requestDownload(
@@ -65,6 +72,8 @@ export class DeliveryController {
    * PUBLIC: Get download artifact status.
    * Returns the current status and CDN URL when ready.
    */
+  // Rate limit: 60 requests per minute per IP (polling endpoint)
+  @Throttle({ default: { ttl: 60000, limit: 60 } })
   @Public()
   @Get(':token/download-status/:artifactId')
   async getDownloadStatus(
@@ -78,6 +87,8 @@ export class DeliveryController {
    * PUBLIC: Download all media as a zip file (streaming fallback).
    * Use download-request endpoint for better reliability.
    */
+  // Rate limit: 3 streaming downloads per minute per IP (very expensive)
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Public()
   @Post(':token/download-all')
   @Header('Content-Type', 'application/zip')
