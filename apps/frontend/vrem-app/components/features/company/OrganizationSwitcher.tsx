@@ -62,7 +62,9 @@ export function OrganizationSwitcher({
       // For AGENT users, hide COMPANY orgs where they are only a CUSTOMER
       if (user?.accountType === "AGENT") {
         const isCompanyOrg = membership.organization?.type === "COMPANY";
-        const isCustomerRole = membership.role === "CUSTOMER" || membership.orgRole === "CUSTOMER";
+        // Check if the relationship is customer-type (may come as string "CUSTOMER" from backend)
+        const roleStr = String(membership.role || membership.orgRole || "");
+        const isCustomerRole = roleStr === "CUSTOMER" || (membership as any).relationship === "customer";
         if (isCompanyOrg && isCustomerRole) {
           return false;
         }

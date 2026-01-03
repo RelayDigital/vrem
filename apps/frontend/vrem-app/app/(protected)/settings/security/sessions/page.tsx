@@ -84,7 +84,7 @@ export default function SecuritySessionsPage() {
   const handleRevokeSession = async (session: SessionResource) => {
     setRevokingSessionId(session.id);
     try {
-      await session.revoke();
+      await session.end();
       setSessions((prev) => prev.filter((s) => s.id !== session.id));
       toast.success("Session revoked successfully");
     } catch (error) {
@@ -104,7 +104,7 @@ export default function SecuritySessionsPage() {
 
     setIsRevokingAll(true);
     try {
-      await Promise.all(otherSessions.map((s) => s.revoke()));
+      await Promise.all(otherSessions.map((s) => s.end()));
       setSessions((prev) => prev.filter((s) => s.id === currentSession?.id));
       toast.success(`Revoked ${otherSessions.length} session(s)`);
     } catch (error) {

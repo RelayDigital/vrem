@@ -446,7 +446,7 @@ export function JobTaskView({
   const agentCanModifyOrder = useMemo(() => {
     if (!isAgentUser || !job) return { canDelete: false, canCancel: false };
     const status = job.status?.toLowerCase();
-    const hasTechnician = !!job.technicianId;
+    const hasTechnician = !!job.assignedTechnicianId;
 
     // Delivered jobs cannot be modified
     if (status === 'delivered') {
@@ -465,7 +465,7 @@ export function JobTaskView({
 
     // Assigned jobs (PENDING with tech, BOOKED, SHOOTING, EDITING) = can cancel only
     return { canDelete: false, canCancel: true };
-  }, [isAgentUser, job?.status, job?.technicianId]);
+  }, [isAgentUser, job?.status, job?.assignedTechnicianId]);
 
   // Permission: Can write to customer chat (OWNER/ADMIN, assigned PM, or linked agent customer)
   const canWriteToCustomerChat = useMemo(() => {

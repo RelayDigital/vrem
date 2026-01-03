@@ -33,7 +33,7 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
-  LinkOff,
+  Unlink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/components/ui/utils";
@@ -428,7 +428,7 @@ export function DeliveryPanel({
                 </>
               ) : (
                 <>
-                  <LinkOff className="h-4 w-4 mr-2" />
+                  <Unlink className="h-4 w-4 mr-2" />
                   Disable
                 </>
               )}

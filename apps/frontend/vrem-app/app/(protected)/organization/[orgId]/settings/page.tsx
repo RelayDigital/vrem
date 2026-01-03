@@ -1465,7 +1465,7 @@ function AnalyticsContent() {
               <ChartTooltip
                 cursor={false}
                 content={<ChartTooltipContent />}
-                formatter={(value: number) => `$${value.toLocaleString()}`}
+                formatter={(value) => value != null ? `$${Number(value).toLocaleString()}` : ''}
               />
               <Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} />
             </BarChart>
@@ -1492,7 +1492,7 @@ function AnalyticsContent() {
               <ChartTooltip
                 cursor={false}
                 content={<ChartTooltipContent />}
-                formatter={(value: number) => value.toLocaleString()}
+                formatter={(value) => value != null ? Number(value).toLocaleString() : ''}
               />
               <Bar dataKey="count" fill="var(--color-count)" radius={4}>
                 <LabelList

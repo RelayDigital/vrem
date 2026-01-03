@@ -46,7 +46,8 @@ interface NotificationsProviderProps {
 }
 
 export function NotificationsProvider({ children }: NotificationsProviderProps) {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const isAuthenticated = !!user;
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
