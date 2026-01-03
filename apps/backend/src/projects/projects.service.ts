@@ -1006,6 +1006,42 @@ export class ProjectsService {
   }
 
   /**
+   * Regenerate the delivery token for a project.
+   * This invalidates any existing delivery links.
+   */
+  async regenerateDeliveryToken(projectId: string, ctx: OrgContext, user: AuthenticatedUser) {
+    const project = await this.ensureProjectInOrg(projectId, ctx);
+
+    // Only managers can regenerate delivery token
+    if (!this.authorization.canEditProject(ctx, project, user)) {
+      throw new ForbiddenException('You cannot manage delivery for this project');
+    }
+
+    const { randomUUID } = await import('crypto');
+    const newToken = randomUUID();
+
+    const updated = await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        deliveryToken: newToken,
+      },
+      select: {
+        id: true,
+        deliveryToken: true,
+        deliveryEnabledAt: true,
+        clientApprovalStatus: true,
+      },
+    });
+
+    return {
+      enabled: !!updated.deliveryEnabledAt,
+      deliveryToken: updated.deliveryToken,
+      deliveryEnabledAt: updated.deliveryEnabledAt,
+      clientApprovalStatus: updated.clientApprovalStatus,
+    };
+  }
+
+  /**
    * Get delivery status for a project.
    */
   async getDeliveryStatus(projectId: string, ctx: OrgContext, user: AuthenticatedUser) {

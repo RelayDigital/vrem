@@ -3,6 +3,7 @@
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/context/auth-context';
 import { BackendHealthProvider } from '@/context/BackendHealthContext';
+import { NotificationsProvider } from '@/context/notifications-context';
 import { Toaster } from '@/components/ui/sonner';
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -14,10 +15,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
             disableTransitionOnChange
         >
             <AuthProvider>
-                <BackendHealthProvider>
-                {children}
-                <Toaster />
-                </BackendHealthProvider>
+                <NotificationsProvider>
+                    <BackendHealthProvider>
+                    {children}
+                    <Toaster />
+                    </BackendHealthProvider>
+                </NotificationsProvider>
             </AuthProvider>
         </ThemeProvider>
     );

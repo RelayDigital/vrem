@@ -732,6 +732,7 @@ export interface DeliveryResponse {
     email: string | null;
   };
   canApprove: boolean;
+  canComment: boolean;
 }
 
 // =============================

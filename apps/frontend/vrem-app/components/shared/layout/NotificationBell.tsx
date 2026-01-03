@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Check, X, ExternalLink, Briefcase, Building2, MessageSquare, CheckCircle, GraduationCap, RotateCcw, ChevronRight, Package, AlertTriangle, MessageCircle, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,12 +15,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
-import { api } from "@/lib/api";
 import { NotificationItem, NotificationType } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
-import { useTour, TRACK_METADATA } from "@/context/tour-context";
+import { useNotifications } from "@/context/notifications-context";
+import { useTour } from "@/context/tour-context";
 
 interface NotificationBellProps {
   className?: string;
@@ -47,60 +47,41 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const router = useRouter();
   const { activeOrganizationId, switchOrganization, user, memberships } = useAuth();
   const {
+    notifications,
+    unreadCount,
+    isLoading,
+    markAsRead,
+    markAllAsRead,
+    acceptInvitation,
+    declineInvitation,
+    refetch,
+  } = useNotifications();
+  const {
     status: tourStatus,
     getOverallProgress,
     resetProgress: resetTourProgress,
     dismissGuide: dismissTourGuide,
     refetchStatus: refetchTourStatus,
   } = useTour();
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const [isResettingTour, setIsResettingTour] = useState(false);
   const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
-  const fetchNotifications = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const data = await api.notifications.list();
-      setNotifications(data);
-    } catch (error) {
-      console.error("Failed to fetch notifications:", error);
-    } finally {
-      setIsLoading(false);
+  // Refetch when dropdown opens (optional - context already handles polling)
+  const handleOpenChange = useCallback((open: boolean) => {
+    setIsOpen(open);
+    if (open) {
+      refetch(); // Force refetch when opening dropdown
     }
-  }, []);
-
-  // Fetch notifications on mount and when dropdown opens
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
-
-  // Refetch when dropdown opens
-  useEffect(() => {
-    if (isOpen) {
-      fetchNotifications();
-    }
-  }, [isOpen, fetchNotifications]);
-
-  // Refetch on window focus
-  useEffect(() => {
-    const handleFocus = () => {
-      fetchNotifications();
-    };
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [fetchNotifications]);
+  }, [refetch]);
 
   const handleAcceptInvitation = async (notification: NotificationItem) => {
     if (!notification.invitationId) return;
-    
+
     setProcessingIds((prev) => new Set(prev).add(notification.id));
     try {
-      await api.invitations.accept(notification.invitationId);
-      // Remove from list after accepting
-      setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
+      await acceptInvitation(notification.id, notification.invitationId);
       // Refresh the page to update memberships
       window.location.reload();
     } catch (error) {
@@ -116,12 +97,10 @@ export function NotificationBell({ className }: NotificationBellProps) {
 
   const handleDeclineInvitation = async (notification: NotificationItem) => {
     if (!notification.invitationId) return;
-    
+
     setProcessingIds((prev) => new Set(prev).add(notification.id));
     try {
-      await api.invitations.decline(notification.invitationId);
-      // Remove from list after declining
-      setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
+      await declineInvitation(notification.id, notification.invitationId);
     } catch (error) {
       console.error("Failed to decline invitation:", error);
     } finally {
@@ -144,12 +123,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
 
     // Mark as read
     try {
-      await api.notifications.markRead(notification.id);
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notification.id ? { ...n, readAt: new Date() } : n
-        )
-      );
+      await markAsRead(notification.id);
     } catch (error) {
       console.error("Failed to mark notification as read:", error);
     }
@@ -188,19 +162,12 @@ export function NotificationBell({ className }: NotificationBellProps) {
   };
 
   const handleViewGroupedProject = async (grouped: GroupedMessageNotification) => {
-    // Mark all notifications in the group as read
+    // Mark all unread notifications in the group as read
     try {
       await Promise.all(
         grouped.notifications
           .filter((n) => !n.readAt)
-          .map((n) => api.notifications.markRead(n.id))
-      );
-      setNotifications((prev) =>
-        prev.map((n) =>
-          grouped.notifications.some((gn) => gn.id === n.id)
-            ? { ...n, readAt: new Date() }
-            : n
-        )
+          .map((n) => markAsRead(n.id))
       );
     } catch (error) {
       console.error("Failed to mark notifications as read:", error);
@@ -384,8 +351,6 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const isInvitation = (type: NotificationType) =>
     type === "INVITATION_MEMBER" || type === "INVITATION_CUSTOMER";
 
-  const unreadCount = notifications.filter((n) => !n.readAt).length;
-
   // Tour progress
   const tourProgress = getOverallProgress();
   const isTourComplete = tourStatus?.hasCompletedSetup ?? false;
@@ -451,11 +416,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const handleMarkAllRead = async () => {
     setIsMarkingAllRead(true);
     try {
-      await api.notifications.markAllRead();
-      // Mark all notifications as read locally
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, readAt: n.readAt || new Date() }))
-      );
+      await markAllAsRead();
     } catch (error) {
       console.error("Failed to mark all as read:", error);
     } finally {
@@ -464,7 +425,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
   };
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+    <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"

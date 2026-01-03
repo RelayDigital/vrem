@@ -15,10 +15,59 @@ import * as path from 'path';
 export class DeliveryService {
   private readonly logger = new Logger(DeliveryService.name);
 
+  // Configuration for zip generation
+  private readonly ZIP_CONCURRENCY_LIMIT = 5; // Max concurrent file downloads
+  private readonly FILE_DOWNLOAD_TIMEOUT_MS = 30000; // 30 seconds per file
+
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
   ) {}
+
+  /**
+   * Fetch a file with timeout.
+   */
+  private async fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      return response;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  /**
+   * Process items with limited concurrency.
+   */
+  private async processWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    processor: (item: T) => Promise<R>,
+  ): Promise<R[]> {
+    const results: R[] = [];
+    const executing: Promise<void>[] = [];
+
+    for (const item of items) {
+      const promise = processor(item).then((result) => {
+        results.push(result);
+      });
+
+      const e = promise.then(() => {
+        executing.splice(executing.indexOf(e), 1);
+      });
+      executing.push(e);
+
+      if (executing.length >= limit) {
+        await Promise.race(executing);
+      }
+    }
+
+    await Promise.all(executing);
+    return results;
+  }
 
   /**
    * Get delivery data by token.
@@ -55,10 +104,25 @@ export class DeliveryService {
     }
 
     // Determine if current user can approve (is the linked customer)
-    const canApprove =
+    const isLinkedCustomer =
       !!currentUserId &&
       !!project.customer?.userId &&
       project.customer.userId === currentUserId;
+
+    const canApprove = isLinkedCustomer;
+
+    // Determine if current user can comment (linked customer OR org admin/PM)
+    let canComment = isLinkedCustomer;
+    if (!canComment && currentUserId) {
+      const membership = await this.prisma.organizationMember.findFirst({
+        where: {
+          userId: currentUserId,
+          orgId: project.orgId,
+          role: { in: ['OWNER', 'ADMIN', 'PROJECT_MANAGER'] },
+        },
+      });
+      canComment = !!membership;
+    }
 
     // Map media to DTO
     const media: MediaDto[] = project.media.map((m) => ({
@@ -111,6 +175,7 @@ export class DeliveryService {
           }
         : undefined,
       canApprove,
+      canComment,
     };
   }
 
@@ -608,7 +673,7 @@ export class DeliveryService {
 
   /**
    * Generate zip artifact and upload to storage.
-   * This runs asynchronously.
+   * This runs asynchronously with limited concurrency and per-file timeout.
    */
   private async generateZipArtifact(
     artifactId: string,
@@ -630,7 +695,51 @@ export class DeliveryService {
         data: { status: DownloadArtifactStatus.GENERATING },
       });
 
-      // Create zip archive
+      // Download files with limited concurrency and timeout
+      type DownloadResult = { filename: string; buffer: Buffer } | null;
+
+      const downloadResults = await this.processWithConcurrency<
+        typeof media[number],
+        DownloadResult
+      >(
+        media,
+        this.ZIP_CONCURRENCY_LIMIT,
+        async (m): Promise<DownloadResult> => {
+          const url = m.cdnUrl || `https://ucarecdn.com/${m.key}/`;
+          try {
+            const response = await this.fetchWithTimeout(url, this.FILE_DOWNLOAD_TIMEOUT_MS);
+            if (response.ok) {
+              const arrayBuffer = await response.arrayBuffer();
+              const buffer = Buffer.from(arrayBuffer);
+              const safeFilename = m.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+              return { filename: safeFilename, buffer };
+            } else {
+              this.logger.warn(`Failed to fetch media ${m.id}: HTTP ${response.status}`);
+              return null;
+            }
+          } catch (error: any) {
+            if (error.name === 'AbortError') {
+              this.logger.warn(`Timeout fetching media ${m.id} after ${this.FILE_DOWNLOAD_TIMEOUT_MS}ms`);
+            } else {
+              this.logger.warn(`Failed to fetch media ${m.id}:`, error.message);
+            }
+            return null;
+          }
+        },
+      );
+
+      // Filter successful downloads
+      const successfulDownloads = downloadResults.filter((r): r is NonNullable<typeof r> => r !== null);
+
+      if (successfulDownloads.length === 0) {
+        throw new Error('No media files could be downloaded');
+      }
+
+      this.logger.log(
+        `Downloaded ${successfulDownloads.length}/${media.length} files for artifact ${artifactId}`,
+      );
+
+      // Create zip archive from downloaded buffers
       const archive = archiver('zip', { zlib: { level: 5 } });
       const output = fs.createWriteStream(tempZipPath);
 
@@ -641,27 +750,12 @@ export class DeliveryService {
 
         archive.pipe(output);
 
-        // Add files sequentially
-        const addFiles = async () => {
-          for (const m of media) {
-            const url = m.cdnUrl || `https://ucarecdn.com/${m.key}/`;
-            try {
-              const response = await fetch(url);
-              if (response.ok) {
-                // Convert to Buffer (fetch returns Web ReadableStream, archiver needs Node.js stream/Buffer)
-                const arrayBuffer = await response.arrayBuffer();
-                const buffer = Buffer.from(arrayBuffer);
-                const safeFilename = m.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-                archive.append(buffer, { name: safeFilename });
-              }
-            } catch (error) {
-              this.logger.warn(`Failed to fetch media ${m.id}:`, error);
-            }
-          }
-          archive.finalize();
-        };
+        // Add all downloaded files to archive
+        for (const { filename, buffer } of successfulDownloads) {
+          archive.append(buffer, { name: filename });
+        }
 
-        addFiles();
+        archive.finalize();
       });
 
       // Get file size

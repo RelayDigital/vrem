@@ -1977,6 +1977,24 @@ class ApiClient {
     },
 
     /**
+     * Regenerate delivery token for a project (invalidates existing links)
+     */
+    regenerateToken: async (projectId: string): Promise<{
+      enabled: boolean;
+      deliveryToken: string;
+      deliveryEnabledAt: Date | null;
+      clientApprovalStatus: ClientApprovalStatus;
+    }> => {
+      const data = await this.request<any>(`/projects/${projectId}/delivery/regenerate-token`, {
+        method: 'POST',
+      });
+      return {
+        ...data,
+        deliveryEnabledAt: data.deliveryEnabledAt ? new Date(data.deliveryEnabledAt) : null,
+      };
+    },
+
+    /**
      * Get the delivery link URL for a project
      */
     getDeliveryUrl: (deliveryToken: string): string => {

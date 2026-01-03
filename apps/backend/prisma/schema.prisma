@@ -103,6 +103,7 @@ model DownloadArtifact {
   mediaHash     String?                // Hash of media IDs to detect changes
   error         String?                // Error message if generation failed
   createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
   expiresAt     DateTime?              // When the artifact should be deleted
   project       Project                @relation(fields: [projectId], references: [id])
 

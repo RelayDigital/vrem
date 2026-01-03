@@ -52,6 +52,8 @@ export class DeliveryResponseDto {
   };
 
   canApprove: boolean;
+
+  canComment: boolean;
 }
 
 export class AddCommentDto {

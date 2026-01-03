@@ -69,8 +69,13 @@ export function DeliveryHeader({ organization, project }: DeliveryHeaderProps) {
           </div>
 
           {/* Approval status */}
-          <div>
+          <div className="flex flex-col items-end gap-1">
             {getApprovalBadge(project.clientApprovalStatus)}
+            {project.clientApprovalStatus === ClientApprovalStatus.APPROVED && project.clientApprovedAt && (
+              <span className="text-xs text-muted-foreground">
+                Approved on {format(project.clientApprovedAt, 'MMM d, yyyy')}
+              </span>
+            )}
           </div>
         </div>
 

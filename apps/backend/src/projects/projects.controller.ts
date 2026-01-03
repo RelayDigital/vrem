@@ -275,4 +275,15 @@ export class ProjectsController {
     const ctx = req.orgContext as OrgContext;
     return this.projectsService.disableDelivery(id, ctx, user);
   }
+
+  // REGENERATE delivery token for a project
+  @Post(':id/delivery/regenerate-token')
+  regenerateDeliveryToken(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req,
+  ) {
+    const ctx = req.orgContext as OrgContext;
+    return this.projectsService.regenerateDeliveryToken(id, ctx, user);
+  }
 }

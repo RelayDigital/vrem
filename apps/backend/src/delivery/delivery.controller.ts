@@ -15,6 +15,7 @@ import { DeliveryService } from './delivery.service';
 import { Public } from '../auth/public.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DeliveryCustomerGuard } from './delivery-customer.guard';
+import { DeliveryCommentGuard } from './delivery-comment.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth-context';
 import { DownloadAllDto, AddCommentDto, RequestChangesDto } from './dto/delivery-response.dto';
@@ -126,9 +127,9 @@ export class DeliveryController {
 
   /**
    * PROTECTED: Add a comment to a delivery.
-   * Requires authentication as the linked customer.
+   * Requires authentication as the linked customer OR org admin/PM.
    */
-  @UseGuards(JwtAuthGuard, DeliveryCustomerGuard)
+  @UseGuards(JwtAuthGuard, DeliveryCommentGuard)
   @Post(':token/comments')
   async addComment(
     @Param('token') token: string,

@@ -13,6 +13,17 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   ExternalLink,
   Copy,
   Check,
@@ -21,6 +32,8 @@ import {
   Clock,
   AlertCircle,
   Loader2,
+  RefreshCw,
+  LinkOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/components/ui/utils";
@@ -72,7 +85,10 @@ export function DeliveryPanel({
   const [status, setStatus] = useState<DeliveryStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showDisableDialog, setShowDisableDialog] = useState(false);
+  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -89,25 +105,65 @@ export function DeliveryPanel({
     fetchStatus();
   }, [projectId]);
 
-  const handleToggleDelivery = async () => {
+  const handleEnableDelivery = async () => {
     if (!status) return;
 
     setToggling(true);
     try {
-      if (status.enabled) {
-        const result = await api.projectDelivery.disable(projectId);
-        setStatus((prev) => prev ? { ...prev, ...result } : null);
-        toast.success("Delivery link disabled");
-      } else {
-        const result = await api.projectDelivery.enable(projectId);
-        setStatus((prev) => prev ? { ...prev, ...result } : null);
-        toast.success("Delivery link enabled");
-      }
+      const result = await api.projectDelivery.enable(projectId);
+      setStatus((prev) => prev ? { ...prev, ...result } : null);
+      toast.success("Delivery link enabled");
     } catch (error) {
-      console.error("Failed to toggle delivery:", error);
-      toast.error("Failed to update delivery settings");
+      console.error("Failed to enable delivery:", error);
+      toast.error("Failed to enable delivery");
     } finally {
       setToggling(false);
+    }
+  };
+
+  const handleDisableDelivery = async () => {
+    if (!status) return;
+
+    setToggling(true);
+    try {
+      const result = await api.projectDelivery.disable(projectId);
+      setStatus((prev) => prev ? { ...prev, ...result } : null);
+      toast.success("Delivery link disabled");
+      setShowDisableDialog(false);
+    } catch (error) {
+      console.error("Failed to disable delivery:", error);
+      toast.error("Failed to disable delivery");
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const handleRegenerateToken = async () => {
+    if (!status) return;
+
+    setRegenerating(true);
+    try {
+      const result = await api.projectDelivery.regenerateToken(projectId);
+      setStatus((prev) => prev ? { ...prev, ...result } : null);
+      toast.success("Delivery link regenerated. Previous links are now invalid.");
+      setShowRegenerateDialog(false);
+    } catch (error) {
+      console.error("Failed to regenerate token:", error);
+      toast.error("Failed to regenerate delivery link");
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  const handleToggleDelivery = async () => {
+    if (!status) return;
+
+    if (status.enabled) {
+      // Show confirmation for disabling
+      setShowDisableDialog(true);
+    } else {
+      // Enable directly
+      await handleEnableDelivery();
     }
   };
 
@@ -231,85 +287,186 @@ export function DeliveryPanel({
 
   // Card variant
   return (
-    <div className="rounded-lg border p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Link2 className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium">Client Delivery</span>
+    <TooltipProvider>
+      <div className="rounded-lg border p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Client Delivery</span>
+          </div>
+
+          {canManageDelivery && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                {toggling ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : status.enabled ? (
+                  "Enabled"
+                ) : (
+                  "Disabled"
+                )}
+              </span>
+              <Switch
+                checked={status.enabled}
+                onCheckedChange={handleToggleDelivery}
+                disabled={toggling}
+                className="data-[state=checked]:bg-green-600"
+              />
+            </div>
+          )}
         </div>
 
-        {canManageDelivery && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {status.enabled ? "Enabled" : "Disabled"}
-            </span>
-            <Switch
-              checked={status.enabled}
-              onCheckedChange={handleToggleDelivery}
-              disabled={toggling}
-              className="data-[state=checked]:bg-green-600"
-            />
+        {status.enabled && status.deliveryToken && (
+          <>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 px-3 py-2 bg-muted rounded-md text-sm font-mono truncate">
+                {api.projectDelivery.getDeliveryUrl(status.deliveryToken)}
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyLink}
+                    className="shrink-0"
+                  >
+                    {copied ? (
+                      <Check className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copy link</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleOpenDelivery}
+                    className="shrink-0"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Open delivery page</TooltipContent>
+              </Tooltip>
+              {canManageDelivery && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowRegenerateDialog(true)}
+                      disabled={regenerating}
+                      className="shrink-0"
+                    >
+                      {regenerating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Regenerate link</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t">
+              <span className="text-sm text-muted-foreground">
+                Client Approval Status
+              </span>
+              <Badge
+                variant="outline"
+                className={cn("gap-1.5", approvalConfig.color)}
+              >
+                <ApprovalIcon className="h-3.5 w-3.5" />
+                {approvalConfig.label}
+              </Badge>
+            </div>
+
+            {status.clientApprovedAt && status.clientApprovedBy && (
+              <div className="text-xs text-muted-foreground">
+                Approved by {status.clientApprovedBy.name} on{" "}
+                {new Date(status.clientApprovedAt).toLocaleDateString()}
+              </div>
+            )}
+          </>
+        )}
+
+        {!status.enabled && (
+          <div className="text-sm text-muted-foreground">
+            {canManageDelivery
+              ? "Enable delivery to share media with your client."
+              : "Delivery has not been enabled for this project."}
           </div>
         )}
       </div>
 
-      {status.enabled && status.deliveryToken && (
-        <>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 px-3 py-2 bg-muted rounded-md text-sm font-mono truncate">
-              {api.projectDelivery.getDeliveryUrl(status.deliveryToken)}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyLink}
-              className="shrink-0"
+      {/* Disable Confirmation Dialog */}
+      <AlertDialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable Delivery Link?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The client will no longer be able to access this delivery page. You can re-enable it at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={toggling}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDisableDelivery}
+              disabled={toggling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {copied ? (
-                <Check className="h-4 w-4 text-green-600" />
+              {toggling ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Disabling...
+                </>
               ) : (
-                <Copy className="h-4 w-4" />
+                <>
+                  <LinkOff className="h-4 w-4 mr-2" />
+                  Disable
+                </>
               )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleOpenDelivery}
-              className="shrink-0"
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Regenerate Token Confirmation Dialog */}
+      <AlertDialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate Delivery Link?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will create a new delivery link. The previous link will stop working immediately. Anyone with the old link will no longer have access.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={regenerating}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRegenerateToken}
+              disabled={regenerating}
             >
-              <ExternalLink className="h-4 w-4" />
-            </Button>
-          </div>
-
-          <div className="flex items-center justify-between pt-2 border-t">
-            <span className="text-sm text-muted-foreground">
-              Client Approval Status
-            </span>
-            <Badge
-              variant="outline"
-              className={cn("gap-1.5", approvalConfig.color)}
-            >
-              <ApprovalIcon className="h-3.5 w-3.5" />
-              {approvalConfig.label}
-            </Badge>
-          </div>
-
-          {status.clientApprovedAt && status.clientApprovedBy && (
-            <div className="text-xs text-muted-foreground">
-              Approved by {status.clientApprovedBy.name} on{" "}
-              {new Date(status.clientApprovedAt).toLocaleDateString()}
-            </div>
-          )}
-        </>
-      )}
-
-      {!status.enabled && (
-        <div className="text-sm text-muted-foreground">
-          {canManageDelivery
-            ? "Enable delivery to share media with your client."
-            : "Delivery has not been enabled for this project."}
-        </div>
-      )}
-    </div>
+              {regenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Regenerating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Regenerate
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </TooltipProvider>
   );
 }

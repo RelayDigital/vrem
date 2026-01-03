@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { DeliveryResponse, DeliveryComment } from '@/types';
 import { DeliveryHeader } from './DeliveryHeader';
 import { DeliveryGallery } from './DeliveryGallery';
@@ -8,7 +8,7 @@ import { DeliveryApproval } from './DeliveryApproval';
 import { DeliveryComments } from './DeliveryComments';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Loader2, AlertCircle } from 'lucide-react';
+import { Download, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -17,79 +17,182 @@ interface DeliveryViewProps {
   token: string;
 }
 
-type DownloadState = 'idle' | 'downloading' | 'error';
+type DownloadState = 'idle' | 'preparing' | 'generating' | 'ready' | 'error';
+
+const POLL_INTERVAL_MS = 2000; // Poll every 2 seconds
+const MAX_POLL_ATTEMPTS = 150; // Max 5 minutes of polling (150 * 2s)
 
 export function DeliveryView({ delivery: initialDelivery, token }: DeliveryViewProps) {
   const [delivery, setDelivery] = useState(initialDelivery);
   const [downloadState, setDownloadState] = useState<DownloadState>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollCountRef = useRef(0);
 
-  // Build filename from delivery address
-  const getDownloadFilename = useCallback(() => {
-    const { project } = delivery;
-    const addressParts = [
-      project.addressLine1,
-      project.city,
-      project.region,
-    ].filter(Boolean);
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+      }
+    };
+  }, []);
 
-    if (addressParts.length > 0) {
-      const address = addressParts.join('_').replace(/[^a-zA-Z0-9_-]/g, '_');
-      return `${address}.zip`;
+  // Trigger browser download from CDN URL
+  const triggerDownload = useCallback((cdnUrl: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = cdnUrl;
+    link.download = filename;
+    link.target = '_blank'; // Open in new tab as fallback
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast.success('Download started');
+    setDownloadState('idle');
+  }, []);
+
+  // Request a new download artifact
+  const requestArtifact = useCallback(async (): Promise<string | null> => {
+    try {
+      const result = await api.delivery.requestDownload(token);
+
+      switch (result.status) {
+        case 'READY':
+          if (result.cdnUrl) {
+            setDownloadState('ready');
+            triggerDownload(result.cdnUrl, result.filename || 'media.zip');
+          } else {
+            throw new Error('Download URL not available');
+          }
+          return null; // No need to poll
+
+        case 'GENERATING':
+        case 'PENDING':
+          setDownloadState('generating');
+          return result.artifactId; // Need to poll
+
+        case 'FAILED':
+          setDownloadState('error');
+          setErrorMessage(result.error || 'Download preparation failed');
+          toast.error(result.error || 'Download preparation failed');
+          return null;
+
+        default:
+          return null;
+      }
+    } catch (error: any) {
+      console.error('Failed to request download:', error);
+      setDownloadState('error');
+      setErrorMessage(error.message || 'Failed to start download');
+      toast.error('Failed to start download');
+      return null;
     }
-    return 'delivery.zip';
-  }, [delivery]);
+  }, [token, triggerDownload]);
 
-  // Streaming download
-  const startStreamingDownload = useCallback(async () => {
-    setDownloadState('downloading');
-    toast.info('Starting download...');
+  // Poll for artifact status
+  const pollArtifactStatus = useCallback(async (artifactId: string) => {
+    pollCountRef.current++;
+
+    if (pollCountRef.current > MAX_POLL_ATTEMPTS) {
+      setDownloadState('error');
+      setErrorMessage('Download preparation timed out. Please try again.');
+      toast.error('Download preparation timed out');
+      return;
+    }
 
     try {
-      const streamingUrl = api.delivery.getDownloadUrl(token);
-      const response = await fetch(streamingUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
+      const status = await api.delivery.getDownloadStatus(token, artifactId);
 
-      if (!response.ok) {
-        throw new Error('Download failed');
+      switch (status.status) {
+        case 'READY':
+          if (status.cdnUrl) {
+            setDownloadState('ready');
+            triggerDownload(status.cdnUrl, status.filename || 'media.zip');
+          } else {
+            throw new Error('Download URL not available');
+          }
+          break;
+
+        case 'GENERATING':
+        case 'PENDING':
+          setDownloadState('generating');
+          // Continue polling
+          pollTimeoutRef.current = setTimeout(() => {
+            pollArtifactStatus(artifactId);
+          }, POLL_INTERVAL_MS);
+          break;
+
+        case 'FAILED':
+          setDownloadState('error');
+          setErrorMessage(status.error || 'Download preparation failed');
+          toast.error(status.error || 'Download preparation failed');
+          break;
+
+        case 'EXPIRED':
+          // Artifact expired, request a new one
+          setDownloadState('preparing');
+          const newArtifactId = await requestArtifact();
+          if (newArtifactId) {
+            pollTimeoutRef.current = setTimeout(() => {
+              pollArtifactStatus(newArtifactId);
+            }, POLL_INTERVAL_MS);
+          }
+          break;
       }
-
-      // Build filename from delivery address
-      const filename = getDownloadFilename();
-
-      // Convert response to blob and trigger download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success('Download complete');
-      setDownloadState('idle');
-    } catch (error) {
-      console.error('Streaming download failed:', error);
-      toast.error('Failed to download files');
+    } catch (error: any) {
+      console.error('Failed to check download status:', error);
       setDownloadState('error');
+      setErrorMessage('Failed to check download status');
+      toast.error('Failed to check download status');
     }
-  }, [token, getDownloadFilename]);
+  }, [token, triggerDownload, requestArtifact]);
+
+  // Start download - request artifact and poll
+  const startDownload = useCallback(async () => {
+    setDownloadState('preparing');
+    setErrorMessage(null);
+    pollCountRef.current = 0;
+    toast.info('Preparing your download...');
+
+    const artifactId = await requestArtifact();
+    if (artifactId) {
+      // Start polling
+      pollTimeoutRef.current = setTimeout(() => {
+        pollArtifactStatus(artifactId);
+      }, POLL_INTERVAL_MS);
+    }
+  }, [requestArtifact, pollArtifactStatus]);
 
   const handleDownloadAll = () => {
-    startStreamingDownload();
+    // Clear any existing polling
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+    }
+    startDownload();
   };
 
   const getDownloadButtonContent = () => {
     switch (downloadState) {
-      case 'downloading':
+      case 'preparing':
         return (
           <>
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            Downloading...
+            Requesting...
+          </>
+        );
+      case 'generating':
+        return (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Preparing download...
+          </>
+        );
+      case 'ready':
+        return (
+          <>
+            <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+            Download starting...
           </>
         );
       case 'error':
@@ -140,7 +243,7 @@ export function DeliveryView({ delivery: initialDelivery, token }: DeliveryViewP
           <div className="flex justify-end mb-6">
             <Button
               onClick={handleDownloadAll}
-              disabled={downloadState === 'downloading'}
+              disabled={['preparing', 'generating', 'ready'].includes(downloadState)}
               variant={downloadState === 'error' ? 'destructive' : 'outline'}
             >
               {getDownloadButtonContent()}
@@ -175,7 +278,7 @@ export function DeliveryView({ delivery: initialDelivery, token }: DeliveryViewP
               <CardContent>
                 <DeliveryComments
                   comments={delivery.comments}
-                  canComment={delivery.canApprove}
+                  canComment={delivery.canComment}
                   token={token}
                   onCommentAdded={handleCommentAdded}
                 />
