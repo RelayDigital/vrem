@@ -238,8 +238,8 @@ export function DeliveryView({ delivery: initialDelivery, token }: DeliveryViewP
 
       {/* Main content */}
       <main className="container max-w-7xl mx-auto px-4 py-8">
-        {/* Actions bar */}
-        {delivery.media.length > 0 && (
+        {/* Actions bar - only show download button if enabled and media exists */}
+        {delivery.downloadEnabled && delivery.media.length > 0 && (
           <div className="flex justify-end mb-6">
             <Button
               onClick={handleDownloadAll}

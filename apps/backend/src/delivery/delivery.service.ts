@@ -1,12 +1,10 @@
-import { Injectable, Logger, NotFoundException, StreamableFile } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ProjectChatChannel, MediaType, ClientApprovalStatus, DownloadArtifactStatus, DownloadArtifactType } from '@prisma/client';
 import { DeliveryResponseDto, MediaDto, CommentDto } from './dto/delivery-response.dto';
 import archiver from 'archiver';
-import { PassThrough } from 'stream';
 import * as crypto from 'crypto';
-import axios from 'axios';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -19,10 +17,35 @@ export class DeliveryService {
   private readonly ZIP_CONCURRENCY_LIMIT = 5; // Max concurrent file downloads
   private readonly FILE_DOWNLOAD_TIMEOUT_MS = 30000; // 30 seconds per file
 
+  // Storage configuration - checked once at startup
+  private readonly storageConfigured: boolean;
+
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
-  ) {}
+  ) {
+    // Check storage configuration at startup
+    const publicKey = process.env.UPLOADCARE_PUBLIC_KEY;
+    const privateKey = process.env.UPLOADCARE_PRIVATE_KEY;
+    this.storageConfigured = !!(publicKey && privateKey);
+
+    if (!this.storageConfigured) {
+      this.logger.warn(
+        'UPLOADCARE_PUBLIC_KEY and UPLOADCARE_PRIVATE_KEY not configured. ' +
+        '"Download All" feature will be disabled. ' +
+        'Set these environment variables to enable bulk download functionality.',
+      );
+    } else {
+      this.logger.log('Storage configured: Uploadcare. "Download All" feature enabled.');
+    }
+  }
+
+  /**
+   * Check if storage is configured for download artifacts.
+   */
+  isStorageConfigured(): boolean {
+    return this.storageConfigured;
+  }
 
   /**
    * Fetch a file with timeout.
@@ -176,6 +199,7 @@ export class DeliveryService {
         : undefined,
       canApprove,
       canComment,
+      downloadEnabled: this.storageConfigured,
     };
   }
 
@@ -235,118 +259,6 @@ export class DeliveryService {
     }
 
     return project;
-  }
-
-  /**
-   * Get media items for download.
-   * Returns media with CDN URLs for streaming.
-   */
-  async getMediaForDownload(
-    token: string,
-    mediaTypes?: MediaType[],
-  ): Promise<{ filename: string; cdnUrl: string }[]> {
-    const project = await this.prisma.project.findUnique({
-      where: { deliveryToken: token },
-      include: {
-        media: {
-          orderBy: { createdAt: 'desc' },
-        },
-        organization: true,
-      },
-    });
-
-    if (!project) {
-      throw new NotFoundException('Delivery not found or invalid token');
-    }
-
-    if (!project.deliveryEnabledAt) {
-      throw new NotFoundException('Delivery is not enabled for this project');
-    }
-
-    let media = project.media;
-
-    // Filter by media types if specified
-    if (mediaTypes && mediaTypes.length > 0) {
-      media = media.filter((m) => mediaTypes.includes(m.type));
-    }
-
-    // Build download URLs
-    return media.map((m) => ({
-      filename: m.filename,
-      cdnUrl: m.cdnUrl || `https://ucarecdn.com/${m.key}/`,
-    }));
-  }
-
-  /**
-   * Create a zip archive stream of all media.
-   * Returns a StreamableFile that can be sent as response.
-   */
-  async createDownloadStream(
-    token: string,
-    mediaTypes?: MediaType[],
-  ): Promise<{ stream: PassThrough; filename: string }> {
-    const project = await this.prisma.project.findUnique({
-      where: { deliveryToken: token },
-      include: {
-        media: {
-          orderBy: { createdAt: 'desc' },
-        },
-        organization: true,
-      },
-    });
-
-    if (!project) {
-      throw new NotFoundException('Delivery not found or invalid token');
-    }
-
-    if (!project.deliveryEnabledAt) {
-      throw new NotFoundException('Delivery is not enabled for this project');
-    }
-
-    let media = project.media;
-
-    // Filter by media types if specified
-    if (mediaTypes && mediaTypes.length > 0) {
-      media = media.filter((m) => mediaTypes.includes(m.type));
-    }
-
-    // Create zip archive
-    const archive = archiver('zip', {
-      zlib: { level: 5 }, // Moderate compression for speed
-    });
-
-    const passThrough = new PassThrough();
-    archive.pipe(passThrough);
-
-    // Add each media file to the archive
-    for (const m of media) {
-      const url = m.cdnUrl || `https://ucarecdn.com/${m.key}/`;
-      try {
-        const response = await fetch(url);
-        if (response.ok) {
-          // Convert to Buffer (fetch returns Web ReadableStream, archiver needs Node.js stream/Buffer)
-          const arrayBuffer = await response.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
-          // Use a sanitized filename
-          const safeFilename = m.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-          archive.append(buffer, { name: safeFilename });
-        }
-      } catch (error) {
-        console.error(`Failed to fetch media ${m.id}:`, error);
-        // Continue with other files
-      }
-    }
-
-    archive.finalize();
-
-    // Generate filename using address as primary name
-    const addressParts = [project.addressLine1, project.city, project.region].filter(Boolean);
-    const address = addressParts.length > 0
-      ? addressParts.join('_').replace(/[^a-zA-Z0-9_-]/g, '_')
-      : project.id;
-    const filename = `${address}.zip`;
-
-    return { stream: passThrough, filename };
   }
 
   /**
@@ -545,6 +457,13 @@ export class DeliveryService {
     filename?: string;
     error?: string;
   }> {
+    // Fail fast if storage is not configured
+    if (!this.storageConfigured) {
+      throw new NotFoundException(
+        'Download feature is not available. Storage provider not configured.',
+      );
+    }
+
     const project = await this.prisma.project.findUnique({
       where: { deliveryToken: token },
       include: {

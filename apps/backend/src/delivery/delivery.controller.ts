@@ -5,13 +5,9 @@ import {
   Param,
   Body,
   Req,
-  Res,
   UseGuards,
-  StreamableFile,
-  Header,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import type { Response } from 'express';
 import { DeliveryService } from './delivery.service';
 import { Public } from '../auth/public.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -81,32 +77,6 @@ export class DeliveryController {
     @Param('artifactId') artifactId: string,
   ) {
     return this.deliveryService.getDownloadArtifactStatus(token, artifactId);
-  }
-
-  /**
-   * PUBLIC: Download all media as a zip file (streaming fallback).
-   * Use download-request endpoint for better reliability.
-   */
-  // Rate limit: 3 streaming downloads per minute per IP (very expensive)
-  @Throttle({ default: { ttl: 60000, limit: 3 } })
-  @Public()
-  @Post(':token/download-all')
-  @Header('Content-Type', 'application/zip')
-  async downloadAll(
-    @Param('token') token: string,
-    @Body() dto: DownloadAllDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<StreamableFile> {
-    const { stream, filename } = await this.deliveryService.createDownloadStream(
-      token,
-      dto.mediaTypes,
-    );
-
-    res.set({
-      'Content-Disposition': `attachment; filename="${filename}"`,
-    });
-
-    return new StreamableFile(stream);
   }
 
   /**

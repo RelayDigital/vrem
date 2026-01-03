@@ -1841,16 +1841,7 @@ class ApiClient {
     },
 
     /**
-     * Download all media as zip (public)
-     * Returns the download URL for direct streaming
-     */
-    getDownloadUrl: (token: string, mediaTypes?: MediaType[]): string => {
-      const params = mediaTypes?.length ? `?mediaTypes=${mediaTypes.join(',')}` : '';
-      return `${API_URL}${API_PREFIX}/delivery/${token}/download-all${params}`;
-    },
-
-    /**
-     * Request download artifact generation (new non-streaming approach)
+     * Request download artifact generation
      */
     requestDownload: async (token: string, mediaTypes?: MediaType[]): Promise<{
       status: 'PENDING' | 'GENERATING' | 'READY' | 'EXPIRED' | 'FAILED';
@@ -1888,37 +1879,6 @@ class ApiClient {
       }
 
       return response.json();
-    },
-
-    /**
-     * Trigger download of all media as zip (streaming fallback)
-     */
-    downloadAll: async (token: string, mediaTypes?: MediaType[]): Promise<void> => {
-      const response = await fetch(`${API_URL}${API_PREFIX}/delivery/${token}/download-all`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mediaTypes }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to download');
-      }
-
-      // Get filename from Content-Disposition header
-      const contentDisposition = response.headers.get('Content-Disposition');
-      const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
-      const filename = filenameMatch?.[1] || 'media.zip';
-
-      // Create blob and trigger download
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
     },
   };
 

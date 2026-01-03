@@ -733,6 +733,8 @@ export interface DeliveryResponse {
   };
   canApprove: boolean;
   canComment: boolean;
+  /** Whether bulk download is available (requires storage backend) */
+  downloadEnabled: boolean;
 }
 
 // =============================
