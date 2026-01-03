@@ -9,6 +9,7 @@ import {
   NotFoundException,
   BadRequestException,
   Headers,
+  Logger,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { DeliveryService } from './delivery.service';
@@ -23,13 +24,18 @@ import { DeliveryCommentGuard } from './delivery-comment.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth-context';
 import { DownloadAllDto, AddCommentDto, RequestChangesDto, RetryArtifactDto } from './dto/delivery-response.dto';
+import { AuditLogger, AuditEventType, maskToken } from '../config/audit-log';
 
 @Controller('delivery')
 export class DeliveryController {
+  private readonly audit: AuditLogger;
+
   constructor(
     private readonly deliveryService: DeliveryService,
     private readonly artifactWorker: ArtifactWorkerService,
-  ) {}
+  ) {
+    this.audit = new AuditLogger(new Logger(DeliveryController.name));
+  }
 
   /**
    * PUBLIC: Get delivery data by token.
@@ -44,7 +50,17 @@ export class DeliveryController {
   async getDeliveryByToken(@Param('token') token: string, @Req() req: any) {
     // User may or may not be authenticated
     const user = req.user as AuthenticatedUser | undefined;
-    return this.deliveryService.getDeliveryByToken(token, user?.id);
+    const result = await this.deliveryService.getDeliveryByToken(token, user?.id);
+
+    // Audit log the page view
+    this.audit.log(AuditEventType.DELIVERY_PAGE_VIEW, req, {
+      projectId: result.project.id,
+      orgId: result.organization.id,
+      tokenMasked: maskToken(token),
+      authenticated: !!user,
+    });
+
+    return result;
   }
 
   /**
@@ -54,8 +70,15 @@ export class DeliveryController {
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   @Public()
   @Get(':token/comments')
-  async getComments(@Param('token') token: string) {
-    return this.deliveryService.getComments(token);
+  async getComments(@Param('token') token: string, @Req() req: any) {
+    const result = await this.deliveryService.getComments(token);
+
+    this.audit.log(AuditEventType.DELIVERY_COMMENTS_VIEW, req, {
+      tokenMasked: maskToken(token),
+      commentCount: result.length,
+    });
+
+    return result;
   }
 
   /**
@@ -70,8 +93,18 @@ export class DeliveryController {
   async requestDownload(
     @Param('token') token: string,
     @Body() dto: DownloadAllDto,
+    @Req() req: any,
   ) {
-    return this.deliveryService.requestDownloadArtifact(token, dto.mediaTypes);
+    const result = await this.deliveryService.requestDownloadArtifact(token, dto.mediaTypes);
+
+    this.audit.log(AuditEventType.DOWNLOAD_REQUEST, req, {
+      tokenMasked: maskToken(token),
+      artifactId: result.artifactId,
+      status: result.status,
+      mediaTypes: dto.mediaTypes || 'all',
+    });
+
+    return result;
   }
 
   /**
@@ -85,8 +118,20 @@ export class DeliveryController {
   async getDownloadStatus(
     @Param('token') token: string,
     @Param('artifactId') artifactId: string,
+    @Req() req: any,
   ) {
-    return this.deliveryService.getDownloadArtifactStatus(token, artifactId);
+    const result = await this.deliveryService.getDownloadArtifactStatus(token, artifactId);
+
+    // Only log significant status checks (READY or FAILED), not every poll
+    if (result.status === 'READY' || result.status === 'FAILED') {
+      this.audit.log(AuditEventType.DOWNLOAD_STATUS_CHECK, req, {
+        tokenMasked: maskToken(token),
+        artifactId,
+        status: result.status,
+      });
+    }
+
+    return result;
   }
 
   /**
@@ -98,8 +143,16 @@ export class DeliveryController {
   async approveDelivery(
     @Param('token') token: string,
     @CurrentUser() user: AuthenticatedUser,
+    @Req() req: any,
   ) {
-    return this.deliveryService.approveDelivery(token, user.id);
+    const result = await this.deliveryService.approveDelivery(token, user.id);
+
+    this.audit.log(AuditEventType.DELIVERY_APPROVE, req, {
+      tokenMasked: maskToken(token),
+      approvalStatus: result.clientApprovalStatus,
+    });
+
+    return result;
   }
 
   /**
@@ -112,8 +165,17 @@ export class DeliveryController {
     @Param('token') token: string,
     @Body() dto: RequestChangesDto,
     @CurrentUser() user: AuthenticatedUser,
+    @Req() req: any,
   ) {
-    return this.deliveryService.requestChanges(token, user.id, dto.feedback);
+    const result = await this.deliveryService.requestChanges(token, user.id, dto.feedback);
+
+    this.audit.log(AuditEventType.DELIVERY_REQUEST_CHANGES, req, {
+      tokenMasked: maskToken(token),
+      approvalStatus: result.clientApprovalStatus,
+      hasFeedback: !!dto.feedback,
+    });
+
+    return result;
   }
 
   /**
@@ -126,8 +188,16 @@ export class DeliveryController {
     @Param('token') token: string,
     @Body() dto: AddCommentDto,
     @CurrentUser() user: AuthenticatedUser,
+    @Req() req: any,
   ) {
-    return this.deliveryService.addComment(token, user.id, dto.content);
+    const result = await this.deliveryService.addComment(token, user.id, dto.content);
+
+    this.audit.log(AuditEventType.DELIVERY_COMMENT_ADD, req, {
+      tokenMasked: maskToken(token),
+      commentId: result.id,
+    });
+
+    return result;
   }
 
   // =============================

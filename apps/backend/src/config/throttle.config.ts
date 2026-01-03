@@ -51,4 +51,16 @@ export const RATE_LIMIT_PRESETS = {
 
   // General API calls
   api: { ttl: 60000, limit: 60 },      // 60 requests per minute (1/sec avg)
+
+  // Public delivery page access
+  deliveryPage: { ttl: 60000, limit: 30 }, // 30 req/min (generous for page loads)
+
+  // Polling endpoints (status checks)
+  polling: { ttl: 60000, limit: 60 },  // 60 req/min (1/sec for polling)
+
+  // Invite validation - prevent enumeration
+  inviteValidation: { ttl: 60000, limit: 20 }, // 20 req/min
+
+  // Email lookup - prevent email enumeration
+  emailLookup: { ttl: 60000, limit: 10 }, // 10 req/min
 };
