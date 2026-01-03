@@ -1751,6 +1751,22 @@ class ApiClient {
       if (USE_MOCK_DATA) return;
       await this.request(`/notifications/${id}/read`, { method: 'POST' });
     },
+
+    /**
+     * Mark all notifications as read
+     */
+    markAllRead: async (): Promise<{ count: number }> => {
+      if (USE_MOCK_DATA) return { count: 0 };
+      return this.request('/notifications/read-all', { method: 'POST' });
+    },
+
+    /**
+     * Get unread notification count
+     */
+    getUnreadCount: async (): Promise<{ count: number }> => {
+      if (USE_MOCK_DATA) return { count: 0 };
+      return this.request('/notifications/count');
+    },
   };
 
   // =============================

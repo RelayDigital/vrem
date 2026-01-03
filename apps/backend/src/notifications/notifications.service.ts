@@ -57,7 +57,7 @@ export class NotificationsService {
       });
     }
 
-    // 2. Get unread notifications (PROJECT_ASSIGNED, NEW_MESSAGE, PROJECT_APPROVED, PROJECT_DELIVERED)
+    // 2. Get unread notifications (various project-related types)
     const projectNotifications = await this.prisma.notification.findMany({
       where: {
         userId: user.id,
@@ -67,9 +67,12 @@ export class NotificationsService {
             NotificationType.NEW_MESSAGE,
             NotificationType.PROJECT_APPROVED,
             NotificationType.PROJECT_DELIVERED,
+            NotificationType.CHANGES_REQUESTED,
+            NotificationType.DELIVERY_COMMENT,
           ],
         },
         readAt: null,
+        orgId: { not: null }, // Only include notifications with an org
       },
       include: {
         organization: true,
@@ -79,13 +82,16 @@ export class NotificationsService {
     });
 
     for (const notification of projectNotifications) {
+      // Skip notifications without organization (shouldn't happen but handle gracefully)
+      if (!notification.organization) continue;
+
       const payload = notification.payload as Record<string, any> | null;
       const projectAddress = this.buildProjectAddress(notification.project);
 
       notifications.push({
         id: notification.id,
         type: notification.type,
-        orgId: notification.orgId,
+        orgId: notification.orgId || '',
         orgName: notification.organization.name,
         orgType: notification.organization.type,
         createdAt: notification.createdAt,
@@ -260,6 +266,43 @@ export class NotificationsService {
       where: { id: notificationId },
       data: { readAt: new Date() },
     });
+  }
+
+  /**
+   * Mark all notifications as read for the current user.
+   */
+  async markAllNotificationsAsRead(user: AuthenticatedUser): Promise<{ count: number }> {
+    const result = await this.prisma.notification.updateMany({
+      where: {
+        userId: user.id,
+        readAt: null,
+      },
+      data: { readAt: new Date() },
+    });
+
+    return { count: result.count };
+  }
+
+  /**
+   * Get unread notification count for the current user.
+   */
+  async getUnreadCount(user: AuthenticatedUser): Promise<{ count: number }> {
+    const count = await this.prisma.notification.count({
+      where: {
+        userId: user.id,
+        readAt: null,
+      },
+    });
+
+    // Also count pending invitations
+    const pendingInvitations = await this.prisma.invitation.count({
+      where: {
+        email: user.email,
+        status: InvitationStatus.PENDING,
+      },
+    });
+
+    return { count: count + pendingInvitations };
   }
 
   /**
@@ -546,6 +589,133 @@ export class NotificationsService {
           type: NotificationType.PROJECT_APPROVED,
           payload: {
             approverName,
+            address: this.buildProjectAddress(project),
+          },
+        },
+      });
+    }
+  }
+
+  /**
+   * Create notifications when a customer requests changes on delivery.
+   * Notifies ops team (PM, OWNER/ADMIN, technician, editor).
+   */
+  async createChangesRequestedNotifications(
+    projectId: string,
+    orgId: string,
+    requesterId: string,
+    requesterName: string,
+    comment?: string,
+  ): Promise<void> {
+    // Get project with org members
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        organization: {
+          include: {
+            members: {
+              where: {
+                role: { in: ['OWNER', 'ADMIN', 'PROJECT_MANAGER'] },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!project) return;
+
+    const watcherIds = new Set<string>();
+    if (project.projectManagerId) watcherIds.add(project.projectManagerId);
+    if (project.technicianId) watcherIds.add(project.technicianId);
+    if (project.editorId) watcherIds.add(project.editorId);
+    project.organization.members.forEach((m) => watcherIds.add(m.userId));
+
+    // Don't notify the requester
+    watcherIds.delete(requesterId);
+
+    for (const userId of watcherIds) {
+      await this.prisma.notification.create({
+        data: {
+          userId,
+          orgId,
+          projectId,
+          type: NotificationType.CHANGES_REQUESTED,
+          title: 'Changes requested',
+          body: comment ? comment.substring(0, 200) : undefined,
+          entityType: 'project',
+          entityId: projectId,
+          payload: {
+            requesterName,
+            address: this.buildProjectAddress(project),
+            comment: comment?.substring(0, 200),
+          },
+        },
+      });
+    }
+  }
+
+  /**
+   * Create notifications for a new delivery comment.
+   * Notifies project watchers (agent/customer and ops team).
+   */
+  async createDeliveryCommentNotifications(
+    projectId: string,
+    orgId: string,
+    senderId: string,
+    senderName: string,
+    commentPreview: string,
+    isFromCustomer: boolean,
+  ): Promise<void> {
+    // Get project with assignments
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        customer: true,
+        organization: {
+          include: {
+            members: {
+              where: {
+                role: { in: ['OWNER', 'ADMIN', 'PROJECT_MANAGER'] },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!project) return;
+
+    const watcherIds = new Set<string>();
+
+    if (isFromCustomer) {
+      // Customer commented - notify ops team
+      if (project.projectManagerId) watcherIds.add(project.projectManagerId);
+      if (project.technicianId) watcherIds.add(project.technicianId);
+      if (project.editorId) watcherIds.add(project.editorId);
+      project.organization.members.forEach((m) => watcherIds.add(m.userId));
+    } else {
+      // Ops team commented - notify customer
+      if (project.customer?.userId) watcherIds.add(project.customer.userId);
+    }
+
+    // Don't notify the sender
+    watcherIds.delete(senderId);
+
+    for (const userId of watcherIds) {
+      await this.prisma.notification.create({
+        data: {
+          userId,
+          orgId,
+          projectId,
+          type: NotificationType.DELIVERY_COMMENT,
+          title: 'New delivery comment',
+          body: commentPreview.substring(0, 100),
+          entityType: 'project',
+          entityId: projectId,
+          payload: {
+            senderName,
+            preview: commentPreview.substring(0, 100),
             address: this.buildProjectAddress(project),
           },
         },

@@ -366,6 +366,19 @@ export class DeliveryService {
       include: { user: true },
     });
 
+    // Create notifications for CHANGES_REQUESTED
+    try {
+      await this.notifications.createChangesRequestedNotifications(
+        project.id,
+        project.orgId,
+        userId,
+        message.user.name,
+        feedback,
+      );
+    } catch (error: any) {
+      this.logger.warn(`Failed to create changes requested notifications: ${error.message}`);
+    }
+
     return {
       success: true,
       clientApprovalStatus: ClientApprovalStatus.CHANGES_REQUESTED,
@@ -388,6 +401,7 @@ export class DeliveryService {
   async addComment(token: string, userId: string, content: string): Promise<CommentDto> {
     const project = await this.prisma.project.findUnique({
       where: { deliveryToken: token },
+      include: { customer: true },
     });
 
     if (!project) {
@@ -403,6 +417,22 @@ export class DeliveryService {
       },
       include: { user: true },
     });
+
+    // Create notifications for delivery comment
+    try {
+      // Determine if comment is from customer or ops team
+      const isFromCustomer = project.customer?.userId === userId;
+      await this.notifications.createDeliveryCommentNotifications(
+        project.id,
+        project.orgId,
+        userId,
+        message.user.name,
+        content,
+        isFromCustomer,
+      );
+    } catch (error: any) {
+      this.logger.warn(`Failed to create delivery comment notifications: ${error.message}`);
+    }
 
     return {
       id: message.id,

@@ -257,18 +257,26 @@ model Invitation {
 model Notification {
   id           String           @id @default(uuid())
   userId       String
-  orgId        String
+  orgId        String?          // Nullable for user-level notifications
   type         NotificationType
+  title        String?          // Short title for the notification
+  body         String?          // Longer description/body text
+  entityType   String?          // e.g., "project", "invitation", "message", "delivery"
+  entityId     String?          // ID of the related entity
   invitationId String?
   projectId    String?
+  messageId    String?
   payload      Json?
   createdAt    DateTime         @default(now())
   readAt       DateTime?
-  messageId    String?
   invitation   Invitation?      @relation(fields: [invitationId], references: [id])
-  organization Organization     @relation(fields: [orgId], references: [id])
+  organization Organization?    @relation(fields: [orgId], references: [id])
   project      Project?         @relation(fields: [projectId], references: [id])
   user         User             @relation(fields: [userId], references: [id])
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@index([userId, type])
 }
 
 model PendingOrder {
@@ -491,6 +499,8 @@ enum NotificationType {
   NEW_MESSAGE
   PROJECT_APPROVED
   PROJECT_DELIVERED
+  CHANGES_REQUESTED    // Customer requested changes on delivery
+  DELIVERY_COMMENT     // New comment on delivery
 }
 
 enum ClientApprovalStatus {

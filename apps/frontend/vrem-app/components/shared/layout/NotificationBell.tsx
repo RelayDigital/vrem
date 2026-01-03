@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Check, X, ExternalLink, Briefcase, Building2, MessageSquare, CheckCircle, GraduationCap, RotateCcw, ChevronRight, Package } from "lucide-react";
+import { Bell, Check, X, ExternalLink, Briefcase, Building2, MessageSquare, CheckCircle, GraduationCap, RotateCcw, ChevronRight, Package, AlertTriangle, MessageCircle, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -58,6 +58,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const [isResettingTour, setIsResettingTour] = useState(false);
+  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -291,6 +292,10 @@ export function NotificationBell({ className }: NotificationBellProps) {
         return <CheckCircle className="h-4 w-4 text-emerald-500" />;
       case "PROJECT_DELIVERED":
         return <Package className="h-4 w-4 text-primary" />;
+      case "CHANGES_REQUESTED":
+        return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+      case "DELIVERY_COMMENT":
+        return <MessageCircle className="h-4 w-4 text-blue-500" />;
       default:
         return <Building2 className="h-4 w-4 text-purple-500" />;
     }
@@ -310,6 +315,10 @@ export function NotificationBell({ className }: NotificationBellProps) {
         return `Project approved`;
       case "PROJECT_DELIVERED":
         return `Your media is ready`;
+      case "CHANGES_REQUESTED":
+        return `Changes requested`;
+      case "DELIVERY_COMMENT":
+        return `New delivery comment`;
       default:
         return "Notification";
     }
@@ -359,6 +368,14 @@ export function NotificationBell({ className }: NotificationBellProps) {
         return notification.projectAddress
           ? `${notification.orgName} has delivered your media for ${notification.projectAddress}`
           : `${notification.orgName} has delivered your media`;
+      case "CHANGES_REQUESTED":
+        return notification.projectAddress
+          ? `Customer requested changes for ${notification.projectAddress}`
+          : `Customer requested changes on the delivery`;
+      case "DELIVERY_COMMENT":
+        return notification.messagePreview
+          ? `"${notification.messagePreview.substring(0, 50)}${notification.messagePreview.length > 50 ? '...' : ''}"`
+          : notification.projectAddress || 'New comment on delivery';
       default:
         return "";
     }
@@ -429,6 +446,21 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const handleContinueTour = () => {
     setIsOpen(false);
     switchToPersonalAndNavigate();
+  };
+
+  const handleMarkAllRead = async () => {
+    setIsMarkingAllRead(true);
+    try {
+      await api.notifications.markAllRead();
+      // Mark all notifications as read locally
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, readAt: n.readAt || new Date() }))
+      );
+    } catch (error) {
+      console.error("Failed to mark all as read:", error);
+    } finally {
+      setIsMarkingAllRead(false);
+    }
   };
 
   return (
@@ -519,9 +551,29 @@ export function NotificationBell({ className }: NotificationBellProps) {
           </>
         )}
 
-        <DropdownMenuLabel className="font-semibold">
-          Notifications
-        </DropdownMenuLabel>
+        <div className="flex items-center justify-between px-2 py-1.5">
+          <DropdownMenuLabel className="font-semibold p-0">
+            Notifications
+          </DropdownMenuLabel>
+          {unreadCount > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 text-xs text-muted-foreground hover:text-foreground"
+              onClick={handleMarkAllRead}
+              disabled={isMarkingAllRead}
+            >
+              {isMarkingAllRead ? (
+                <Spinner className="h-3 w-3" />
+              ) : (
+                <>
+                  <CheckCheck className="h-3 w-3 mr-1" />
+                  Mark all read
+                </>
+              )}
+            </Button>
+          )}
+        </div>
         <DropdownMenuSeparator />
         
         {isLoading && notifications.length === 0 ? (

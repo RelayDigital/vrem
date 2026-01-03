@@ -534,7 +534,9 @@ export type NotificationType =
   | "PROJECT_ASSIGNED"
   | "NEW_MESSAGE"
   | "PROJECT_APPROVED"
-  | "PROJECT_DELIVERED";
+  | "PROJECT_DELIVERED"
+  | "CHANGES_REQUESTED"
+  | "DELIVERY_COMMENT";
 
 export type ProjectAssignedRole =
   | "TECHNICIAN"

@@ -64,6 +64,24 @@ export class NotificationsController {
   }
 
   /**
+   * POST /notifications/read-all
+   * Mark all notifications as read
+   */
+  @Post('notifications/read-all')
+  async markAllAsRead(@CurrentUser() user: AuthenticatedUser) {
+    return this.notificationsService.markAllNotificationsAsRead(user);
+  }
+
+  /**
+   * GET /notifications/count
+   * Get unread notification count
+   */
+  @Get('notifications/count')
+  async getUnreadCount(@CurrentUser() user: AuthenticatedUser) {
+    return this.notificationsService.getUnreadCount(user);
+  }
+
+  /**
    * GET /organizations/:id/public
    * Get public organization info for viewing from an invitation
    */
