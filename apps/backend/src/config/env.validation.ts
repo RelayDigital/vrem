@@ -40,6 +40,12 @@ const ENV_VARS: EnvVarConfig[] = [
     requiredInProduction: true,
     description: 'Resend API key for sending emails',
   },
+  {
+    name: 'EMAIL_FROM',
+    required: false,
+    requiredInProduction: false,
+    description: 'From address for transactional emails (defaults to VREM <noreply@vrem.app>)',
+  },
 
   // Storage - Required for media features
   {

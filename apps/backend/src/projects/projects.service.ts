@@ -20,6 +20,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class ProjectsService {
@@ -32,6 +33,7 @@ export class ProjectsService {
     private availabilityService: AvailabilityService,
     private calendarSync: CalendarSyncService,
     private notifications: NotificationsService,
+    private emailService: EmailService,
   ) {}
 
   /**
@@ -936,7 +938,18 @@ export class ProjectsService {
    * Returns the delivery token that can be used to access the delivery page.
    */
   async enableDelivery(projectId: string, ctx: OrgContext, user: AuthenticatedUser) {
-    const project = await this.ensureProjectInOrg(projectId, ctx);
+    // Get project with customer info for email notification
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, orgId: ctx.org.id },
+      include: {
+        customer: true,
+        organization: true,
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
 
     // Only managers can enable delivery
     if (!this.authorization.canEditProject(ctx, project, user)) {
@@ -972,12 +985,53 @@ export class ProjectsService {
       this.logger.warn(`Failed to create delivery notification: ${error.message}`);
     }
 
+    // Send delivery email to customer if they have an email address
+    // Fire-and-forget: don't await, don't fail the request
+    if (project.customer?.email) {
+      const projectAddress = this.buildProjectAddress(project);
+      this.emailService.sendDeliveryEmail(
+        project.customer.email,
+        project.customer.name || '',
+        project.organization.name,
+        projectAddress,
+        updated.deliveryToken!,
+      ).then((sent) => {
+        if (sent) {
+          this.logger.log(`Delivery email sent to ${project.customer!.email} for project ${projectId}`);
+        } else {
+          this.logger.warn(`Delivery email failed to send to ${project.customer!.email}`);
+        }
+      }).catch((emailError) => {
+        this.logger.error(`Failed to send delivery email to ${project.customer!.email}:`, emailError);
+      });
+    }
+
     return {
       enabled: true,
       deliveryToken: updated.deliveryToken,
       deliveryEnabledAt: updated.deliveryEnabledAt,
       clientApprovalStatus: updated.clientApprovalStatus,
     };
+  }
+
+  /**
+   * Build a project address string from project fields.
+   */
+  private buildProjectAddress(project: {
+    addressLine1?: string | null;
+    addressLine2?: string | null;
+    city?: string | null;
+    region?: string | null;
+    postalCode?: string | null;
+  }): string {
+    const parts = [
+      project.addressLine1,
+      project.addressLine2,
+      project.city,
+      project.region,
+      project.postalCode,
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'Project';
   }
 
   /**

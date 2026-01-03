@@ -164,20 +164,24 @@ export class OrganizationsService {
     }
 
     // Send invitation email (for both existing and new users)
-    try {
-      await this.emailService.sendInvitationEmail(
-        dto.email,
-        inviter.name,
-        ctx.org.name,
-        token,
-        !!existingUser,
-        inviteType,
-      );
-      this.logger.log(`Invitation email sent to ${dto.email} for org ${ctx.org.id}`);
-    } catch (emailError) {
-      // Log but don't fail the invitation if email fails
+    // Fire-and-forget: don't await, don't fail the request
+    this.emailService.sendInvitationEmail(
+      dto.email,
+      inviter.name,
+      ctx.org.name,
+      token,
+      !!existingUser,
+      inviteType,
+      role,
+    ).then((sent) => {
+      if (sent) {
+        this.logger.log(`Invitation email sent to ${dto.email} for org ${ctx.org.id}`);
+      } else {
+        this.logger.warn(`Invitation email failed to send to ${dto.email}`);
+      }
+    }).catch((emailError) => {
       this.logger.error(`Failed to send invitation email to ${dto.email}:`, emailError);
-    }
+    });
 
     return invitation;
   }

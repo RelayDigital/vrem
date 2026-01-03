@@ -61,47 +61,230 @@ export class EmailService {
     inviteToken: string,
     isExistingUser: boolean,
     inviteType: 'MEMBER' | 'CUSTOMER' = 'MEMBER',
+    role?: string,
   ): Promise<boolean> {
     const appUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const inviteUrl = isExistingUser
       ? `${appUrl}/dashboard?invite=${inviteToken}`
       : `${appUrl}/signup?invite=${inviteToken}`;
 
-    const roleDescription =
-      inviteType === 'CUSTOMER'
-        ? 'as a customer'
-        : 'to join their team';
+    // Build role description based on invite type and role
+    let roleDescription: string;
+    if (inviteType === 'CUSTOMER') {
+      roleDescription = 'to view and approve project deliveries';
+    } else {
+      // Team member - include specific role if provided
+      const roleLabel = role ? this.formatRole(role) : 'team member';
+      roleDescription = `to join their team as ${roleLabel}`;
+    }
 
-    const subject = `You've been invited to ${organizationName} on VREM`;
+    const subject = `${inviterName} invited you to ${organizationName}`;
     const html = `
-      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #333; font-size: 24px; margin-bottom: 24px;">
-          You're invited!
-        </h1>
-        <p style="color: #666; font-size: 16px; line-height: 1.5;">
-          <strong>${inviterName}</strong> has invited you ${roleDescription} at <strong>${organizationName}</strong>.
-        </p>
-        <div style="margin: 32px 0;">
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <h1 style="color: #18181b; font-size: 24px; margin: 0 0 8px 0; font-weight: 600;">
+            You're invited to ${organizationName}
+          </h1>
+          <p style="color: #71717a; font-size: 16px; margin: 0;">
+            ${inviterName} has invited you ${roleDescription}
+          </p>
+        </div>
+
+        <div style="background: #f4f4f5; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+          <table style="width: 100%;">
+            <tr>
+              <td style="color: #71717a; font-size: 14px; padding-bottom: 8px;">Organization</td>
+              <td style="color: #18181b; font-size: 14px; font-weight: 500; text-align: right; padding-bottom: 8px;">${organizationName}</td>
+            </tr>
+            <tr>
+              <td style="color: #71717a; font-size: 14px; padding-bottom: 8px;">Invited by</td>
+              <td style="color: #18181b; font-size: 14px; font-weight: 500; text-align: right; padding-bottom: 8px;">${inviterName}</td>
+            </tr>
+            ${inviteType !== 'CUSTOMER' && role ? `
+            <tr>
+              <td style="color: #71717a; font-size: 14px;">Role</td>
+              <td style="color: #18181b; font-size: 14px; font-weight: 500; text-align: right;">${this.formatRole(role)}</td>
+            </tr>
+            ` : ''}
+          </table>
+        </div>
+
+        <div style="text-align: center; margin: 32px 0;">
           <a href="${inviteUrl}"
-             style="display: inline-block; background: #18181b; color: white; padding: 12px 24px;
-                    border-radius: 6px; text-decoration: none; font-weight: 500;">
-            ${isExistingUser ? 'Accept Invitation' : 'Sign Up & Accept'}
+             style="display: inline-block; background: #18181b; color: white; padding: 14px 32px;
+                    border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 16px;">
+            ${isExistingUser ? 'Accept Invitation' : 'Create Account & Accept'}
           </a>
         </div>
-        <p style="color: #666; font-size: 14px; line-height: 1.5;">
-          ${isExistingUser ? 'You can also accept this invitation from your notifications in the app.' : 'Create your account to get started with VREM.'}
+
+        <p style="color: #71717a; font-size: 14px; line-height: 1.6; text-align: center;">
+          ${isExistingUser
+            ? 'You can also accept this invitation from your notifications in the VREM app.'
+            : 'Click the button above to create your VREM account and accept this invitation.'}
         </p>
+
         <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;" />
-        <p style="color: #a1a1aa; font-size: 12px;">
+
+        <p style="color: #a1a1aa; font-size: 12px; text-align: center; margin: 0 0 8px 0;">
           If you didn't expect this invitation, you can safely ignore this email.
         </p>
-        <p style="color: #a1a1aa; font-size: 12px;">
+        <p style="color: #a1a1aa; font-size: 12px; text-align: center; margin: 0;">
           VREM - Visual Real Estate Media
         </p>
       </div>
     `;
 
     return this.sendEmail(to, subject, html);
+  }
+
+  /**
+   * Send a delivery link email to the customer.
+   * Notifies them that project media is ready for review.
+   */
+  async sendDeliveryEmail(
+    to: string,
+    customerName: string,
+    organizationName: string,
+    projectAddress: string,
+    deliveryToken: string,
+  ): Promise<boolean> {
+    const appUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const deliveryUrl = `${appUrl}/delivery/${deliveryToken}`;
+
+    const subject = `Your media is ready from ${organizationName}`;
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <h1 style="color: #18181b; font-size: 24px; margin: 0 0 8px 0; font-weight: 600;">
+            Your media is ready!
+          </h1>
+          <p style="color: #71717a; font-size: 16px; margin: 0;">
+            ${organizationName} has finished processing your project
+          </p>
+        </div>
+
+        <div style="background: #f4f4f5; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+          <table style="width: 100%;">
+            <tr>
+              <td style="color: #71717a; font-size: 14px; padding-bottom: 8px;">Project</td>
+              <td style="color: #18181b; font-size: 14px; font-weight: 500; text-align: right; padding-bottom: 8px;">${projectAddress}</td>
+            </tr>
+            <tr>
+              <td style="color: #71717a; font-size: 14px;">From</td>
+              <td style="color: #18181b; font-size: 14px; font-weight: 500; text-align: right;">${organizationName}</td>
+            </tr>
+          </table>
+        </div>
+
+        <p style="color: #52525b; font-size: 15px; line-height: 1.6; text-align: center; margin-bottom: 24px;">
+          Hi${customerName ? ` ${customerName}` : ''},<br/>
+          Your photos and videos are ready for review. Click below to view, download, and approve your media.
+        </p>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${deliveryUrl}"
+             style="display: inline-block; background: #18181b; color: white; padding: 14px 32px;
+                    border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 16px;">
+            View Your Media
+          </a>
+        </div>
+
+        <p style="color: #71717a; font-size: 14px; line-height: 1.6; text-align: center;">
+          You can view, download individual files or all media, leave comments, and approve the delivery.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;" />
+
+        <p style="color: #a1a1aa; font-size: 12px; text-align: center; margin: 0;">
+          VREM - Visual Real Estate Media
+        </p>
+      </div>
+    `;
+
+    return this.sendEmail(to, subject, html);
+  }
+
+  /**
+   * Send an approval status change notification email.
+   */
+  async sendApprovalNotificationEmail(
+    to: string,
+    recipientName: string,
+    organizationName: string,
+    projectAddress: string,
+    status: 'APPROVED' | 'CHANGES_REQUESTED',
+    customerName: string,
+    comment?: string,
+  ): Promise<boolean> {
+    const statusLabel = status === 'APPROVED' ? 'approved' : 'requested changes on';
+    const statusColor = status === 'APPROVED' ? '#22c55e' : '#f59e0b';
+    const statusBg = status === 'APPROVED' ? '#dcfce7' : '#fef3c7';
+
+    const subject = status === 'APPROVED'
+      ? `Project approved: ${projectAddress}`
+      : `Changes requested: ${projectAddress}`;
+
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <div style="display: inline-block; background: ${statusBg}; color: ${statusColor}; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500; margin-bottom: 16px;">
+            ${status === 'APPROVED' ? 'Approved' : 'Changes Requested'}
+          </div>
+          <h1 style="color: #18181b; font-size: 24px; margin: 0 0 8px 0; font-weight: 600;">
+            ${customerName} ${statusLabel} the delivery
+          </h1>
+        </div>
+
+        <div style="background: #f4f4f5; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+          <table style="width: 100%;">
+            <tr>
+              <td style="color: #71717a; font-size: 14px; padding-bottom: 8px;">Project</td>
+              <td style="color: #18181b; font-size: 14px; font-weight: 500; text-align: right; padding-bottom: 8px;">${projectAddress}</td>
+            </tr>
+            <tr>
+              <td style="color: #71717a; font-size: 14px;">Customer</td>
+              <td style="color: #18181b; font-size: 14px; font-weight: 500; text-align: right;">${customerName}</td>
+            </tr>
+          </table>
+        </div>
+
+        ${comment ? `
+        <div style="background: #fafafa; border-left: 4px solid ${statusColor}; padding: 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
+          <p style="color: #71717a; font-size: 12px; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px;">Customer feedback</p>
+          <p style="color: #18181b; font-size: 15px; line-height: 1.5; margin: 0;">${comment}</p>
+        </div>
+        ` : ''}
+
+        <p style="color: #71717a; font-size: 14px; line-height: 1.6; text-align: center;">
+          ${status === 'APPROVED'
+            ? 'Great work! This project has been approved by the customer.'
+            : 'Please review the feedback and make the requested changes.'}
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;" />
+
+        <p style="color: #a1a1aa; font-size: 12px; text-align: center; margin: 0;">
+          VREM - Visual Real Estate Media
+        </p>
+      </div>
+    `;
+
+    return this.sendEmail(to, subject, html);
+  }
+
+  /**
+   * Format role enum to human-readable string.
+   */
+  private formatRole(role: string): string {
+    const roleMap: Record<string, string> = {
+      'OWNER': 'an Owner',
+      'ADMIN': 'an Administrator',
+      'PROJECT_MANAGER': 'a Project Manager',
+      'TECHNICIAN': 'a Technician',
+      'EDITOR': 'an Editor',
+      'AGENT': 'a Team Member',
+    };
+    return roleMap[role] || 'a team member';
   }
 
   /**

@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../email/email.service';
 import { ProjectChatChannel, MediaType, ClientApprovalStatus, DownloadArtifactStatus, DownloadArtifactType } from '@prisma/client';
 import { DeliveryResponseDto, MediaDto, CommentDto } from './dto/delivery-response.dto';
 import * as crypto from 'crypto';
@@ -15,6 +16,7 @@ export class DeliveryService {
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
+    private emailService: EmailService,
   ) {
     // Check storage configuration at startup
     const publicKey = process.env.UPLOADCARE_PUBLIC_KEY;
@@ -215,7 +217,17 @@ export class DeliveryService {
   async approveDelivery(token: string, userId: string) {
     const project = await this.prisma.project.findUnique({
       where: { deliveryToken: token },
-      include: { customer: true },
+      include: {
+        customer: true,
+        organization: {
+          include: {
+            members: {
+              where: { role: { in: ['OWNER', 'ADMIN', 'PROJECT_MANAGER'] } },
+              include: { user: true },
+            },
+          },
+        },
+      },
     });
 
     if (!project) {
@@ -236,16 +248,40 @@ export class DeliveryService {
       },
     });
 
+    const customerName = approver?.name || project.customer?.name || 'Customer';
+    const projectAddress = this.buildProjectAddress(project);
+
     // Create approval notifications for ops team
     try {
       await this.notifications.createApprovalNotifications(
         project.id,
         project.orgId,
         userId,
-        approver?.name || project.customer?.name || 'Customer',
+        customerName,
       );
     } catch (error: any) {
       this.logger.warn(`Failed to create approval notifications: ${error.message}`);
+    }
+
+    // Send email notifications to ops team (PM, OWNER, ADMIN)
+    // Fire-and-forget: don't await, don't fail the request
+    for (const member of project.organization.members) {
+      if (member.user?.email && member.userId !== userId) {
+        this.emailService.sendApprovalNotificationEmail(
+          member.user.email,
+          member.user.name,
+          project.organization.name,
+          projectAddress,
+          'APPROVED',
+          customerName,
+        ).then((sent) => {
+          if (sent) {
+            this.logger.log(`Approval email sent to ${member.user!.email} for project ${project.id}`);
+          }
+        }).catch((emailError) => {
+          this.logger.error(`Failed to send approval email to ${member.user!.email}:`, emailError);
+        });
+      }
     }
 
     return {
@@ -263,6 +299,17 @@ export class DeliveryService {
   async requestChanges(token: string, userId: string, feedback: string) {
     const project = await this.prisma.project.findUnique({
       where: { deliveryToken: token },
+      include: {
+        customer: true,
+        organization: {
+          include: {
+            members: {
+              where: { role: { in: ['OWNER', 'ADMIN', 'PROJECT_MANAGER'] } },
+              include: { user: true },
+            },
+          },
+        },
+      },
     });
 
     if (!project) {
@@ -290,17 +337,42 @@ export class DeliveryService {
       include: { user: true },
     });
 
+    const customerName = message.user.name;
+    const projectAddress = this.buildProjectAddress(project);
+
     // Create notifications for CHANGES_REQUESTED
     try {
       await this.notifications.createChangesRequestedNotifications(
         project.id,
         project.orgId,
         userId,
-        message.user.name,
+        customerName,
         feedback,
       );
     } catch (error: any) {
       this.logger.warn(`Failed to create changes requested notifications: ${error.message}`);
+    }
+
+    // Send email notifications to ops team (PM, OWNER, ADMIN)
+    // Fire-and-forget: don't await, don't fail the request
+    for (const member of project.organization.members) {
+      if (member.user?.email && member.userId !== userId) {
+        this.emailService.sendApprovalNotificationEmail(
+          member.user.email,
+          member.user.name,
+          project.organization.name,
+          projectAddress,
+          'CHANGES_REQUESTED',
+          customerName,
+          feedback,
+        ).then((sent) => {
+          if (sent) {
+            this.logger.log(`Changes requested email sent to ${member.user!.email} for project ${project.id}`);
+          }
+        }).catch((emailError) => {
+          this.logger.error(`Failed to send changes requested email to ${member.user!.email}:`, emailError);
+        });
+      }
     }
 
     return {
@@ -533,5 +605,25 @@ export class DeliveryService {
       filename: artifact.filename || undefined,
       error: artifact.error || undefined,
     };
+  }
+
+  /**
+   * Build a project address string from project fields.
+   */
+  private buildProjectAddress(project: {
+    addressLine1?: string | null;
+    addressLine2?: string | null;
+    city?: string | null;
+    region?: string | null;
+    postalCode?: string | null;
+  }): string {
+    const parts = [
+      project.addressLine1,
+      project.addressLine2,
+      project.city,
+      project.region,
+      project.postalCode,
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'Project';
   }
 }
