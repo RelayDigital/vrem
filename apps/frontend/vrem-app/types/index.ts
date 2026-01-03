@@ -56,8 +56,24 @@ export interface User {
   // Global identity: how they entered the system / what they can create
   accountType: AccountType;
 
+  // Personal org ID - every user has exactly one personal org
+  personalOrgId?: string | null;
+
+  // Server-recommended active org (from bootstrap)
+  recommendedActiveOrgId?: string | null;
+
   // Memberships define what they actually are inside each org
   organizationMemberships?: OrganizationMember[];
+
+  // All accessible org contexts (from bootstrap)
+  accessibleOrgs?: Array<{
+    orgId: string;
+    orgName: string;
+    orgType: OrgType;
+    relationship: 'member' | 'customer';
+    role: string | null;
+    logoUrl: string | null;
+  }>;
 }
 
 export interface Organization {

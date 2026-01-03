@@ -74,6 +74,22 @@ export class AuthController {
     return this.authService.me(req.user.id);
   }
 
+  /**
+   * Bootstrap endpoint - ensures user is fully provisioned and returns complete app state.
+   * This endpoint is idempotent and should be called on every app load/auth success.
+   * It guarantees:
+   * - User has a personal org
+   * - Returns dbUser, personalOrgId, accessible org contexts, recommended active org
+   */
+  @Get('me/bootstrap')
+  async bootstrap(@Req() req: Request & { user: { id: string } }) {
+    if (!req.user?.id) {
+      throw new UnauthorizedException('Not authenticated');
+    }
+
+    return this.authService.bootstrap(req.user.id);
+  }
+
   // Rate limit: 3 registrations per minute per IP
   @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Public()

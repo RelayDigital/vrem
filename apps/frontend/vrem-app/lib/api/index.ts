@@ -17,6 +17,20 @@ const API_URL = USE_PRODUCTION_API && PRODUCTION_API_URL ? PRODUCTION_API_URL : 
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || '';
 const USE_MOCK_DATA = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
 
+/**
+ * Error class for org-scoped API failures that might be recoverable
+ */
+export class OrgContextError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly orgId: string | null
+  ) {
+    super(message);
+    this.name = 'OrgContextError';
+  }
+}
+
 class ApiClient {
   private baseUrl: string;
   private isRefreshingToken: boolean = false;
@@ -24,6 +38,18 @@ class ApiClient {
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
+  }
+
+  /**
+   * Notify listeners that an org-scoped API call failed due to invalid org context.
+   * This allows the auth context to recover by resetting to personal org.
+   */
+  private notifyOrgContextError(status: number, orgId: string | null) {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('org-context-error', {
+        detail: { status, orgId }
+      }));
+    }
   }
 
   // Wait for token refresh and return the new token
@@ -345,6 +371,25 @@ class ApiClient {
         }));
       }
 
+      // Detect org context errors (403 for wrong org, 404 for deleted org)
+      // and notify listeners so auth context can recover
+      if ((response.status === 403 || response.status === 404) && orgId) {
+        const errorMsg = typeof responseBody === 'object' && responseBody?.message
+          ? responseBody.message.toLowerCase()
+          : '';
+
+        // Check if this is an org-related error
+        const isOrgError = errorMsg.includes('organization') ||
+          errorMsg.includes('org') ||
+          errorMsg.includes('access') ||
+          errorMsg.includes('belong') ||
+          errorMsg.includes('member');
+
+        if (isOrgError) {
+          this.notifyOrgContextError(response.status, orgId);
+        }
+      }
+
       // Create error with status code and backend message
       const errorMessage = typeof responseBody === 'object' && responseBody?.message
         ? responseBody.message
@@ -367,6 +412,21 @@ class ApiClient {
   }
 
   auth = {
+    /**
+     * Bootstrap endpoint - ensures user is fully provisioned and returns complete app state.
+     * This should be called on every app load/auth success.
+     * Guarantees: user has personal org, returns all accessible orgs, recommended active org.
+     */
+    bootstrap: async () => {
+      if (USE_MOCK_DATA) {
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem('mockUser');
+          if (stored) return JSON.parse(stored);
+        }
+        return currentUser;
+      }
+      return this.request<User>('/auth/me/bootstrap');
+    },
     login: async (credentials: { email: string; password: string }) => {
       if (USE_MOCK_DATA) {
         await new Promise(resolve => setTimeout(resolve, 300));

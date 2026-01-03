@@ -12,6 +12,7 @@ import { OrgRole, OrgType, UserAccountType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
 import { AuthenticatedUser, OrgContext, buildOrgContext } from './auth-context';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class OrgContextGuard implements CanActivate {
@@ -110,7 +111,7 @@ export class OrgContextGuard implements CanActivate {
     let membership: OrgContext['membership'] = null;
 
     if (!orgId) {
-      const personalMembership = await this.prisma.organizationMember.findFirst({
+      let personalMembership = await this.prisma.organizationMember.findFirst({
         where: {
           userId: user.id,
           organization: { type: OrgType.PERSONAL },
@@ -119,8 +120,58 @@ export class OrgContextGuard implements CanActivate {
         orderBy: { createdAt: 'asc' },
       });
 
+      // Auto-provision personal org if missing (defensive recovery)
       if (!personalMembership) {
-        throw new ForbiddenException('Personal organization not found');
+        this.logger.warn(`Personal org missing for user ${user.id}, auto-provisioning...`);
+        try {
+          // Fetch user to get name for org creation
+          const dbUser = await this.prisma.user.findUnique({
+            where: { id: user.id },
+            select: { name: true },
+          });
+          const userName = dbUser?.name || 'Personal';
+
+          // Create personal org in transaction
+          const result = await this.prisma.$transaction(async (tx) => {
+            const personalOrg = await tx.organization.create({
+              data: {
+                id: randomUUID(),
+                name: `${userName} Workspace`,
+                type: OrgType.PERSONAL,
+              },
+            });
+
+            const newMembership = await tx.organizationMember.create({
+              data: {
+                userId: user.id,
+                orgId: personalOrg.id,
+                role: OrgRole.OWNER,
+              },
+              include: { organization: true },
+            });
+
+            return newMembership;
+          });
+
+          personalMembership = result;
+          this.logger.log(`Auto-provisioned personal org ${result.orgId} for user ${user.id}`);
+        } catch (provisionError: any) {
+          // Race condition - another request created it, retry lookup
+          if (provisionError.code === 'P2002') {
+            personalMembership = await this.prisma.organizationMember.findFirst({
+              where: {
+                userId: user.id,
+                organization: { type: OrgType.PERSONAL },
+              },
+              include: { organization: true },
+              orderBy: { createdAt: 'asc' },
+            });
+          }
+          if (!personalMembership) {
+            this.logger.error(`Failed to provision personal org for user ${user.id}:`, provisionError);
+            throw new ForbiddenException('Personal organization not found');
+          }
+        }
       }
 
       orgId = personalMembership.orgId;

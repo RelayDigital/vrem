@@ -308,6 +308,32 @@ export class AuthService {
   }
 
   /**
+   * Idempotent user bootstrap - ensures user is fully provisioned before returning data.
+   * Called from /me/bootstrap endpoint to guarantee:
+   * - User exists in DB with personal org
+   * - Personal org membership exists
+   * - Returns deterministic active org recommendation
+   *
+   * This is the single source of truth for frontend app initialization.
+   */
+  async bootstrap(userId: string) {
+    // First ensure user has a personal org (idempotent repair)
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Ensure personal org exists (idempotent)
+    await this.ensurePersonalOrganization(user.id, user.name);
+
+    // Now fetch the full bootstrap data
+    return this.me(userId);
+  }
+
+  /**
    * Auth bootstrap endpoint - returns all data needed to initialize app state.
    * This is the single source of truth for:
    * - User profile (from DB, not Clerk)

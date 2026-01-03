@@ -89,24 +89,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem("token", clerkToken);
             setToken(clerkToken);
 
-            // Sync user with backend (backend will validate Clerk token and return/create user)
-            // The /auth/me endpoint is the single source of truth for:
-            // - User profile (from DB, not Clerk)
-            // - Organization memberships
-            // - Customer relationships
-            // - Recommended active org
+            // Use bootstrap endpoint - ensures user is fully provisioned (idempotent)
+            // This guarantees: personal org exists, returns all accessible orgs
             let authData;
-            try {
-              authData = await api.auth.me();
-            } catch (meError: any) {
-              // If me() fails with 403, try clearing org and retrying
-              if (meError?.message?.includes('403')) {
-                localStorage.removeItem("organizationId");
-                api.organizations.setActiveOrganization(null as any);
-                authData = await api.auth.me();
-              } else {
-                throw meError;
+            let retryCount = 0;
+            const maxRetries = 2;
+
+            while (retryCount <= maxRetries) {
+              try {
+                // Use bootstrap endpoint for reliable provisioning
+                authData = await api.auth.bootstrap();
+                break;
+              } catch (bootstrapError: any) {
+                const is403 = bootstrapError?.message?.includes('403');
+                const is404 = bootstrapError?.message?.includes('404');
+
+                // If org-related error, clear stale org and retry
+                if ((is403 || is404) && retryCount < maxRetries) {
+                  console.warn(`Bootstrap attempt ${retryCount + 1} failed with org error, clearing org and retrying...`);
+                  localStorage.removeItem("organizationId");
+                  api.organizations.setActiveOrganization(null as any);
+                  retryCount++;
+                  continue;
+                }
+                throw bootstrapError;
               }
+            }
+
+            if (!authData) {
+              throw new Error('Failed to bootstrap after retries');
             }
 
             setUser(normalizeUser(authData));
@@ -115,25 +126,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const orgs = authData.memberships || [];
             setMemberships(orgs);
 
-            // Determine active org:
+            // Determine active org with recovery logic:
             // 1. Check if stored org is still valid (user is still a member)
-            // 2. Otherwise use server's recommended org
+            // 2. Otherwise use server's recommended org (which is guaranteed to exist)
+            // 3. Fall back to personalOrgId if recommendation is null
             const storedOrg = api.organizations.getActiveOrganization();
             const isValidStoredOrg = storedOrg && orgs.some((m: any) => m.orgId === storedOrg);
 
             if (storedOrg && !isValidStoredOrg) {
               // Stored org is no longer valid - clear it
+              console.warn(`Stored org ${storedOrg} is no longer valid, clearing...`);
               localStorage.removeItem("organizationId");
             }
 
+            // Resolve org with guaranteed fallback to personal org
             const resolvedOrgId = isValidStoredOrg
               ? storedOrg
-              : authData.recommendedActiveOrgId || null;
+              : authData.recommendedActiveOrgId || authData.personalOrgId || null;
 
             if (resolvedOrgId) {
               api.organizations.setActiveOrganization(resolvedOrgId);
             } else {
-              // No valid org - clear any stale org ID
+              // This should never happen after bootstrap, but handle gracefully
+              console.error('No valid org after bootstrap - this should not happen');
               api.organizations.setActiveOrganization(null as any);
             }
             setActiveOrganizationId(resolvedOrgId);
@@ -233,8 +248,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
     };
 
+    // Handle org context errors - auto-recover by switching to personal org
+    const handleOrgContextError = (event: Event) => {
+      const detail = (event as CustomEvent)?.detail;
+      const { status, orgId: failedOrgId } = detail || {};
+
+      console.warn(`Org context error: status=${status}, orgId=${failedOrgId}`);
+
+      // Only recover if we have a user and personal org
+      if (user?.personalOrgId) {
+        const personalOrg = memberships.find((m) => m.orgId === user.personalOrgId);
+        if (personalOrg) {
+          console.log(`Recovering from org error by switching to personal org ${user.personalOrgId}`);
+          setActiveOrganizationId(user.personalOrgId);
+          api.organizations.setActiveOrganization(user.personalOrgId);
+
+          // Notify user that we've recovered
+          window.dispatchEvent(
+            new CustomEvent("organizationChanged", { detail: { orgId: user.personalOrgId, recovered: true } })
+          );
+        }
+      }
+    };
+
     if (typeof window !== "undefined") {
       window.addEventListener("organizationUpdated", handleOrganizationUpdated);
+      window.addEventListener("org-context-error", handleOrgContextError);
     }
 
     return () => {
@@ -243,24 +282,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           "organizationUpdated",
           handleOrganizationUpdated
         );
+        window.removeEventListener("org-context-error", handleOrgContextError);
       }
     };
-  }, []);
+  }, [user, memberships]);
 
   const applyAuthResponse = async (response: { token: string; user: any }) => {
     localStorage.setItem("token", response.token);
     setToken(response.token);
 
-    // Fetch full auth data from backend (DB is source of truth)
-    const authData = await api.auth.me();
+    // Use bootstrap to ensure user is fully provisioned (idempotent)
+    const authData = await api.auth.bootstrap();
     setUser(normalizeUser(authData));
 
     // Use memberships from auth response
     const orgs = authData.memberships || [];
     setMemberships(orgs);
 
-    // Use server's recommended org
-    const resolvedOrgId = authData.recommendedActiveOrgId || null;
+    // Use server's recommended org with fallback to personal org
+    const resolvedOrgId = authData.recommendedActiveOrgId || authData.personalOrgId || null;
     if (resolvedOrgId) {
       api.organizations.setActiveOrganization(resolvedOrgId);
     } else {
@@ -515,6 +555,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const switchOrganization = (orgId: string | null) => {
+    // Validate that orgId is accessible (user is a member)
+    if (orgId) {
+      const isValidOrg = memberships.some((m) => m.orgId === orgId);
+      if (!isValidOrg) {
+        // Invalid org - fall back to personal org or first available
+        console.warn(`Attempted to switch to invalid org ${orgId}, recovering...`);
+        const fallbackOrgId = user?.personalOrgId || memberships[0]?.orgId || null;
+        if (fallbackOrgId) {
+          setActiveOrganizationId(fallbackOrgId);
+          api.organizations.setActiveOrganization(fallbackOrgId);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("organizationChanged", { detail: { orgId: fallbackOrgId } })
+            );
+          }
+        }
+        return;
+      }
+    }
+
     setActiveOrganizationId(orgId);
     api.organizations.setActiveOrganization(orgId);
     // Notify listeners (job context, etc.) that org changed
