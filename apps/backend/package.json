@@ -18,6 +18,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:smoke": "jest --config ./test/smoke/jest-smoke.json --runInBand",
+    "test:smoke:runner": "npx ts-node -r tsconfig-paths/register test/smoke/smoke-runner.ts",
     "seed:test-org": "node dist/src/scripts/seed-test-org.js",
     "seed:test-org:ts": "npx ts-node -r tsconfig-paths/register src/scripts/seed-test-org.ts",
     "migrate:clerk": "npx ts-node -r tsconfig-paths/register src/scripts/migrate-users-to-clerk.ts"
