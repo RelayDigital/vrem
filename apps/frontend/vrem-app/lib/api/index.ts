@@ -1,4 +1,4 @@
-import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization, DeliveryResponse, DeliveryComment, MediaType, ServicePackage, PackageAddOn, CreatePackagePayload, CreateAddOnPayload, DayOfWeek, TourTrack, TourStatusResponse, TourTrackProgress, TourProgressStep, UpdateTourProgressRequest } from '@/types';
+import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization, DeliveryResponse, DeliveryComment, MediaType, ServicePackage, PackageAddOn, CreatePackagePayload, CreateAddOnPayload, DayOfWeek, TourTrack, TourStatusResponse, TourTrackProgress, TourProgressStep, UpdateTourProgressRequest, ClientApprovalStatus } from '@/types';
 import {
   currentUser,
   jobRequests,
@@ -1374,6 +1374,8 @@ class ApiClient {
       id: project.id,
       orderNumber: project.id.substring(0, 8), // Use part of ID as order number
       organizationId: project.orgId,
+      organizationName: project.organization?.name,
+      organizationLogoUrl: project.organization?.logoUrl,
       clientName: project.customer?.name || 'Unassigned',
       customerId: project.customerId || undefined,
       customer: project.customer || null, // Include full customer object for linked user checks
@@ -1403,6 +1405,14 @@ class ApiClient {
       priority: 'standard',
       status: this.projectStatusToJobStatus(project.status, project.technicianId),
       assignedTechnicianId: project.technicianId,
+      technician: project.technician
+        ? {
+            id: project.technician.id,
+            name: project.technician.name,
+            avatarUrl: (project.technician as any)?.avatarUrl,
+            email: project.technician.email,
+          }
+        : null,
       estimatedDuration: 120, // Default duration
       requirements: requirements,
       createdBy: project.projectManagerId || 'system',
@@ -1810,7 +1820,48 @@ class ApiClient {
     },
 
     /**
-     * Trigger download of all media as zip
+     * Request download artifact generation (new non-streaming approach)
+     */
+    requestDownload: async (token: string, mediaTypes?: MediaType[]): Promise<{
+      status: 'PENDING' | 'GENERATING' | 'READY' | 'EXPIRED' | 'FAILED';
+      artifactId: string;
+      cdnUrl?: string;
+      filename?: string;
+      error?: string;
+    }> => {
+      const response = await fetch(`${API_URL}${API_PREFIX}/delivery/${token}/download-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mediaTypes }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to request download');
+      }
+
+      return response.json();
+    },
+
+    /**
+     * Check download artifact status
+     */
+    getDownloadStatus: async (token: string, artifactId: string): Promise<{
+      status: 'PENDING' | 'GENERATING' | 'READY' | 'EXPIRED' | 'FAILED';
+      cdnUrl?: string;
+      filename?: string;
+      error?: string;
+    }> => {
+      const response = await fetch(`${API_URL}${API_PREFIX}/delivery/${token}/download-status/${artifactId}`);
+
+      if (!response.ok) {
+        throw new Error('Failed to get download status');
+      }
+
+      return response.json();
+    },
+
+    /**
+     * Trigger download of all media as zip (streaming fallback)
      */
     downloadAll: async (token: string, mediaTypes?: MediaType[]): Promise<void> => {
       const response = await fetch(`${API_URL}${API_PREFIX}/delivery/${token}/download-all`, {
@@ -1838,6 +1889,72 @@ class ApiClient {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+    },
+  };
+
+  // =============================
+  // Project Delivery Management API
+  // =============================
+  projectDelivery = {
+    /**
+     * Get delivery status for a project
+     */
+    getStatus: async (projectId: string): Promise<{
+      enabled: boolean;
+      deliveryToken: string | null;
+      deliveryEnabledAt: Date | null;
+      clientApprovalStatus: ClientApprovalStatus;
+      clientApprovedAt: Date | null;
+      clientApprovedBy: { id: string; name: string } | null;
+    }> => {
+      const data = await this.request<any>(`/projects/${projectId}/delivery`);
+      return {
+        ...data,
+        deliveryEnabledAt: data.deliveryEnabledAt ? new Date(data.deliveryEnabledAt) : null,
+        clientApprovedAt: data.clientApprovedAt ? new Date(data.clientApprovedAt) : null,
+      };
+    },
+
+    /**
+     * Enable delivery for a project
+     */
+    enable: async (projectId: string): Promise<{
+      enabled: boolean;
+      deliveryToken: string;
+      deliveryEnabledAt: Date;
+      clientApprovalStatus: ClientApprovalStatus;
+    }> => {
+      const data = await this.request<any>(`/projects/${projectId}/delivery/enable`, {
+        method: 'POST',
+      });
+      return {
+        ...data,
+        deliveryEnabledAt: new Date(data.deliveryEnabledAt),
+      };
+    },
+
+    /**
+     * Disable delivery for a project
+     */
+    disable: async (projectId: string): Promise<{
+      enabled: boolean;
+      deliveryToken: string;
+      deliveryEnabledAt: null;
+    }> => {
+      return this.request(`/projects/${projectId}/delivery/disable`, {
+        method: 'POST',
+      });
+    },
+
+    /**
+     * Get the delivery link URL for a project
+     */
+    getDeliveryUrl: (deliveryToken: string): string => {
+      // Use the frontend URL for the delivery page
+      const baseUrl = typeof window !== 'undefined'
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      return `${baseUrl}/delivery/${deliveryToken}`;
     },
   };
 

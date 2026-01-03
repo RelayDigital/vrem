@@ -372,6 +372,8 @@ export interface JobRequest {
   id: string;
   orderNumber: string;
   organizationId: string; // maps to Project.orgId
+  organizationName?: string; // Organization name (for agent view)
+  organizationLogoUrl?: string; // Organization logo (for agent view)
   clientName: string;
   customerId?: string;
   customer?: OrganizationCustomer | null; // Full customer object for linked user checks
@@ -403,6 +405,7 @@ export interface JobRequest {
     | "cancelled";
 
   assignedTechnicianId?: string;
+  technician?: Pick<User, "id" | "name" | "avatarUrl" | "email"> | null;
   estimatedDuration: number; // minutes
   requirements: string;
   createdBy: string;

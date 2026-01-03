@@ -19,6 +19,7 @@ import { AssignProjectDto } from './dto/assign-project.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ProjectsService {
@@ -30,6 +31,7 @@ export class ProjectsService {
     private authorization: AuthorizationService,
     private availabilityService: AvailabilityService,
     private calendarSync: CalendarSyncService,
+    private notifications: NotificationsService,
   ) {}
 
   /**
@@ -235,6 +237,7 @@ export class ProjectsService {
       projectManager: true,
       media: true,
       customer: true,
+      organization: true, // Include organization for agent view
     };
 
     if (withMessages) {
@@ -921,5 +924,116 @@ export class ProjectsService {
       },
       include: { user: true },
     });
+  }
+
+  // =============================
+  // Delivery management
+  // =============================
+
+  /**
+   * Enable delivery for a project.
+   * Returns the delivery token that can be used to access the delivery page.
+   */
+  async enableDelivery(projectId: string, ctx: OrgContext, user: AuthenticatedUser) {
+    const project = await this.ensureProjectInOrg(projectId, ctx);
+
+    // Only managers can enable delivery
+    if (!this.authorization.canEditProject(ctx, project, user)) {
+      throw new ForbiddenException('You cannot manage delivery for this project');
+    }
+
+    // Generate a delivery token if one doesn't exist (for legacy projects)
+    const { randomUUID } = await import('crypto');
+    const deliveryToken = project.deliveryToken || randomUUID();
+
+    const updated = await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        deliveryEnabledAt: new Date(),
+        deliveryToken: deliveryToken,
+      },
+      select: {
+        id: true,
+        deliveryToken: true,
+        deliveryEnabledAt: true,
+        clientApprovalStatus: true,
+      },
+    });
+
+    // Create delivery notification for the customer (agent)
+    try {
+      await this.notifications.createDeliveryNotification(
+        projectId,
+        ctx.org.id,
+        updated.deliveryToken!,
+      );
+    } catch (error: any) {
+      this.logger.warn(`Failed to create delivery notification: ${error.message}`);
+    }
+
+    return {
+      enabled: true,
+      deliveryToken: updated.deliveryToken,
+      deliveryEnabledAt: updated.deliveryEnabledAt,
+      clientApprovalStatus: updated.clientApprovalStatus,
+    };
+  }
+
+  /**
+   * Disable delivery for a project.
+   * The delivery token remains but the page won't be accessible.
+   */
+  async disableDelivery(projectId: string, ctx: OrgContext, user: AuthenticatedUser) {
+    const project = await this.ensureProjectInOrg(projectId, ctx);
+
+    // Only managers can disable delivery
+    if (!this.authorization.canEditProject(ctx, project, user)) {
+      throw new ForbiddenException('You cannot manage delivery for this project');
+    }
+
+    await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        deliveryEnabledAt: null,
+      },
+    });
+
+    return {
+      enabled: false,
+      deliveryToken: project.deliveryToken,
+      deliveryEnabledAt: null,
+    };
+  }
+
+  /**
+   * Get delivery status for a project.
+   */
+  async getDeliveryStatus(projectId: string, ctx: OrgContext, user: AuthenticatedUser) {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, orgId: ctx.org.id },
+      include: {
+        customer: true,
+        clientApprovedBy: true,
+      },
+    });
+
+    if (!project) {
+      throw new ForbiddenException('Project does not belong to your organization');
+    }
+
+    if (!this.authorization.canViewProject(ctx, project, user)) {
+      throw new ForbiddenException('You cannot view this project');
+    }
+
+    return {
+      enabled: !!project.deliveryEnabledAt,
+      deliveryToken: project.deliveryToken,
+      deliveryEnabledAt: project.deliveryEnabledAt,
+      clientApprovalStatus: project.clientApprovalStatus,
+      clientApprovedAt: project.clientApprovedAt,
+      clientApprovedBy: project.clientApprovedBy
+        ? { id: project.clientApprovedBy.id, name: project.clientApprovedBy.name }
+        : null,
+    };
   }
 }

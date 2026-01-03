@@ -4,11 +4,12 @@ import { CronofyModule } from '../cronofy/cronofy.module';
 import { MediaModule } from '../media/media.module';
 import { AvailabilityModule } from '../availability/availability.module';
 import { NylasModule } from '../nylas/nylas.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ProjectsController } from './projects.controller';
 import { ProjectsService } from './projects.service';
 
 @Module({
-  imports: [CronofyModule, MediaModule, AuthModule, AvailabilityModule, NylasModule],
+  imports: [CronofyModule, MediaModule, AuthModule, AvailabilityModule, NylasModule, NotificationsModule],
   providers: [ProjectsService],
   controllers: [ProjectsController],
 })

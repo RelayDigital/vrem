@@ -57,7 +57,7 @@ export class NotificationsService {
       });
     }
 
-    // 2. Get unread notifications (PROJECT_ASSIGNED, NEW_MESSAGE, PROJECT_APPROVED)
+    // 2. Get unread notifications (PROJECT_ASSIGNED, NEW_MESSAGE, PROJECT_APPROVED, PROJECT_DELIVERED)
     const projectNotifications = await this.prisma.notification.findMany({
       where: {
         userId: user.id,
@@ -66,6 +66,7 @@ export class NotificationsService {
             NotificationType.PROJECT_ASSIGNED,
             NotificationType.NEW_MESSAGE,
             NotificationType.PROJECT_APPROVED,
+            NotificationType.PROJECT_DELIVERED,
           ],
         },
         readAt: null,
@@ -95,6 +96,7 @@ export class NotificationsService {
         messagePreview: payload?.preview,
         messageChannel: payload?.channel,
         approverName: payload?.approverName,
+        deliveryToken: payload?.deliveryToken,
       });
     }
 
@@ -444,6 +446,60 @@ export class NotificationsService {
         });
       }
     }
+  }
+
+  /**
+   * Create notification when a project is delivered to customer.
+   * Notifies the linked customer (agent) that their job is ready.
+   */
+  async createDeliveryNotification(
+    projectId: string,
+    orgId: string,
+    deliveryToken: string,
+  ): Promise<void> {
+    // Get project with customer
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        customer: true,
+        organization: true,
+      },
+    });
+
+    if (!project) return;
+
+    // Only notify if there's a linked customer user
+    if (!project.customer?.userId) return;
+
+    const userId = project.customer.userId;
+
+    // Check if notification already exists for this delivery
+    const existing = await this.prisma.notification.findFirst({
+      where: {
+        userId,
+        projectId,
+        type: NotificationType.PROJECT_DELIVERED,
+      },
+    });
+
+    if (existing) {
+      // Already notified for this delivery - don't duplicate
+      return;
+    }
+
+    await this.prisma.notification.create({
+      data: {
+        userId,
+        orgId,
+        projectId,
+        type: NotificationType.PROJECT_DELIVERED,
+        payload: {
+          address: this.buildProjectAddress(project),
+          organizationName: project.organization.name,
+          deliveryToken,
+        },
+      },
+    });
   }
 
   /**

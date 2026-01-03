@@ -79,9 +79,10 @@ export function DeliveryComments({
                     {formatDistanceToNow(new Date(comment.timestamp), { addSuffix: true })}
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground mt-0.5 whitespace-pre-wrap">
-                  {comment.content}
-                </p>
+                <div
+                  className="text-sm text-muted-foreground mt-0.5 prose prose-sm max-w-none [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_a]:text-primary [&_a]:underline"
+                  dangerouslySetInnerHTML={{ __html: comment.content }}
+                />
               </div>
             </div>
           ))}

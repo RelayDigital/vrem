@@ -47,8 +47,35 @@ export class DeliveryController {
   }
 
   /**
-   * PUBLIC: Download all media as a zip file.
-   * Streams the zip directly to the client.
+   * PUBLIC: Request a download artifact (new non-streaming approach).
+   * Returns artifact status and URL when ready.
+   * Client should poll download-status endpoint if not immediately ready.
+   */
+  @Public()
+  @Post(':token/download-request')
+  async requestDownload(
+    @Param('token') token: string,
+    @Body() dto: DownloadAllDto,
+  ) {
+    return this.deliveryService.requestDownloadArtifact(token, dto.mediaTypes);
+  }
+
+  /**
+   * PUBLIC: Get download artifact status.
+   * Returns the current status and CDN URL when ready.
+   */
+  @Public()
+  @Get(':token/download-status/:artifactId')
+  async getDownloadStatus(
+    @Param('token') token: string,
+    @Param('artifactId') artifactId: string,
+  ) {
+    return this.deliveryService.getDownloadArtifactStatus(token, artifactId);
+  }
+
+  /**
+   * PUBLIC: Download all media as a zip file (streaming fallback).
+   * Use download-request endpoint for better reliability.
    */
   @Public()
   @Post(':token/download-all')

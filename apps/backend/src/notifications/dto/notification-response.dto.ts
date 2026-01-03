@@ -24,5 +24,8 @@ export class NotificationResponseDto {
 
   // For PROJECT_APPROVED notifications
   approverName?: string;
+
+  // For PROJECT_DELIVERED notifications
+  deliveryToken?: string;
 }
 

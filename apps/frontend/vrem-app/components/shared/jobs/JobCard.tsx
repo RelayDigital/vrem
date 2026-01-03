@@ -637,7 +637,8 @@ export function JobCard({
           </div>
 
           {/* Technician Profile Overlay or Find Technician Button */}
-          {canAssignTechnician && (
+          {/* Show technician info if assigned (for all users including agents), or show Find button if can assign */}
+          {(technician || canAssignTechnician) && (
               <div className="flex z-10 self-center w-full">
                 {technician ? (
                   <div className="flex items-center gap-3 pl-1 pr-3 py-1 backdrop-blur-md! bg-card/60! group-hover:bg-card! transition-colors duration-200 rounded-full max-w-[80%] mx-auto h-auto">
@@ -663,7 +664,7 @@ export function JobCard({
                     </div>
                   </div>
                 ) : (
-                  onViewRankings && (
+                  canAssignTechnician && onViewRankings && (
                     <Button
                       onClick={(e) => {
                         e.stopPropagation();

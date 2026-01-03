@@ -89,10 +89,10 @@ export class OrgContextGuard implements CanActivate {
       throw new UnauthorizedException('Authentication required');
     }
 
-    // User-scoped endpoints under /me/* don't require org membership validation
+    // User-scoped endpoints under /me/* and /auth/* don't require org membership validation
     // These endpoints operate on the authenticated user's data, not org-scoped data
     const url = req.url || req.path || '';
-    if (url.startsWith('/me/') || url === '/me') {
+    if (url.startsWith('/me/') || url === '/me' || url.startsWith('/auth/')) {
       return true;
     }
 

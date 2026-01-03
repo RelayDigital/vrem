@@ -89,9 +89,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem("token", clerkToken);
             setToken(clerkToken);
 
+            // Clear potentially stale org ID before syncing to avoid 403 errors
+            // This can happen when viewing cross-org pages like delivery
+            const storedOrgBeforeSync = api.organizations.getActiveOrganization();
+
             // Sync user with backend (backend will validate Clerk token and return/create user)
-            const user = await api.auth.me();
-            setUser(normalizeUser(user));
+            let user;
+            try {
+              user = await api.auth.me();
+              setUser(normalizeUser(user));
+            } catch (meError: any) {
+              // If me() fails with 403, try clearing org and retrying
+              if (meError?.message?.includes('403')) {
+                localStorage.removeItem("organizationId");
+                api.organizations.setActiveOrganization(null as any);
+                user = await api.auth.me();
+                setUser(normalizeUser(user));
+              } else {
+                throw meError;
+              }
+            }
 
             const orgs = await api.organizations.listMine();
             setMemberships(orgs);

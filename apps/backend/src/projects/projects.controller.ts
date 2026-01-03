@@ -240,4 +240,39 @@ export class ProjectsController {
     const ctx = req.orgContext as OrgContext;
     return this.projectsService.updateStatus(id, dto.status, ctx, user);
   }
+
+  // DELIVERY MANAGEMENT
+
+  // GET delivery status for a project
+  @Get(':id/delivery')
+  getDeliveryStatus(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req,
+  ) {
+    const ctx = req.orgContext as OrgContext;
+    return this.projectsService.getDeliveryStatus(id, ctx, user);
+  }
+
+  // ENABLE delivery for a project
+  @Post(':id/delivery/enable')
+  enableDelivery(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req,
+  ) {
+    const ctx = req.orgContext as OrgContext;
+    return this.projectsService.enableDelivery(id, ctx, user);
+  }
+
+  // DISABLE delivery for a project
+  @Post(':id/delivery/disable')
+  disableDelivery(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req,
+  ) {
+    const ctx = req.orgContext as OrgContext;
+    return this.projectsService.disableDelivery(id, ctx, user);
+  }
 }

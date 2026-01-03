@@ -165,6 +165,7 @@ import {
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { fetchOrganizationTechnicians } from "@/lib/technicians";
+import { DeliveryPanel } from "@/components/features/delivery/DeliveryPanel";
 import { useCurrentOrganization } from "@/hooks/useCurrentOrganization";
 import { useJobManagement } from "@/context/JobManagementContext";
 import { useMessaging } from "@/context/MessagingContext";
@@ -662,14 +663,22 @@ export function JobTaskView({
     );
   }, [technicians, job?.assignedTechnicianId]);
 
-  // Use assignedTechnician from lookup, fall back to technician prop
+  // Use assignedTechnician from lookup, fall back to technician prop or job.technician
   const displayTechnician = assignedTechnician
     ? {
         name: assignedTechnician.name,
         avatarUrl: assignedTechnician.avatar,
         role: assignedTechnician.role || "TECHNICIAN",
       }
-    : technician || null;
+    : technician
+    ? technician
+    : job?.technician
+    ? {
+        name: job.technician.name,
+        avatarUrl: job.technician.avatarUrl,
+        role: "TECHNICIAN" as const,
+      }
+    : null;
 
   const customerDisplayName =
     assignedCustomer?.name || job?.clientName || "Unassigned";
@@ -1456,7 +1465,7 @@ export function JobTaskView({
   };
 
   const handleDeleteMedia = async (id: string) => {
-    if (!job) return;
+    if (!job || isAgentUser) return; // Agents cannot delete media
     const orgId = activeOrganizationId || job.organizationId;
     if (orgId) {
       api.organizations.setActiveOrganization(orgId);
@@ -1678,14 +1687,16 @@ export function JobTaskView({
                         >
                           <Maximize2 className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 bg-background/90 hover:bg-background hover:text-destructive"
-                          onClick={() => handleDeleteMedia(item.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {!isAgentUser && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 bg-background/90 hover:bg-background hover:text-destructive"
+                            onClick={() => handleDeleteMedia(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
@@ -1853,14 +1864,16 @@ export function JobTaskView({
                   >
                     <Maximize2 className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 bg-background/90 hover:bg-background hover:text-destructive"
-                    onClick={() => handleDeleteMedia(item.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {!isAgentUser && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 bg-background/90 hover:bg-background hover:text-destructive"
+                      onClick={() => handleDeleteMedia(item.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
@@ -3360,6 +3373,28 @@ export function JobTaskView({
                   {job?.propertyAddress || "—"}
                 </div>
 
+                {/* Provider (only for agents) */}
+                {isAgentUser && job?.organizationName && (
+                  <>
+                    <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
+                      Provider
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {job.organizationLogoUrl && (
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={job.organizationLogoUrl} alt={job.organizationName} />
+                          <AvatarFallback className="text-[10px] bg-muted">
+                            {job.organizationName.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                      <span className="text-sm font-medium text-foreground">
+                        {job.organizationName}
+                      </span>
+                    </div>
+                  </>
+                )}
+
                 {/* Customer */}
                 {!isAgentUser && (
                   <>
@@ -3519,7 +3554,8 @@ export function JobTaskView({
                       Tech Assigned
                     </div>
                     <div className="flex items-center">
-                      {canAssignTechnicianOrEditor ? (
+                      {/* Agents should never be able to change technician - show read-only view */}
+                      {canAssignTechnicianOrEditor && !isAgentUser ? (
                     <div className="flex items-center gap-1">
                       <button
                         onClick={displayTechnician ? onChangeTechnician : onAssignTechnician}
@@ -3592,8 +3628,8 @@ export function JobTaskView({
                   </>
                 )}
 
-                {/* Editor Assigned - hide if agent and unassigned, or if solo provider */}
-                {!isProviderInPersonalOrg && (!isAgentUser || editorDisplayName !== "Unassigned") && (
+                {/* Editor Assigned - hide completely from agents (internal role), hide if solo provider */}
+                {!isAgentUser && !isProviderInPersonalOrg && (
                   <>
                     <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                       Editor Assigned
@@ -3709,21 +3745,38 @@ export function JobTaskView({
                   </Badge>
                 </div>
 
-                {/* Delivery Link (only for delivered projects) */}
-                {job?.status === "delivered" && job?.deliveryToken && (
+                {/* Delivery Panel - for providers */}
+                {!isAgentUser && (
                   <>
                     <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
                       Delivery
                     </div>
                     <div>
+                      <DeliveryPanel
+                        projectId={job?.id || ""}
+                        projectStatus={job?.status || ""}
+                        canManageDelivery={canEditThisProject}
+                        variant="inline"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Delivery Link - for agents when delivery is enabled */}
+                {isAgentUser && job?.deliveryToken && (
+                  <>
+                    <div className="text-[13px] font-medium text-muted-foreground tracking-wide self-center">
+                      Delivery
+                    </div>
+                    <div className="flex items-center gap-2">
                       <Button
-                        variant="link"
+                        variant="outline"
                         size="sm"
-                        className="h-auto p-0 text-[13px] font-medium"
+                        className="h-7 gap-1.5"
                         onClick={() => window.open(`/delivery/${job.deliveryToken}`, '_blank')}
                       >
-                        <ExternalLink className="mr-1.5 h-3 w-3" />
-                        View delivery page
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        View Delivery
                       </Button>
                     </div>
                   </>
