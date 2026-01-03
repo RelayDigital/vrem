@@ -89,56 +89,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem("token", clerkToken);
             setToken(clerkToken);
 
-            // Clear potentially stale org ID before syncing to avoid 403 errors
-            // This can happen when viewing cross-org pages like delivery
-            const storedOrgBeforeSync = api.organizations.getActiveOrganization();
-
             // Sync user with backend (backend will validate Clerk token and return/create user)
-            let user;
+            // The /auth/me endpoint is the single source of truth for:
+            // - User profile (from DB, not Clerk)
+            // - Organization memberships
+            // - Customer relationships
+            // - Recommended active org
+            let authData;
             try {
-              user = await api.auth.me();
-              setUser(normalizeUser(user));
+              authData = await api.auth.me();
             } catch (meError: any) {
               // If me() fails with 403, try clearing org and retrying
               if (meError?.message?.includes('403')) {
                 localStorage.removeItem("organizationId");
                 api.organizations.setActiveOrganization(null as any);
-                user = await api.auth.me();
-                setUser(normalizeUser(user));
+                authData = await api.auth.me();
               } else {
                 throw meError;
               }
             }
 
-            // Agents don't have org memberships - skip listMine for them
-            const isAgent = user?.accountType?.toUpperCase() === 'AGENT';
-            let orgs: any[] = [];
-            if (!isAgent) {
-              orgs = await api.organizations.listMine();
-            }
+            setUser(normalizeUser(authData));
+
+            // Use memberships from the auth response (DB is source of truth)
+            const orgs = authData.memberships || [];
             setMemberships(orgs);
 
+            // Determine active org:
+            // 1. Check if stored org is still valid (user is still a member)
+            // 2. Otherwise use server's recommended org
             const storedOrg = api.organizations.getActiveOrganization();
-            const isValidStoredOrg = storedOrg && orgs.some((m) => m.orgId === storedOrg);
+            const isValidStoredOrg = storedOrg && orgs.some((m: any) => m.orgId === storedOrg);
 
             if (storedOrg && !isValidStoredOrg) {
+              // Stored org is no longer valid - clear it
               localStorage.removeItem("organizationId");
             }
 
-            const personal = orgs.find(
-              (m) =>
-                m.organization?.type === "PERSONAL" ||
-                (m.organization as any)?.type === "PERSONAL"
-            );
-            const resolvedOrgId =
-              (isValidStoredOrg ? storedOrg : null) ||
-              personal?.orgId ||
-              orgs[0]?.orgId ||
-              null;
+            const resolvedOrgId = isValidStoredOrg
+              ? storedOrg
+              : authData.recommendedActiveOrgId || null;
+
             if (resolvedOrgId) {
               api.organizations.setActiveOrganization(resolvedOrgId);
-            } else if (isAgent) {
-              // Agents don't need org context - clear any stale org ID
+            } else {
+              // No valid org - clear any stale org ID
               api.organizations.setActiveOrganization(null as any);
             }
             setActiveOrganizationId(resolvedOrgId);
@@ -255,31 +250,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applyAuthResponse = async (response: { token: string; user: any }) => {
     localStorage.setItem("token", response.token);
     setToken(response.token);
-    const normalizedUser = normalizeUser(response.user);
-    setUser(normalizedUser);
 
-    // Agents don't have org memberships - skip listMine for them
-    const isAgent = normalizedUser?.accountType?.toUpperCase() === 'AGENT';
-    let orgs: any[] = [];
-    if (!isAgent) {
-      orgs = await api.organizations.listMine();
-    }
+    // Fetch full auth data from backend (DB is source of truth)
+    const authData = await api.auth.me();
+    setUser(normalizeUser(authData));
+
+    // Use memberships from auth response
+    const orgs = authData.memberships || [];
     setMemberships(orgs);
 
-    // Find the best organization to use (prefer personal org, then first available)
-    const personal = orgs.find(
-      (m) =>
-        m.organization?.type === "PERSONAL" ||
-        (m.organization as any)?.type === "PERSONAL"
-    );
-    const resolvedOrgId =
-      personal?.orgId ||
-      orgs[0]?.orgId ||
-      null;
+    // Use server's recommended org
+    const resolvedOrgId = authData.recommendedActiveOrgId || null;
     if (resolvedOrgId) {
       api.organizations.setActiveOrganization(resolvedOrgId);
-    } else if (isAgent) {
-      // Agents don't need org context - clear any stale org ID
+    } else {
       api.organizations.setActiveOrganization(null as any);
     }
     setActiveOrganizationId(resolvedOrgId);

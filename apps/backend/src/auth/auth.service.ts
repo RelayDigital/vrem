@@ -307,6 +307,16 @@ export class AuthService {
     };
   }
 
+  /**
+   * Auth bootstrap endpoint - returns all data needed to initialize app state.
+   * This is the single source of truth for:
+   * - User profile (from DB, not Clerk)
+   * - Organization memberships (member relationships)
+   * - Customer relationships (for agents)
+   * - Recommended active org ID
+   *
+   * Clerk provides ONLY identity/session. All access control is DB-based.
+   */
   async me(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -365,6 +375,57 @@ export class AuthService {
       }));
     }
 
+    // Determine recommended active org:
+    // 1. Personal org for agents (they don't operate in company orgs)
+    // 2. First non-personal COMPANY org for providers/company users
+    // 3. Personal org as fallback
+    let recommendedActiveOrgId: string | null = null;
+    if (user.accountType === 'AGENT') {
+      recommendedActiveOrgId = personalMembership?.orgId || null;
+    } else {
+      // For providers/company users, prefer a COMPANY org if they have one
+      const companyMembership = memberships.find(
+        (m) => m.organization.type === 'COMPANY',
+      );
+      recommendedActiveOrgId =
+        companyMembership?.orgId ||
+        personalMembership?.orgId ||
+        memberships[0]?.orgId ||
+        null;
+    }
+
+    // Build accessible org contexts with relationship type
+    const accessibleOrgs: Array<{
+      orgId: string;
+      orgName: string;
+      orgType: OrgType;
+      relationship: 'member' | 'customer';
+      role: OrgRole | null;
+      logoUrl: string | null;
+    }> = memberships.map((m) => ({
+      orgId: m.orgId,
+      orgName: m.organization.name,
+      orgType: m.organization.type,
+      relationship: 'member',
+      role: m.role,
+      logoUrl: m.organization.logoUrl,
+    }));
+
+    // Add customer orgs to accessible list (for agents)
+    for (const co of customerOrganizations) {
+      // Only add if not already in list (shouldn't happen, but be safe)
+      if (!accessibleOrgs.find((o) => o.orgId === co.orgId)) {
+        accessibleOrgs.push({
+          orgId: co.orgId,
+          orgName: co.orgName,
+          orgType: co.orgType as OrgType,
+          relationship: 'customer',
+          role: null,
+          logoUrl: null,
+        });
+      }
+    }
+
     return {
       ...safeUser,
       // Keep organizationId for backwards compatibility (first/personal org)
@@ -386,6 +447,10 @@ export class AuthService {
       personalOrgId: personalMembership?.orgId || null,
       // Customer access for agents
       customerOrganizations,
+      // Server-recommended active org
+      recommendedActiveOrgId,
+      // All accessible org contexts
+      accessibleOrgs,
     };
   }
 
