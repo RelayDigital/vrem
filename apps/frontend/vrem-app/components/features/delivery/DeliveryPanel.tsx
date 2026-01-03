@@ -387,10 +387,22 @@ export function DeliveryPanel({
               </Badge>
             </div>
 
-            {status.clientApprovedAt && status.clientApprovedBy && (
+            {/* Show approval/activity info based on status */}
+            {status.clientApprovalStatus === "APPROVED" && status.clientApprovedAt && status.clientApprovedBy && (
               <div className="text-xs text-muted-foreground">
                 Approved by {status.clientApprovedBy.name} on{" "}
                 {new Date(status.clientApprovedAt).toLocaleDateString()}
+              </div>
+            )}
+            {status.clientApprovalStatus === "CHANGES_REQUESTED" && (
+              <div className="text-xs text-muted-foreground">
+                Client requested changes
+              </div>
+            )}
+            {status.clientApprovalStatus === "PENDING_REVIEW" && status.deliveryEnabledAt && (
+              <div className="text-xs text-muted-foreground">
+                Delivery ready since{" "}
+                {new Date(status.deliveryEnabledAt).toLocaleDateString()}
               </div>
             )}
           </>

@@ -286,4 +286,15 @@ export class ProjectsController {
     const ctx = req.orgContext as OrgContext;
     return this.projectsService.regenerateDeliveryToken(id, ctx, user);
   }
+
+  // ROTATE delivery token for a project (alias for regenerate-token)
+  @Post(':id/delivery/rotate-token')
+  rotateDeliveryToken(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req,
+  ) {
+    const ctx = req.orgContext as OrgContext;
+    return this.projectsService.regenerateDeliveryToken(id, ctx, user);
+  }
 }

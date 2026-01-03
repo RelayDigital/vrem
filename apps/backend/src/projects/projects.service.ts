@@ -238,6 +238,7 @@ export class ProjectsService {
       media: true,
       customer: true,
       organization: true, // Include organization for agent view
+      clientApprovedBy: true, // Include approver for delivery state
     };
 
     if (withMessages) {
