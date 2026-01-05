@@ -130,10 +130,7 @@ export default function AccountPage() {
     }
   };
 
-  if (isLoading) {
-    return <SettingsLoadingSkeleton />;
-  }
-
+  // Layout already handles auth loading - if we reach here, user exists
   if (!user) {
     return null;
   }

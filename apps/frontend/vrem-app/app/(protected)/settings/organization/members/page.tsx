@@ -20,10 +20,7 @@ export default function OrganizationMembersPage() {
     }
   }, [isLoading, isAllowed, router, user?.organizationId]);
 
-  if (isLoading) {
-    return <TeamLoadingSkeleton />;
-  }
-
+  // Layout already handles auth loading - if we reach here, user exists
   if (!user) {
     return null;
   }

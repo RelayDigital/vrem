@@ -4,7 +4,6 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode,
 import { JobRequest, Project, ProjectStatus } from '@/types';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import { toEffectiveRole } from '@/lib/roles';
 
 interface JobManagementContextType {
   // Job state
@@ -112,64 +111,28 @@ export function JobManagementProvider({
     }
 
     try {
-      const memberRoleUpper = (memberRole || '').toUpperCase();
-      const userRoleUpper = (userRole || '').toUpperCase();
-      const hasOrgRole = Boolean(memberRoleUpper || userRoleUpper);
-      const isProjectManagerRole =
-        memberRoleUpper === 'PROJECT_MANAGER' || userRoleUpper === 'PROJECT_MANAGER';
-      // TECHNICIAN and EDITOR can only see their own assigned projects
-      const isLimitedRole =
-        memberRoleUpper === 'TECHNICIAN' || memberRoleUpper === 'EDITOR' ||
-        userRoleUpper === 'TECHNICIAN' || userRoleUpper === 'EDITOR';
-      const effectiveRole = toEffectiveRole(memberRoleUpper || userRoleUpper);
-      // Only OWNER/ADMIN can view all org projects via listForOrg
-      // PROJECT_MANAGER, TECHNICIAN, EDITOR should use listForCurrentUser
-      const canViewOrgProjects =
-        hasOrgRole &&
-        userRoleUpper !== 'AGENT' &&
-        !isProjectManagerRole &&
-        !isLimitedRole &&
-        effectiveRole === 'COMPANY';
-
+      // Always use listForCurrentUser as the primary method - it works for all roles
+      // and returns appropriate projects based on user's permissions.
+      // The listForOrg endpoint requires OWNER/ADMIN and should only be used
+      // when we're certain of the role, which is unreliable during org switches.
       let fetchedProjects: Project[] = [];
-      if (canViewOrgProjects) {
-        try {
-          fetchedProjects = await api.projects.listForOrg();
-        } catch (err: any) {
-          const message = err?.message || '';
-          const isForbidden =
-            message.includes('403') || message.toLowerCase().includes('forbidden');
-          if (!isForbidden) {
-            // If no org header or other issue, fallback for agents/others
-            fetchedProjects = await api.projects.listForCurrentUser();
-          } else {
-            fetchedProjects = await api.projects.listForCurrentUser();
-          }
-        }
-      } else {
+      try {
         fetchedProjects = await api.projects.listForCurrentUser();
+      } catch (err: any) {
+        console.warn('Failed to fetch user projects:', err?.message);
+        fetchedProjects = [];
       }
-      if (isProjectManagerRole) {
-        try {
-          const assigned = await api.projects.listForCurrentUser();
-          const byId = new Map(fetchedProjects.map((p) => [p.id, p]));
-          assigned.forEach((p) => {
-            if (!byId.has(p.id)) {
-              byId.set(p.id, p);
-            }
-          });
-          fetchedProjects = Array.from(byId.values());
-        } catch (err) {
-          console.warn('Failed to fetch assigned projects for project manager', err);
-        }
-      }
+
       // Ensure dates are Date objects
       const projectsWithDates = normalizeProjects(fetchedProjects);
       setProjects(projectsWithDates);
     } catch (error) {
       console.error('Error fetching jobs:', error);
       setJobsError(error as Error);
-      toast.error('Failed to load jobs');
+      // Don't show toast for expected errors during org switch
+      if (!String(error).includes('org')) {
+        toast.error('Failed to load jobs');
+      }
     } finally {
       setIsLoadingJobs(false);
     }
@@ -181,7 +144,14 @@ export function JobManagementProvider({
 
   // Reload jobs when organization changes (event fired by auth context)
   useEffect(() => {
-    const handleOrgChange = () => {
+    const handleOrgChange = async () => {
+      // Clear current jobs during org switch to prevent stale data
+      setProjects([]);
+      setJobsError(null);
+
+      // Small delay to allow localStorage and context to sync
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       fetchJobs();
     };
     if (typeof window !== 'undefined') {

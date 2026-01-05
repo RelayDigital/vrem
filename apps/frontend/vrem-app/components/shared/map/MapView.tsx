@@ -439,6 +439,67 @@ export function MapView({
     return el;
   };
 
+  // Helper function to create avatar element for person markers
+  const createAvatarElement = (
+    avatarUrl: string | undefined | null,
+    name: string,
+    size: number = 36,
+    borderColor: string = "white"
+  ): HTMLElement => {
+    const el = document.createElement("div");
+    el.style.width = `${size}px`;
+    el.style.height = `${size}px`;
+    el.style.borderRadius = "50%";
+    el.style.border = `2.5px solid ${borderColor}`;
+    el.style.boxShadow = "0 2px 6px rgba(0,0,0,0.25)";
+    el.style.cursor = "pointer";
+    el.style.overflow = "hidden";
+    el.style.display = "flex";
+    el.style.alignItems = "center";
+    el.style.justifyContent = "center";
+
+    if (avatarUrl) {
+      // Use profile picture
+      const img = document.createElement("img");
+      img.src = avatarUrl;
+      img.alt = name;
+      img.style.width = "100%";
+      img.style.height = "100%";
+      img.style.objectFit = "cover";
+      // Fallback to initials if image fails to load
+      img.onerror = () => {
+        img.remove();
+        const initials = name
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2);
+        el.style.backgroundColor = getCSSVar("--muted-foreground") || "#6b7280";
+        el.style.color = "white";
+        el.style.fontSize = `${size * 0.4}px`;
+        el.style.fontWeight = "600";
+        el.textContent = initials;
+      };
+      el.appendChild(img);
+    } else {
+      // Use initials
+      const initials = name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+      el.style.backgroundColor = getCSSVar("--muted-foreground") || "#6b7280";
+      el.style.color = "white";
+      el.style.fontSize = `${size * 0.4}px`;
+      el.style.fontWeight = "600";
+      el.textContent = initials;
+    }
+
+    return el;
+  };
+
   // Create markers and popups
   useEffect(() => {
     if (!mapRef.current || !isLoaded) return;
@@ -776,10 +837,6 @@ export function MapView({
         technician.availability.find((a) => a.date === today)?.available ||
         false;
 
-      // Use neutral color for technician markers
-      const technicianColor = getCSSVar("--muted-foreground") || "#6b7280";
-      const el = createIconElement(User, technicianColor, 32);
-
       // Keep availableColor for popup styling (availability badges, etc.)
       const availableColor = isAvailable
         ? getStatusColor("delivered")
@@ -913,6 +970,9 @@ export function MapView({
             </div>
           </div>
         `;
+
+      // Use profile picture for technician marker
+      const el = createAvatarElement(technician.avatar, technician.name, 36, "white");
 
       const marker = new mapboxgl.Marker({ element: el })
         .setLngLat(lngLat)

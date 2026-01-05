@@ -98,16 +98,22 @@ export default function MapPage() {
   const effectiveRole = getEffectiveOrgRole(user, memberships, organizationId);
   const companyElevated = isCompanyRole(effectiveRole);
   const activeMembership = memberships.find((m) => m.orgId === organizationId);
+
+  // Use orgDetails (full data from API) if available, otherwise fall back to membership.organization
   const activeOrg =
     (orgDetails as Organization | null) ||
     (activeMembership?.organization as Organization | undefined);
+
+  // Check organization type from multiple sources for robustness
+  const membershipOrgType = activeMembership?.organization?.type;
   const isPersonalOrg =
+    membershipOrgType === "PERSONAL" ||
     activeOrg?.type === "PERSONAL" ||
     (activeMembership as any)?.organizationType === "PERSONAL";
-  const isProviderAccount =
-    (user?.accountType || "").toUpperCase() === "PROVIDER";
-  const orgLatRaw = (activeOrg as any)?.lat;
-  const orgLngRaw = (activeOrg as any)?.lng;
+
+  // Get location from orgDetails (full API response) since membership.organization doesn't include lat/lng
+  const orgLatRaw = orgDetails?.lat;
+  const orgLngRaw = orgDetails?.lng;
   const orgLat =
     typeof orgLatRaw === "string" ? parseFloat(orgLatRaw) : orgLatRaw;
   const orgLng =
@@ -118,36 +124,51 @@ export default function MapPage() {
     typeof orgLng === "number" &&
     !Number.isNaN(orgLng);
 
+  // Geocode org address if lat/lng not available
+  // Only runs when orgDetails is loaded (full API response with address fields)
   useEffect(() => {
     const tryGeocode = async () => {
-      if (hasOrgLocation || !activeOrg) return;
+      // Skip if we already have coordinates from orgDetails
+      if (hasOrgLocation) return;
+      // Skip if orgDetails hasn't loaded yet (need full org data for address fields)
+      if (!orgDetails) return;
+
       const addressParts = [
-        (activeOrg as any)?.addressLine1,
-        (activeOrg as any)?.addressLine2,
-        (activeOrg as any)?.city,
-        (activeOrg as any)?.region,
-        (activeOrg as any)?.postalCode,
-        (activeOrg as any)?.countryCode,
+        orgDetails.addressLine1,
+        orgDetails.addressLine2,
+        orgDetails.city,
+        orgDetails.region,
+        orgDetails.postalCode,
+        orgDetails.countryCode,
       ].filter(Boolean);
-      if (!addressParts.length) return;
+
+      if (!addressParts.length) {
+        // No address - don't show marker
+        return;
+      }
+
       const addressString = addressParts.join(", ");
       try {
         const coords = await geocodeAddress(addressString);
         if (coords) {
           setOrgGeocodedCoords(coords);
+        } else {
+          // Geocoding failed - don't show marker
+          console.warn("Geocoding returned no results for org address");
         }
       } catch (error) {
-        console.error("Failed to geocode org address for map", error);
+        console.error("Failed to geocode org address for map:", error);
       }
     };
     void tryGeocode();
-  }, [activeOrg, hasOrgLocation]);
+  }, [orgDetails, hasOrgLocation]);
 
   const selfTechnician: Technician | null = useMemo(() => {
+    // Show self marker in personal org for any account type with a location
+    // Requires orgDetails to be loaded for location data
     if (
       !user ||
       !isPersonalOrg ||
-      !isProviderAccount ||
       (!hasOrgLocation && !orgGeocodedCoords)
     ) {
       return null;
@@ -156,13 +177,13 @@ export default function MapPage() {
       id: user.id,
       userId: user.id,
       orgMemberId: activeMembership?.id || user.id,
-      orgId: organizationId || activeMembership?.orgId || activeOrg?.id || user.organizationId || "",
+      orgId: organizationId || activeMembership?.orgId || orgDetails?.id || user.organizationId || "",
       memberId: activeMembership?.id,
-      organizationId: activeOrg?.id,
+      organizationId: orgDetails?.id,
       role: "TECHNICIAN",
       name: user.name || "Me",
       email: user.email || "",
-      phone: activeOrg?.phone || "",
+      phone: orgDetails?.phone || "",
       isIndependent: true,
       companyId: undefined,
       companyName: undefined,
@@ -170,11 +191,11 @@ export default function MapPage() {
         lat: (hasOrgLocation ? orgLat : orgGeocodedCoords?.lat) as number,
         lng: (hasOrgLocation ? orgLng : orgGeocodedCoords?.lng) as number,
         address: {
-          street: activeOrg?.addressLine1 || "",
-          city: activeOrg?.city || "",
-          stateProvince: activeOrg?.region || "",
-          country: activeOrg?.countryCode || "",
-          postalCode: activeOrg?.postalCode || "",
+          street: orgDetails?.addressLine1 || "",
+          city: orgDetails?.city || "",
+          stateProvince: orgDetails?.region || "",
+          country: orgDetails?.countryCode || "",
+          postalCode: orgDetails?.postalCode || "",
         },
       },
       availability: [],
@@ -217,10 +238,9 @@ export default function MapPage() {
     };
   }, [
     activeMembership,
-    activeOrg,
+    orgDetails,
     hasOrgLocation,
     isPersonalOrg,
-    isProviderAccount,
     organizationId,
     orgGeocodedCoords,
     orgLat,
@@ -321,12 +341,14 @@ export default function MapPage() {
     user,
   ]);
 
-  if (isLoading || loadingTechnicians) {
-    return <MapLoadingSkeleton />;
-  }
-
+  // Layout already handles auth loading - if we reach here, user exists
   if (!user) {
     return null; // Redirect handled by hook
+  }
+
+  // Show skeleton while loading technicians - map needs this data
+  if (loadingTechnicians) {
+    return <MapLoadingSkeleton />;
   }
 
   const userRole = effectiveRole;

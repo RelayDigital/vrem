@@ -10,6 +10,7 @@ import { JobTaskView } from "@/components/shared/tasks/JobTaskView";
 import {
   JobRequest,
   Metrics,
+  Organization,
   ProjectStatus,
   ProviderProfile,
   Technician,
@@ -25,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
 import { fetchOrganizationTechnicians, geocodeAddress } from "@/lib/technicians";
 import { getUIContext } from "@/lib/roles";
+import { api } from "@/lib/api";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -41,68 +43,117 @@ export default function DashboardPage() {
   const fetchedJobsRef = useRef<Set<string>>(new Set());
   const [providers, setProviders] = useState<ProviderProfile[]>([]);
   const [loadingProviders, setLoadingProviders] = useState(false);
+  const [orgDetails, setOrgDetails] = useState<Organization | null>(null);
   const [orgGeocodedCoords, setOrgGeocodedCoords] = useState<{ lat: number; lng: number } | null>(null);
-  
+
   // Build UIContext for role-based rendering
   const uiContext = useMemo(() => {
     return getUIContext(user, memberships, organizationId);
   }, [user, memberships, organizationId]);
-  
+
   // Get active org details for self-marker
   const activeMembership = memberships.find((m) => m.orgId === organizationId);
-  const activeOrg = activeMembership?.organization;
-  const isPersonalOrg = activeOrg?.type === "PERSONAL" || (activeMembership as any)?.organizationType === "PERSONAL";
-  const isProviderAccount = (user?.accountType || "").toUpperCase() === "PROVIDER";
-  
-  // Parse org location
-  const orgLatRaw = (activeOrg as any)?.lat;
-  const orgLngRaw = (activeOrg as any)?.lng;
+
+  // Check organization type from multiple sources for robustness
+  const membershipOrgType = activeMembership?.organization?.type;
+  const isPersonalOrg =
+    membershipOrgType === "PERSONAL" ||
+    orgDetails?.type === "PERSONAL" ||
+    (activeMembership as any)?.organizationType === "PERSONAL";
+
+  // Fetch full org details (includes lat/lng and address)
+  useEffect(() => {
+    let cancelled = false;
+    const loadOrg = async () => {
+      if (!organizationId) {
+        setOrgDetails(null);
+        return;
+      }
+      try {
+        const org = await api.organizations.getById(organizationId);
+        if (!cancelled) {
+          setOrgDetails(org);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setOrgDetails(null);
+          console.error("Failed to load organization for dashboard", error);
+        }
+      }
+    };
+    if (user) {
+      loadOrg();
+    } else {
+      setOrgDetails(null);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId, user]);
+
+  // Get location from orgDetails (full API response) since membership.organization doesn't include lat/lng
+  const orgLatRaw = orgDetails?.lat;
+  const orgLngRaw = orgDetails?.lng;
   const orgLat = typeof orgLatRaw === "string" ? parseFloat(orgLatRaw) : orgLatRaw;
   const orgLng = typeof orgLngRaw === "string" ? parseFloat(orgLngRaw) : orgLngRaw;
   const hasOrgLocation = typeof orgLat === "number" && !Number.isNaN(orgLat) && typeof orgLng === "number" && !Number.isNaN(orgLng);
-  
-  // Geocode org address if lat/lng not set
+
+  // Geocode org address if lat/lng not available
+  // Only runs when orgDetails is loaded (full API response with address fields)
   useEffect(() => {
     const tryGeocode = async () => {
-      if (hasOrgLocation || !activeOrg) return;
+      // Skip if we already have coordinates from orgDetails
+      if (hasOrgLocation) return;
+      // Skip if orgDetails hasn't loaded yet (need full org data for address fields)
+      if (!orgDetails) return;
+
       const addressParts = [
-        (activeOrg as any)?.addressLine1,
-        (activeOrg as any)?.addressLine2,
-        (activeOrg as any)?.city,
-        (activeOrg as any)?.region,
-        (activeOrg as any)?.postalCode,
-        (activeOrg as any)?.countryCode,
+        orgDetails.addressLine1,
+        orgDetails.addressLine2,
+        orgDetails.city,
+        orgDetails.region,
+        orgDetails.postalCode,
+        orgDetails.countryCode,
       ].filter(Boolean);
-      if (!addressParts.length) return;
+
+      if (!addressParts.length) {
+        // No address - don't show marker
+        return;
+      }
+
       const addressString = addressParts.join(", ");
       try {
         const coords = await geocodeAddress(addressString);
         if (coords) {
           setOrgGeocodedCoords(coords);
+        } else {
+          // Geocoding failed - don't show marker
+          console.warn("Geocoding returned no results for org address");
         }
       } catch (error) {
-        console.error("Failed to geocode org address for dashboard", error);
+        console.error("Failed to geocode org address for dashboard:", error);
       }
     };
     void tryGeocode();
-  }, [activeOrg, hasOrgLocation]);
+  }, [orgDetails, hasOrgLocation]);
   
-  // Create selfTechnician for PERSONAL org providers
+  // Create selfTechnician for PERSONAL org users with a location
+  // Requires orgDetails to be loaded for location data
   const selfTechnician: Technician | null = useMemo(() => {
-    if (!user || !isPersonalOrg || !isProviderAccount || (!hasOrgLocation && !orgGeocodedCoords)) {
+    if (!user || !isPersonalOrg || (!hasOrgLocation && !orgGeocodedCoords)) {
       return null;
     }
     return {
       id: user.id,
       userId: user.id,
       orgMemberId: activeMembership?.id || user.id,
-      orgId: organizationId || activeMembership?.orgId || activeOrg?.id || user.organizationId || "",
+      orgId: organizationId || activeMembership?.orgId || orgDetails?.id || user.organizationId || "",
       memberId: activeMembership?.id,
-      organizationId: activeOrg?.id,
+      organizationId: orgDetails?.id,
       role: "TECHNICIAN",
       name: user.name || "Me",
       email: user.email || "",
-      phone: (activeOrg as any)?.phone || "",
+      phone: orgDetails?.phone || "",
       isIndependent: true,
       companyId: undefined,
       companyName: undefined,
@@ -110,11 +161,11 @@ export default function DashboardPage() {
         lat: (hasOrgLocation ? orgLat : orgGeocodedCoords?.lat) as number,
         lng: (hasOrgLocation ? orgLng : orgGeocodedCoords?.lng) as number,
         address: {
-          street: (activeOrg as any)?.addressLine1 || "",
-          city: (activeOrg as any)?.city || "",
-          stateProvince: (activeOrg as any)?.region || "",
-          country: (activeOrg as any)?.countryCode || "",
-          postalCode: (activeOrg as any)?.postalCode || "",
+          street: orgDetails?.addressLine1 || "",
+          city: orgDetails?.city || "",
+          stateProvince: orgDetails?.region || "",
+          country: orgDetails?.countryCode || "",
+          postalCode: orgDetails?.postalCode || "",
         },
       },
       availability: [],
@@ -155,7 +206,7 @@ export default function DashboardPage() {
       portfolio: [],
       certifications: [],
     };
-  }, [user, isPersonalOrg, isProviderAccount, hasOrgLocation, orgGeocodedCoords, activeMembership, organizationId, activeOrg, orgLat, orgLng]);
+  }, [user, isPersonalOrg, hasOrgLocation, orgGeocodedCoords, activeMembership, organizationId, orgDetails, orgLat, orgLng]);
 
   const roleUpper = (
     (activeMembership?.role || (activeMembership as any)?.orgRole || "") as string
@@ -393,17 +444,12 @@ export default function DashboardPage() {
     };
   }, [user, memberships, organizationId, isAgent]);
 
-  if (isLoading) {
-    return <DashboardLoadingSkeleton />;
-  }
-
+  // Layout already handles auth loading - if we reach here, user exists
   if (!user || !uiContext) {
     return null; // Redirect handled by hook
   }
 
-  if (loadingProviders && providers.length === 0) {
-    return <DashboardLoadingSkeleton />;
-  }
+  // Note: loadingProviders is handled inline with JobDataBoundary - no full-screen loader
 
   // Role-based rendering using UIContext
   const { showSidebar, accountType, orgType, isElevatedRole } = uiContext;

@@ -54,10 +54,7 @@ export default function CustomersPage() {
     loadCustomers();
   }, [user, isAllowed, isLoading]);
 
-  if (isLoading) {
-    return <TeamLoadingSkeleton />;
-  }
-
+  // Layout already handles auth loading - if we reach here, user exists
   if (!user) {
     return null; // Redirect handled by parent layout
   }

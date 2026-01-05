@@ -21,6 +21,9 @@ import { randomUUID } from 'crypto';
 import { AuthorizationService } from '../auth/authorization.service';
 import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { EmailService } from '../email/email.service';
+import {
+  geocodeAddressComponents as geocodeUtil,
+} from '../common/geocode.util';
 
 @Injectable()
 export class OrganizationsService {
@@ -31,6 +34,28 @@ export class OrganizationsService {
     private authorization: AuthorizationService,
     private emailService: EmailService,
   ) {}
+
+  /**
+   * Helper to geocode address components.
+   * Returns null if geocoding fails or MAPBOX_ACCESS_TOKEN is not set.
+   */
+  private async geocodeAddressComponents(address: {
+    addressLine1?: string | null;
+    addressLine2?: string | null;
+    city?: string | null;
+    region?: string | null;
+    postalCode?: string | null;
+    countryCode?: string | null;
+  }): Promise<{ lat: number; lng: number } | null> {
+    return geocodeUtil({
+      addressLine1: address.addressLine1 ?? undefined,
+      addressLine2: address.addressLine2 ?? undefined,
+      city: address.city ?? undefined,
+      region: address.region ?? undefined,
+      postalCode: address.postalCode ?? undefined,
+      countryCode: address.countryCode ?? undefined,
+    });
+  }
 
   async createOrganization(
     user: AuthenticatedUser,
@@ -312,6 +337,33 @@ export class OrganizationsService {
     if (dto.countryCode !== undefined) updateData.countryCode = dto.countryCode;
     if (dto.lat !== undefined) updateData.lat = dto.lat;
     if (dto.lng !== undefined) updateData.lng = dto.lng;
+
+    // Auto-geocode if address changed but lat/lng not explicitly provided
+    const addressFieldsChanged =
+      dto.addressLine1 !== undefined ||
+      dto.city !== undefined ||
+      dto.region !== undefined ||
+      dto.postalCode !== undefined ||
+      dto.countryCode !== undefined;
+
+    if (addressFieldsChanged && dto.lat === undefined && dto.lng === undefined) {
+      // Build address from updated fields (or fall back to existing org values)
+      const addressForGeocode = {
+        addressLine1: dto.addressLine1 ?? org.addressLine1,
+        addressLine2: dto.addressLine2 ?? org.addressLine2,
+        city: dto.city ?? org.city,
+        region: dto.region ?? org.region,
+        postalCode: dto.postalCode ?? org.postalCode,
+        countryCode: dto.countryCode ?? org.countryCode,
+      };
+
+      const coords = await this.geocodeAddressComponents(addressForGeocode);
+      if (coords) {
+        updateData.lat = coords.lat;
+        updateData.lng = coords.lng;
+        this.logger.log(`Auto-geocoded address for org ${orgId}: ${coords.lat}, ${coords.lng}`);
+      }
+    }
 
     // For personal organizations, lock the name to "<User Name>'s Workspace"
     if (org.type === OrgType.PERSONAL) {
