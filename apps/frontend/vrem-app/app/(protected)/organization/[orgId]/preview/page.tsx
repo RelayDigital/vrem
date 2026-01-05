@@ -40,8 +40,21 @@ export default function OrganizationPreviewPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner className="h-8 w-8" />
+      <div className="container max-w-2xl mx-auto py-8 px-4">
+        <div className="h-9 w-20 bg-muted animate-pulse rounded mb-6" />
+        <Card>
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="h-20 w-20 bg-muted animate-pulse rounded-full" />
+            </div>
+            <div className="h-8 w-48 mx-auto bg-muted animate-pulse rounded" />
+            <div className="h-6 w-24 mx-auto bg-muted animate-pulse rounded mt-2" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+            <div className="h-4 w-48 bg-muted animate-pulse rounded" />
+          </CardContent>
+        </Card>
       </div>
     );
   }

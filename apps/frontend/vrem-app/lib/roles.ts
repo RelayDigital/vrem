@@ -134,9 +134,9 @@ export const getEffectiveOrgRole = (
   if (ctx.accountType === 'AGENT') {
     return 'AGENT';
   }
-  // PROVIDER in their PERSONAL org should see all jobs (they own the business)
+  // Any user in their PERSONAL org should see all jobs (they own the business)
   // Treat them as COMPANY role for job visibility purposes
-  if (ctx.accountType === 'PROVIDER' && ctx.orgType === 'PERSONAL') {
+  if (ctx.orgType === 'PERSONAL') {
     return 'COMPANY';
   }
   return 'TECHNICIAN';

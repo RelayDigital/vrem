@@ -20,20 +20,36 @@ export default function Home() {
     }
   }, [isLoaded, isSignedIn, router]);
 
-  // Show loading state while Clerk is loading
-  if (!isLoaded) {
+  // Show skeleton while Clerk is loading or redirecting
+  if (!isLoaded || isSignedIn) {
     return (
-      <div className="min-h-svh flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
-
-  // If signed in, show loading while redirecting
-  if (isSignedIn) {
-    return (
-      <div className="min-h-svh flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Redirecting to dashboard...</div>
+      <div className="grid min-h-svh lg:grid-cols-2">
+        <div className="flex flex-col gap-4 p-6 md:p-10">
+          <div className="flex justify-center gap-2 md:justify-start">
+            <div className="flex items-center gap-2 font-medium">
+              <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
+                <GalleryVerticalEnd className="size-4" />
+              </div>
+              VX Media
+            </div>
+          </div>
+          <div className="flex flex-1 items-center justify-center">
+            <div className="w-full max-w-xs space-y-6">
+              <div className="space-y-2 text-center">
+                <div className="h-8 w-48 mx-auto bg-muted animate-pulse rounded" />
+                <div className="h-4 w-64 mx-auto bg-muted animate-pulse rounded" />
+              </div>
+              <div className="space-y-4">
+                <div className="h-10 w-full bg-muted animate-pulse rounded" />
+                <div className="h-10 w-full bg-muted animate-pulse rounded" />
+                <div className="h-10 w-full bg-muted animate-pulse rounded" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-muted relative hidden lg:block">
+          <div className="absolute inset-0 bg-muted animate-pulse" />
+        </div>
       </div>
     );
   }

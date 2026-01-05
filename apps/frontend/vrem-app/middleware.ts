@@ -5,7 +5,10 @@ const isPublicRoute = createRouteMatcher([
   '/',
   '/login(.*)',
   '/signup(.*)',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
   '/sso-callback(.*)',
+  '/delivery/(.*)',
   '/api/health(.*)',
   '/api/otp(.*)',
   '/api/invitations/by-email(.*)',
@@ -17,8 +20,8 @@ export default clerkMiddleware(async (auth, req) => {
     return
   }
 
-  // For protected routes, just check auth but don't redirect to Clerk's UI
-  // The app will handle showing login page if needed
+  // Protect all other routes - redirect to sign-in if not authenticated
+  await auth.protect()
 })
 
 export const config = {

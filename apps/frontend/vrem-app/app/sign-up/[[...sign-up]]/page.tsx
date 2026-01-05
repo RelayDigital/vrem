@@ -3,6 +3,9 @@ import { GalleryVerticalEnd } from "lucide-react";
 import Link from "next/link";
 import { LoginMapView } from "@/components/shared/map/LoginMapView";
 
+// Next.js 15: Force dynamic rendering for catch-all routes with async params
+export const dynamic = 'force-dynamic';
+
 export default function SignUpPage() {
   return (
     <div className="grid min-h-svh lg:grid-cols-2">

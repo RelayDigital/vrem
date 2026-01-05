@@ -87,10 +87,7 @@ export default function CalendarPage() {
     }
   }, [jobManagement.selectedJob?.id, memberships, organizationId, isAgent]);
 
-  if (isLoading) {
-    return <CalendarLoadingSkeleton />;
-  }
-
+  // Layout already handles auth loading - if we reach here, user exists
   if (!user) {
     return null; // Redirect handled by hook
   }

@@ -21,10 +21,7 @@ export default function Security2FAPage() {
   ]);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
-  if (isLoading) {
-    return <SettingsLoadingSkeleton />;
-  }
-
+  // Layout already handles auth loading - if we reach here, user exists
   if (!user) {
     return null;
   }

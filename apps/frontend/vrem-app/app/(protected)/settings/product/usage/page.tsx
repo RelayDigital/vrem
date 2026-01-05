@@ -18,10 +18,7 @@ export default function ProductUsagePage() {
     "PROJECT_MANAGER",
   ]);
 
-  if (isLoading) {
-    return <SettingsLoadingSkeleton />;
-  }
-
+  // Layout already handles auth loading - if we reach here, user exists
   if (!user) {
     return null;
   }

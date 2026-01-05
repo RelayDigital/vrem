@@ -137,10 +137,7 @@ export default function JobsPage() {
     };
   }, [user, isAgent]);
 
-  if (isLoading) {
-    return <JobsLoadingSkeleton />;
-  }
-
+  // Layout already handles auth loading - if we reach here, user exists
   if (!user) {
     return null; // Redirect handled by hook
   }
