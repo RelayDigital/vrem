@@ -1,4 +1,4 @@
-import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization, DeliveryResponse, DeliveryComment, MediaType, ServicePackage, PackageAddOn, CreatePackagePayload, CreateAddOnPayload, DayOfWeek, TourTrack, TourStatusResponse, TourTrackProgress, TourProgressStep, UpdateTourProgressRequest, ClientApprovalStatus } from '@/types';
+import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization, DeliveryResponse, DeliveryComment, MediaType, ServicePackage, PackageAddOn, CreatePackagePayload, CreateAddOnPayload, DayOfWeek, TourTrack, TourStatusResponse, TourTrackProgress, TourProgressStep, UpdateTourProgressRequest, ClientApprovalStatus, OrgContextResponse } from '@/types';
 import {
   currentUser,
   jobRequests,
@@ -587,6 +587,45 @@ class ApiClient {
         ...org,
         createdAt: new Date(org.createdAt),
       }));
+    },
+
+    /**
+     * Get the canonical org context for the org switcher.
+     * This is the single source of truth for:
+     * - Personal org (always present)
+     * - Team and Company org memberships with role
+     * - For AGENT accounts: orgs where they are a customer
+     *
+     * Use this instead of calling disparate endpoints.
+     */
+    orgContext: async (): Promise<OrgContextResponse> => {
+      if (USE_MOCK_DATA) {
+        // Return minimal mock data
+        return {
+          personalOrg: {
+            id: 'personal-org-mock',
+            name: 'Personal Workspace',
+            type: 'PERSONAL',
+            logoUrl: null,
+          },
+          memberships: [],
+          customerOfOrgs: [],
+          accountType: 'PROVIDER',
+        };
+      }
+      const result = await this.request<any>('/users/me/org-context');
+      // Parse dates
+      return {
+        ...result,
+        memberships: result.memberships.map((m: any) => ({
+          ...m,
+          createdAt: new Date(m.createdAt),
+        })),
+        customerOfOrgs: result.customerOfOrgs.map((c: any) => ({
+          ...c,
+          createdAt: new Date(c.createdAt),
+        })),
+      };
     },
   };
 
@@ -1250,6 +1289,50 @@ class ApiClient {
     },
   };
 
+  /**
+   * Map backend OrgDashboardMetrics to legacy Metrics format
+   */
+  private mapBackendMetricsToLegacy(backendMetrics: any): Metrics {
+    if (!backendMetrics) {
+      return {
+        organizationId: "",
+        period: "week" as const,
+        jobs: { total: 0, pending: 0, assigned: 0, completed: 0, cancelled: 0 },
+        technicians: { active: 0, available: 0, utilization: 0 },
+        performance: { averageAssignmentTime: 0, averageDeliveryTime: 0, onTimeRate: 0, clientSatisfaction: 0 },
+        revenue: { total: 0, perJob: 0 },
+      };
+    }
+
+    // Map backend structure to legacy frontend structure
+    return {
+      organizationId: backendMetrics.organizationId || "",
+      period: backendMetrics.period || "week",
+      jobs: {
+        total: backendMetrics.jobs?.total || 0,
+        pending: backendMetrics.jobs?.pending || 0,
+        assigned: backendMetrics.jobs?.booked || 0, // Map booked -> assigned
+        completed: backendMetrics.jobs?.delivered || 0, // Map delivered -> completed
+        cancelled: backendMetrics.jobs?.cancelled || 0,
+      },
+      technicians: {
+        active: backendMetrics.staff?.active || 0,
+        available: backendMetrics.staff?.available || 0,
+        utilization: backendMetrics.staff?.utilization || 0,
+      },
+      performance: {
+        averageAssignmentTime: backendMetrics.performance?.averageAssignmentTime || 0,
+        averageDeliveryTime: backendMetrics.performance?.averageDeliveryTime || 0,
+        onTimeRate: backendMetrics.performance?.onTimeRate || 0,
+        clientSatisfaction: backendMetrics.performance?.clientApprovalRate || 0, // Map clientApprovalRate -> clientSatisfaction
+      },
+      revenue: {
+        total: backendMetrics.revenue?.total || 0,
+        perJob: backendMetrics.revenue?.perJob || 0,
+      },
+    };
+  }
+
   // Dashboard endpoint - fetches dashboard data from backend
   dashboard = {
     get: async () => {
@@ -1261,26 +1344,42 @@ class ApiClient {
           technicians: technicians,
           auditLog: auditLog,
           metrics: metrics,
+          role: 'COMPANY',
+          stats: null,
         };
       }
       try {
         const dashboardData = await this.request<any>('/dashboard');
-        const projects = dashboardData.projects || [];
+        const projects = (dashboardData.projects || []).map((p: any) => this.normalizeProject(p));
+
+        // Debug: log what backend returns
+        console.log('[API] Dashboard raw metrics from backend:', dashboardData.metrics);
+        console.log('[API] Backend jobs.total:', dashboardData.metrics?.jobs?.total);
+
+        // Map metrics based on dashboard role
+        const mappedMetrics = this.mapBackendMetricsToLegacy(dashboardData.metrics);
+
+        // Debug: log mapped metrics
+        console.log('[API] Mapped metrics jobs:', mappedMetrics.jobs);
+
         return {
-          projects: projects.map((p: any) => this.normalizeProject(p)),
-          jobCards: projects.map((p: any) => this.mapProjectToJobCard(this.normalizeProject(p))),
+          projects,
+          jobCards: projects.map((p: any) => this.mapProjectToJobCard(p)),
           technicians: dashboardData.technicians || [],
           auditLog: dashboardData.auditLog || [],
-          metrics: dashboardData.metrics || {
-            organizationId: "",
-            period: "week" as const,
-            jobs: { total: 0, pending: 0, assigned: 0, completed: 0, cancelled: 0 },
-            technicians: { active: 0, available: 0, utilization: 0 },
-            performance: { averageAssignmentTime: 0, averageDeliveryTime: 0, onTimeRate: 0, clientSatisfaction: 0 },
-            revenue: { total: 0, perJob: 0 },
-          },
+          metrics: mappedMetrics,
+          // New fields from backend
+          role: dashboardData.role || 'COMPANY',
+          stats: dashboardData.stats || null,
+          counts: dashboardData.counts || null,
+          // Role-specific project lists
+          upcomingShoots: (dashboardData.upcomingShoots || []).map((p: any) => this.normalizeProject(p)),
+          completedProjects: (dashboardData.completedProjects || dashboardData.deliveredProjects || []).map((p: any) => this.normalizeProject(p)),
+          assignedShoots: (dashboardData.assignedShoots || []).map((p: any) => this.normalizeProject(p)),
+          readyForEditing: (dashboardData.readyForEditing || []).map((p: any) => this.normalizeProject(p)),
         };
       } catch (error) {
+        console.error('Dashboard fetch error:', error);
         // Fallback to projects-only if dashboard endpoint fails
         const projects = await this.projects.listForCurrentUser();
         return {
@@ -1288,14 +1387,14 @@ class ApiClient {
           jobCards: projects.map((p) => this.mapProjectToJobCard(p)),
           technicians: [],
           auditLog: [],
-          metrics: {
-            organizationId: "",
-            period: "week" as const,
-            jobs: { total: 0, pending: 0, assigned: 0, completed: 0, cancelled: 0 },
-            technicians: { active: 0, available: 0, utilization: 0 },
-            performance: { averageAssignmentTime: 0, averageDeliveryTime: 0, onTimeRate: 0, clientSatisfaction: 0 },
-            revenue: { total: 0, perJob: 0 },
-          },
+          metrics: this.mapBackendMetricsToLegacy(null),
+          role: 'COMPANY',
+          stats: null,
+          counts: null,
+          upcomingShoots: [],
+          completedProjects: [],
+          assignedShoots: [],
+          readyForEditing: [],
         };
       }
     },

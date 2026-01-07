@@ -20,6 +20,10 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:smoke": "jest --config ./test/smoke/jest-smoke.json --runInBand",
     "test:smoke:runner": "npx ts-node -r tsconfig-paths/register test/smoke/smoke-runner.ts",
+    "test:regression": "jest --config ./test/regression/jest-regression.json --runInBand",
+    "test:regression:runner": "npx ts-node -r tsconfig-paths/register test/regression/regression-runner.ts",
+    "test:regression:ci": "./scripts/run-regression.sh",
+    "diagnose:auth": "npx ts-node -r tsconfig-paths/register scripts/diagnose-auth-flow.ts",
     "seed:test-org": "node dist/src/scripts/seed-test-org.js",
     "seed:test-org:ts": "npx ts-node -r tsconfig-paths/register src/scripts/seed-test-org.ts",
     "migrate:clerk": "npx ts-node -r tsconfig-paths/register src/scripts/migrate-users-to-clerk.ts"

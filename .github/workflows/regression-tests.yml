@@ -1,0 +1,190 @@
+# Regression Test Workflow
+#
+# Runs core flow regression tests that validate:
+# - User registration and personal org creation
+# - Organization creation and membership invites
+# - Project creation and management
+# - Dashboard and projects/mine endpoints
+# - Delivery page access
+#
+# Fails if any endpoint returns 500 or auth/org-context is inconsistent.
+
+name: Regression Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/backend/**'
+      - '.github/workflows/regression-tests.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/backend/**'
+      - '.github/workflows/regression-tests.yml'
+  # Allow manual trigger
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  regression-tests:
+    name: Core Flow Regression Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vrem_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: apps/backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: apps/backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: apps/backend
+        run: npx prisma generate
+
+      - name: Run database migrations
+        working-directory: apps/backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vrem_test?schema=public
+        run: npx prisma migrate deploy
+
+      - name: Build backend
+        working-directory: apps/backend
+        run: npm run build
+
+      - name: Start backend server
+        working-directory: apps/backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vrem_test?schema=public
+          JWT_SECRET: test-regression-secret-key-ci-12345
+          PORT: 3001
+          NODE_ENV: test
+        run: |
+          node dist/main.js &
+          echo $! > /tmp/server.pid
+
+          # Wait for server to be ready
+          echo "Waiting for server to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3001 > /dev/null 2>&1; then
+              echo "Server is ready!"
+              break
+            fi
+            echo "Retry $i/30..."
+            sleep 1
+          done
+
+          # Verify server is running
+          if ! curl -s http://localhost:3001 > /dev/null 2>&1; then
+            echo "Server failed to start"
+            exit 1
+          fi
+
+      - name: Run regression tests
+        working-directory: apps/backend
+        env:
+          REGRESSION_BASE_URL: http://localhost:3001
+        run: npm run test:regression:runner
+
+      - name: Stop backend server
+        if: always()
+        run: |
+          if [ -f /tmp/server.pid ]; then
+            kill $(cat /tmp/server.pid) 2>/dev/null || true
+          fi
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-test-logs
+          path: |
+            apps/backend/logs/
+            apps/backend/test-results/
+          retention-days: 7
+
+  # Run Jest-based regression tests as a separate job for comparison
+  regression-tests-jest:
+    name: Jest Regression Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vrem_test_jest
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: apps/backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: apps/backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: apps/backend
+        run: npx prisma generate
+
+      - name: Run database migrations
+        working-directory: apps/backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5433/vrem_test_jest?schema=public
+        run: npx prisma migrate deploy
+
+      - name: Run Jest regression tests
+        working-directory: apps/backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5433/vrem_test_jest?schema=public
+          JWT_SECRET: test-jest-regression-secret-12345
+          NODE_ENV: test
+        run: npm run test:regression
+
+      - name: Upload Jest test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jest-regression-results
+          path: apps/backend/coverage/
+          retention-days: 7

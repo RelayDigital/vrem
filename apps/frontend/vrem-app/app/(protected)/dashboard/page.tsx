@@ -233,19 +233,42 @@ export default function DashboardPage() {
   // Filter jobs based on role - TECHNICIAN sees their technician assignments, EDITOR sees their editor assignments
   const assignedJobs = useMemo(() => {
     if (!user) return [];
-    
+
     // EDITOR: Filter by editorId
     if (roleUpper === "EDITOR") {
       return jobManagement.jobs.filter((job) => job.editorId === user.id);
     }
-    
+
     // TECHNICIAN and others: Filter by assignedTechnicianId
     return jobManagement.jobs.filter(
       (job) => job.assignedTechnicianId === user.id
     );
   }, [jobManagement.jobs, user, roleUpper]);
-  
+
+  // Fetch dashboard metrics/stats for all authenticated users
+  // Company orgs get org-level metrics, providers get individual stats
+  const {
+    metrics,
+    stats: backendStats,
+    role: dashboardRole,
+    isLoading: metricsLoading,
+    error: metricsError,
+    refetch: refetchMetrics,
+  } = useDashboardMetrics(!!user);
+
   const assignedJobStats = useMemo(() => {
+    // Use backend-provided stats when available (for PROVIDER/TECHNICIAN/EDITOR dashboards)
+    if (backendStats && 'upcomingJobs' in backendStats) {
+      const providerStats = backendStats as import('@/types').ProviderStats;
+      return {
+        upcoming: providerStats.upcomingJobs,
+        completed: providerStats.completedJobs,
+        rating: providerProfile?.rating.overall ?? 0, // Rating still comes from provider profile
+        onTimeRate: (providerStats.onTimeRate * 100).toFixed(0),
+      };
+    }
+
+    // Fallback to client-side computation if backend stats not available
     const upcomingJobs = assignedJobs.filter(
       (job) => job.status === "assigned" || job.status === "pending"
     );
@@ -261,17 +284,7 @@ export default function DashboardPage() {
         (providerProfile?.reliability.onTimeRate || 0) * 100
       ).toFixed(0),
     };
-  }, [assignedJobs, providerProfile]);
-
-  // Only fetch metrics for company orgs
-  const shouldFetchMetrics = uiContext?.showSidebar ?? false;
-
-  const {
-    metrics,
-    isLoading: metricsLoading,
-    error: metricsError,
-    refetch: refetchMetrics,
-  } = useDashboardMetrics(!!user && shouldFetchMetrics);
+  }, [assignedJobs, providerProfile, backendStats]);
 
   const emptyMetrics: Metrics = {
     organizationId: "",
@@ -691,7 +704,10 @@ export default function DashboardPage() {
 
   // COMPANY org: Show CompanyDashboardView (with sidebar)
   if (showSidebar) {
+    console.log('[DashboardPage] showSidebar=true, metrics from hook:', metrics);
+    console.log('[DashboardPage] metrics?.jobs:', metrics?.jobs);
     const displayMetrics = metrics ?? emptyMetrics;
+    console.log('[DashboardPage] displayMetrics.jobs:', displayMetrics.jobs);
     const handleViewRankings = jobManagement.openRankings;
     const handleJobAssign = jobManagement.assignJob;
     const handleJobSelect = jobManagement.toggleJobSelection;

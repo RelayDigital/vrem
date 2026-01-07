@@ -3,7 +3,51 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
-import { UserAccountType, ProviderUseCaseType } from '@prisma/client';
+import { UserAccountType, ProviderUseCaseType, OrgType, OrgRole } from '@prisma/client';
+
+/**
+ * Org metadata returned for org switcher display
+ */
+interface OrgMetadata {
+  id: string;
+  name: string;
+  type: OrgType;
+  logoUrl: string | null;
+}
+
+/**
+ * Membership entry for org switcher
+ */
+interface OrgContextMembership {
+  orgId: string;
+  role: OrgRole;
+  organization: OrgMetadata;
+  createdAt: Date;
+}
+
+/**
+ * Customer relationship entry for agents
+ */
+interface CustomerOfOrg {
+  orgId: string;
+  customerId: string;
+  organization: OrgMetadata;
+  createdAt: Date;
+}
+
+/**
+ * Full org context response for org switcher
+ */
+export interface OrgContextResponse {
+  /** Personal org - always present */
+  personalOrg: OrgMetadata;
+  /** Team and Company org memberships with role */
+  memberships: OrgContextMembership[];
+  /** For AGENT accounts: orgs where they are a customer */
+  customerOfOrgs: CustomerOfOrg[];
+  /** Account type (determines which fields are relevant) */
+  accountType: UserAccountType;
+}
 
 @Injectable()
 export class UsersService {
@@ -293,5 +337,116 @@ export class UsersService {
     });
 
     return useCases;
+  }
+
+  /**
+   * Get the org context for the current user.
+   * This is the canonical endpoint for the org switcher UI.
+   *
+   * Returns:
+   * - personalOrg: Always present, the user's personal workspace
+   * - memberships: TEAM and COMPANY orgs where user is a member (with role)
+   * - customerOfOrgs: For AGENT accounts, orgs where they are linked as a customer
+   */
+  async getOrgContext(userId: string): Promise<OrgContextResponse> {
+    // Get user with account type
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, accountType: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Get all memberships
+    const memberships = await this.prisma.organizationMember.findMany({
+      where: { userId },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            logoUrl: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Find personal org
+    const personalMembership = memberships.find(
+      (m) => m.organization.type === OrgType.PERSONAL,
+    );
+
+    if (!personalMembership) {
+      // This should never happen - all users should have a personal org
+      throw new NotFoundException('Personal organization not found');
+    }
+
+    const personalOrg: OrgMetadata = {
+      id: personalMembership.organization.id,
+      name: personalMembership.organization.name,
+      type: personalMembership.organization.type,
+      logoUrl: personalMembership.organization.logoUrl,
+    };
+
+    // Build memberships list (TEAM and COMPANY orgs only)
+    const orgMemberships: OrgContextMembership[] = memberships
+      .filter((m) => m.organization.type !== OrgType.PERSONAL)
+      .map((m) => ({
+        orgId: m.orgId,
+        role: m.role,
+        organization: {
+          id: m.organization.id,
+          name: m.organization.name,
+          type: m.organization.type,
+          logoUrl: m.organization.logoUrl,
+        },
+        createdAt: m.createdAt,
+      }));
+
+    // For AGENT accounts, get customer relationships
+    let customerOfOrgs: CustomerOfOrg[] = [];
+    if (user.accountType === UserAccountType.AGENT) {
+      const customerRelations = await this.prisma.organizationCustomer.findMany({
+        where: { userId },
+        include: {
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              logoUrl: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      // Filter out orgs where user is already a member
+      const memberOrgIds = new Set(memberships.map((m) => m.orgId));
+      customerOfOrgs = customerRelations
+        .filter((c) => !memberOrgIds.has(c.orgId))
+        .map((c) => ({
+          orgId: c.orgId,
+          customerId: c.id,
+          organization: {
+            id: c.organization.id,
+            name: c.organization.name,
+            type: c.organization.type,
+            logoUrl: c.organization.logoUrl,
+          },
+          createdAt: c.createdAt,
+        }));
+    }
+
+    return {
+      personalOrg,
+      memberships: orgMemberships,
+      customerOfOrgs,
+      accountType: user.accountType,
+    };
   }
 }

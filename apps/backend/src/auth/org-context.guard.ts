@@ -85,19 +85,26 @@ export class OrgContextGuard implements CanActivate {
 
     const req = context.switchToHttp().getRequest();
     const user = req.user as AuthenticatedUser | undefined;
+    const url = req.url || req.path || '';
+    const method = req.method || 'UNKNOWN';
+
+    // Debug: Log incoming request context
+    this.logger.debug(`[OrgContext] ${method} ${url} | userId=${user?.id || 'NONE'} | headerOrgId=${req.headers['x-org-id'] || 'NONE'} | personalOrgId=${user?.personalOrgId || 'NONE'}`);
 
     if (!user?.id) {
+      this.logger.warn(`[OrgContext] REJECT: No authenticated user for ${method} ${url}`);
       throw new UnauthorizedException('Authentication required');
     }
 
     // User-scoped endpoints under /me/* and /auth/* don't require org membership validation
     // These endpoints operate on the authenticated user's data, not org-scoped data
-    const url = req.url || req.path || '';
     if (url.startsWith('/me/') || url === '/me' || url.startsWith('/auth/')) {
+      this.logger.debug(`[OrgContext] ALLOW: User-scoped endpoint ${url}`);
       return true;
     }
 
     if (req.orgContext) {
+      this.logger.debug(`[OrgContext] ALLOW: Already has orgContext`);
       return true;
     }
 
@@ -106,6 +113,8 @@ export class OrgContextGuard implements CanActivate {
       (Array.isArray(headerOrgId) ? headerOrgId[0] : headerOrgId) ||
       user.personalOrgId ||
       null;
+
+    this.logger.debug(`[OrgContext] Resolved orgId=${orgId || 'NONE'} (header=${headerOrgId || 'NONE'}, fallback=${user.personalOrgId || 'NONE'})`);
 
     let org: OrgContext['org'] | null = null;
     let membership: OrgContext['membership'] = null;
@@ -202,6 +211,7 @@ export class OrgContextGuard implements CanActivate {
     }
 
     if (!org) {
+      this.logger.warn(`[OrgContext] REJECT: Org not found for orgId=${orgId}`);
       throw new NotFoundException('Organization not found');
     }
 
@@ -210,8 +220,11 @@ export class OrgContextGuard implements CanActivate {
     });
 
     const isPersonalOrg = String(org.type) === 'PERSONAL';
+    this.logger.debug(`[OrgContext] Org found: id=${org.id} type=${org.type} memberCount=${memberCount} | userMembership=${membership ? `role=${membership.role}` : 'NONE'}`);
+
     if (isPersonalOrg) {
       if (!membership || membership.userId !== user.id) {
+        this.logger.warn(`[OrgContext] REJECT: Personal org access denied | userId=${user.id} orgId=${org.id} membershipUserId=${membership?.userId || 'NONE'}`);
         throw new ForbiddenException(
           'You do not have access to this personal organization',
         );
@@ -222,10 +235,11 @@ export class OrgContextGuard implements CanActivate {
       // This allows cross-org access for customer-assigned projects
       const isCustomerAccess = await this.checkCustomerAccess(req, user, org.id);
       if (!isCustomerAccess) {
+        this.logger.warn(`[OrgContext] REJECT: Not a member | userId=${user.id} orgId=${org.id} accountType=${user.accountType}`);
         throw new ForbiddenException('You do not belong to this organization');
       }
       // For customer access, we create a minimal context - the service layer will handle authorization
-      this.logger.debug(`Agent ${user.id} granted customer access to org ${org.id}`);
+      this.logger.debug(`[OrgContext] ALLOW: Agent customer access | userId=${user.id} orgId=${org.id}`);
     }
 
     const orgContext = buildOrgContext({
@@ -234,6 +248,8 @@ export class OrgContextGuard implements CanActivate {
       membership,
       memberCount,
     });
+
+    this.logger.debug(`[OrgContext] ALLOW: ${method} ${url} | userId=${user.id} orgId=${org.id} role=${membership?.role || 'CUSTOMER_ACCESS'} orgType=${org.type}`);
 
     req.orgContext = orgContext;
     req.activeOrg = org;

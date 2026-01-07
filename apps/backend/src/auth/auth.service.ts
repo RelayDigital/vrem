@@ -27,31 +27,6 @@ export class AuthService {
       : null;
   }
 
-  private async finalizeAuth(user: any, name?: string) {
-    // Ensure personal org exists
-    await this.ensurePersonalOrganization(user.id, name || user.name);
-
-    const token = this.jwtService.sign({
-      sub: user.id,
-      role: user.accountType,
-    });
-
-    // Fetch user's first organization membership
-    const membership = await this.prisma.organizationMember.findFirst({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'asc' },
-      select: { orgId: true },
-    });
-
-    return {
-      user: {
-        ...user,
-        organizationId: membership?.orgId || null,
-      },
-      token,
-    };
-  }
-
   private async ensurePersonalOrganization(userId: string, name: string) {
     const existingPersonalMemberships = await this.prisma.organizationMember.findMany({
       where: {
@@ -95,12 +70,14 @@ export class AuthService {
 
   /**
    * Create or update a user from an OAuth profile while preserving account intent.
+   * For new users, creates personal org + membership atomically.
+   * Returns { user, isNewUser, personalOrgId }
    */
   private async upsertUserFromProfile(
     email: string,
     name: string,
     accountTypeIntent: UserAccountType,
-  ) {
+  ): Promise<{ user: any; isNewUser: boolean; personalOrgId: string | null }> {
     const allowedRoles: UserAccountType[] = [
       UserAccountType.PROVIDER,
       UserAccountType.AGENT,
@@ -126,20 +103,58 @@ export class AuthService {
           accountType: existing.accountType || accountTypeToStore,
         },
       });
-      return updated;
+
+      // Find existing personal org
+      const personalMembership = await this.prisma.organizationMember.findFirst({
+        where: { userId: existing.id, organization: { type: OrgType.PERSONAL } },
+        select: { orgId: true },
+      });
+
+      return {
+        user: updated,
+        isNewUser: false,
+        personalOrgId: personalMembership?.orgId || null,
+      };
     }
 
+    // New user - create atomically with personal org
     const randomPassword = randomUUID();
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
-    return this.prisma.user.create({
-      data: {
-        email,
-        name,
-        password: hashedPassword,
-        accountType: accountTypeToStore,
-      },
+    const { user, personalOrg } = await this.prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          email,
+          name,
+          password: hashedPassword,
+          accountType: accountTypeToStore,
+        },
+      });
+
+      const newPersonalOrg = await tx.organization.create({
+        data: {
+          id: randomUUID(),
+          name: `${name || 'Personal'} Workspace`,
+          type: OrgType.PERSONAL,
+        },
+      });
+
+      await tx.organizationMember.create({
+        data: {
+          userId: newUser.id,
+          orgId: newPersonalOrg.id,
+          role: OrgRole.OWNER,
+        },
+      });
+
+      return { user: newUser, personalOrg: newPersonalOrg };
     });
+
+    return {
+      user,
+      isNewUser: true,
+      personalOrgId: personalOrg.id,
+    };
   }
 
   async register(
@@ -163,22 +178,55 @@ export class AuthService {
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new UnauthorizedException('Email already registered');
 
-    const accountTypeToStore = accountTypeIntent;
-
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user with global role intent
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        name,
-        password: hashedPassword,
-        accountType: accountTypeToStore,
-      },
+    // Create user + personal org atomically in transaction
+    const { user, personalOrg } = await this.prisma.$transaction(async (tx) => {
+      // Create user
+      const newUser = await tx.user.create({
+        data: {
+          email,
+          name,
+          password: hashedPassword,
+          accountType: accountTypeIntent,
+        },
+      });
+
+      // Create personal organization
+      const newPersonalOrg = await tx.organization.create({
+        data: {
+          id: randomUUID(),
+          name: `${name || 'Personal'} Workspace`,
+          type: OrgType.PERSONAL,
+        },
+      });
+
+      // Create membership with OWNER role
+      await tx.organizationMember.create({
+        data: {
+          userId: newUser.id,
+          orgId: newPersonalOrg.id,
+          role: OrgRole.OWNER,
+        },
+      });
+
+      return { user: newUser, personalOrg: newPersonalOrg };
     });
 
-    return this.finalizeAuth(user, name);
+    // Generate JWT token
+    const token = this.jwtService.sign({
+      sub: user.id,
+      role: user.accountType,
+    });
+
+    return {
+      user: {
+        ...user,
+        organizationId: personalOrg.id,
+      },
+      token,
+    };
   }
 
   async login(email: string, password: string) {
@@ -193,7 +241,22 @@ export class AuthService {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
-    return this.finalizeAuth(user);
+    // Ensure personal org exists (handles legacy users)
+    const personalOrg = await this.ensurePersonalOrganization(user.id, user.name);
+
+    // Generate JWT token
+    const token = this.jwtService.sign({
+      sub: user.id,
+      role: user.accountType,
+    });
+
+    return {
+      user: {
+        ...user,
+        organizationId: personalOrg.id,
+      },
+      token,
+    };
   }
 
   private async verifyGoogleToken(idToken: string) {
@@ -266,13 +329,36 @@ export class AuthService {
         ? await this.verifyGoogleToken(dto.token)
         : await this.verifyFacebookToken(dto.token);
 
-    const user = await this.upsertUserFromProfile(
+    const { user, isNewUser, personalOrgId } = await this.upsertUserFromProfile(
       profile.email,
       dto.name || profile.name || profile.email,
       dto.accountType,
     );
 
-    return this.finalizeAuth(user, dto.name || profile.name);
+    // For existing users without personal org, ensure one exists
+    // (handles legacy users who may not have one)
+    let finalPersonalOrgId = personalOrgId;
+    if (!isNewUser && !personalOrgId) {
+      const personalOrg = await this.ensurePersonalOrganization(
+        user.id,
+        dto.name || profile.name || user.name,
+      );
+      finalPersonalOrgId = personalOrg.id;
+    }
+
+    // Generate JWT token
+    const token = this.jwtService.sign({
+      sub: user.id,
+      role: user.accountType,
+    });
+
+    return {
+      user: {
+        ...user,
+        organizationId: finalPersonalOrgId,
+      },
+      token,
+    };
   }
 
   async validateUser(userId: string): Promise<AuthenticatedUser | null> {

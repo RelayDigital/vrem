@@ -1,11 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Metrics } from '@/types';
+import { Metrics, ProviderStats, AgentStats } from '@/types';
 import { api } from '@/lib/api';
+
+type DashboardRole = 'COMPANY' | 'PROVIDER' | 'AGENT' | 'TECHNICIAN' | 'EDITOR';
 
 interface DashboardMetricsState {
   metrics: Metrics | null;
+  stats: ProviderStats | AgentStats | null;
+  role: DashboardRole | null;
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
@@ -13,12 +17,16 @@ interface DashboardMetricsState {
 
 export function useDashboardMetrics(enabled: boolean): DashboardMetricsState {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [stats, setStats] = useState<ProviderStats | AgentStats | null>(null);
+  const [role, setRole] = useState<DashboardRole | null>(null);
   const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchMetrics = useCallback(async () => {
     if (!enabled) {
       setMetrics(null);
+      setStats(null);
+      setRole(null);
       setIsLoading(false);
       setError(null);
       return;
@@ -29,7 +37,11 @@ export function useDashboardMetrics(enabled: boolean): DashboardMetricsState {
 
     try {
       const dashboardData = await api.dashboard.get();
+      console.log('[Hook] dashboardData.metrics.jobs:', dashboardData.metrics?.jobs);
+      console.log('[Hook] Setting metrics with total:', dashboardData.metrics?.jobs?.total);
       setMetrics(dashboardData.metrics);
+      setStats(dashboardData.stats || null);
+      setRole(dashboardData.role || null);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to load dashboard metrics'));
     } finally {
@@ -43,6 +55,8 @@ export function useDashboardMetrics(enabled: boolean): DashboardMetricsState {
 
   return {
     metrics,
+    stats,
+    role,
     isLoading,
     error,
     refetch: fetchMetrics,

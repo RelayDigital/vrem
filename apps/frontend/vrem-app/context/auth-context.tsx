@@ -75,8 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sync with Clerk auth state
   useEffect(() => {
     const initAuth = async () => {
+      console.debug('[AuthContext] initAuth START | isClerkLoaded=%s isSignedIn=%s', isClerkLoaded, isSignedIn);
+
       // Wait for Clerk to finish loading before processing auth state
       if (!isClerkLoaded) {
+        console.debug('[AuthContext] Waiting for Clerk to load...');
         return; // Keep isLoading: true until Clerk is ready
       }
 
@@ -84,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isSignedIn) {
         try {
           const clerkToken = await getToken();
+          console.debug('[AuthContext] Clerk token obtained: %s', clerkToken ? `${clerkToken.substring(0, 20)}...` : 'NONE');
           if (clerkToken) {
             // Store Clerk token for API calls
             localStorage.setItem("token", clerkToken);
@@ -95,10 +99,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             let retryCount = 0;
             const maxRetries = 2;
 
+            const storedOrgBefore = localStorage.getItem("organizationId");
+            console.debug('[AuthContext] Before bootstrap | storedOrgId=%s', storedOrgBefore || 'NONE');
+
             while (retryCount <= maxRetries) {
               try {
                 // Use bootstrap endpoint for reliable provisioning
+                console.debug('[AuthContext] Calling /auth/me/bootstrap (attempt %d)', retryCount + 1);
                 authData = await api.auth.bootstrap();
+                console.debug('[AuthContext] Bootstrap SUCCESS | userId=%s personalOrgId=%s recommendedOrgId=%s memberships=%d',
+                  authData.id, authData.personalOrgId, authData.recommendedActiveOrgId, authData.memberships?.length || 0);
                 break;
               } catch (bootstrapError: any) {
                 const is403 = bootstrapError?.message?.includes('403');
@@ -106,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                 // If org-related error, clear stale org and retry
                 if ((is403 || is404) && retryCount < maxRetries) {
-                  console.warn(`Bootstrap attempt ${retryCount + 1} failed with org error, clearing org and retrying...`);
+                  console.warn(`[AuthContext] Bootstrap attempt ${retryCount + 1} failed with org error, clearing org and retrying...`);
                   localStorage.removeItem("organizationId");
                   api.organizations.setActiveOrganization(null as any);
                   retryCount++;
@@ -128,30 +138,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             // Determine active org with recovery logic:
             // 1. Check if stored org is still valid (user is still a member)
-            // 2. Otherwise use server's recommended org (which is guaranteed to exist)
-            // 3. Fall back to personalOrgId if recommendation is null
+            // 2. On first login (no stored org), default to personal org for predictability
+            // 3. Otherwise use server's recommended org for returning users
             const storedOrg = api.organizations.getActiveOrganization();
             const isValidStoredOrg = storedOrg && orgs.some((m: any) => m.orgId === storedOrg);
+            const isFirstLogin = !storedOrg;
+
+            console.debug('[AuthContext] Org resolution | storedOrg=%s isValid=%s isFirstLogin=%s memberships=[%s]',
+              storedOrg || 'NONE', isValidStoredOrg, isFirstLogin, orgs.map((m: any) => m.orgId).join(', '));
 
             if (storedOrg && !isValidStoredOrg) {
               // Stored org is no longer valid - clear it
-              console.warn(`Stored org ${storedOrg} is no longer valid, clearing...`);
+              console.warn(`[AuthContext] Stored org ${storedOrg} is no longer valid, clearing...`);
               localStorage.removeItem("organizationId");
             }
 
-            // Resolve org with guaranteed fallback to personal org
-            const resolvedOrgId = isValidStoredOrg
-              ? storedOrg
-              : authData.recommendedActiveOrgId || authData.personalOrgId || null;
+            // Resolve org deterministically:
+            // - Stored org (if still valid) - respect user's previous choice
+            // - First login: personal org for predictable UX
+            // - Invalid stored org: server recommendation or personal org fallback
+            let resolvedOrgId: string | null;
+            if (isValidStoredOrg) {
+              resolvedOrgId = storedOrg;
+            } else if (isFirstLogin && authData.personalOrgId) {
+              // First login always defaults to personal org for predictability
+              resolvedOrgId = authData.personalOrgId;
+            } else {
+              // Returning user with invalid stored org - use server recommendation
+              resolvedOrgId = authData.recommendedActiveOrgId || authData.personalOrgId || null;
+            }
+
+            console.debug('[AuthContext] Resolved orgId=%s (storedValid=%s, isFirstLogin=%s, recommended=%s, personal=%s)',
+              resolvedOrgId, isValidStoredOrg ? storedOrg : 'N/A', isFirstLogin, authData.recommendedActiveOrgId, authData.personalOrgId);
 
             if (resolvedOrgId) {
               api.organizations.setActiveOrganization(resolvedOrgId);
             } else {
               // This should never happen after bootstrap, but handle gracefully
-              console.error('No valid org after bootstrap - this should not happen');
+              console.error('[AuthContext] No valid org after bootstrap - this should not happen');
               api.organizations.setActiveOrganization(null as any);
             }
             setActiveOrganizationId(resolvedOrgId);
+            console.debug('[AuthContext] initAuth COMPLETE | activeOrgId=%s', resolvedOrgId);
           }
         } catch (error: any) {
           // Check if this is a network error (backend unreachable)
@@ -325,8 +353,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const orgs = authData.memberships || [];
     setMemberships(orgs);
 
-    // Use server's recommended org with fallback to personal org
-    const resolvedOrgId = authData.recommendedActiveOrgId || authData.personalOrgId || null;
+    // For onboarding completion, default to personal org (first login scenario)
+    // This is consistent with initAuth's first-login behavior
+    const resolvedOrgId = authData.personalOrgId || authData.recommendedActiveOrgId || null;
     if (resolvedOrgId) {
       api.organizations.setActiveOrganization(resolvedOrgId);
     } else {

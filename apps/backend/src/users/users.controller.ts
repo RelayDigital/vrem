@@ -110,6 +110,24 @@ export class UsersController {
     return this.usersService.updateUseCases(user.id, dto.useCases);
   }
 
+  /**
+   * Get the org context for the org switcher.
+   *
+   * This is the canonical endpoint for building org switcher UI.
+   * Returns:
+   * - personalOrg: Always present, the user's personal workspace
+   * - memberships: TEAM and COMPANY orgs where user is a member (with role + metadata)
+   * - customerOfOrgs: For AGENT accounts, orgs where they are linked as a customer
+   * - accountType: User's account type (AGENT, PROVIDER, COMPANY)
+   *
+   * Self-service endpoint - no org context required
+   */
+  @Get('me/org-context')
+  @UseGuards(JwtAuthGuard)
+  getMyOrgContext(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.getOrgContext(user.id);
+  }
+
   // =============================
   // Admin endpoints
   // =============================

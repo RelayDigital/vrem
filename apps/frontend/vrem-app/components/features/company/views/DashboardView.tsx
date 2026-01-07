@@ -107,35 +107,8 @@ export function CompanyDashboardView({
     }
   };
 
-  // Use empty metrics when mock data is disabled
-  const displayMetrics = USE_MOCK_DATA
-    ? metrics
-    : {
-        organizationId: "",
-        period: "week" as const,
-        jobs: {
-          total: 0,
-          pending: 0,
-          assigned: 0,
-          completed: 0,
-          cancelled: 0,
-        },
-        technicians: {
-          active: 0,
-          available: 0,
-          utilization: 0,
-        },
-        performance: {
-          averageAssignmentTime: 0,
-          averageDeliveryTime: 0,
-          onTimeRate: 0,
-          clientSatisfaction: 0,
-        },
-        revenue: {
-          total: 0,
-          perJob: 0,
-        },
-      };
+  // Use the metrics prop directly - real data comes from backend
+  const displayMetrics = metrics;
 
   return (
     <main className="container relative mx-auto">

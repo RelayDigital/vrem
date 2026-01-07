@@ -153,6 +153,51 @@ export interface CustomerOrganization {
   createdAt: Date;
 }
 
+/**
+ * Org metadata for org switcher display
+ */
+export interface OrgMetadata {
+  id: string;
+  name: string;
+  type: OrgType;
+  logoUrl: string | null;
+}
+
+/**
+ * Membership entry for org switcher
+ */
+export interface OrgContextMembership {
+  orgId: string;
+  role: OrgRole;
+  organization: OrgMetadata;
+  createdAt: Date;
+}
+
+/**
+ * Customer relationship entry (for agents)
+ */
+export interface CustomerOfOrg {
+  orgId: string;
+  customerId: string;
+  organization: OrgMetadata;
+  createdAt: Date;
+}
+
+/**
+ * Canonical org context response for org switcher.
+ * Returned by GET /users/me/org-context
+ */
+export interface OrgContextResponse {
+  /** Personal org - always present */
+  personalOrg: OrgMetadata;
+  /** Team and Company org memberships with role */
+  memberships: OrgContextMembership[];
+  /** For AGENT accounts: orgs where they are a customer */
+  customerOfOrgs: CustomerOfOrg[];
+  /** Account type (AGENT, PROVIDER, COMPANY) */
+  accountType: AccountType;
+}
+
 // =============================
 // Vendor & applications
 // =============================
@@ -469,14 +514,97 @@ export interface AuditLogEntry {
 // Metrics / Analytics DTOs
 // =============================
 
+export type MetricsPeriod = "today" | "week" | "month" | "all";
+
+/**
+ * Job metrics - counts by status
+ */
+export interface JobMetrics {
+  total: number;
+  pending: number;
+  booked: number;
+  shooting: number;
+  editing: number;
+  delivered: number;
+  cancelled: number;
+}
+
+/**
+ * Staff/technician metrics
+ */
+export interface StaffMetrics {
+  active: number;
+  available: number;
+  utilization: number; // 0-1
+}
+
+/**
+ * Performance metrics
+ */
+export interface PerformanceMetrics {
+  averageAssignmentTime: number; // hours
+  averageDeliveryTime: number; // hours
+  onTimeRate: number; // 0-1
+  clientApprovalRate: number; // 0-1
+}
+
+/**
+ * Revenue metrics
+ */
+export interface RevenueMetrics {
+  total: number; // cents
+  perJob: number; // cents
+  currency: string;
+}
+
+/**
+ * Full org dashboard metrics (for COMPANY org managers)
+ */
+export interface OrgDashboardMetrics {
+  organizationId: string;
+  period: MetricsPeriod;
+  periodStart: string;
+  periodEnd: string;
+  jobs: JobMetrics;
+  staff: StaffMetrics;
+  performance: PerformanceMetrics;
+  revenue: RevenueMetrics;
+}
+
+/**
+ * Provider personal stats (for PROVIDER in personal org or as technician)
+ */
+export interface ProviderStats {
+  upcomingJobs: number;
+  completedJobs: number;
+  totalJobs: number;
+  onTimeRate: number; // 0-1
+  averageDeliveryTime: number; // hours
+  clientApprovalRate: number; // 0-1
+}
+
+/**
+ * Agent stats (for AGENT users)
+ */
+export interface AgentStats {
+  upcomingJobs: number;
+  completedJobs: number;
+  totalOrders: number;
+  pendingJobs: number;
+}
+
+/**
+ * Legacy Metrics interface for backward compatibility
+ * Maps to OrgDashboardMetrics structure
+ */
 export interface Metrics {
   organizationId: string;
-  period: "today" | "week" | "month";
+  period: MetricsPeriod;
   jobs: {
     total: number;
     pending: number;
-    assigned: number;
-    completed: number;
+    assigned: number; // maps to booked
+    completed: number; // maps to delivered
     cancelled: number;
   };
   technicians: {
@@ -485,10 +613,10 @@ export interface Metrics {
     utilization: number;
   };
   performance: {
-    averageAssignmentTime: number; // minutes
-    averageDeliveryTime: number; // hours
-    onTimeRate: number; // 0–1 or 0–100, pick one convention
-    clientSatisfaction: number;
+    averageAssignmentTime: number;
+    averageDeliveryTime: number;
+    onTimeRate: number;
+    clientSatisfaction: number; // maps to clientApprovalRate
   };
   revenue: {
     total: number;
@@ -497,7 +625,7 @@ export interface Metrics {
 }
 
 export interface AnalyticsSummary {
-  period: "today" | "week" | "month";
+  period: MetricsPeriod;
   jobs: Metrics["jobs"];
   technicians: Metrics["technicians"];
   revenue: Metrics["revenue"];

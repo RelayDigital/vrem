@@ -307,91 +307,249 @@ export class ProjectsService {
   // Project listing
   // =============================
 
+  /**
+   * Find projects accessible to the current user in the given org context.
+   *
+   * Access rules:
+   * - AGENT in personal org: sees all projects where they are the linked customer (cross-org)
+   * - AGENT with customer access in non-personal org: sees their customer-assigned projects in that org
+   * - Manager roles (OWNER, ADMIN, PM, PERSONAL_OWNER): sees all org projects
+   * - TECHNICIAN: sees only their assigned projects
+   * - EDITOR: sees only their assigned projects
+   * - No membership + not agent customer: 403 Forbidden
+   *
+   * @returns Project[] - always returns array (empty if no projects), never throws for empty results
+   * @throws ForbiddenException (403) - user lacks access to this org
+   * @throws BadRequestException (400) - invalid parameters
+   */
   async findForUser(ctx: OrgContext, user: AuthenticatedUser) {
+    // ===========================================
+    // Input validation - explicit checks to avoid 500s
+    // ===========================================
+
+    // Validate user
+    if (!user || !user.id) {
+      this.logger.error('[findForUser] REJECT: Invalid user object - missing user or user.id');
+      throw new BadRequestException('Invalid user context');
+    }
+
+    // Validate org context
+    if (!ctx || !ctx.org) {
+      this.logger.error(`[findForUser] REJECT: Invalid org context - missing ctx or ctx.org | userId=${user.id}`);
+      throw new BadRequestException('Invalid organization context');
+    }
+
+    if (!ctx.org.id) {
+      this.logger.error(`[findForUser] REJECT: Invalid org context - missing ctx.org.id | userId=${user.id}`);
+      throw new BadRequestException('Invalid organization ID');
+    }
+
+    const orgId = ctx.org.id;
+    const orgType = ctx.org.type ?? 'UNKNOWN';
+
+    this.logger.debug(`[findForUser] START | userId=${user.id} orgId=${orgId} orgType=${orgType} effectiveRole=${ctx.effectiveRole} isPersonalOrg=${ctx.isPersonalOrg} accountType=${user.accountType}`);
+
+    // ===========================================
+    // Agent customer access handling
+    // ===========================================
+
+    // AGENT in their PERSONAL org: show all projects where they are assigned as customer
+    // This bypasses org boundaries - customer-assigned projects are visible regardless
+    // of which org the project belongs to.
+    if (user.accountType === UserAccountType.AGENT && ctx.isPersonalOrg) {
+      return this.findAgentCustomerProjects(user);
+    }
+
+    // AGENT in a non-personal org where they're not a member: check for customer access
+    // OrgContextGuard allows this for specific project access, so we support listing
+    // their customer-assigned projects in that org.
+    if (user.accountType === UserAccountType.AGENT && ctx.effectiveRole === 'NONE') {
+      this.logger.debug(`[findForUser] AGENT with effectiveRole=NONE in non-personal org - checking customer access | userId=${user.id} orgId=${orgId}`);
+      return this.findAgentCustomerProjectsInOrg(user, orgId);
+    }
+
+    // ===========================================
+    // Membership validation for non-agents
+    // ===========================================
+
+    // Non-agents with no membership get 403
     if (ctx.effectiveRole === 'NONE') {
+      this.logger.warn(`[findForUser] REJECT: effectiveRole=NONE (non-agent, no membership) | userId=${user.id} orgId=${orgId} accountType=${user.accountType}`);
       throw new ForbiddenException('You are not a member of this organization');
     }
 
+    // ===========================================
+    // Role-based project queries
+    // ===========================================
+
+    const include = this.projectInclude(true);
+
     try {
-      const orgId = ctx.org.id;
-      const include = this.projectInclude(true);
-
-      // AGENT in their PERSONAL org: show all projects where they are assigned as customer
-      // This bypasses org boundaries - customer-assigned projects are visible regardless
-      // of which org the project belongs to. This is different from PROVIDER accounts
-      // which are restricted to projects within their org membership.
-      if (user.accountType === UserAccountType.AGENT && ctx.isPersonalOrg) {
-        // Find all OrganizationCustomer records where this user is linked
-        const customerRecords = await this.prisma.organizationCustomer.findMany({
-          where: { userId: user.id },
-          select: { id: true },
-        });
-        const customerIds = customerRecords.map((c) => c.id);
-
-        // Return projects where user is the customer (across ALL orgs, no org filter)
-        if (customerIds.length > 0) {
-          const projects = await this.prisma.project.findMany({
-            where: {
-              customerId: { in: customerIds },
-            },
-            include: {
-              ...include,
-              organization: true,
-            },
-            orderBy: { createdAt: 'desc' },
-          });
-          return projects;
-        }
-        
-        // No customer records, return empty
-        return [];
-      }
-
-      // Manager roles (OWNER, ADMIN, PROJECT_MANAGER) see all org projects
+      // Manager roles (OWNER, ADMIN, PROJECT_MANAGER, PERSONAL_OWNER) see all org projects
       if (this.isManagerRole(ctx)) {
-        return this.prisma.project.findMany({
+        this.logger.debug(`[findForUser] MANAGER role - querying all org projects | userId=${user.id} orgId=${orgId} role=${ctx.effectiveRole}`);
+        const projects = await this.prisma.project.findMany({
           where: { orgId },
           include,
           orderBy: { createdAt: 'desc' },
         });
+        this.logger.debug(`[findForUser] SUCCESS: MANAGER query returned ${projects.length} projects | userId=${user.id} orgId=${orgId}`);
+        return projects;
       }
 
       // TECHNICIAN sees only their assigned projects within the org
       if (ctx.effectiveRole === 'TECHNICIAN') {
-        return this.prisma.project.findMany({
+        this.logger.debug(`[findForUser] TECHNICIAN role - querying assigned projects | userId=${user.id} orgId=${orgId}`);
+        const projects = await this.prisma.project.findMany({
           where: { orgId, technicianId: user.id },
           include,
           orderBy: { createdAt: 'desc' },
         });
+        this.logger.debug(`[findForUser] SUCCESS: TECHNICIAN query returned ${projects.length} projects | userId=${user.id} orgId=${orgId}`);
+        return projects;
       }
 
       // EDITOR sees only their assigned projects within the org
       if (ctx.effectiveRole === 'EDITOR') {
-        return this.prisma.project.findMany({
+        this.logger.debug(`[findForUser] EDITOR role - querying assigned projects | userId=${user.id} orgId=${orgId}`);
+        const projects = await this.prisma.project.findMany({
           where: { orgId, editorId: user.id },
           include,
           orderBy: { createdAt: 'desc' },
         });
+        this.logger.debug(`[findForUser] SUCCESS: EDITOR query returned ${projects.length} projects | userId=${user.id} orgId=${orgId}`);
+        return projects;
       }
 
-      // Fallback: return projects where user is project manager within the org
-      return this.prisma.project.findMany({
+      // Fallback for other roles: return projects where user is assigned as PM
+      this.logger.debug(`[findForUser] FALLBACK: querying PM-assigned projects | userId=${user.id} orgId=${orgId} role=${ctx.effectiveRole}`);
+      const projects = await this.prisma.project.findMany({
         where: { orgId, projectManagerId: user.id },
         include,
         orderBy: { createdAt: 'desc' },
       });
+      this.logger.debug(`[findForUser] SUCCESS: FALLBACK query returned ${projects.length} projects | userId=${user.id} orgId=${orgId}`);
+      return projects;
     } catch (error: any) {
-      // Re-throw HTTP exceptions as-is (e.g., ForbiddenException)
+      // Re-throw HTTP exceptions as-is
       if (error instanceof HttpException) {
         throw error;
       }
-      this.logger.error(`Error in findForUser: ${error.message}`, error.stack);
+
+      // Log and wrap database/unexpected errors
+      this.logger.error(`[findForUser] Database error: ${error.message}`, error.stack);
+
+      // Map Prisma error codes to appropriate HTTP status
+      if (error.code === 'P2025') {
+        // Record not found - this shouldn't happen for findMany, but handle it
+        throw new NotFoundException('Resource not found');
+      }
+      if (error.code === 'P2002') {
+        // Unique constraint violation - shouldn't happen for reads
+        throw new HttpException('Database conflict', HttpStatus.CONFLICT);
+      }
+
+      // Default to 500 for unexpected errors
       throw new HttpException(
-        `Failed to fetch projects: ${error.message}`,
-        error.code === 'P2002'
-          ? HttpStatus.CONFLICT
-          : HttpStatus.INTERNAL_SERVER_ERROR,
+        'Failed to fetch projects',
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
+    }
+  }
+
+  /**
+   * Find all projects where an agent is the linked customer (cross-org).
+   * Used when agent is in their personal org context.
+   */
+  private async findAgentCustomerProjects(user: AuthenticatedUser) {
+    this.logger.debug(`[findAgentCustomerProjects] Querying cross-org customer projects | userId=${user.id}`);
+
+    try {
+      // Find all OrganizationCustomer records where this user is linked
+      const customerRecords = await this.prisma.organizationCustomer.findMany({
+        where: { userId: user.id },
+        select: { id: true },
+      });
+      const customerIds = customerRecords.map((c) => c.id);
+
+      this.logger.debug(`[findAgentCustomerProjects] Found ${customerIds.length} customer records | userId=${user.id}`);
+
+      if (customerIds.length === 0) {
+        this.logger.debug(`[findAgentCustomerProjects] SUCCESS: No customer records, returning empty | userId=${user.id}`);
+        return [];
+      }
+
+      const include = this.projectInclude(true);
+      const projects = await this.prisma.project.findMany({
+        where: {
+          customerId: { in: customerIds },
+        },
+        include: {
+          ...include,
+          organization: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      this.logger.debug(`[findAgentCustomerProjects] SUCCESS: Returned ${projects.length} projects | userId=${user.id}`);
+      return projects;
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(`[findAgentCustomerProjects] Database error: ${error.message}`, error.stack);
+      throw new HttpException('Failed to fetch projects', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  /**
+   * Find projects in a specific org where an agent is the linked customer.
+   * Used when agent accesses a non-personal org without membership.
+   */
+  private async findAgentCustomerProjectsInOrg(user: AuthenticatedUser, orgId: string) {
+    this.logger.debug(`[findAgentCustomerProjectsInOrg] Querying customer projects in org | userId=${user.id} orgId=${orgId}`);
+
+    try {
+      // Find customer records for this user in this specific org
+      const customerRecords = await this.prisma.organizationCustomer.findMany({
+        where: {
+          userId: user.id,
+          orgId: orgId,
+        },
+        select: { id: true },
+      });
+      const customerIds = customerRecords.map((c) => c.id);
+
+      this.logger.debug(`[findAgentCustomerProjectsInOrg] Found ${customerIds.length} customer records | userId=${user.id} orgId=${orgId}`);
+
+      if (customerIds.length === 0) {
+        // No customer records in this org - return empty (not forbidden)
+        // The user might legitimately have no projects yet
+        this.logger.debug(`[findAgentCustomerProjectsInOrg] SUCCESS: No customer records in org, returning empty | userId=${user.id} orgId=${orgId}`);
+        return [];
+      }
+
+      const include = this.projectInclude(true);
+      const projects = await this.prisma.project.findMany({
+        where: {
+          orgId,
+          customerId: { in: customerIds },
+        },
+        include: {
+          ...include,
+          organization: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      this.logger.debug(`[findAgentCustomerProjectsInOrg] SUCCESS: Returned ${projects.length} projects | userId=${user.id} orgId=${orgId}`);
+      return projects;
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      this.logger.error(`[findAgentCustomerProjectsInOrg] Database error: ${error.message}`, error.stack);
+      throw new HttpException('Failed to fetch projects', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
