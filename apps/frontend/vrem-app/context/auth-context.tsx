@@ -153,7 +153,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
             setActiveOrganizationId(resolvedOrgId);
           }
-        } catch (error) {
+        } catch (error: any) {
+          // Check if this is a network error (backend unreachable)
+          const isNetworkError =
+            error?.message?.includes('Network Error') ||
+            error?.message?.includes('Failed to fetch') ||
+            error?.message?.includes('ERR_CONNECTION_REFUSED') ||
+            error?.name === 'TypeError';
+
+          if (isNetworkError) {
+            // Backend is unreachable - sign out completely and redirect to login
+            console.warn("Backend unreachable, signing out...");
+            localStorage.removeItem("token");
+            localStorage.removeItem("organizationId");
+            setToken(null);
+            setUser(null);
+            setMemberships([]);
+            setActiveOrganizationId(null);
+            try {
+              await signOut();
+            } catch {
+              // Ignore signOut errors
+            }
+            window.location.href = "/sign-in";
+            return;
+          }
+
+          // For other errors, just clear local state
           console.error("Failed to sync with backend:", error);
           localStorage.removeItem("token");
           localStorage.removeItem("organizationId");

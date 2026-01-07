@@ -296,15 +296,22 @@ class ApiClient {
     } catch (error: any) {
       // Network error (fetch failed completely)
       const errorMessage = error.message || 'Network request failed';
-      console.error('[API Network Error]', {
-        endpoint,
-        fullUrl,
-        method,
-        error: errorMessage,
-      });
+      const isConnectionRefused = errorMessage.includes('Failed to fetch') ||
+                                   errorMessage.includes('ERR_CONNECTION_REFUSED');
 
-      // Track persistent network errors
-      if (typeof window !== 'undefined') {
+      // Use warn for connection refused (expected when backend is down)
+      // Skip verbose logging for auth endpoints (handled by auth context)
+      const isAuthEndpoint = endpoint.includes('/auth/') || endpoint.includes('/me');
+      if (!isAuthEndpoint) {
+        if (isConnectionRefused) {
+          console.warn('[API] Backend unreachable');
+        } else {
+          console.warn('[API Network Error]', { endpoint, method, error: errorMessage });
+        }
+      }
+
+      // Track persistent network errors (but not for auth endpoints)
+      if (typeof window !== 'undefined' && !isAuthEndpoint) {
         window.dispatchEvent(new CustomEvent('backend-api-error', {
           detail: { message: `${method} ${endpoint} failed: ${errorMessage}` }
         }));
