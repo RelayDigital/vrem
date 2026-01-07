@@ -704,10 +704,7 @@ export default function DashboardPage() {
 
   // COMPANY org: Show CompanyDashboardView (with sidebar)
   if (showSidebar) {
-    console.log('[DashboardPage] showSidebar=true, metrics from hook:', metrics);
-    console.log('[DashboardPage] metrics?.jobs:', metrics?.jobs);
     const displayMetrics = metrics ?? emptyMetrics;
-    console.log('[DashboardPage] displayMetrics.jobs:', displayMetrics.jobs);
     const handleViewRankings = jobManagement.openRankings;
     const handleJobAssign = jobManagement.assignJob;
     const handleJobSelect = jobManagement.toggleJobSelection;

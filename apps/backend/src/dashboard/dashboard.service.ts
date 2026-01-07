@@ -370,12 +370,6 @@ export class DashboardService {
     // Compute full org metrics for the period
     const metrics = await this.metricsService.computeOrgMetrics(orgId, period);
 
-    // Debug: log to understand what's happening
-    console.log('[Dashboard] orgId:', orgId);
-    console.log('[Dashboard] total projects:', projects.length);
-    console.log('[Dashboard] projects with scheduledTime:', projects.filter(p => p.scheduledTime).length);
-    console.log('[Dashboard] metrics.jobs:', metrics.jobs);
-
     return {
       role: 'COMPANY',
       projects,

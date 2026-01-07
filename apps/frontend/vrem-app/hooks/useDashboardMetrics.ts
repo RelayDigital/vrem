@@ -37,8 +37,6 @@ export function useDashboardMetrics(enabled: boolean): DashboardMetricsState {
 
     try {
       const dashboardData = await api.dashboard.get();
-      console.log('[Hook] dashboardData.metrics.jobs:', dashboardData.metrics?.jobs);
-      console.log('[Hook] Setting metrics with total:', dashboardData.metrics?.jobs?.total);
       setMetrics(dashboardData.metrics);
       setStats(dashboardData.stats || null);
       setRole(dashboardData.role || null);
