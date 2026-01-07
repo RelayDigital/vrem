@@ -254,4 +254,58 @@ export class DeliveryController {
       recovered: result.recovered,
     };
   }
+
+  /**
+   * CRON: Serverless-safe endpoint for artifact generation.
+   *
+   * Call this endpoint periodically (every 30-60 seconds) from an external scheduler
+   * to process pending download artifacts when no persistent worker is running.
+   *
+   * Protected by X-CRON-SECRET header (env: CRON_SECRET).
+   *
+   * Example cURL:
+   *   curl -X POST https://api.example.com/delivery/admin/run-artifact-worker \
+   *     -H "X-CRON-SECRET: your-secret-here"
+   *
+   * Returns:
+   *   { success: true, processed: number, recovered: number }
+   *
+   * - processed: Number of artifacts moved from PENDING to GENERATING/READY
+   * - recovered: Number of stuck GENERATING artifacts reset to PENDING for retry
+   */
+  @Public()
+  @Throttle({ default: { ttl: 60000, limit: 12 } }) // Max 12 calls per minute
+  @Post('admin/run-artifact-worker')
+  async runArtifactWorker(@Headers('x-cron-secret') cronSecret?: string, @Req() req?: any) {
+    // Validate cron secret
+    const expectedSecret = process.env.CRON_SECRET;
+    if (!expectedSecret) {
+      // Endpoint disabled when CRON_SECRET not configured
+      throw new NotFoundException('Not found');
+    }
+
+    if (!cronSecret || cronSecret !== expectedSecret) {
+      // Log failed attempt without exposing secrets
+      this.audit.log(AuditEventType.DELIVERY_PAGE_VIEW, req, {
+        action: 'artifact_worker_cron_auth_failed',
+        hasSecret: !!cronSecret,
+      });
+      throw new NotFoundException('Not found');
+    }
+
+    const result = await this.artifactWorker.poll();
+
+    // Log successful cron run (no sensitive data)
+    this.audit.log(AuditEventType.DELIVERY_PAGE_VIEW, req, {
+      action: 'artifact_worker_cron_success',
+      processed: result.processed,
+      recovered: result.recovered,
+    });
+
+    return {
+      success: true,
+      processed: result.processed,
+      recovered: result.recovered,
+    };
+  }
 }

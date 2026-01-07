@@ -355,6 +355,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (result.status === "complete") {
           await setActiveSignIn({ session: result.createdSessionId });
+          // Don't set isLoading(false) here - let the main useEffect handle it
+          // after Clerk's isSignedIn updates and bootstrap completes.
+          // This prevents the race condition where dashboard loads before auth state syncs.
           router.push("/dashboard");
           return;
         } else {
@@ -371,6 +374,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.status === "complete") {
         // Set the active session - this will trigger the useEffect to sync with backend
         await setActiveSignIn({ session: result.createdSessionId });
+        // Don't set isLoading(false) here - let the main useEffect handle it
+        // after Clerk's isSignedIn updates and bootstrap completes.
         router.push("/dashboard");
       } else if (result.status === "needs_second_factor") {
         // Clerk is requiring a second factor (e.g., email code, TOTP)
@@ -391,6 +396,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(`Sign-in incomplete: ${result.status}`);
       }
     } catch (error: any) {
+      // Only set isLoading to false on error - successful login lets useEffect handle it
+      setIsLoading(false);
       console.error("Login failed:", error);
       // Handle "already signed in" error gracefully
       if (error.errors?.[0]?.code === "session_exists" ||
@@ -403,9 +410,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(error.errors[0]?.message || "Login failed");
       }
       throw error;
-    } finally {
-      setIsLoading(false);
     }
+    // Note: No finally block - isLoading is handled by:
+    // - catch block on error
+    // - main useEffect after successful login + bootstrap
   };
 
   const register = async (data: {
@@ -449,6 +457,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.status === "complete") {
         // Set the active session - this will trigger the useEffect to sync with backend
         await setActiveSignUp({ session: result.createdSessionId });
+        // Don't set isLoading(false) here - let the main useEffect handle it
+        // after Clerk's isSignedIn updates and bootstrap completes.
         router.push("/dashboard");
       } else if (result.status === "missing_requirements") {
         // Email verification might be required
@@ -464,14 +474,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(`Registration incomplete: ${result.status}`);
       }
     } catch (error: any) {
+      // Only set isLoading to false on error - successful registration lets useEffect handle it
+      setIsLoading(false);
       console.error("Registration failed:", error);
       if (error.errors) {
         throw new Error(error.errors[0]?.message || "Registration failed");
       }
       throw error;
-    } finally {
-      setIsLoading(false);
     }
+    // Note: No finally block - isLoading is handled by:
+    // - catch block on error
+    // - main useEffect after successful registration + bootstrap
   };
 
   const loginWithOAuth = async (
@@ -503,20 +516,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Initiate OAuth flow with Clerk
       // This will redirect to the provider's OAuth page
+      // Note: This redirects away from the app, so isLoading state doesn't matter here
       await signIn.authenticateWithRedirect({
         strategy,
         redirectUrl: '/sso-callback',
         redirectUrlComplete: '/dashboard',
       });
     } catch (error: any) {
+      // Only set isLoading to false on error
+      setIsLoading(false);
       console.error("OAuth login failed:", error);
       if (error.errors) {
         throw new Error(error.errors[0]?.message || "OAuth login failed");
       }
       throw error;
-    } finally {
-      setIsLoading(false);
     }
+    // Note: No finally block - OAuth redirects away from the page
   };
 
   const completeOnboarding = async (response: { token: string; user: any }) => {

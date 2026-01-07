@@ -404,18 +404,6 @@ export function JobChat({
           </div>
         </div>
 
-        {/* Avatar for own messages */}
-        {isOwn && (
-          <Avatar className="h-8 w-8 ml-2 mt-auto mb-1 flex-shrink-0">
-            <AvatarImage src={currentUserAvatar} alt={currentUserName} />
-            <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-              {currentUserName
-                .split(' ')
-                .map((n) => n[0])
-                .join('')}
-            </AvatarFallback>
-          </Avatar>
-        )}
       </div>
     );
   };
@@ -543,17 +531,6 @@ export function JobChat({
                       </div>
                     </div>
 
-                    {isOwn && (
-                      <Avatar className="h-7 w-7 ml-2 mt-auto mb-1 flex-shrink-0">
-                        <AvatarImage src={currentUserAvatar} alt={currentUserName} />
-                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                          {currentUserName
-                            .split(' ')
-                            .map((n) => n[0])
-                            .join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
                   </div>
                 );
               })}

@@ -35,7 +35,7 @@
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.1.9",
     "@prisma/adapter-pg": "^7.1.0",
-    "@prisma/client": "^7.1.0",
+    "@prisma/client": "^7.2.0",
     "@supabase/supabase-js": "^2.84.0",
     "@uploadcare/rest-client": "^6.18.2",
     "archiver": "^7.0.1",

@@ -80,15 +80,16 @@ model OrganizationMember {
 }
 
 model Media {
-  id        String    @id @default(cuid())
-  projectId String
-  key       String
-  cdnUrl    String?
-  filename  String
-  size      Int
-  type      MediaType
-  createdAt DateTime  @default(now())
-  project   Project   @relation(fields: [projectId], references: [id])
+  id          String    @id @default(cuid())
+  projectId   String
+  key         String?   // Storage key (null for external URLs like virtual tours)
+  cdnUrl      String?
+  externalUrl String?   // External URL for virtual tours (iGUIDE, Matterport, etc.)
+  filename    String
+  size        Int
+  type        MediaType
+  createdAt   DateTime  @default(now())
+  project     Project   @relation(fields: [projectId], references: [id])
 }
 
 model DownloadArtifact {
@@ -468,6 +469,7 @@ enum MediaType {
   VIDEO
   FLOORPLAN
   DOCUMENT
+  VIRTUAL_TOUR // External virtual tour URLs (iGUIDE, Matterport, etc.)
 }
 
 enum ProjectStatus {

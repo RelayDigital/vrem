@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { DeliveryComment } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Send, Loader2, LogIn, MessageSquare } from 'lucide-react';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
@@ -68,6 +68,7 @@ export function DeliveryComments({
           {comments.map((comment) => (
             <div key={comment.id} className="flex gap-3">
               <Avatar className="h-8 w-8">
+                <AvatarImage src={comment.user.avatarUrl ?? undefined} alt={comment.user.name} />
                 <AvatarFallback className="text-xs">
                   {getInitials(comment.user.name)}
                 </AvatarFallback>

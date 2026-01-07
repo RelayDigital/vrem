@@ -279,6 +279,7 @@ export default function ProtectedLayout({
         <MessagingProvider
           defaultUserId={user?.id}
           defaultUserName={user?.name}
+          defaultUserAvatar={user?.avatarUrl}
         >
           <DispatcherNavigationProvider>
             <TourProvider>

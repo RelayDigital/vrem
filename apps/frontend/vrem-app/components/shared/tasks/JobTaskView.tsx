@@ -75,6 +75,7 @@ import {
   Image as ImageIcon,
   File,
   Box,
+  Globe,
   Upload,
   Grid3x3,
   Loader2,
@@ -274,6 +275,8 @@ export function JobTaskView({
   const { activeOrganizationId, activeMembership } = useCurrentOrganization();
   const jobManagement = useJobManagement();
   const messaging = useMessaging();
+  // Use prop avatar if provided, otherwise fall back to messaging context
+  const effectiveUserAvatar = currentUserAvatar ?? messaging.currentUserAvatar;
   const isMessagesLoading = job ? messaging.isLoadingMessages(job.id) : false;
   const isAgentUser = (currentUserAccountType || "").toUpperCase() === "AGENT";
   const [activeTab, setActiveTab] = useState<
@@ -367,6 +370,8 @@ export function JobTaskView({
   const [hasEditorContent, setHasEditorContent] = useState(false);
   const [hasEditEditorContent, setHasEditEditorContent] = useState(false);
   const [uploadedMedia, setUploadedMedia] = useState<MediaItem[]>([]);
+  const [deletingMediaIds, setDeletingMediaIds] = useState<Set<string>>(new Set());
+  const [isAddingUrl, setIsAddingUrl] = useState(false);
   const [isLoadingMedia, setIsLoadingMedia] = useState(false);
   const [draggingCategory, setDraggingCategory] = useState<string | null>(null);
   const [threeDUrl, setThreeDUrl] = useState<string>("");
@@ -762,6 +767,8 @@ export function JobTaskView({
           return "video";
         case MediaType.FLOORPLAN:
           return "floor-plan";
+        case MediaType.VIRTUAL_TOUR:
+          return "3d-content";
         case MediaType.DOCUMENT:
           return "file";
         case MediaType.PHOTO:
@@ -779,8 +786,9 @@ export function JobTaskView({
           return MediaType.VIDEO;
         case "floor-plan":
           return MediaType.FLOORPLAN;
-        case "file":
         case "3d-content":
+          return MediaType.VIRTUAL_TOUR;
+        case "file":
           return MediaType.DOCUMENT;
         case "image":
         default:
@@ -795,7 +803,7 @@ export function JobTaskView({
       id: media.id,
       name: media.filename,
       type: mapBackendTypeToCategory(media.type),
-      url: media.cdnUrl || media.key,
+      url: media.externalUrl || media.cdnUrl || media.key || '',
       size: media.size,
       uploadedAt: new Date(media.createdAt),
       key: media.key,
@@ -1399,7 +1407,7 @@ export function JobTaskView({
       case "floor-plan":
         return <FileText className="size-10 text-muted-foreground" />;
       case "3d-content":
-        return <Box className="size-10 text-muted-foreground" />;
+        return <Globe className="size-10 text-muted-foreground" />;
       default:
         return <File className="size-10 text-muted-foreground" />;
     }
@@ -1495,44 +1503,63 @@ export function JobTaskView({
 
   const handleDeleteMedia = async (id: string) => {
     if (!job || isAgentUser) return; // Agents cannot delete media
+
+    // Prevent double-deletion
+    if (deletingMediaIds.has(id)) return;
+
     const orgId = activeOrganizationId || job.organizationId;
     if (orgId) {
       api.organizations.setActiveOrganization(orgId);
     }
+
+    // Mark as deleting and optimistically remove from UI
+    setDeletingMediaIds((prev) => new Set(prev).add(id));
+    const deletedItem = uploadedMedia.find((m) => m.id === id);
+    setUploadedMedia((prev) => prev.filter((m) => m.id !== id));
+
     try {
       await api.media.deleteFromProject(job.id, id);
-      setUploadedMedia((prev) => {
-        const item = prev.find((m) => m.id === id);
-        if (item && item.url.startsWith("blob:")) {
-          URL.revokeObjectURL(item.url);
+      // Clean up blob URL and processed keys
+      if (deletedItem) {
+        if (deletedItem.url.startsWith("blob:")) {
+          URL.revokeObjectURL(deletedItem.url);
         }
-        const filtered = prev.filter((m) => m.id !== id);
-        if (item?.key) {
-          processedMediaKeysRef.current.delete(item.key);
+        if (deletedItem.key) {
+          processedMediaKeysRef.current.delete(deletedItem.key);
         }
-        return filtered;
-      });
+      }
       toast.success("Media deleted");
     } catch (error) {
       console.error("Failed to delete media", error);
+      // Restore item on failure
+      if (deletedItem) {
+        setUploadedMedia((prev) => [...prev, deletedItem]);
+      }
       toast.error("Failed to delete media");
+    } finally {
+      setDeletingMediaIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
   const handleUrlUpload = async (url: string, category: "3d-content") => {
-    if (!url.trim() || !job) return;
+    if (!url.trim() || !job || isAddingUrl) return;
 
     // Validate URL
     try {
       new URL(url);
     } catch {
-      // Invalid URL, could show error message here
+      toast.error("Please enter a valid URL");
       return;
     }
 
     const urlParts = url.split("/");
-    const fileName = urlParts[urlParts.length - 1] || "3D Model";
+    const fileName = urlParts[urlParts.length - 1] || "Virtual Tour";
 
+    setIsAddingUrl(true);
     try {
       const orgId = activeOrganizationId || job.organizationId;
       if (orgId) {
@@ -1564,6 +1591,7 @@ export function JobTaskView({
       toast.error("Failed to save media URL");
     } finally {
       setThreeDUrl("");
+      setIsAddingUrl(false);
     }
   };
 
@@ -1623,10 +1651,10 @@ export function JobTaskView({
       category === "floor-plan"
         ? "Floor Plans"
         : category === "3d-content"
-        ? "3D Content"
+        ? "Virtual Tours"
         : category.charAt(0).toUpperCase() + category.slice(1) + "s";
 
-    // Special handling for 3D Content (URL input)
+    // Special handling for Virtual Tours (URL input)
     if (category === "3d-content") {
       return (
         <div className="py-4 space-y-4">
@@ -1640,19 +1668,23 @@ export function JobTaskView({
                     value={threeDUrl}
                     onChange={(e) => setThreeDUrl(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !uploadsDisabled) {
+                      if (e.key === "Enter" && !uploadsDisabled && !isAddingUrl) {
                         handleUrlUpload(threeDUrl, "3d-content");
                       }
                     }}
-                    disabled={uploadsDisabled}
+                    disabled={uploadsDisabled || isAddingUrl}
                     className="flex-1"
                   />
                   <Button
                     onClick={() => handleUrlUpload(threeDUrl, "3d-content")}
-                    disabled={!threeDUrl.trim() || uploadsDisabled}
+                    disabled={!threeDUrl.trim() || uploadsDisabled || isAddingUrl}
                   >
-                    <Link className="h-4 w-4 mr-2" />
-                    Add URL
+                    {isAddingUrl ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Link className="h-4 w-4 mr-2" />
+                    )}
+                    {isAddingUrl ? "Adding..." : "Add URL"}
                   </Button>
                 </div>
                 <P className="text-xs text-muted-foreground">
@@ -1676,21 +1708,25 @@ export function JobTaskView({
                     value={threeDUrl}
                     onChange={(e) => setThreeDUrl(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !uploadsDisabled) {
+                      if (e.key === "Enter" && !uploadsDisabled && !isAddingUrl) {
                         handleUrlUpload(threeDUrl, "3d-content");
                       }
                     }}
-                    disabled={uploadsDisabled}
+                    disabled={uploadsDisabled || isAddingUrl}
                     className="w-[300px]"
                   />
                   <Button
                     onClick={() => handleUrlUpload(threeDUrl, "3d-content")}
-                    disabled={!threeDUrl.trim() || uploadsDisabled}
+                    disabled={!threeDUrl.trim() || uploadsDisabled || isAddingUrl}
                     variant="outline"
                     size="sm"
                   >
-                    <Link className="h-4 w-4 mr-2" />
-                    Add URL
+                    {isAddingUrl ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Link className="h-4 w-4 mr-2" />
+                    )}
+                    {isAddingUrl ? "Adding..." : "Add URL"}
                   </Button>
                 </div>
               </div>
@@ -2478,25 +2514,6 @@ export function JobTaskView({
           )}
         </div>
 
-        {/* Avatar for own messages - only show on last message of chain (drops to most recent) */}
-        {isOwnMessage && (
-          <div className="w-8 ml-2 flex-shrink-0 self-end">
-            {isLastInChain ? (
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={currentUserAvatar} alt={currentUserName} />
-                <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                  {currentUserName
-                    .split(" ")
-                    .map((n: string) => n[0])
-                    .join("")}
-                </AvatarFallback>
-              </Avatar>
-            ) : (
-              // Empty placeholder to maintain alignment
-              <div className="h-8 w-8" />
-            )}
-          </div>
-        )}
       </div>
     );
   };
@@ -2601,17 +2618,6 @@ export function JobTaskView({
                       </div>
                     </div>
 
-                    {isOwn && (
-                      <Avatar className="h-7 w-7 ml-2 mt-auto mb-1 flex-shrink-0">
-                        <AvatarImage src={currentUserAvatar} alt={currentUserName} />
-                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                          {currentUserName
-                            .split(" ")
-                            .map((n: string) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
                   </div>
                 );
               })}
@@ -2868,7 +2874,7 @@ export function JobTaskView({
         <div className="flex flex-col gap-0" data-tour="messaging-compose">
           <div className="flex items-start gap-3">
             <Avatar className="h-8 w-8 shrink-0">
-              <AvatarImage src={currentUserAvatar} alt={currentUserName} />
+              <AvatarImage src={effectiveUserAvatar} alt={currentUserName} />
               <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                 {currentUserName
                   .split(" ")
@@ -3450,7 +3456,7 @@ export function JobTaskView({
                       {renderAssigneeSelector({
                         isAssigned: customerDisplayName !== "Unassigned",
                         name: customerDisplayName,
-                        avatar: undefined,
+                        avatar: assignedCustomer?.avatar ?? undefined,
                         label: "Assign Customer",
                         onClear: assignedCustomer
                           ? () => handleAssignCustomerInline("")
@@ -3483,6 +3489,7 @@ export function JobTaskView({
                                 className="flex items-center gap-2"
                               >
                                 <Avatar className="h-8 w-8">
+                                  <AvatarImage src={customer.avatar ?? undefined} alt={customer.name} />
                                   <AvatarFallback className="text-xs bg-muted">
                                     {getInitials(customer.name)}
                                   </AvatarFallback>
@@ -4212,7 +4219,7 @@ export function JobTaskView({
                     </AccordionItem>
                   )}
 
-                  {/* 3D Content Section */}
+                  {/* Virtual Tours Section */}
                   {(!isAgentUser ||
                     getMediaByCategory("3d-content").length > 0) && (
                     <AccordionItem
@@ -4221,8 +4228,8 @@ export function JobTaskView({
                     >
                       <AccordionTrigger className="hover:no-underline">
                         <div className="flex items-center gap-3">
-                          <Box className="h-5 w-5 text-muted-foreground" />
-                          <span className="font-medium">3D Content</span>
+                          <Globe className="h-5 w-5 text-muted-foreground" />
+                          <span className="font-medium">Virtual Tours</span>
                           {getMediaByCategory("3d-content").length > 0 && (
                             <Badge variant="secondary" className="ml-2">
                               {getMediaByCategory("3d-content").length}

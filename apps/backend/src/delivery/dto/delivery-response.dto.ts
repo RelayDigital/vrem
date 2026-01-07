@@ -2,8 +2,9 @@ import { ClientApprovalStatus, MediaType, ProjectStatus } from '@prisma/client';
 
 export class MediaDto {
   id: string;
-  key: string;
+  key: string | null; // Storage key (null for external URLs like virtual tours)
   cdnUrl: string | null;
+  externalUrl: string | null; // External URL for virtual tours (iGUIDE, Matterport, etc.)
   filename: string;
   size: number;
   type: MediaType;
@@ -17,6 +18,7 @@ export class CommentDto {
   user: {
     id: string;
     name: string;
+    avatarUrl?: string | null;
   };
 }
 
@@ -57,6 +59,9 @@ export class DeliveryResponseDto {
 
   /** Whether bulk download is available (requires storage backend) */
   downloadEnabled: boolean;
+
+  /** Whether user can retry failed artifacts (OWNER/ADMIN/PROJECT_MANAGER only) */
+  canRetryArtifact: boolean;
 }
 
 export class AddCommentDto {

@@ -30,8 +30,12 @@ export class ArtifactWorkerService implements OnModuleInit, OnModuleDestroy {
   private readonly MAX_RETRIES = 3;
   private readonly INITIAL_BACKOFF_MS = 1000; // 1 second initial backoff
   private readonly MAX_BACKOFF_MS = 30000; // 30 second max backoff
-  private readonly ZIP_CONCURRENCY_LIMIT = 5;
+  private readonly ZIP_CONCURRENCY_LIMIT = 5; // Max concurrent file downloads
   private readonly FILE_DOWNLOAD_TIMEOUT_MS = 30000; // 30 seconds per file
+
+  // MVP Guardrails - configurable via env
+  private readonly MAX_MEDIA_FILES_PER_ZIP: number;
+  private readonly MAX_ZIP_SIZE_BYTES: number;
 
   // Worker state
   private pollTimeout: NodeJS.Timeout | null = null;
@@ -46,6 +50,14 @@ export class ArtifactWorkerService implements OnModuleInit, OnModuleDestroy {
     this.workerId = crypto.randomUUID();
     this.storageConfigured = !!(
       process.env.UPLOADCARE_PUBLIC_KEY && process.env.UPLOADCARE_PRIVATE_KEY
+    );
+
+    // MVP Guardrails - configurable via env with sensible defaults
+    this.MAX_MEDIA_FILES_PER_ZIP = parseInt(process.env.MAX_MEDIA_FILES_PER_ZIP || '500', 10);
+    this.MAX_ZIP_SIZE_BYTES = parseInt(process.env.MAX_ZIP_SIZE_BYTES || String(2 * 1024 * 1024 * 1024), 10); // 2GB default
+
+    this.logger.log(
+      `Artifact worker limits: max ${this.MAX_MEDIA_FILES_PER_ZIP} files, max ${Math.round(this.MAX_ZIP_SIZE_BYTES / 1024 / 1024)}MB`,
     );
   }
 
@@ -174,47 +186,69 @@ export class ArtifactWorkerService implements OnModuleInit, OnModuleDestroy {
   /**
    * Claim the next pending job using optimistic locking.
    * Returns the job if successfully claimed, null otherwise.
+   *
+   * Uses a two-step atomic pattern:
+   * 1. Find the oldest eligible PENDING artifact
+   * 2. Conditionally update ONLY that specific row (id + status + workerToken=null)
+   * 3. If update affects 0 rows (race condition), return null
+   *
+   * This ensures exactly one artifact is claimed per call, even under concurrency.
    */
   private async claimNextJob() {
     const workerToken = crypto.randomUUID();
 
-    // Find a pending job and atomically claim it
-    // Use updateMany with a unique condition to ensure only one worker claims it
-    const result = await this.prisma.downloadArtifact.updateMany({
-      where: {
-        status: DownloadArtifactStatus.PENDING,
-        workerToken: null, // Not claimed by another worker
-      },
-      data: {
-        status: DownloadArtifactStatus.GENERATING,
-        processingStartedAt: new Date(),
-        workerToken: workerToken,
-      },
-    });
+    return await this.prisma.$transaction(async (tx) => {
+      // Step 1: Find the oldest eligible PENDING artifact
+      const candidate = await tx.downloadArtifact.findFirst({
+        where: {
+          status: DownloadArtifactStatus.PENDING,
+          workerToken: null,
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
 
-    if (result.count === 0) {
-      return null;
-    }
+      if (!candidate) {
+        return null;
+      }
 
-    // Fetch the job we just claimed
-    const job = await this.prisma.downloadArtifact.findFirst({
-      where: {
-        workerToken: workerToken,
-        status: DownloadArtifactStatus.GENERATING,
-      },
-      include: {
-        project: {
-          include: {
-            organization: true,
-            media: {
-              orderBy: { createdAt: 'desc' },
+      // Step 2: Atomically claim this specific artifact
+      // The WHERE clause ensures we only update if it's still PENDING and unclaimed
+      const result = await tx.downloadArtifact.updateMany({
+        where: {
+          id: candidate.id,
+          status: DownloadArtifactStatus.PENDING,
+          workerToken: null,
+        },
+        data: {
+          status: DownloadArtifactStatus.GENERATING,
+          processingStartedAt: new Date(),
+          workerToken: workerToken,
+        },
+      });
+
+      // Step 3: If another worker claimed it first (race condition), return null
+      if (result.count === 0) {
+        return null;
+      }
+
+      // Step 4: Fetch the full job with relations
+      const job = await tx.downloadArtifact.findUnique({
+        where: { id: candidate.id },
+        include: {
+          project: {
+            include: {
+              organization: true,
+              media: {
+                orderBy: { createdAt: 'desc' },
+              },
             },
           },
         },
-      },
-    });
+      });
 
-    return job;
+      return job;
+    });
   }
 
   /**
@@ -241,12 +275,38 @@ export class ArtifactWorkerService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    // MVP Guardrail: Check file count limit
+    if (media.length > this.MAX_MEDIA_FILES_PER_ZIP) {
+      const errorMsg = `Too many files (${media.length}). Maximum allowed is ${this.MAX_MEDIA_FILES_PER_ZIP} files per download. Please contact support for large exports.`;
+      this.logger.warn(`Artifact ${job.id} rejected: ${errorMsg}`);
+      await this.failJob(job.id, job.workerToken!, errorMsg);
+      return;
+    }
+
+    // MVP Guardrail: Estimate total size and check limit (if size info available)
+    const estimatedTotalSize = media.reduce((sum, m) => sum + (m.size || 0), 0);
+    if (estimatedTotalSize > 0 && estimatedTotalSize > this.MAX_ZIP_SIZE_BYTES) {
+      const sizeMB = Math.round(estimatedTotalSize / 1024 / 1024);
+      const limitMB = Math.round(this.MAX_ZIP_SIZE_BYTES / 1024 / 1024);
+      const errorMsg = `Total size too large (~${sizeMB}MB). Maximum allowed is ${limitMB}MB per download. Please contact support for large exports.`;
+      this.logger.warn(`Artifact ${job.id} rejected: ${errorMsg}`);
+      await this.failJob(job.id, job.workerToken!, errorMsg);
+      return;
+    }
+
+    this.logger.log(
+      `Artifact ${job.id}: ${media.length} files, ~${Math.round(estimatedTotalSize / 1024 / 1024)}MB estimated`,
+    );
+
     const tempDir = os.tmpdir();
     const tempZipPath = path.join(tempDir, `${job.id}.zip`);
 
     try {
+      // Filter out media without storage keys (e.g., virtual tours with only external URLs)
+      const downloadableMedia = media.filter((m): m is typeof m & { key: string } => m.key !== null);
+
       // Download files with limited concurrency and retry
-      const downloadResults = await this.downloadFilesWithRetry(media);
+      const downloadResults = await this.downloadFilesWithRetry(downloadableMedia);
 
       const successfulDownloads = downloadResults.filter(
         (r): r is NonNullable<typeof r> => r !== null,

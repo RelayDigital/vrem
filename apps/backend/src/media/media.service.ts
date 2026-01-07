@@ -186,7 +186,10 @@ export class MediaService {
       throw new ForbiddenException('Not allowed to delete this media');
     }
 
-    await this.deleteFromStorageIfConfigured(media.key);
+    // Only delete from storage if media has a storage key (virtual tours with external URLs only don't have keys)
+    if (media.key) {
+      await this.deleteFromStorageIfConfigured(media.key);
+    }
 
     // Delete metadata record
     return this.prisma.media.delete({

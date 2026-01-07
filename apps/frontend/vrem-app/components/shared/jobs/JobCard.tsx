@@ -454,17 +454,17 @@ export function JobCard({
 
                 {/* View in Project Management */}
                 {onViewInProjectManagement && (
-                  <Button
-                    size="icon"
+                  <Badge
+                    // size="icon"
                     onClick={(e) => {
                       e.stopPropagation();
                       onViewInProjectManagement();
                     }}
-                    className="size-6 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80 active:scale-[0.97]"
+                    className="items-center gap-1.5 rounded-full px-1! bg-primary/10! text-primary-foreground hidden! group-hover:block! hover:bg-primary/50! active:bg-primary/80 active:scale-[0.97]"
                   >
-                    <ExternalLink className="size-3" />
+                    <ExternalLink className="size-3 text-primary-foreground" />
                     <span className="sr-only">View in job management</span>
-                  </Button>
+                  </Badge>
                 )}
               </div>
             </div>
@@ -618,9 +618,9 @@ export function JobCard({
               </Badge>
             )}
 
-            {/* View in Job Management Button - Top Right */}
+            {/* View in Job Management Button - Top Right (appears on hover) */}
             {onViewInProjectManagement && (
-              <div className="flex absolute right-0 z-10">
+              <div className="flex absolute right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <Button
                   size="icon"
                   className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80 active:scale-[0.97]"

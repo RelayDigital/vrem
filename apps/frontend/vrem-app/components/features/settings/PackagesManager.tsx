@@ -675,27 +675,36 @@ export function PackagesManager() {
     }
 
     setIsSavingPackage(true);
-    try {
-      const payload: CreatePackagePayload = {
-        name: packageForm.name.trim(),
-        description: packageForm.description.trim() || undefined,
-        price: parsePriceInput(packageForm.price),
-        currency: packageForm.currency,
-        mediaTypes: packageForm.mediaTypes,
-        turnaroundDays: packageForm.turnaroundDays
-          ? parseInt(packageForm.turnaroundDays)
-          : undefined,
-        photoCount: packageForm.photoCount
-          ? parseInt(packageForm.photoCount)
-          : undefined,
-        videoMinutes: packageForm.videoMinutes
-          ? parseInt(packageForm.videoMinutes)
-          : undefined,
-        features: packageForm.features.filter(Boolean),
-        images: packageForm.images.filter(Boolean),
-      };
 
-      if (editingPackage) {
+    const payload: CreatePackagePayload = {
+      name: packageForm.name.trim(),
+      description: packageForm.description.trim() || undefined,
+      price: parsePriceInput(packageForm.price),
+      currency: packageForm.currency,
+      mediaTypes: packageForm.mediaTypes,
+      turnaroundDays: packageForm.turnaroundDays
+        ? parseInt(packageForm.turnaroundDays)
+        : undefined,
+      photoCount: packageForm.photoCount
+        ? parseInt(packageForm.photoCount)
+        : undefined,
+      videoMinutes: packageForm.videoMinutes
+        ? parseInt(packageForm.videoMinutes)
+        : undefined,
+      features: packageForm.features.filter(Boolean),
+      images: packageForm.images.filter(Boolean),
+    };
+
+    if (editingPackage) {
+      // For updates: optimistic update with rollback
+      const previousPackage = packages.find((p) => p.id === editingPackage.id);
+      const optimisticUpdate = { ...editingPackage, ...payload, isActive: packageForm.isActive };
+      setPackages((prev) =>
+        prev.map((p) => (p.id === editingPackage.id ? optimisticUpdate : p))
+      );
+      setPackageDialogOpen(false);
+
+      try {
         const updated = await api.packages.update(editingPackage.id, {
           ...payload,
           isActive: packageForm.isActive,
@@ -704,20 +713,35 @@ export function PackagesManager() {
           prev.map((p) => (p.id === updated.id ? updated : p))
         );
         toast.success("Package updated successfully");
-      } else {
+      } catch (err) {
+        console.error("Failed to update package:", err);
+        // Restore on error
+        if (previousPackage) {
+          setPackages((prev) =>
+            prev.map((p) => (p.id === editingPackage.id ? previousPackage : p))
+          );
+        }
+        toast.error(
+          err instanceof Error ? err.message : "Failed to update package"
+        );
+      } finally {
+        setIsSavingPackage(false);
+      }
+    } else {
+      // For creates: wait for API success before closing dialog
+      try {
         const created = await api.packages.create(payload);
         setPackages((prev) => [...prev, created]);
         toast.success("Package created successfully");
+        setPackageDialogOpen(false);
+      } catch (err) {
+        console.error("Failed to create package:", err);
+        toast.error(
+          err instanceof Error ? err.message : "Failed to create package"
+        );
+      } finally {
+        setIsSavingPackage(false);
       }
-
-      setPackageDialogOpen(false);
-    } catch (err) {
-      console.error("Failed to save package:", err);
-      toast.error(
-        err instanceof Error ? err.message : "Failed to save package"
-      );
-    } finally {
-      setIsSavingPackage(false);
     }
   };
 
@@ -752,16 +776,25 @@ export function PackagesManager() {
     }
 
     setIsSavingAddOn(true);
-    try {
-      const payload: CreateAddOnPayload = {
-        name: addOnForm.name.trim(),
-        description: addOnForm.description.trim() || undefined,
-        price: parsePriceInput(addOnForm.price),
-        currency: addOnForm.currency,
-        category: addOnForm.category,
-      };
 
-      if (editingAddOn) {
+    const payload: CreateAddOnPayload = {
+      name: addOnForm.name.trim(),
+      description: addOnForm.description.trim() || undefined,
+      price: parsePriceInput(addOnForm.price),
+      currency: addOnForm.currency,
+      category: addOnForm.category,
+    };
+
+    if (editingAddOn) {
+      // For updates: optimistic update with rollback
+      const previousAddOn = addOns.find((a) => a.id === editingAddOn.id);
+      const optimisticUpdate = { ...editingAddOn, ...payload, isActive: addOnForm.isActive };
+      setAddOns((prev) =>
+        prev.map((a) => (a.id === editingAddOn.id ? optimisticUpdate : a))
+      );
+      setAddOnDialogOpen(false);
+
+      try {
         const updated = await api.packages.updateAddOn(editingAddOn.id, {
           ...payload,
           isActive: addOnForm.isActive,
@@ -770,18 +803,31 @@ export function PackagesManager() {
           prev.map((a) => (a.id === updated.id ? updated : a))
         );
         toast.success("Add-on updated successfully");
-      } else {
+      } catch (err) {
+        console.error("Failed to update add-on:", err);
+        // Restore on error
+        if (previousAddOn) {
+          setAddOns((prev) =>
+            prev.map((a) => (a.id === editingAddOn.id ? previousAddOn : a))
+          );
+        }
+        toast.error(err instanceof Error ? err.message : "Failed to update add-on");
+      } finally {
+        setIsSavingAddOn(false);
+      }
+    } else {
+      // For creates: wait for API success before closing dialog
+      try {
         const created = await api.packages.createAddOn(payload);
         setAddOns((prev) => [...prev, created]);
         toast.success("Add-on created successfully");
+        setAddOnDialogOpen(false);
+      } catch (err) {
+        console.error("Failed to create add-on:", err);
+        toast.error(err instanceof Error ? err.message : "Failed to create add-on");
+      } finally {
+        setIsSavingAddOn(false);
       }
-
-      setAddOnDialogOpen(false);
-    } catch (err) {
-      console.error("Failed to save add-on:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to save add-on");
-    } finally {
-      setIsSavingAddOn(false);
     }
   };
 
@@ -799,19 +845,36 @@ export function PackagesManager() {
     if (!itemToDelete) return;
 
     setIsDeleting(true);
+
+    // Optimistically remove from UI
+    let deletedPackage: typeof packages[0] | undefined;
+    let deletedAddOn: typeof addOns[0] | undefined;
+
+    if (itemToDelete.type === "package") {
+      deletedPackage = packages.find((p) => p.id === itemToDelete.id);
+      setPackages((prev) => prev.filter((p) => p.id !== itemToDelete.id));
+    } else {
+      deletedAddOn = addOns.find((a) => a.id === itemToDelete.id);
+      setAddOns((prev) => prev.filter((a) => a.id !== itemToDelete.id));
+    }
+    setDeleteConfirmOpen(false);
+
     try {
       if (itemToDelete.type === "package") {
         await api.packages.delete(itemToDelete.id);
-        setPackages((prev) => prev.filter((p) => p.id !== itemToDelete.id));
         toast.success("Package deleted successfully");
       } else {
         await api.packages.deleteAddOn(itemToDelete.id);
-        setAddOns((prev) => prev.filter((a) => a.id !== itemToDelete.id));
         toast.success("Add-on deleted successfully");
       }
-      setDeleteConfirmOpen(false);
     } catch (err) {
       console.error("Failed to delete:", err);
+      // Restore on error
+      if (itemToDelete.type === "package" && deletedPackage) {
+        setPackages((prev) => [...prev, deletedPackage]);
+      } else if (deletedAddOn) {
+        setAddOns((prev) => [...prev, deletedAddOn]);
+      }
       toast.error(err instanceof Error ? err.message : "Failed to delete");
     } finally {
       setIsDeleting(false);

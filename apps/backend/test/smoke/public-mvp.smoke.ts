@@ -371,7 +371,7 @@ describe('Public MVP Smoke Tests', () => {
           orgId: personalOrgId,
           name: `Smoke Test Customer ${TEST_RUN_ID}`,
           email: customerEmail,
-          linkedUserId: customerUser.id,
+          userId: customerUser.id,
         },
       });
 

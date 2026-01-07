@@ -5,7 +5,7 @@ import { DeliveryMedia, MediaType } from '@/types';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Camera, Video, FileText, Plane, X, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { Camera, Video, FileText, Plane, X, ChevronLeft, ChevronRight, Download, Globe } from 'lucide-react';
 import Image from 'next/image';
 
 interface DeliveryGalleryProps {
@@ -18,6 +18,7 @@ const MEDIA_TYPE_ICONS: Record<MediaType, React.ReactNode> = {
   [MediaType.VIDEO]: <Video className="h-4 w-4" />,
   [MediaType.FLOORPLAN]: <FileText className="h-4 w-4" />,
   [MediaType.DOCUMENT]: <FileText className="h-4 w-4" />,
+  [MediaType.VIRTUAL_TOUR]: <Globe className="h-4 w-4" />,
 };
 
 const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
@@ -25,12 +26,16 @@ const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
   [MediaType.VIDEO]: 'Videos',
   [MediaType.FLOORPLAN]: 'Floor Plans',
   [MediaType.DOCUMENT]: 'Documents',
+  [MediaType.VIRTUAL_TOUR]: 'Virtual Tours',
 };
 
 function getMediaUrl(media: DeliveryMedia): string {
+  // For virtual tours, use the external URL
+  if (media.externalUrl) return media.externalUrl;
   if (media.cdnUrl) return media.cdnUrl;
   // Uploadcare CDN URL pattern
-  return `https://ucarecdn.com/${media.key}/`;
+  if (media.key) return `https://ucarecdn.com/${media.key}/`;
+  return '';
 }
 
 function getThumbnailUrl(media: DeliveryMedia): string {
@@ -135,6 +140,13 @@ export function DeliveryGallery({ media, token }: DeliveryGalleryProps) {
                   {item.filename}
                 </span>
               </div>
+            ) : item.type === MediaType.VIRTUAL_TOUR ? (
+              <div className="w-full h-full flex flex-col items-center justify-center bg-muted p-4">
+                <Globe className="h-12 w-12 text-muted-foreground mb-2" />
+                <span className="text-xs text-muted-foreground text-center truncate max-w-full">
+                  {item.filename || 'Virtual Tour'}
+                </span>
+              </div>
             ) : (
               <Image
                 src={getThumbnailUrl(item)}
@@ -208,6 +220,19 @@ export function DeliveryGallery({ media, token }: DeliveryGalleryProps) {
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Download
+                    </Button>
+                  </div>
+                ) : currentMedia.type === MediaType.VIRTUAL_TOUR ? (
+                  <div className="text-center text-white">
+                    <Globe className="h-24 w-24 mx-auto mb-4" />
+                    <p className="text-lg mb-4">{currentMedia.filename || 'Virtual Tour'}</p>
+                    <Button
+                      variant="outline"
+                      className="text-white border-white hover:bg-white/20"
+                      onClick={() => window.open(getMediaUrl(currentMedia), '_blank')}
+                    >
+                      <Globe className="h-4 w-4 mr-2" />
+                      Open Virtual Tour
                     </Button>
                   </div>
                 ) : (

@@ -83,12 +83,18 @@ export function ServicesEditor({ className }: ServicesEditorProps) {
     }
 
     setIsSaving(true);
+
+    // Optimistically update - hide the save button
+    const previousOriginal = [...originalUseCases];
+    setOriginalUseCases([...useCases]);
+
     try {
       await api.users.updateUseCases(useCases);
-      setOriginalUseCases(useCases);
       toast.success("Services updated successfully");
     } catch (error) {
       console.error("Failed to update use cases:", error);
+      // Restore on error - show the save button again
+      setOriginalUseCases(previousOriginal);
       toast.error(
         error instanceof Error ? error.message : "Failed to update services"
       );

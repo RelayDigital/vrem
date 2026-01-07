@@ -513,20 +513,28 @@ export function CustomersView({
 
   const handleDelete = async (customer: Customer) => {
     setDeletingId(customer.id);
+
+    // Optimistically remove from UI
+    const deletedCustomer = customerList.find((c) => c.id === customer.id);
+    setCustomerList((prev) => prev.filter((c) => c.id !== customer.id));
+    setSelectedIds((prev) => prev.filter((id) => id !== customer.id));
+    setDeleteConfirmOpen(false);
+    setDeleteTargets([]);
+
     try {
       if (api.customers.delete) {
         await api.customers.delete(customer.id);
       }
-      setCustomerList((prev) => prev.filter((c) => c.id !== customer.id));
-      setSelectedIds((prev) => prev.filter((id) => id !== customer.id));
       toast.success("Customer deleted");
     } catch (error) {
       console.error("Failed to delete customer", error);
+      // Restore on error
+      if (deletedCustomer) {
+        setCustomerList((prev) => [...prev, deletedCustomer]);
+      }
       toast.error("Unable to delete customer");
     } finally {
       setDeletingId(null);
-      setDeleteConfirmOpen(false);
-      setDeleteTargets([]);
     }
   };
 
@@ -535,23 +543,31 @@ export function CustomersView({
     const ids = deleteTargets.map((c) => c.id);
     setIsDeleting(true);
     setDeletingId(deleteTargets.length === 1 ? deleteTargets[0].id : "bulk");
+
+    // Optimistically remove from UI
+    const deletedCustomers = customerList.filter((c) => ids.includes(c.id));
+    setCustomerList((prev) => prev.filter((c) => !ids.includes(c.id)));
+    setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+    setDeleteConfirmOpen(false);
+    setDeleteTargets([]);
+
     try {
       if (api.customers.delete) {
         await Promise.all(ids.map((id) => api.customers.delete!(id)));
       }
-      setCustomerList((prev) => prev.filter((c) => !ids.includes(c.id)));
-      setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
       toast.success(
         `Deleted ${ids.length} customer${ids.length === 1 ? "" : "s"}`
       );
     } catch (error) {
       console.error("Failed to delete customers", error);
+      // Restore on error
+      if (deletedCustomers.length > 0) {
+        setCustomerList((prev) => [...prev, ...deletedCustomers]);
+      }
       toast.error("Unable to delete customers");
     } finally {
       setIsDeleting(false);
       setDeletingId(null);
-      setDeleteConfirmOpen(false);
-      setDeleteTargets([]);
     }
   };
 

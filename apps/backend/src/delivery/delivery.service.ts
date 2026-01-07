@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from '../email/email.service';
@@ -13,6 +13,10 @@ export class DeliveryService {
   // Storage configuration - checked once at startup
   private readonly storageConfigured: boolean;
 
+  // MVP Guardrails - must match artifact-worker.service.ts
+  private readonly MAX_MEDIA_FILES_PER_ZIP: number;
+  private readonly MAX_ZIP_SIZE_BYTES: number;
+
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
@@ -22,6 +26,10 @@ export class DeliveryService {
     const publicKey = process.env.UPLOADCARE_PUBLIC_KEY;
     const privateKey = process.env.UPLOADCARE_PRIVATE_KEY;
     this.storageConfigured = !!(publicKey && privateKey);
+
+    // MVP Guardrails - must match artifact-worker.service.ts
+    this.MAX_MEDIA_FILES_PER_ZIP = parseInt(process.env.MAX_MEDIA_FILES_PER_ZIP || '500', 10);
+    this.MAX_ZIP_SIZE_BYTES = parseInt(process.env.MAX_ZIP_SIZE_BYTES || String(2 * 1024 * 1024 * 1024), 10);
 
     if (!this.storageConfigured) {
       this.logger.warn(
@@ -83,9 +91,9 @@ export class DeliveryService {
 
     const canApprove = isLinkedCustomer;
 
-    // Determine if current user can comment (linked customer OR org admin/PM)
-    let canComment = isLinkedCustomer;
-    if (!canComment && currentUserId) {
+    // Determine if current user is an org admin/PM (for commenting and retry permissions)
+    let isOrgManager = false;
+    if (currentUserId) {
       const membership = await this.prisma.organizationMember.findFirst({
         where: {
           userId: currentUserId,
@@ -93,14 +101,21 @@ export class DeliveryService {
           role: { in: ['OWNER', 'ADMIN', 'PROJECT_MANAGER'] },
         },
       });
-      canComment = !!membership;
+      isOrgManager = !!membership;
     }
+
+    // Can comment: linked customer OR org admin/PM
+    const canComment = isLinkedCustomer || isOrgManager;
+
+    // Can retry artifacts: only org admin/PM (not customers)
+    const canRetryArtifact = isOrgManager;
 
     // Map media to DTO
     const media: MediaDto[] = project.media.map((m) => ({
       id: m.id,
       key: m.key,
       cdnUrl: m.cdnUrl,
+      externalUrl: m.externalUrl,
       filename: m.filename,
       size: m.size,
       type: m.type,
@@ -115,6 +130,7 @@ export class DeliveryService {
       user: {
         id: msg.user.id,
         name: msg.user.name,
+        avatarUrl: msg.user.avatarUrl,
       },
     }));
 
@@ -149,6 +165,7 @@ export class DeliveryService {
       canApprove,
       canComment,
       downloadEnabled: this.storageConfigured,
+      canRetryArtifact,
     };
   }
 
@@ -183,6 +200,7 @@ export class DeliveryService {
       user: {
         id: msg.user.id,
         name: msg.user.name,
+        avatarUrl: msg.user.avatarUrl,
       },
     }));
   }
@@ -385,6 +403,7 @@ export class DeliveryService {
         user: {
           id: message.user.id,
           name: message.user.name,
+          avatarUrl: message.user.avatarUrl,
         },
       },
     };
@@ -437,6 +456,7 @@ export class DeliveryService {
       user: {
         id: message.user.id,
         name: message.user.name,
+        avatarUrl: message.user.avatarUrl,
       },
     };
   }
@@ -476,11 +496,14 @@ export class DeliveryService {
     filename?: string;
     error?: string;
   }> {
-    // Fail fast if storage is not configured
+    // Fail fast if storage is not configured - return 503 with stable error code
     if (!this.storageConfigured) {
-      throw new NotFoundException(
-        'Download feature is not available. Storage provider not configured.',
-      );
+      throw new ServiceUnavailableException({
+        statusCode: 503,
+        error: 'Service Unavailable',
+        message: 'Download feature is temporarily unavailable. Storage provider not configured.',
+        code: 'STORAGE_NOT_CONFIGURED',
+      });
     }
 
     const project = await this.prisma.project.findUnique({
@@ -508,6 +531,28 @@ export class DeliveryService {
 
     if (media.length === 0) {
       throw new NotFoundException('No media available for download');
+    }
+
+    // MVP Guardrail: Fail fast if limits exceeded (before creating artifact)
+    if (media.length > this.MAX_MEDIA_FILES_PER_ZIP) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: `Too many files (${media.length}). Maximum allowed is ${this.MAX_MEDIA_FILES_PER_ZIP} files per download.`,
+        code: 'TOO_MANY_FILES',
+      });
+    }
+
+    const estimatedTotalSize = media.reduce((sum, m) => sum + (m.size || 0), 0);
+    if (estimatedTotalSize > 0 && estimatedTotalSize > this.MAX_ZIP_SIZE_BYTES) {
+      const sizeMB = Math.round(estimatedTotalSize / 1024 / 1024);
+      const limitMB = Math.round(this.MAX_ZIP_SIZE_BYTES / 1024 / 1024);
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        message: `Total size too large (~${sizeMB}MB). Maximum allowed is ${limitMB}MB per download.`,
+        code: 'SIZE_LIMIT_EXCEEDED',
+      });
     }
 
     const mediaHash = this.computeMediaHash(media.map((m) => m.id));

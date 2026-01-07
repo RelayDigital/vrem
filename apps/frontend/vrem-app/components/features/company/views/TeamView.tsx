@@ -299,7 +299,18 @@ export function TeamView({
       setRoleDialogOpen(true);
       return;
     }
+
+    // Save previous role for rollback
+    const previousRole = technician.role;
     setUpdatingRoleId(technician.id);
+
+    // Optimistically update UI
+    setTechnicianList((prev) =>
+      prev.map((t) =>
+        t.id === technician.id ? { ...t, role } : t
+      )
+    );
+
     try {
       const updated = await api.organizations.updateMemberRole(
         technician.memberId,
@@ -307,6 +318,7 @@ export function TeamView({
       );
       const updatedRole =
         (updated as any)?.orgRole || updated.role || role;
+      // Update with server response in case it differs
       setTechnicianList((prev) =>
         prev.map((t) =>
           t.id === technician.id ? { ...t, role: updatedRole } : t
@@ -315,6 +327,12 @@ export function TeamView({
       toast.success("Role updated");
     } catch (error) {
       console.error("Failed to update role", error);
+      // Restore previous role on error
+      setTechnicianList((prev) =>
+        prev.map((t) =>
+          t.id === technician.id ? { ...t, role: previousRole } : t
+        )
+      );
       toast.error("Unable to update role");
     } finally {
       setUpdatingRoleId(null);
@@ -331,7 +349,19 @@ export function TeamView({
       setRoleDialogOpen(false);
       return;
     }
+
+    // Save previous role for rollback
+    const previousRole = pendingTechnician.role;
     setUpdatingRoleId(pendingTechnician.id);
+    setRoleDialogOpen(false);
+
+    // Optimistically update UI
+    setTechnicianList((prev) =>
+      prev.map((t) =>
+        t.id === pendingTechnician.id ? { ...t, role: pendingRole } : t
+      )
+    );
+
     try {
       const updated = await api.organizations.updateMemberRole(
         pendingTechnician.memberId,
@@ -339,6 +369,7 @@ export function TeamView({
       );
       const updatedRole =
         (updated as any)?.orgRole || updated.role || pendingRole;
+      // Update with server response in case it differs
       setTechnicianList((prev) =>
         prev.map((t) =>
           t.id === pendingTechnician.id ? { ...t, role: updatedRole } : t
@@ -347,10 +378,15 @@ export function TeamView({
       toast.success("Role updated");
     } catch (error) {
       console.error("Failed to update role", error);
+      // Restore previous role on error
+      setTechnicianList((prev) =>
+        prev.map((t) =>
+          t.id === pendingTechnician.id ? { ...t, role: previousRole } : t
+        )
+      );
       toast.error("Unable to update role");
     } finally {
       setUpdatingRoleId(null);
-      setRoleDialogOpen(false);
       setPendingRole(undefined);
       setPendingTechnician(null);
     }

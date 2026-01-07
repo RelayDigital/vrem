@@ -27,6 +27,7 @@ export enum MediaType {
   VIDEO = "VIDEO",
   FLOORPLAN = "FLOORPLAN",
   DOCUMENT = "DOCUMENT",
+  VIRTUAL_TOUR = "VIRTUAL_TOUR", // External virtual tour URLs (iGUIDE, Matterport, etc.)
 }
 
 export enum DayOfWeek {
@@ -127,6 +128,9 @@ export interface OrganizationCustomer {
   phone?: string;
   notes?: string;
   userId?: string;
+  avatar?: string;
+  totalJobs?: number;
+  lastJob?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -188,8 +192,9 @@ export interface CalendarEvent {
 export interface Media {
   id: string;
   projectId: string;
-  key: string;
+  key?: string; // Storage key (null for external URLs like virtual tours)
   cdnUrl?: string;
+  externalUrl?: string; // External URL for virtual tours (iGUIDE, Matterport, etc.)
   filename: string;
   size: number;
   type: MediaType;
@@ -703,8 +708,9 @@ export enum ClientApprovalStatus {
 
 export interface DeliveryMedia {
   id: string;
-  key: string;
-  cdnUrl: string | null;
+  key?: string; // Storage key (null for external URLs like virtual tours)
+  cdnUrl?: string | null;
+  externalUrl?: string | null; // External URL for virtual tours (iGUIDE, Matterport, etc.)
   filename: string;
   size: number;
   type: MediaType;
@@ -718,6 +724,7 @@ export interface DeliveryComment {
   user: {
     id: string;
     name: string;
+    avatarUrl?: string | null;
   };
 }
 
@@ -751,6 +758,8 @@ export interface DeliveryResponse {
   canComment: boolean;
   /** Whether bulk download is available (requires storage backend) */
   downloadEnabled: boolean;
+  /** Whether user can retry failed artifacts (OWNER/ADMIN/PROJECT_MANAGER only) */
+  canRetryArtifact: boolean;
 }
 
 // =============================

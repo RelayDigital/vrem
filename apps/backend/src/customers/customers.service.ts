@@ -60,6 +60,9 @@ export class CustomersService {
         projects: {
           select: { id: true, scheduledTime: true },
         },
+        user: {
+          select: { avatarUrl: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -84,6 +87,7 @@ export class CustomersService {
         phone: customer.phone,
         notes: customer.notes,
         userId: customer.userId,
+        avatar: customer.user?.avatarUrl || null,
         totalJobs,
         lastJob: lastJobDate,
         createdAt: customer.createdAt,

@@ -32,6 +32,8 @@ export function DeliveryView({ delivery: initialDelivery, token }: DeliveryViewP
   const [delivery, setDelivery] = useState(initialDelivery);
   const [downloadState, setDownloadState] = useState<DownloadState>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [failedArtifactId, setFailedArtifactId] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
   const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pollCountRef = useRef(0);
 
@@ -81,6 +83,7 @@ export function DeliveryView({ delivery: initialDelivery, token }: DeliveryViewP
         case 'FAILED':
           setDownloadState('error');
           setErrorMessage(result.error || 'Download preparation failed');
+          setFailedArtifactId(result.artifactId);
           toast.error(result.error || 'Download preparation failed');
           return null;
 
@@ -132,6 +135,7 @@ export function DeliveryView({ delivery: initialDelivery, token }: DeliveryViewP
         case 'FAILED':
           setDownloadState('error');
           setErrorMessage(status.error || 'Download preparation failed');
+          setFailedArtifactId(artifactId);
           toast.error(status.error || 'Download preparation failed');
           break;
 
@@ -234,6 +238,29 @@ export function DeliveryView({ delivery: initialDelivery, token }: DeliveryViewP
     }));
   }, []);
 
+  // Retry failed artifact (admin only)
+  const handleRetryArtifact = useCallback(async () => {
+    if (!failedArtifactId) return;
+
+    setIsRetrying(true);
+    try {
+      await api.delivery.retryArtifact(failedArtifactId);
+      toast.success('Retry queued. Starting download...');
+      setFailedArtifactId(null);
+      setErrorMessage(null);
+      // Start polling for the retried artifact
+      setDownloadState('generating');
+      pollCountRef.current = 0;
+      pollTimeoutRef.current = setTimeout(() => {
+        pollArtifactStatus(failedArtifactId);
+      }, POLL_INTERVAL_MS);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to retry artifact');
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [failedArtifactId, pollArtifactStatus]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header with company branding and project info */}
@@ -244,33 +271,79 @@ export function DeliveryView({ delivery: initialDelivery, token }: DeliveryViewP
 
       {/* Main content */}
       <main className="container max-w-7xl mx-auto px-4 py-8">
-        {/* Actions bar - only show download button if enabled and media exists */}
-        {delivery.downloadEnabled && delivery.media.length > 0 && (
+        {/* Actions bar */}
+        {delivery.media.length > 0 && (
           <div className="flex flex-col items-end gap-2 mb-6">
-            {downloadState === 'error' && errorMessage && (
-              <div className="text-sm text-destructive flex items-center gap-2">
+            {delivery.downloadEnabled ? (
+              <>
+                {downloadState === 'error' && errorMessage && (
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="text-sm text-destructive flex items-center gap-2 bg-destructive/10 px-3 py-2 rounded-md max-w-md text-right">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{errorMessage}</span>
+                    </div>
+                    {delivery.canRetryArtifact && failedArtifactId && (
+                      <Button
+                        onClick={handleRetryArtifact}
+                        disabled={isRetrying}
+                        variant="outline"
+                        size="sm"
+                      >
+                        {isRetrying ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Retrying...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Retry Failed Download
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {downloadState !== 'error' && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={handleDownloadAll}
+                          disabled={['preparing', 'generating', 'ready'].includes(downloadState)}
+                          variant="outline"
+                        >
+                          {getDownloadButtonContent()}
+                        </Button>
+                      </TooltipTrigger>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {downloadState === 'error' && !delivery.canRetryArtifact && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={handleDownloadAll}
+                          variant="destructive"
+                        >
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Try Again
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Request a new download. The previous attempt failed.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </>
+            ) : (
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
-                {errorMessage}
+                Download all is temporarily unavailable
               </div>
             )}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={handleDownloadAll}
-                    disabled={['preparing', 'generating', 'ready'].includes(downloadState)}
-                    variant={downloadState === 'error' ? 'destructive' : 'outline'}
-                  >
-                    {getDownloadButtonContent()}
-                  </Button>
-                </TooltipTrigger>
-                {downloadState === 'error' && (
-                  <TooltipContent>
-                    <p>Click to try again. The download will be prepared fresh.</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
           </div>
         )}
 
