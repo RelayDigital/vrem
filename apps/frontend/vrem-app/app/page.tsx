@@ -33,9 +33,6 @@ export default function Home() {
               Login
             </a>
             <button className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/90">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/10 text-[10px] font-bold">
-                GD
-              </span>
               Get a demo
             </button>
           </div>
