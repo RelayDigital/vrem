@@ -58,8 +58,7 @@ export default function Home() {
             </span>
             </div>
             <p className="mt-6 max-w-2xl text-base text-white/60 md:text-lg animate-hero-fade-delay-2">
-            A complete, AI-powered advertising solution helping consumer brands
-            improve ad performance and streamline workflows
+            Run your entire real estate media operation on one intelligent platform.
             </p>
 
             <div className="mt-16 flex w-full flex-col gap-16">
@@ -278,7 +277,7 @@ export default function Home() {
 
       <div className="fixed bottom-6 right-6 z-50">
         <button className="flex items-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-semibold text-black shadow-[0_20px_40px_rgba(0,0,0,0.35)] transition hover:-translate-y-0.5 hover:bg-white/90">
-          Get a demo
+          Book Onboarding
         </button>
       </div>
     </div>
