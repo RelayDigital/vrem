@@ -98,22 +98,14 @@ export class MetricsService {
   ): Promise<JobMetrics> {
     const { start, end } = this.getPeriodDates(period);
 
-    console.log('[Metrics] computeJobMetrics - period:', period);
-    console.log('[Metrics] date range:', start.toISOString(), 'to', end.toISOString());
-
     const projects = await this.prisma.project.findMany({
       where: {
         orgId,
         scheduledTime: { gte: start, lte: end },
         isDemo: false, // Exclude demo projects
       },
-      select: { status: true, scheduledTime: true },
+      select: { status: true },
     });
-
-    console.log('[Metrics] found projects:', projects.length);
-    if (projects.length > 0) {
-      console.log('[Metrics] sample scheduledTimes:', projects.slice(0, 3).map(p => p.scheduledTime));
-    }
 
     const counts = projects.reduce(
       (acc, p) => {
