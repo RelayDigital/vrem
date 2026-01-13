@@ -20,6 +20,7 @@ export default function SignInPage() {
         </div>
         <div className="flex flex-1 items-center justify-center">
           <SignIn
+            fallbackRedirectUrl="/dashboard"
             appearance={{
               elements: {
                 rootBox: "w-full max-w-md",
