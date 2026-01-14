@@ -16,8 +16,8 @@ interface MetricsDashboardProps {
 }
 
 /**
- * MetricsDashboard - Displays dashboard statistics
- * NOTE: Currently uses mock data. In production, metrics should be fetched from the API.
+ * MetricsDashboard - Displays organization dashboard statistics
+ * All metrics are derived from the backend MetricsService and represent real data.
  */
 export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
   const utilizationPercent = Math.round(
@@ -110,23 +110,23 @@ export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
 
       <Card className="md:col-span-2" variant="muted">
         <CardHeader>
-          <CardTitle className="text-sm">Client Satisfaction</CardTitle>
+          <CardTitle className="text-sm">Client Approval Rate</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
             <div className="flex-1">
               <div className="text-3xl">
-                {metrics.performance.clientSatisfaction}/5.0
+                {Math.round(metrics.performance.clientSatisfaction * 100)}%
               </div>
               <Progress
-                value={(metrics.performance.clientSatisfaction / 5) * 100}
+                value={metrics.performance.clientSatisfaction * 100}
                 className="mt-2"
               />
             </div>
             <TrendingUp className="h-8 w-8 text-blue-600" />
           </div>
           <P className="text-xs text-muted-foreground mt-3">
-            Based on {metrics.jobs.completed} completed jobs
+            {Math.round(metrics.jobs.completed * metrics.performance.clientSatisfaction)} of {metrics.jobs.completed} jobs approved by clients
           </P>
         </CardContent>
       </Card>

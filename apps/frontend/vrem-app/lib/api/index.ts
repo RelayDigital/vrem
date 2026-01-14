@@ -1352,15 +1352,8 @@ class ApiClient {
         const dashboardData = await this.request<any>('/dashboard');
         const projects = (dashboardData.projects || []).map((p: any) => this.normalizeProject(p));
 
-        // Debug: log what backend returns
-        console.log('[API] Dashboard raw metrics from backend:', dashboardData.metrics);
-        console.log('[API] Backend jobs.total:', dashboardData.metrics?.jobs?.total);
-
         // Map metrics based on dashboard role
         const mappedMetrics = this.mapBackendMetricsToLegacy(dashboardData.metrics);
-
-        // Debug: log mapped metrics
-        console.log('[API] Mapped metrics jobs:', mappedMetrics.jobs);
 
         return {
           projects,

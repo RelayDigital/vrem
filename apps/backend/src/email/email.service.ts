@@ -273,6 +273,80 @@ export class EmailService {
   }
 
   /**
+   * Send a project assignment notification email.
+   * Notifies a user when they are assigned to a project.
+   */
+  async sendProjectAssignmentEmail(
+    to: string,
+    recipientName: string,
+    projectAddress: string,
+    role: 'TECHNICIAN' | 'EDITOR' | 'PROJECT_MANAGER' | 'CUSTOMER',
+    organizationName: string,
+    scheduledTime?: Date,
+  ): Promise<boolean> {
+    const roleLabels: Record<string, string> = {
+      'TECHNICIAN': 'Technician',
+      'EDITOR': 'Editor',
+      'PROJECT_MANAGER': 'Project Manager',
+      'CUSTOMER': 'Customer',
+    };
+
+    const roleLabel = roleLabels[role] || role;
+    const subject = `You've been assigned to a project: ${projectAddress}`;
+
+    const scheduledSection = scheduledTime ? `
+    <tr>
+      <td style="color: #71717a; font-size: 14px;">Scheduled</td>
+      <td style="color: #18181b; font-size: 14px; font-weight: 500; text-align: right;">${new Date(scheduledTime).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
+    </tr>
+    ` : '';
+
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <h1 style="color: #18181b; font-size: 24px; margin: 0 0 8px 0; font-weight: 600;">
+            New Project Assignment
+          </h1>
+          <p style="color: #71717a; font-size: 16px; margin: 0;">
+            You've been assigned as ${roleLabel} on a project
+          </p>
+        </div>
+
+        <div style="background: #f4f4f5; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+          <table style="width: 100%;">
+            <tr>
+              <td style="color: #71717a; font-size: 14px; padding-bottom: 8px;">Project</td>
+              <td style="color: #18181b; font-size: 14px; font-weight: 500; text-align: right; padding-bottom: 8px;">${projectAddress}</td>
+            </tr>
+            <tr>
+              <td style="color: #71717a; font-size: 14px; padding-bottom: 8px;">Role</td>
+              <td style="color: #18181b; font-size: 14px; font-weight: 500; text-align: right; padding-bottom: 8px;">${roleLabel}</td>
+            </tr>
+            <tr>
+              <td style="color: #71717a; font-size: 14px; padding-bottom: 8px;">Organization</td>
+              <td style="color: #18181b; font-size: 14px; font-weight: 500; text-align: right; padding-bottom: 8px;">${organizationName}</td>
+            </tr>
+            ${scheduledSection}
+          </table>
+        </div>
+
+        <p style="color: #52525b; font-size: 15px; line-height: 1.6; text-align: center; margin-bottom: 24px;">
+          Hi${recipientName ? ` ${recipientName}` : ''},<br/>
+          You have been assigned to this project. Log in to VREM to view details and get started.
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;" />
+
+        <p style="color: #a1a1aa; font-size: 12px; text-align: center; margin: 0;">
+          VREM - Visual Real Estate Media
+        </p>
+      </div>
+    `;
+
+    return this.sendEmail(to, subject, html);
+  }
+
+  /**
    * Format role enum to human-readable string.
    */
   private formatRole(role: string): string {

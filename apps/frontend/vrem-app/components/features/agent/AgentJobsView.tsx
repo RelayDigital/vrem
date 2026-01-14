@@ -62,6 +62,8 @@ export function AgentJobsView({
   // The backend already returns only the projects the agent should see
   const myJobs = jobs;
 
+  // Job counts are derived from the backend-provided jobs array.
+  // This ensures consistency between displayed jobs and tab counts.
   const pendingJobs = myJobs.filter((j) => j.status === "pending");
   const assignedJobs = myJobs.filter((j) => j.status === "assigned");
   const inProgressJobs = myJobs.filter((j) => j.status === "in_progress");

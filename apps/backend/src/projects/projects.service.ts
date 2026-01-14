@@ -253,13 +253,14 @@ export class ProjectsService {
   /**
    * Create a project assignment notification for a user.
    * Skips if the user was already notified for this project/role combination.
+   * Also sends an email notification.
    */
   private async createAssignmentNotification(
     userId: string,
     projectId: string,
     orgId: string,
     role: 'TECHNICIAN' | 'EDITOR' | 'PROJECT_MANAGER' | 'CUSTOMER',
-    project?: { addressLine1?: string | null; city?: string | null; status?: ProjectStatus },
+    project?: { addressLine1?: string | null; city?: string | null; status?: ProjectStatus; scheduledTime?: Date | null },
   ): Promise<void> {
     try {
       // Check if notification already exists for this user/project/role combo
@@ -297,9 +298,59 @@ export class ProjectsService {
           },
         },
       });
+
+      // Send email notification (fire-and-forget)
+      this.sendAssignmentEmail(userId, orgId, role, projectAddress || 'Project', project?.scheduledTime);
     } catch (error) {
       // Log but don't fail the assignment if notification creation fails
       this.logger.warn(`Failed to create assignment notification: ${error}`);
+    }
+  }
+
+  /**
+   * Send email for project assignment (fire-and-forget).
+   */
+  private async sendAssignmentEmail(
+    userId: string,
+    orgId: string,
+    role: 'TECHNICIAN' | 'EDITOR' | 'PROJECT_MANAGER' | 'CUSTOMER',
+    projectAddress: string,
+    scheduledTime?: Date | null,
+  ): Promise<void> {
+    try {
+      // Fetch user email and org name
+      const [user, org] = await Promise.all([
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { email: true, name: true },
+        }),
+        this.prisma.organization.findUnique({
+          where: { id: orgId },
+          select: { name: true },
+        }),
+      ]);
+
+      if (!user?.email || !org) {
+        return;
+      }
+
+      // Fire-and-forget email
+      this.emailService.sendProjectAssignmentEmail(
+        user.email,
+        user.name || '',
+        projectAddress,
+        role,
+        org.name,
+        scheduledTime || undefined,
+      ).then((sent) => {
+        if (sent) {
+          this.logger.log(`Assignment email sent to ${user.email} for role ${role}`);
+        }
+      }).catch((emailError) => {
+        this.logger.warn(`Failed to send assignment email to ${user.email}: ${emailError.message}`);
+      });
+    } catch (error: any) {
+      this.logger.warn(`Failed to send assignment email: ${error.message}`);
     }
   }
 

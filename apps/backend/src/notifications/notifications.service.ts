@@ -2,6 +2,9 @@ import {
   Injectable,
   ForbiddenException,
   NotFoundException,
+  Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedUser } from '../auth/auth-context';
@@ -13,10 +16,71 @@ import {
   OrgRole,
   OrgType,
 } from '@prisma/client';
+import { NotificationsGateway, NotificationPayload } from './notifications.gateway';
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+  private gateway: NotificationsGateway | null = null;
+
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Set the gateway reference (called during module init to avoid circular dependency)
+   */
+  setGateway(gateway: NotificationsGateway): void {
+    this.gateway = gateway;
+  }
+
+  /**
+   * Emit a notification in real-time via WebSocket.
+   * Falls back gracefully if gateway is not available.
+   */
+  private emitNotification(userId: string, notification: NotificationPayload): void {
+    try {
+      if (this.gateway) {
+        this.gateway.sendNotificationToUser(userId, notification);
+      }
+    } catch (error: any) {
+      this.logger.warn(`Failed to emit real-time notification: ${error.message}`);
+    }
+  }
+
+  /**
+   * Emit a count update via WebSocket.
+   */
+  private async emitCountUpdate(userId: string): Promise<void> {
+    try {
+      if (this.gateway) {
+        const { count } = await this.getUnreadCountInternal(userId);
+        this.gateway.sendCountUpdate(userId, count);
+      }
+    } catch (error: any) {
+      this.logger.warn(`Failed to emit count update: ${error.message}`);
+    }
+  }
+
+  /**
+   * Internal method to get unread count without user auth context.
+   */
+  private async getUnreadCountInternal(userId: string): Promise<{ count: number }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
+    const notificationCount = await this.prisma.notification.count({
+      where: { userId, readAt: null },
+    });
+
+    const invitationCount = user?.email
+      ? await this.prisma.invitation.count({
+          where: { email: user.email, status: InvitationStatus.PENDING },
+        })
+      : 0;
+
+    return { count: notificationCount + invitationCount };
+  }
 
   /**
    * Get all notifications for the current user.
@@ -393,7 +457,7 @@ export class NotificationsService {
       return;
     }
 
-    await this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         userId,
         orgId,
@@ -405,6 +469,17 @@ export class NotificationsService {
           status: projectStatus,
         },
       },
+    });
+
+    // Emit real-time notification
+    this.emitNotification(userId, {
+      id: notification.id,
+      type: notification.type,
+      userId,
+      orgId,
+      projectId,
+      payload: notification.payload as Record<string, any>,
+      createdAt: notification.createdAt,
     });
   }
 
@@ -474,7 +549,7 @@ export class NotificationsService {
       });
 
       if (!existing) {
-        await this.prisma.notification.create({
+        const notification = await this.prisma.notification.create({
           data: {
             userId,
             orgId,
@@ -486,6 +561,17 @@ export class NotificationsService {
               preview: preview.substring(0, 100),
             },
           },
+        });
+
+        // Emit real-time notification
+        this.emitNotification(userId, {
+          id: notification.id,
+          type: notification.type,
+          userId,
+          orgId,
+          projectId,
+          payload: notification.payload as Record<string, any>,
+          createdAt: notification.createdAt,
         });
       }
     }
@@ -530,7 +616,7 @@ export class NotificationsService {
       return;
     }
 
-    await this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         userId,
         orgId,
@@ -539,9 +625,21 @@ export class NotificationsService {
         payload: {
           address: this.buildProjectAddress(project),
           organizationName: project.organization.name,
+          orgType: project.organization.type,
           deliveryToken,
         },
       },
+    });
+
+    // Emit real-time notification
+    this.emitNotification(userId, {
+      id: notification.id,
+      type: notification.type,
+      userId,
+      orgId,
+      projectId,
+      payload: notification.payload as Record<string, any>,
+      createdAt: notification.createdAt,
     });
   }
 
@@ -581,7 +679,7 @@ export class NotificationsService {
     watcherIds.delete(approverId);
 
     for (const userId of watcherIds) {
-      await this.prisma.notification.create({
+      const notification = await this.prisma.notification.create({
         data: {
           userId,
           orgId,
@@ -592,6 +690,17 @@ export class NotificationsService {
             address: this.buildProjectAddress(project),
           },
         },
+      });
+
+      // Emit real-time notification
+      this.emitNotification(userId, {
+        id: notification.id,
+        type: notification.type,
+        userId,
+        orgId,
+        projectId,
+        payload: notification.payload as Record<string, any>,
+        createdAt: notification.createdAt,
       });
     }
   }
@@ -635,7 +744,7 @@ export class NotificationsService {
     watcherIds.delete(requesterId);
 
     for (const userId of watcherIds) {
-      await this.prisma.notification.create({
+      const notification = await this.prisma.notification.create({
         data: {
           userId,
           orgId,
@@ -651,6 +760,19 @@ export class NotificationsService {
             comment: comment?.substring(0, 200),
           },
         },
+      });
+
+      // Emit real-time notification
+      this.emitNotification(userId, {
+        id: notification.id,
+        type: notification.type,
+        userId,
+        orgId,
+        projectId,
+        title: notification.title || undefined,
+        body: notification.body || undefined,
+        payload: notification.payload as Record<string, any>,
+        createdAt: notification.createdAt,
       });
     }
   }
@@ -703,7 +825,7 @@ export class NotificationsService {
     watcherIds.delete(senderId);
 
     for (const userId of watcherIds) {
-      await this.prisma.notification.create({
+      const notification = await this.prisma.notification.create({
         data: {
           userId,
           orgId,
@@ -719,6 +841,19 @@ export class NotificationsService {
             address: this.buildProjectAddress(project),
           },
         },
+      });
+
+      // Emit real-time notification
+      this.emitNotification(userId, {
+        id: notification.id,
+        type: notification.type,
+        userId,
+        orgId,
+        projectId,
+        title: notification.title || undefined,
+        body: notification.body || undefined,
+        payload: notification.payload as Record<string, any>,
+        createdAt: notification.createdAt,
       });
     }
   }

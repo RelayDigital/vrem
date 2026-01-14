@@ -13,8 +13,9 @@ import {
 import { api } from "@/lib/api";
 import { NotificationItem } from "@/types";
 import { useAuth } from "./auth-context";
+import { notificationSocket, NotificationPayload } from "@/lib/notification-socket";
 
-// Poll interval: 60 seconds when visible, stop when hidden
+// Poll interval: 60 seconds when visible (fallback when WebSocket disconnected)
 const POLL_INTERVAL_MS = 60000;
 // Minimum time between fetches to prevent spam
 const MIN_FETCH_INTERVAL_MS = 5000;
@@ -46,11 +47,12 @@ interface NotificationsProviderProps {
 }
 
 export function NotificationsProvider({ children }: NotificationsProviderProps) {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, token } = useAuth();
   const isAuthenticated = !!user;
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
 
   // Track last fetch time to prevent spam
   const lastFetchTimeRef = useRef<number>(0);
@@ -137,27 +139,97 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
     };
   }, [fetchNotifications, startPolling, stopPolling, isAuthenticated]);
 
-  // Initial fetch and polling setup
+  // Convert WebSocket notification payload to NotificationItem
+  const mapNotificationPayload = useCallback((payload: NotificationPayload): NotificationItem => {
+    const payloadData = payload.payload || {};
+    return {
+      id: payload.id,
+      type: payload.type as NotificationItem["type"],
+      orgId: payload.orgId || "",
+      orgName: payloadData.organizationName || "",
+      orgType: payloadData.orgType || "COMPANY", // Default to COMPANY if not provided
+      createdAt: new Date(payload.createdAt),
+      readAt: undefined,
+      projectId: payload.projectId,
+      projectAddress: payloadData.address,
+      assignedRole: payloadData.role,
+      messagePreview: payloadData.preview,
+      messageChannel: payloadData.channel,
+      approverName: payloadData.approverName,
+      deliveryToken: payloadData.deliveryToken,
+    };
+  }, []);
+
+  // WebSocket connection and real-time updates
+  useEffect(() => {
+    if (authLoading || !isAuthenticated || !token) return;
+
+    // Handle incoming real-time notifications
+    const handleNotification = (payload: NotificationPayload) => {
+      const notification = mapNotificationPayload(payload);
+      setNotifications((prev) => {
+        // Check if notification already exists (deduplication)
+        if (prev.some((n) => n.id === notification.id)) {
+          return prev;
+        }
+        // Add to the beginning of the list
+        return [notification, ...prev];
+      });
+    };
+
+    // Handle connection state changes
+    const handleConnectionChange = (connected: boolean) => {
+      setIsWebSocketConnected(connected);
+      if (!connected) {
+        // WebSocket disconnected - ensure polling is running as fallback
+        startPolling();
+      } else {
+        // WebSocket connected - reduce polling frequency (keep as backup)
+        // We still poll occasionally to catch any missed notifications
+        stopPolling();
+      }
+    };
+
+    // Set up WebSocket handlers
+    notificationSocket.onNotification(handleNotification);
+    notificationSocket.onConnectionChange(handleConnectionChange);
+
+    // Connect to WebSocket
+    notificationSocket.connect(token);
+
+    return () => {
+      notificationSocket.offNotification(handleNotification);
+      notificationSocket.offConnectionChange(handleConnectionChange);
+      notificationSocket.disconnect();
+    };
+  }, [isAuthenticated, authLoading, token, mapNotificationPayload, startPolling, stopPolling]);
+
+  // Initial fetch and polling setup (polling as fallback)
   useEffect(() => {
     if (authLoading) return;
 
     if (isAuthenticated) {
       fetchNotifications(true); // Force initial fetch
-      startPolling();
+      // Only start polling if WebSocket is not connected
+      if (!isWebSocketConnected) {
+        startPolling();
+      }
     } else {
       setNotifications([]);
       stopPolling();
+      notificationSocket.disconnect();
     }
 
     return () => {
       stopPolling();
     };
-  }, [isAuthenticated, authLoading, fetchNotifications, startPolling, stopPolling]);
+  }, [isAuthenticated, authLoading, fetchNotifications, startPolling, stopPolling, isWebSocketConnected]);
 
   // Clean up on unmount
   useEffect(() => {
     return () => {
       stopPolling();
+      notificationSocket.disconnect();
     };
   }, [stopPolling]);
 

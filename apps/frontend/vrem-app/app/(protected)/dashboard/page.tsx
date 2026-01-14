@@ -256,19 +256,21 @@ export default function DashboardPage() {
     refetch: refetchMetrics,
   } = useDashboardMetrics(!!user);
 
+  // Provider/Technician/Editor stats: prefer backend-computed stats for accuracy.
+  // Falls back to client-side computation only if backend stats unavailable.
   const assignedJobStats = useMemo(() => {
-    // Use backend-provided stats when available (for PROVIDER/TECHNICIAN/EDITOR dashboards)
+    // Primary source: backend-provided stats (authoritative)
     if (backendStats && 'upcomingJobs' in backendStats) {
       const providerStats = backendStats as import('@/types').ProviderStats;
       return {
         upcoming: providerStats.upcomingJobs,
         completed: providerStats.completedJobs,
-        rating: providerProfile?.rating.overall ?? 0, // Rating still comes from provider profile
+        rating: providerProfile?.rating.overall ?? 0, // Rating is separate from job stats
         onTimeRate: (providerStats.onTimeRate * 100).toFixed(0),
       };
     }
 
-    // Fallback to client-side computation if backend stats not available
+    // Fallback: compute from local jobs array (graceful degradation)
     const upcomingJobs = assignedJobs.filter(
       (job) => job.status === "assigned" || job.status === "pending"
     );
