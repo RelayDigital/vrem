@@ -1,8 +1,11 @@
 import { FadeWrapper } from "@/components/ui/FadeWrapper";
 import Footer from "@/components/ui/Footer";
 import { Compass, Clock, Layers3, Zap } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
+  const onboardingLink = "https://calendly.com/dami-adetula/vrem-onboarding";
+
   return (
     <div className="min-h-svh bg-[#0b0b0b] text-[#f5f5f2]">
       <header className="fixed left-0 top-0 z-50 w-full bg-[#0b0b0b]/95 backdrop-blur">
@@ -26,15 +29,18 @@ export default function Home() {
           </nav> */}
 
           <div className="flex items-center gap-3">
-            <a
+            <Link
               href="/sign-in"
               className="hidden h-10 items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 text-xs font-semibold uppercase tracking-widest text-white/70 transition hover:text-white md:inline-flex"
             >
               Login
+            </Link>
+            <a
+              href={onboardingLink}
+              className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/90"
+            >
+              Book Onboarding
             </a>
-            <button className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/90">
-              Get a demo
-            </button>
           </div>
         </div>
       </header>
@@ -261,12 +267,15 @@ export default function Home() {
                 Decisions driven by live data, not guesswork
               </div>
             </div>
-            <button className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/90">
+            <a
+              href={onboardingLink}
+              className="mt-8 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-white/90"
+            >
               <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/10">
                 <Compass className="h-4 w-4" />
               </span>
               Discover the platform
-            </button>
+            </a>
           </div>
         </div>
       </section>
@@ -276,9 +285,12 @@ export default function Home() {
 
 
       <div className="fixed bottom-6 right-6 z-50">
-        <button className="flex items-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-semibold text-black shadow-[0_20px_40px_rgba(0,0,0,0.35)] transition hover:-translate-y-0.5 hover:bg-white/90">
+        <a
+          href={onboardingLink}
+          className="flex items-center gap-3 rounded-full bg-white px-5 py-3 text-sm font-semibold text-black shadow-[0_20px_40px_rgba(0,0,0,0.35)] transition hover:-translate-y-0.5 hover:bg-white/90"
+        >
           Book Onboarding
-        </button>
+        </a>
       </div>
     </div>
   );
