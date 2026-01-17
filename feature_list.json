@@ -1,0 +1,786 @@
+{
+  "project": "YedaTechs - Real Estate Media Production Platform",
+  "version": "MVP",
+  "last_updated": null,
+  "instructions": "DO NOT remove or edit feature descriptions. Only update 'passes' to true after thorough testing.",
+  "features": [
+    {
+      "id": "P0-001",
+      "phase": 0,
+      "category": "setup",
+      "description": "Initialize project structure with HTML and CSS files",
+      "steps": [
+        "Create monorepo folder structure",
+        "Initialize package.json in root",
+        "Set up frontend and backend directories",
+        "Create basic README.md"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P0-002",
+      "phase": 0,
+      "category": "setup",
+      "description": "Configure Next.js frontend application",
+      "steps": [
+        "Initialize Next.js with TypeScript",
+        "Configure Tailwind CSS",
+        "Set up app router structure",
+        "Create base layout component",
+        "Verify dev server runs on port 3000"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P0-003",
+      "phase": 0,
+      "category": "setup",
+      "description": "Configure NestJS backend application",
+      "steps": [
+        "Initialize NestJS with TypeScript",
+        "Configure CORS for frontend",
+        "Set up module structure",
+        "Create health check endpoint",
+        "Verify dev server runs on port 3001"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P0-004",
+      "phase": 0,
+      "category": "setup",
+      "description": "Set up Prisma with PostgreSQL database",
+      "steps": [
+        "Install Prisma and dependencies",
+        "Configure database connection",
+        "Create initial schema with User model",
+        "Run first migration",
+        "Verify database connection works"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P0-005",
+      "phase": 0,
+      "category": "setup",
+      "description": "Create init.sh script for environment setup",
+      "steps": [
+        "Create executable init.sh script",
+        "Script checks for required dependencies",
+        "Script starts database if needed",
+        "Script runs migrations",
+        "Script starts dev servers"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P1-001",
+      "phase": 1,
+      "category": "auth",
+      "description": "User registration endpoint accepts email and password",
+      "steps": [
+        "Create auth module in backend",
+        "Create register endpoint POST /auth/register",
+        "Validate email format and password strength",
+        "Hash password with bcrypt",
+        "Store user in database",
+        "Return success response"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P1-002",
+      "phase": 1,
+      "category": "auth",
+      "description": "User login endpoint returns JWT token",
+      "steps": [
+        "Create login endpoint POST /auth/login",
+        "Validate credentials against database",
+        "Generate JWT with user id and role",
+        "Return token in response",
+        "Handle invalid credentials with proper error"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P1-003",
+      "phase": 1,
+      "category": "auth",
+      "description": "JWT middleware protects authenticated routes",
+      "steps": [
+        "Create JWT auth guard",
+        "Extract token from Authorization header",
+        "Validate token signature and expiration",
+        "Attach user to request context",
+        "Return 401 for invalid/missing tokens"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P1-004",
+      "phase": 1,
+      "category": "auth",
+      "description": "Role-based access control restricts endpoints",
+      "steps": [
+        "Create roles decorator",
+        "Create roles guard",
+        "Check user role against required roles",
+        "Return 403 for unauthorized access",
+        "Test with different role combinations"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P1-005",
+      "phase": 1,
+      "category": "auth",
+      "description": "Frontend login page submits credentials and stores token",
+      "steps": [
+        "Create /login page",
+        "Build login form with email and password",
+        "Submit to backend login endpoint",
+        "Store JWT in httpOnly cookie",
+        "Redirect to dashboard on success"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P1-006",
+      "phase": 1,
+      "category": "auth",
+      "description": "Frontend registration page creates new user",
+      "steps": [
+        "Create /register page",
+        "Build registration form with fields",
+        "Include role selection (for demo)",
+        "Submit to backend register endpoint",
+        "Redirect to login on success"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P1-007",
+      "phase": 1,
+      "category": "auth",
+      "description": "Protected routes redirect unauthenticated users",
+      "steps": [
+        "Create auth context provider",
+        "Check for valid token on protected pages",
+        "Redirect to /login if not authenticated",
+        "Persist auth state across page refreshes"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P1-008",
+      "phase": 1,
+      "category": "auth",
+      "description": "User can logout and token is cleared",
+      "steps": [
+        "Create logout button in header",
+        "Clear JWT cookie on click",
+        "Clear auth state",
+        "Redirect to login page"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P2-001",
+      "phase": 2,
+      "category": "dashboard",
+      "description": "Main layout with navigation sidebar renders correctly",
+      "steps": [
+        "Create DashboardLayout component",
+        "Add sidebar with navigation links",
+        "Add header with user info",
+        "Make layout responsive",
+        "Apply consistent styling"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P2-002",
+      "phase": 2,
+      "category": "dashboard",
+      "description": "Admin dashboard shows system overview",
+      "steps": [
+        "Create admin dashboard page",
+        "Display total users count",
+        "Display total projects count",
+        "Show recent activity list",
+        "Link to user management"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P2-003",
+      "phase": 2,
+      "category": "dashboard",
+      "description": "Project Manager dashboard shows pipeline view",
+      "steps": [
+        "Create PM dashboard page",
+        "Display 4-column Kanban board",
+        "Show projects in each stage",
+        "Display project cards with key info",
+        "Add quick stats at top"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P2-004",
+      "phase": 2,
+      "category": "dashboard",
+      "description": "Technician dashboard shows assigned shoots",
+      "steps": [
+        "Create technician dashboard page",
+        "List only assigned projects",
+        "Show shoot date, time, address",
+        "Include status badges",
+        "Add action buttons"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P2-005",
+      "phase": 2,
+      "category": "dashboard",
+      "description": "Editor dashboard shows editing queue",
+      "steps": [
+        "Create editor dashboard page",
+        "List projects in EDITING status",
+        "Show project details and deadline",
+        "Add upload action button",
+        "Sort by priority/date"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P2-006",
+      "phase": 2,
+      "category": "dashboard",
+      "description": "Agent dashboard shows bookings and deliveries",
+      "steps": [
+        "Create agent dashboard page",
+        "Show upcoming shoots section",
+        "Show delivered media section",
+        "Add Book New Shoot button",
+        "Display booking history"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P2-007",
+      "phase": 2,
+      "category": "dashboard",
+      "description": "Navigation shows role-appropriate menu items",
+      "steps": [
+        "Get user role from auth context",
+        "Filter menu items based on role",
+        "Highlight active page",
+        "Admin sees all menu items",
+        "Agent sees limited menu"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P3-001",
+      "phase": 3,
+      "category": "projects",
+      "description": "Projects table in database stores all required fields",
+      "steps": [
+        "Add Project model to Prisma schema",
+        "Include status enum (BOOKED, SHOOTING, EDITING, DELIVERED)",
+        "Add relations to User (agent, technician, editor)",
+        "Add address and scheduling fields",
+        "Run migration successfully"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P3-002",
+      "phase": 3,
+      "category": "projects",
+      "description": "Create project endpoint accepts required data",
+      "steps": [
+        "Create projects module in backend",
+        "Create POST /projects endpoint",
+        "Validate required fields",
+        "Set initial status to BOOKED",
+        "Link to creating agent",
+        "Return created project"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P3-003",
+      "phase": 3,
+      "category": "projects",
+      "description": "List projects endpoint with role-based filtering",
+      "steps": [
+        "Create GET /projects endpoint",
+        "Admin/PM sees all projects",
+        "Technician sees only assigned",
+        "Editor sees only assigned in EDITING",
+        "Agent sees only own projects",
+        "Include pagination"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P3-004",
+      "phase": 3,
+      "category": "projects",
+      "description": "Get single project with all details",
+      "steps": [
+        "Create GET /projects/:id endpoint",
+        "Include related user data",
+        "Include media items",
+        "Include messages",
+        "Enforce role-based access"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P3-005",
+      "phase": 3,
+      "category": "projects",
+      "description": "Update project status follows pipeline rules",
+      "steps": [
+        "Create PATCH /projects/:id/status endpoint",
+        "Validate status transitions (BOOKED->SHOOTING->EDITING->DELIVERED)",
+        "Prevent invalid transitions",
+        "Record timestamp of change",
+        "Return updated project"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P3-006",
+      "phase": 3,
+      "category": "projects",
+      "description": "PM can assign technician to project",
+      "steps": [
+        "Create PATCH /projects/:id/assign endpoint",
+        "Accept technicianId in body",
+        "Verify PM role",
+        "Update project record",
+        "Return updated project"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P3-007",
+      "phase": 3,
+      "category": "projects",
+      "description": "PM can assign editor to project",
+      "steps": [
+        "Extend assign endpoint for editorId",
+        "Verify PM role",
+        "Update project record",
+        "Return updated project"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P3-008",
+      "phase": 3,
+      "category": "projects",
+      "description": "Projects list page displays all projects for PM",
+      "steps": [
+        "Create /projects page",
+        "Fetch projects from backend",
+        "Display in table format",
+        "Show status badges",
+        "Link to project detail"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P3-009",
+      "phase": 3,
+      "category": "projects",
+      "description": "Project detail page shows all information",
+      "steps": [
+        "Create /projects/[id] page",
+        "Fetch project details",
+        "Display address and schedule",
+        "Show assigned team members",
+        "Display current status"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P3-010",
+      "phase": 3,
+      "category": "projects",
+      "description": "Technician can update project to SHOOTING status",
+      "steps": [
+        "Add Start Shoot button on tech dashboard",
+        "Call status update endpoint",
+        "Update UI to reflect change",
+        "Show success notification"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P3-011",
+      "phase": 3,
+      "category": "projects",
+      "description": "Technician can update project to EDITING status",
+      "steps": [
+        "Add Complete Shoot button",
+        "Call status update endpoint",
+        "Update UI to reflect change",
+        "Show success notification"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P3-012",
+      "phase": 3,
+      "category": "projects",
+      "description": "Pipeline Kanban board drag and drop updates status",
+      "steps": [
+        "Implement drag-drop in PM dashboard",
+        "Call status update on drop",
+        "Validate allowed transitions",
+        "Optimistic UI update",
+        "Rollback on error"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P4-001",
+      "phase": 4,
+      "category": "booking",
+      "description": "Booking form captures property details",
+      "steps": [
+        "Create /book page",
+        "Build multi-step form",
+        "Include address input",
+        "Include service type selection",
+        "Include notes textarea",
+        "Validate required fields"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P4-002",
+      "phase": 4,
+      "category": "booking",
+      "description": "Date picker shows available time slots",
+      "steps": [
+        "Add calendar component",
+        "Show selectable date/time slots",
+        "Disable past dates",
+        "Show selected slot",
+        "Store selection in form state"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P4-003",
+      "phase": 4,
+      "category": "booking",
+      "description": "Booking confirmation shows summary before payment",
+      "steps": [
+        "Create confirmation step",
+        "Display all entered details",
+        "Show selected time slot",
+        "Display price breakdown",
+        "Include edit button"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P4-004",
+      "phase": 4,
+      "category": "booking",
+      "description": "Create booking endpoint accepts form data",
+      "steps": [
+        "Create POST /bookings endpoint",
+        "Validate all required fields",
+        "Check time slot availability",
+        "Create project record",
+        "Return booking confirmation"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P4-005",
+      "phase": 4,
+      "category": "booking",
+      "description": "Agent can view their upcoming bookings",
+      "steps": [
+        "Add bookings section to agent dashboard",
+        "Fetch agent's projects",
+        "Filter by BOOKED and SHOOTING status",
+        "Display date, time, address",
+        "Link to project detail"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P4-006",
+      "phase": 4,
+      "category": "booking",
+      "description": "Rebook button pre-fills previous booking details",
+      "steps": [
+        "Add Rebook button to delivered projects",
+        "Navigate to booking page",
+        "Pre-fill address from previous",
+        "Pre-fill service type",
+        "Allow editing before submit"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P5-001",
+      "phase": 5,
+      "category": "media",
+      "description": "Media items table stores file references",
+      "steps": [
+        "Add MediaItem model to Prisma",
+        "Include fileUrl, fileType, fileName",
+        "Relation to Project",
+        "Relation to uploader User",
+        "Run migration"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P5-002",
+      "phase": 5,
+      "category": "media",
+      "description": "File upload endpoint accepts and stores files",
+      "steps": [
+        "Create POST /media/upload endpoint",
+        "Configure multer for file handling",
+        "Upload to S3 bucket",
+        "Create MediaItem record with URL",
+        "Return upload confirmation"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P5-003",
+      "phase": 5,
+      "category": "media",
+      "description": "Editor can upload media files to project",
+      "steps": [
+        "Add upload component to project page",
+        "Support drag-and-drop",
+        "Show upload progress",
+        "Handle multiple files",
+        "Display uploaded files list"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P5-004",
+      "phase": 5,
+      "category": "media",
+      "description": "Media gallery displays uploaded images",
+      "steps": [
+        "Create media gallery component",
+        "Display thumbnails",
+        "Support lightbox view",
+        "Show file metadata",
+        "Include download button"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P5-005",
+      "phase": 5,
+      "category": "media",
+      "description": "Secure download links with signed URLs",
+      "steps": [
+        "Create GET /media/:id/download endpoint",
+        "Generate S3 signed URL",
+        "Set expiration time",
+        "Return signed URL",
+        "Test file downloads"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P5-006",
+      "phase": 5,
+      "category": "media",
+      "description": "Editor marks project as delivered after upload",
+      "steps": [
+        "Add Deliver button to editor view",
+        "Require at least one file uploaded",
+        "Call status update endpoint",
+        "Change status to DELIVERED",
+        "Show success notification"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P5-007",
+      "phase": 5,
+      "category": "media",
+      "description": "Agent can view and download delivered media",
+      "steps": [
+        "Show delivered projects on agent dashboard",
+        "Display media gallery",
+        "Include Download All button",
+        "Generate zip for bulk download",
+        "Track download activity"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P6-001",
+      "phase": 6,
+      "category": "messaging",
+      "description": "Messages table stores project conversations",
+      "steps": [
+        "Add Message model to Prisma",
+        "Include content, timestamp",
+        "Relation to Project",
+        "Relation to sender User",
+        "Run migration"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P6-002",
+      "phase": 6,
+      "category": "messaging",
+      "description": "Send message endpoint creates new message",
+      "steps": [
+        "Create POST /projects/:id/messages endpoint",
+        "Validate user has access to project",
+        "Create message record",
+        "Return created message"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P6-003",
+      "phase": 6,
+      "category": "messaging",
+      "description": "Get messages endpoint returns project messages",
+      "steps": [
+        "Create GET /projects/:id/messages endpoint",
+        "Include sender user details",
+        "Order by timestamp",
+        "Support pagination",
+        "Enforce access control"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P6-004",
+      "phase": 6,
+      "category": "messaging",
+      "description": "Chat component displays messages in project detail",
+      "steps": [
+        "Create Chat component",
+        "Fetch messages on load",
+        "Display in chronological order",
+        "Show sender name and avatar",
+        "Auto-scroll to latest"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P6-005",
+      "phase": 6,
+      "category": "messaging",
+      "description": "User can send new message from chat",
+      "steps": [
+        "Add message input field",
+        "Handle form submit",
+        "Call send message endpoint",
+        "Add message to list",
+        "Clear input field"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P6-006",
+      "phase": 6,
+      "category": "messaging",
+      "description": "Real-time message updates without refresh",
+      "steps": [
+        "Set up WebSocket or polling",
+        "Listen for new messages",
+        "Update message list automatically",
+        "Show new message indicator"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P7-001",
+      "phase": 7,
+      "category": "payments",
+      "description": "Payments table stores transaction records",
+      "steps": [
+        "Add Payment model to Prisma",
+        "Include stripePaymentId, amount, status",
+        "Relation to Project",
+        "Run migration"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P7-002",
+      "phase": 7,
+      "category": "payments",
+      "description": "Create checkout session endpoint for booking",
+      "steps": [
+        "Create POST /payments/checkout endpoint",
+        "Initialize Stripe SDK",
+        "Create checkout session",
+        "Include success and cancel URLs",
+        "Return session URL"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P7-003",
+      "phase": 7,
+      "category": "payments",
+      "description": "Booking flow redirects to Stripe checkout",
+      "steps": [
+        "Call checkout endpoint on booking confirm",
+        "Redirect to Stripe checkout page",
+        "Handle successful return",
+        "Handle cancelled return"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P7-004",
+      "phase": 7,
+      "category": "payments",
+      "description": "Stripe webhook updates payment status",
+      "steps": [
+        "Create POST /payments/webhook endpoint",
+        "Verify webhook signature",
+        "Handle checkout.session.completed event",
+        "Update payment record status",
+        "Create project on success"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P7-005",
+      "phase": 7,
+      "category": "payments",
+      "description": "Agent can view payment history",
+      "steps": [
+        "Create payments list page",
+        "Fetch agent's payments",
+        "Display date, amount, status",
+        "Link to related project",
+        "Show invoice download"
+      ],
+      "passes": true
+    }
+  ]
+}
