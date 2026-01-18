@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+npm-debug.log
+
+# Build output
+dist
+
+# Environment files (added via ECS secrets)
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+coverage
+test
+*.spec.ts
+
+# Git
+.git
+.gitignore
+
+# Docs
+docs
+*.md
+!README.md
+
+# Misc
+.claude
+scripts
