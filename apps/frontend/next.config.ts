@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone', // Required for AWS Amplify SSR deployment
   eslint: {
     // Allow builds to complete with ESLint warnings
     ignoreDuringBuilds: true,
