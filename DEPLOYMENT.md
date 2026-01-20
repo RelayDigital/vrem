@@ -1,363 +1,477 @@
 # VREM - AWS Production Deployment Guide
 
+## Quick Access Links
+
+### AWS Console Login
+1. Go to: https://console.aws.amazon.com/
+2. Sign in with your AWS account (Account ID: `471112692213`)
+3. Select region: **US East (N. Virginia) us-east-1**
+
+### Direct Resource Links
+| Resource | Console Link |
+|----------|--------------|
+| **ECS Cluster** | https://us-east-1.console.aws.amazon.com/ecs/v2/clusters/vrem-production |
+| **ECS Service** | https://us-east-1.console.aws.amazon.com/ecs/v2/clusters/vrem-production/services/vrem-backend |
+| **ECR Repository** | https://us-east-1.console.aws.amazon.com/ecr/repositories/private/471112692213/vrem-backend |
+| **Load Balancer** | https://us-east-1.console.aws.amazon.com/ec2/home#LoadBalancers:search=vrem-backend-alb |
+| **Secrets Manager** | https://us-east-1.console.aws.amazon.com/secretsmanager/listsecrets?region=us-east-1&search=vrem |
+| **CloudWatch Logs** | https://us-east-1.console.aws.amazon.com/cloudwatch/home#logsV2:log-groups/log-group/$252Fecs$252Fvrem-backend |
+| **Amplify App** | https://us-east-1.console.aws.amazon.com/amplify/apps/d2nocyi191c77r |
+
+---
+
+## Current Deployment Status
+
+### Backend (ECS Fargate) - RUNNING
+- **Health Check**: http://vrem-backend-alb-1326461645.us-east-1.elb.amazonaws.com/health
+- **API Endpoint**: http://vrem-backend-alb-1326461645.us-east-1.elb.amazonaws.com
+- **Status**: Running with placeholder secrets (needs real credentials)
+
+### Frontend (Amplify) - PENDING GITHUB CONNECTION
+- **App ID**: `d2nocyi191c77r`
+- **URL** (after connection): https://main.d2nocyi191c77r.amplifyapp.com
+- **Status**: Needs GitHub repository connection for SSR deployment
+
+---
+
 ## Architecture Overview
 
 ```
 Internet
     │
     ▼
-Route 53 (DNS)
-    │
-    ├──► CloudFront ──► S3 (Static Assets)
-    │
-    ▼
-Application Load Balancer
-    │
-    ├──► AWS Amplify (Frontend - Next.js)
-    │
-    └──► ECS Fargate (Backend - NestJS)
-              │
-              ▼
-         RDS Aurora PostgreSQL
+┌─────────────────────────────────────────────────────────────┐
+│                         Route 53                             │
+│                    (DNS - to be configured)                  │
+└─────────────────────────────────────────────────────────────┘
+    │                                    │
+    ▼                                    ▼
+┌──────────────────────┐    ┌──────────────────────────────────┐
+│    AWS Amplify       │    │   Application Load Balancer      │
+│  (Next.js Frontend)  │    │   vrem-backend-alb               │
+│                      │    │   (Internet-facing, HTTP:80)     │
+│  App: d2nocyi191c77r │    └──────────────────────────────────┘
+└──────────────────────┘                 │
+                                         ▼
+                          ┌──────────────────────────────────┐
+                          │        ECS Fargate               │
+                          │   Cluster: vrem-production       │
+                          │   Service: vrem-backend          │
+                          │   Task: vrem-backend:2           │
+                          │   Port: 3001                     │
+                          └──────────────────────────────────┘
+                                         │
+                    ┌────────────────────┼────────────────────┐
+                    ▼                    ▼                    ▼
+           ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+           │   Secrets    │    │  CloudWatch  │    │     RDS      │
+           │   Manager    │    │    Logs      │    │   (needed)   │
+           └──────────────┘    └──────────────┘    └──────────────┘
 ```
 
 ---
 
-## Prerequisites
+## Deployed AWS Resources
 
-- AWS Account with appropriate permissions
-- AWS CLI installed and configured
-- Docker installed locally
-- Domain name (for Route 53)
+### Backend Infrastructure
+
+| Resource | ID/ARN | Details |
+|----------|--------|---------|
+| **ECS Cluster** | `vrem-production` | Fargate capacity provider |
+| **ECS Service** | `vrem-backend` | 1 desired task, Fargate launch type |
+| **Task Definition** | `vrem-backend:2` | 512 CPU, 1024 MB memory |
+| **ECR Repository** | `vrem-backend` | `471112692213.dkr.ecr.us-east-1.amazonaws.com/vrem-backend` |
+| **ALB** | `vrem-backend-alb` | DNS: `vrem-backend-alb-1326461645.us-east-1.elb.amazonaws.com` |
+| **Target Group** | `vrem-backend-tg` | Port 3001, HTTP health check on `/health` |
+| **Security Group (Backend)** | `sg-006b78b0c3c3f25e4` | Allows 3001 from ALB |
+| **Security Group (ALB)** | `sg-0a1604fd649148419` | Allows 80 from anywhere |
+| **IAM Role** | `vrem-ecs-task-execution-role` | ECS task execution + Secrets Manager access |
+| **Log Group** | `/ecs/vrem-backend` | Backend application logs |
+
+### Secrets Manager Secrets
+
+| Secret Name | ARN | Status |
+|-------------|-----|--------|
+| `vrem/database-url` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/database-url-XDp8vb` | PLACEHOLDER - needs real value |
+| `vrem/jwt-secret` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/jwt-secret-m4Ffb0` | PLACEHOLDER - needs real value |
+| `vrem/clerk-secret` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/clerk-secret-88o65n` | PLACEHOLDER - needs real value |
+| `vrem/stripe-secret` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/stripe-secret-ac7BO5` | PLACEHOLDER - needs real value |
+| `vrem/stripe-webhook-secret` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/stripe-webhook-secret-lhDiej` | PLACEHOLDER - needs real value |
+| `vrem/resend-api-key` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/resend-api-key-iKbW90` | PLACEHOLDER - needs real value |
+| `vrem/uploadcare-public-key` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/uploadcare-public-key-ssic6h` | PLACEHOLDER - needs real value |
+| `vrem/uploadcare-private-key` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/uploadcare-private-key-xz8ZIY` | PLACEHOLDER - needs real value |
+| `vrem/uploadcare-cdn-base` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/uploadcare-cdn-base-31HRFD` | Set to `https://ucarecdn.com` |
+
+### Frontend Infrastructure
+
+| Resource | ID/ARN | Details |
+|----------|--------|---------|
+| **Amplify App** | `d2nocyi191c77r` | Platform: WEB_COMPUTE (SSR) |
+| **Branch** | `main` | Production stage |
+| **Default Domain** | `d2nocyi191c77r.amplifyapp.com` | |
+| **S3 Bucket** | `vrem-amplify-deployments-471112692213` | Deployment artifacts |
 
 ---
 
-## Step 1: Database Setup (RDS Aurora PostgreSQL)
+## STEP 1: Complete Frontend Setup (Required)
 
-### Create Aurora Cluster
+The frontend needs to be connected to GitHub for SSR deployment:
 
-1. Go to **RDS Console** → **Create database**
-2. Choose **Aurora (PostgreSQL Compatible)**
+1. **Go to Amplify Console**: https://us-east-1.console.aws.amazon.com/amplify/apps/d2nocyi191c77r
+
+2. **Connect to GitHub**:
+   - Click "Hosting" in the left sidebar
+   - Click "Connect repository" or "Deploy without Git" → "Connect different repository"
+   - Choose GitHub and authorize AWS Amplify
+   - Select repository: `duropiri/vrem`
+   - Select branch: `main`
+
+3. **Configure Build Settings**:
+   - Set **App root**: `apps/frontend`
+   - The `amplify.yml` in the repo will be auto-detected
+
+4. **Verify Environment Variables** (already configured):
+   - Go to "Hosting" → "Environment variables"
+   - Update the PLACEHOLDER values with real keys
+
+5. **Save and Deploy**
+
+---
+
+## STEP 2: Update Secrets with Real Values (Required)
+
+Update each secret in AWS Secrets Manager with your actual credentials:
+
+### Via AWS Console:
+1. Go to: https://us-east-1.console.aws.amazon.com/secretsmanager/listsecrets
+2. Click on each `vrem/*` secret
+3. Click "Retrieve secret value" → "Edit"
+4. Enter your real value and save
+
+### Via AWS CLI:
+```bash
+# Database URL (after creating RDS)
+aws secretsmanager put-secret-value \
+  --secret-id vrem/database-url \
+  --secret-string "postgresql://user:password@your-rds-endpoint:5432/vrem" \
+  --region us-east-1
+
+# JWT Secret (generate a secure random string)
+aws secretsmanager put-secret-value \
+  --secret-id vrem/jwt-secret \
+  --secret-string "$(openssl rand -base64 32)" \
+  --region us-east-1
+
+# Clerk Secret Key (from https://dashboard.clerk.com)
+aws secretsmanager put-secret-value \
+  --secret-id vrem/clerk-secret \
+  --secret-string "sk_live_YOUR_CLERK_SECRET" \
+  --region us-east-1
+
+# Stripe Secret Key (from https://dashboard.stripe.com/apikeys)
+aws secretsmanager put-secret-value \
+  --secret-id vrem/stripe-secret \
+  --secret-string "sk_live_YOUR_STRIPE_SECRET" \
+  --region us-east-1
+
+# Stripe Webhook Secret (from Stripe webhook settings)
+aws secretsmanager put-secret-value \
+  --secret-id vrem/stripe-webhook-secret \
+  --secret-string "whsec_YOUR_WEBHOOK_SECRET" \
+  --region us-east-1
+
+# Resend API Key (from https://resend.com/api-keys)
+aws secretsmanager put-secret-value \
+  --secret-id vrem/resend-api-key \
+  --secret-string "re_YOUR_RESEND_KEY" \
+  --region us-east-1
+
+# Uploadcare Public Key (from https://uploadcare.com/dashboard)
+aws secretsmanager put-secret-value \
+  --secret-id vrem/uploadcare-public-key \
+  --secret-string "YOUR_UPLOADCARE_PUBLIC_KEY" \
+  --region us-east-1
+
+# Uploadcare Private Key
+aws secretsmanager put-secret-value \
+  --secret-id vrem/uploadcare-private-key \
+  --secret-string "YOUR_UPLOADCARE_PRIVATE_KEY" \
+  --region us-east-1
+```
+
+After updating secrets, force a new deployment:
+```bash
+aws ecs update-service --cluster vrem-production --service vrem-backend --force-new-deployment --region us-east-1
+```
+
+---
+
+## STEP 3: Create RDS Database (Required)
+
+The backend needs a PostgreSQL database:
+
+### Option A: Via Console
+1. Go to: https://us-east-1.console.aws.amazon.com/rds/home#launch-dbinstance:
+2. Choose **Aurora (PostgreSQL Compatible)** or **PostgreSQL**
 3. Settings:
-   - **Engine version**: PostgreSQL 15.x
-   - **Instance class**: db.r6g.large (production) or db.t4g.medium (staging)
-   - **Multi-AZ**: Yes (production)
-   - **Storage**: Aurora auto-scaling
-
+   - **DB instance identifier**: `vrem-production`
+   - **Master username**: `vrem_admin`
+   - **Master password**: (generate secure password)
+   - **DB instance class**: `db.t4g.micro` (free tier) or `db.t4g.medium`
+   - **Storage**: 20 GB (auto-scaling enabled)
 4. Connectivity:
-   - **VPC**: Your production VPC
-   - **Subnet group**: Private subnets
-   - **Public access**: No
-   - **Security group**: Allow inbound 5432 from ECS security group
+   - **VPC**: Default VPC (`vpc-0400ff329c0aa4189`)
+   - **Public access**: Yes (for initial setup, change to No later)
+   - **Security group**: Create new, allow 5432 from backend security group
+5. Create database
+6. Once created, update the `vrem/database-url` secret with:
+   ```
+   postgresql://vrem_admin:YOUR_PASSWORD@YOUR_RDS_ENDPOINT:5432/vrem
+   ```
 
-5. Save your credentials:
-   ```
-   DATABASE_URL=postgresql://username:password@your-cluster.cluster-xxx.region.rds.amazonaws.com:5432/vrem
-   ```
+### Option B: Via CLI
+```bash
+aws rds create-db-instance \
+  --db-instance-identifier vrem-production \
+  --db-instance-class db.t4g.micro \
+  --engine postgres \
+  --engine-version 15 \
+  --master-username vrem_admin \
+  --master-user-password YOUR_SECURE_PASSWORD \
+  --allocated-storage 20 \
+  --vpc-security-group-ids sg-006b78b0c3c3f25e4 \
+  --region us-east-1
+```
 
 ---
 
-## Step 2: Backend Deployment (ECS Fargate)
+## STEP 4: Run Database Migrations
 
-### 2.1 Create ECR Repository
-
-```bash
-aws ecr create-repository --repository-name vrem-backend --region us-east-1
-```
-
-### 2.2 Build and Push Docker Image
+After database is created and secrets are updated:
 
 ```bash
-# Login to ECR
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
-
-# Build image
-cd apps/backend
-docker build -t vrem-backend .
-
-# Tag image
-docker tag vrem-backend:latest YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/vrem-backend:latest
-
-# Push image
-docker push YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/vrem-backend:latest
-```
-
-### 2.3 Create ECS Cluster
-
-1. Go to **ECS Console** → **Create Cluster**
-2. Choose **Networking only (Fargate)**
-3. Name: `vrem-production`
-
-### 2.4 Create Task Definition
-
-Create `task-definition.json`:
-
-```json
-{
-  "family": "vrem-backend",
-  "networkMode": "awsvpc",
-  "requiresCompatibilities": ["FARGATE"],
-  "cpu": "512",
-  "memory": "1024",
-  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT:role/ecsTaskExecutionRole",
-  "containerDefinitions": [
-    {
-      "name": "vrem-backend",
-      "image": "YOUR_ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/vrem-backend:latest",
-      "portMappings": [
-        {
-          "containerPort": 3001,
-          "protocol": "tcp"
-        }
-      ],
-      "environment": [
-        {"name": "NODE_ENV", "value": "production"},
-        {"name": "PORT", "value": "3001"}
-      ],
-      "secrets": [
-        {"name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:region:account:secret:vrem/database-url"},
-        {"name": "CLERK_SECRET_KEY", "valueFrom": "arn:aws:secretsmanager:region:account:secret:vrem/clerk-secret"},
-        {"name": "STRIPE_SECRET_KEY", "valueFrom": "arn:aws:secretsmanager:region:account:secret:vrem/stripe-secret"}
-      ],
-      "logConfiguration": {
-        "logDriver": "awslogs",
-        "options": {
-          "awslogs-group": "/ecs/vrem-backend",
-          "awslogs-region": "us-east-1",
-          "awslogs-stream-prefix": "ecs"
-        }
-      },
-      "healthCheck": {
-        "command": ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1"],
-        "interval": 30,
-        "timeout": 5,
-        "retries": 3,
-        "startPeriod": 60
-      }
-    }
-  ]
-}
-```
-
-Register task definition:
-```bash
-aws ecs register-task-definition --cli-input-json file://task-definition.json
-```
-
-### 2.5 Create Application Load Balancer
-
-1. Go to **EC2 Console** → **Load Balancers** → **Create**
-2. Choose **Application Load Balancer**
-3. Settings:
-   - **Name**: vrem-backend-alb
-   - **Scheme**: Internet-facing
-   - **Listeners**: HTTPS (443)
-   - **Target group**: Create new (vrem-backend-tg, port 3001, health check /health)
-
-### 2.6 Create ECS Service
-
-```bash
-aws ecs create-service \
+# Option 1: Run as a one-off ECS task
+aws ecs run-task \
   --cluster vrem-production \
-  --service-name vrem-backend \
-  --task-definition vrem-backend \
-  --desired-count 2 \
+  --task-definition vrem-backend:2 \
   --launch-type FARGATE \
-  --network-configuration "awsvpcConfiguration={subnets=[subnet-xxx,subnet-yyy],securityGroups=[sg-xxx],assignPublicIp=DISABLED}" \
-  --load-balancers "targetGroupArn=arn:aws:elasticloadbalancing:...,containerName=vrem-backend,containerPort=3001"
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-0b30b78cd4ea79da3,subnet-06f4c3a4667f98bbb],securityGroups=[sg-006b78b0c3c3f25e4],assignPublicIp=ENABLED}" \
+  --overrides '{"containerOverrides":[{"name":"vrem-backend","command":["npx","prisma","migrate","deploy"]}]}' \
+  --region us-east-1
+
+# Option 2: Connect to running container (requires ECS Exec enabled)
+# First, get the task ID
+TASK_ID=$(aws ecs list-tasks --cluster vrem-production --service-name vrem-backend --query 'taskArns[0]' --output text --region us-east-1 | cut -d'/' -f3)
+
+aws ecs execute-command \
+  --cluster vrem-production \
+  --task $TASK_ID \
+  --container vrem-backend \
+  --interactive \
+  --command "/bin/sh" \
+  --region us-east-1
 ```
 
 ---
 
-## Step 3: Frontend Deployment (AWS Amplify)
+## Daily Operations
 
-### 3.1 Connect Repository
-
-1. Go to **AWS Amplify Console**
-2. Click **New app** → **Host web app**
-3. Connect your GitHub repository
-4. Select the `main` branch
-
-### 3.2 Configure Build Settings
-
-Amplify should auto-detect the `amplify.yml` file. If not, use:
-
-- **App root**: `apps/frontend`
-- **Build command**: `npm run build`
-- **Output directory**: `.next`
-
-### 3.3 Environment Variables
-
-Add these in Amplify Console → **Environment variables**:
-
-```
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxx
-CLERK_SECRET_KEY=sk_live_xxx
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com
-NEXT_PUBLIC_MAPBOX_TOKEN=pk.xxx
-NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY=xxx
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/login
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/signup
-NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/dashboard
-NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/dashboard
-```
-
-### 3.4 Deploy
-
-Click **Save and deploy**. Amplify will build and deploy automatically.
-
----
-
-## Step 4: DNS & SSL (Route 53)
-
-### 4.1 Create Hosted Zone
-
-1. Go to **Route 53** → **Hosted zones** → **Create**
-2. Enter your domain name
-
-### 4.2 Configure Records
-
-| Record | Type | Value |
-|--------|------|-------|
-| `yourdomain.com` | A | Amplify (alias) |
-| `www.yourdomain.com` | CNAME | Amplify domain |
-| `api.yourdomain.com` | A | ALB (alias) |
-
-### 4.3 SSL Certificates
-
-1. Go to **ACM (Certificate Manager)**
-2. Request public certificate for:
-   - `yourdomain.com`
-   - `*.yourdomain.com`
-3. Validate via DNS (add CNAME records)
-4. Attach to ALB and Amplify
-
----
-
-## Step 5: Secrets Management
-
-### Store Secrets in AWS Secrets Manager
-
+### View Backend Logs
 ```bash
-# Database URL
-aws secretsmanager create-secret \
-  --name vrem/database-url \
-  --secret-string "postgresql://user:pass@host:5432/vrem"
+# Stream logs in real-time
+aws logs tail /ecs/vrem-backend --follow --region us-east-1
 
-# Clerk Secret
-aws secretsmanager create-secret \
-  --name vrem/clerk-secret \
-  --secret-string "sk_live_xxx"
+# View recent logs
+aws logs get-log-events \
+  --log-group-name /ecs/vrem-backend \
+  --log-stream-name "$(aws logs describe-log-streams --log-group-name /ecs/vrem-backend --order-by LastEventTime --descending --limit 1 --region us-east-1 --query 'logStreams[0].logStreamName' --output text)" \
+  --region us-east-1 \
+  --limit 50
+```
 
-# Stripe Secret
-aws secretsmanager create-secret \
-  --name vrem/stripe-secret \
-  --secret-string "sk_live_xxx"
+### Check Service Health
+```bash
+# ECS service status
+aws ecs describe-services --cluster vrem-production --services vrem-backend --region us-east-1 \
+  --query 'services[0].{status:status,running:runningCount,desired:desiredCount,pending:pendingCount}'
 
-# Add more as needed...
+# Health endpoint
+curl http://vrem-backend-alb-1326461645.us-east-1.elb.amazonaws.com/health
+
+# Target group health
+aws elbv2 describe-target-health \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:471112692213:targetgroup/vrem-backend-tg/c129228f5409e153 \
+  --region us-east-1
+```
+
+### Deploy New Backend Version
+```bash
+# 1. Build new image (from apps/backend directory)
+cd apps/backend
+docker buildx build --platform linux/amd64 -t vrem-backend:latest .
+
+# 2. Authenticate with ECR
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 471112692213.dkr.ecr.us-east-1.amazonaws.com
+
+# 3. Tag and push
+docker tag vrem-backend:latest 471112692213.dkr.ecr.us-east-1.amazonaws.com/vrem-backend:latest
+docker push 471112692213.dkr.ecr.us-east-1.amazonaws.com/vrem-backend:latest
+
+# 4. Force new deployment
+aws ecs update-service --cluster vrem-production --service vrem-backend --force-new-deployment --region us-east-1
+
+# 5. Monitor deployment
+watch -n 5 'aws ecs describe-services --cluster vrem-production --services vrem-backend --region us-east-1 --query "services[0].{running:runningCount,pending:pendingCount,desired:desiredCount}"'
+```
+
+### Deploy New Frontend Version
+Once connected to GitHub, deployments are automatic on push to `main`.
+
+Manual trigger:
+```bash
+aws amplify start-job --app-id d2nocyi191c77r --branch-name main --job-type RELEASE --region us-east-1
+```
+
+### Scale Backend
+```bash
+# Scale to 2 tasks
+aws ecs update-service --cluster vrem-production --service vrem-backend --desired-count 2 --region us-east-1
+
+# Scale down to 1 task
+aws ecs update-service --cluster vrem-production --service vrem-backend --desired-count 1 --region us-east-1
+```
+
+### Restart Backend (Rolling)
+```bash
+aws ecs update-service --cluster vrem-production --service vrem-backend --force-new-deployment --region us-east-1
 ```
 
 ---
 
-## Step 6: Run Database Migrations
+## Environment Variables Reference
 
-After backend is deployed, run migrations:
+### Backend (ECS Task Definition via Secrets Manager)
+| Variable | Secret Name | Source |
+|----------|-------------|--------|
+| `DATABASE_URL` | `vrem/database-url` | RDS connection string |
+| `JWT_SECRET` | `vrem/jwt-secret` | Generated random string |
+| `CLERK_SECRET_KEY` | `vrem/clerk-secret` | Clerk Dashboard |
+| `STRIPE_SECRET_KEY` | `vrem/stripe-secret` | Stripe Dashboard |
+| `STRIPE_WEBHOOK_SECRET` | `vrem/stripe-webhook-secret` | Stripe Webhooks |
+| `RESEND_API_KEY` | `vrem/resend-api-key` | Resend Dashboard |
+| `UPLOADCARE_PUBLIC_KEY` | `vrem/uploadcare-public-key` | Uploadcare Dashboard |
+| `UPLOADCARE_PRIVATE_KEY` | `vrem/uploadcare-private-key` | Uploadcare Dashboard |
+| `UPLOADCARE_CDN_BASE` | `vrem/uploadcare-cdn-base` | `https://ucarecdn.com` |
 
+### Backend (ECS Task Definition - Environment)
+| Variable | Value |
+|----------|-------|
+| `NODE_ENV` | `production` |
+| `PORT` | `3001` |
+| `FRONTEND_URL` | `https://vrem.yourdomain.com` (update after DNS) |
+| `API_URL` | `http://vrem-backend-alb-1326461645.us-east-1.elb.amazonaws.com` |
+
+### Frontend (Amplify Environment Variables)
+| Variable | Value | Source |
+|----------|-------|--------|
+| `NEXT_PUBLIC_API_URL` | `http://vrem-backend-alb-1326461645.us-east-1.elb.amazonaws.com` | ALB DNS |
+| `NEXT_PUBLIC_USE_PRODUCTION_API` | `true` | |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_live_xxx` | Clerk Dashboard |
+| `CLERK_SECRET_KEY` | `sk_live_xxx` | Clerk Dashboard |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | `/login` | |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | `/signup` | |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | `/dashboard` | |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | `/dashboard` | |
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | `pk.xxx` | Mapbox Dashboard |
+| `NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY` | `xxx` | Uploadcare Dashboard |
+
+---
+
+## Troubleshooting
+
+### Backend Won't Start
+1. **Check logs**: https://us-east-1.console.aws.amazon.com/cloudwatch/home#logsV2:log-groups/log-group/$252Fecs$252Fvrem-backend
+2. **Check task status**:
+   ```bash
+   aws ecs describe-tasks --cluster vrem-production \
+     --tasks $(aws ecs list-tasks --cluster vrem-production --service-name vrem-backend --query 'taskArns[0]' --output text --region us-east-1) \
+     --region us-east-1
+   ```
+3. **Common issues**:
+   - Database not reachable: Check RDS security group allows connections from ECS
+   - Missing secrets: Ensure all secrets have real values (not PLACEHOLDER)
+   - Health check failing: Ensure `/health` endpoint returns 200
+
+### Frontend 404 Error
+- Amplify needs to be connected to GitHub for SSR
+- Check build logs in Amplify Console
+- Verify environment variables are set
+
+### Database Connection Issues
 ```bash
-# Option 1: ECS Exec (if enabled)
+# Test from a task with execute-command
 aws ecs execute-command \
   --cluster vrem-production \
   --task TASK_ID \
   --container vrem-backend \
   --interactive \
-  --command "npx prisma migrate deploy"
-
-# Option 2: One-off task
-aws ecs run-task \
-  --cluster vrem-production \
-  --task-definition vrem-backend \
-  --launch-type FARGATE \
-  --overrides '{"containerOverrides":[{"name":"vrem-backend","command":["npx","prisma","migrate","deploy"]}]}'
+  --command "npx prisma db pull" \
+  --region us-east-1
 ```
 
 ---
 
-## Environment Variables Checklist
+## Cost Management
 
-### Backend (ECS/Secrets Manager)
-- [ ] `DATABASE_URL`
-- [ ] `JWT_SECRET`
-- [ ] `CLERK_SECRET_KEY`
-- [ ] `STRIPE_SECRET_KEY`
-- [ ] `STRIPE_WEBHOOK_SECRET`
-- [ ] `RESEND_API_KEY`
-- [ ] `EMAIL_FROM`
-- [ ] `SUPABASE_URL`
-- [ ] `SUPABASE_SERVICE_ROLE_KEY`
-- [ ] `UPLOADCARE_CDN_BASE`
-- [ ] `FRONTEND_URL`
-- [ ] `API_URL`
-
-### Frontend (Amplify)
-- [ ] `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-- [ ] `CLERK_SECRET_KEY`
-- [ ] `NEXT_PUBLIC_API_URL`
-- [ ] `NEXT_PUBLIC_MAPBOX_TOKEN`
-- [ ] `NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY`
-
----
-
-## Monitoring & Logs
-
-### CloudWatch
-- Backend logs: `/ecs/vrem-backend`
-- Amplify logs: Amplify Console → App → Monitoring
-
-### Alarms (Recommended)
-- ECS CPU/Memory utilization > 80%
-- ALB 5xx errors > 1%
-- RDS connections > 80%
-
----
-
-## Estimated Monthly Costs
-
-| Service | Sizing | Est. Cost |
-|---------|--------|-----------|
-| ECS Fargate | 2 tasks, 0.5 vCPU, 1GB | ~$30 |
-| RDS Aurora | db.t4g.medium | ~$60 |
+### Current Resources Cost Estimate
+| Service | Configuration | Monthly Cost |
+|---------|--------------|--------------|
+| ECS Fargate | 1 task (0.5 vCPU, 1GB) | ~$15 |
 | ALB | Standard | ~$20 |
-| Amplify | Build + Hosting | ~$5-20 |
-| Route 53 | Hosted zone | ~$0.50 |
-| Secrets Manager | 10 secrets | ~$4 |
-| **Total** | | **~$120-150/mo** |
+| ECR | < 1GB storage | ~$0.10 |
+| Secrets Manager | 9 secrets | ~$3.60 |
+| CloudWatch Logs | ~5GB/month | ~$2.50 |
+| Amplify Hosting | SSR compute | ~$5-20 |
+| RDS (when added) | db.t4g.micro | ~$15 |
+| **Total** | | **~$60-80/mo** |
 
-*Costs scale with traffic. Use AWS Calculator for precise estimates.*
-
----
-
-## Quick Deploy Commands
-
-```bash
-# Build and push backend
-cd apps/backend
-docker build -t vrem-backend .
-docker tag vrem-backend:latest $ECR_REPO:latest
-docker push $ECR_REPO:latest
-
-# Force new deployment
-aws ecs update-service --cluster vrem-production --service vrem-backend --force-new-deployment
-
-# Check deployment status
-aws ecs describe-services --cluster vrem-production --services vrem-backend
-```
+### Cost Optimization Tips
+- Use Fargate Spot for non-critical workloads (70% savings)
+- Set up CloudWatch log retention (7-30 days)
+- Use RDS reserved instances for 1-year commitment (30% savings)
 
 ---
 
-## Support
+## Security Checklist
 
-For issues, check:
-1. CloudWatch Logs
-2. ECS Task status
-3. ALB Target Group health
-4. Amplify build logs
+- [ ] Update all placeholder secrets with real values
+- [ ] Enable HTTPS on ALB (requires ACM certificate)
+- [ ] Restrict RDS to private subnets only
+- [ ] Enable VPC Flow Logs for network monitoring
+- [ ] Set up AWS CloudTrail for audit logging
+- [ ] Configure IAM roles with least privilege
+- [ ] Enable MFA on AWS root account
+- [ ] Set up billing alerts
+
+---
+
+## Next Steps
+
+1. **Immediate** (Required for app to work):
+   - [ ] Connect Amplify to GitHub
+   - [ ] Create RDS database
+   - [ ] Update all secrets with real values
+   - [ ] Run database migrations
+
+2. **Soon** (Production readiness):
+   - [ ] Set up custom domain with Route 53
+   - [ ] Configure SSL certificates with ACM
+   - [ ] Enable HTTPS on ALB
+   - [ ] Set up CloudWatch alarms
+   - [ ] Configure auto-scaling
+
+3. **Later** (Optimization):
+   - [ ] Set up CI/CD pipeline
+   - [ ] Configure staging environment
+   - [ ] Set up backup strategy for RDS
+   - [ ] Implement WAF for security
