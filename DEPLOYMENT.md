@@ -4,7 +4,7 @@
 
 ### AWS Console Login
 1. Go to: https://console.aws.amazon.com/
-2. Sign in with your AWS account (Account ID: `471112692213`)
+2. Sign in with your AWS account (Account ID: `741448931302`)
 3. Select region: **US East (N. Virginia) us-east-1**
 
 ### Direct Resource Links
@@ -12,24 +12,24 @@
 |----------|--------------|
 | **ECS Cluster** | https://us-east-1.console.aws.amazon.com/ecs/v2/clusters/vrem-production |
 | **ECS Service** | https://us-east-1.console.aws.amazon.com/ecs/v2/clusters/vrem-production/services/vrem-backend |
-| **ECR Repository** | https://us-east-1.console.aws.amazon.com/ecr/repositories/private/471112692213/vrem-backend |
+| **ECR Repository** | https://us-east-1.console.aws.amazon.com/ecr/repositories/private/741448931302/vrem-backend |
 | **Load Balancer** | https://us-east-1.console.aws.amazon.com/ec2/home#LoadBalancers:search=vrem-backend-alb |
 | **Secrets Manager** | https://us-east-1.console.aws.amazon.com/secretsmanager/listsecrets?region=us-east-1&search=vrem |
 | **CloudWatch Logs** | https://us-east-1.console.aws.amazon.com/cloudwatch/home#logsV2:log-groups/log-group/$252Fecs$252Fvrem-backend |
-| **Amplify App** | https://us-east-1.console.aws.amazon.com/amplify/apps/d2nocyi191c77r |
+| **Amplify App** | https://us-east-1.console.aws.amazon.com/amplify/apps/d7y2o55px1hva |
 
 ---
 
 ## Current Deployment Status
 
 ### Backend (ECS Fargate) - RUNNING
-- **Health Check**: http://vrem-backend-alb-1326461645.us-east-1.elb.amazonaws.com/health
-- **API Endpoint**: http://vrem-backend-alb-1326461645.us-east-1.elb.amazonaws.com
+- **Health Check**: http://vrem-backend-alb-287667160.us-east-1.elb.amazonaws.com/health
+- **API Endpoint**: http://vrem-backend-alb-287667160.us-east-1.elb.amazonaws.com
 - **Status**: Running with placeholder secrets (needs real credentials)
 
 ### Frontend (Amplify) - PENDING GITHUB CONNECTION
-- **App ID**: `d2nocyi191c77r`
-- **URL** (after connection): https://main.d2nocyi191c77r.amplifyapp.com
+- **App ID**: `d7y2o55px1hva`
+- **URL** (after connection): https://main.d7y2o55px1hva.amplifyapp.com
 - **Status**: Needs GitHub repository connection for SSR deployment
 
 ---
@@ -50,7 +50,7 @@ Internet
 │    AWS Amplify       │    │   Application Load Balancer      │
 │  (Next.js Frontend)  │    │   vrem-backend-alb               │
 │                      │    │   (Internet-facing, HTTP:80)     │
-│  App: d2nocyi191c77r │    └──────────────────────────────────┘
+│  App: d7y2o55px1hva │    └──────────────────────────────────┘
 └──────────────────────┘                 │
                                          ▼
                           ┌──────────────────────────────────┐
@@ -79,12 +79,12 @@ Internet
 |----------|--------|---------|
 | **ECS Cluster** | `vrem-production` | Fargate capacity provider |
 | **ECS Service** | `vrem-backend` | 1 desired task, Fargate launch type |
-| **Task Definition** | `vrem-backend:2` | 512 CPU, 1024 MB memory |
-| **ECR Repository** | `vrem-backend` | `471112692213.dkr.ecr.us-east-1.amazonaws.com/vrem-backend` |
-| **ALB** | `vrem-backend-alb` | DNS: `vrem-backend-alb-1326461645.us-east-1.elb.amazonaws.com` |
+| **Task Definition** | `vrem-backend:1` | 512 CPU, 1024 MB memory |
+| **ECR Repository** | `vrem-backend` | `741448931302.dkr.ecr.us-east-1.amazonaws.com/vrem-backend` |
+| **ALB** | `vrem-backend-alb` | DNS: `vrem-backend-alb-287667160.us-east-1.elb.amazonaws.com` |
 | **Target Group** | `vrem-backend-tg` | Port 3001, HTTP health check on `/health` |
-| **Security Group (Backend)** | `sg-006b78b0c3c3f25e4` | Allows 3001 from ALB |
-| **Security Group (ALB)** | `sg-0a1604fd649148419` | Allows 80 from anywhere |
+| **Security Group (Backend)** | `sg-0c514d127d9d19687` | Allows 3001 from ALB |
+| **Security Group (ALB)** | `sg-0aae833a443bc0cc2` | Allows 80 from anywhere |
 | **IAM Role** | `vrem-ecs-task-execution-role` | ECS task execution + Secrets Manager access |
 | **Log Group** | `/ecs/vrem-backend` | Backend application logs |
 
@@ -92,24 +92,23 @@ Internet
 
 | Secret Name | ARN | Status |
 |-------------|-----|--------|
-| `vrem/database-url` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/database-url-XDp8vb` | PLACEHOLDER - needs real value |
-| `vrem/jwt-secret` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/jwt-secret-m4Ffb0` | PLACEHOLDER - needs real value |
-| `vrem/clerk-secret` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/clerk-secret-88o65n` | PLACEHOLDER - needs real value |
-| `vrem/stripe-secret` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/stripe-secret-ac7BO5` | PLACEHOLDER - needs real value |
-| `vrem/stripe-webhook-secret` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/stripe-webhook-secret-lhDiej` | PLACEHOLDER - needs real value |
-| `vrem/resend-api-key` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/resend-api-key-iKbW90` | PLACEHOLDER - needs real value |
-| `vrem/uploadcare-public-key` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/uploadcare-public-key-ssic6h` | PLACEHOLDER - needs real value |
-| `vrem/uploadcare-private-key` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/uploadcare-private-key-xz8ZIY` | PLACEHOLDER - needs real value |
-| `vrem/uploadcare-cdn-base` | `arn:aws:secretsmanager:us-east-1:471112692213:secret:vrem/uploadcare-cdn-base-31HRFD` | Set to `https://ucarecdn.com` |
+| `vrem/database-url` | `arn:aws:secretsmanager:us-east-1:741448931302:secret:vrem/database-url-GDuAsy` | PLACEHOLDER - needs real value |
+| `vrem/jwt-secret` | `arn:aws:secretsmanager:us-east-1:741448931302:secret:vrem/jwt-secret-mCvO5Z` | PLACEHOLDER - needs real value |
+| `vrem/clerk-secret` | `arn:aws:secretsmanager:us-east-1:741448931302:secret:vrem/clerk-secret-VOpDtL` | PLACEHOLDER - needs real value |
+| `vrem/stripe-secret` | `arn:aws:secretsmanager:us-east-1:741448931302:secret:vrem/stripe-secret-6ryaay` | PLACEHOLDER - needs real value |
+| `vrem/stripe-webhook-secret` | `arn:aws:secretsmanager:us-east-1:741448931302:secret:vrem/stripe-webhook-secret-UGIkJ6` | PLACEHOLDER - needs real value |
+| `vrem/resend-api-key` | `arn:aws:secretsmanager:us-east-1:741448931302:secret:vrem/resend-api-key-qBpt9g` | PLACEHOLDER - needs real value |
+| `vrem/uploadcare-public-key` | `arn:aws:secretsmanager:us-east-1:741448931302:secret:vrem/uploadcare-public-key-EZqKzo` | PLACEHOLDER - needs real value |
+| `vrem/uploadcare-private-key` | `arn:aws:secretsmanager:us-east-1:741448931302:secret:vrem/uploadcare-private-key-3Spbhj` | PLACEHOLDER - needs real value |
+| `vrem/uploadcare-cdn-base` | `arn:aws:secretsmanager:us-east-1:741448931302:secret:vrem/uploadcare-cdn-base-EwoxLi` | PLACEHOLDER - needs real value |
 
 ### Frontend Infrastructure
 
 | Resource | ID/ARN | Details |
 |----------|--------|---------|
-| **Amplify App** | `d2nocyi191c77r` | Platform: WEB_COMPUTE (SSR) |
+| **Amplify App** | `d7y2o55px1hva` | Platform: WEB_COMPUTE (SSR) |
 | **Branch** | `main` | Production stage |
-| **Default Domain** | `d2nocyi191c77r.amplifyapp.com` | |
-| **S3 Bucket** | `vrem-amplify-deployments-471112692213` | Deployment artifacts |
+| **Default Domain** | `d7y2o55px1hva.amplifyapp.com` | |
 
 ---
 
@@ -117,7 +116,7 @@ Internet
 
 The frontend needs to be connected to GitHub for SSR deployment:
 
-1. **Go to Amplify Console**: https://us-east-1.console.aws.amazon.com/amplify/apps/d2nocyi191c77r
+1. **Go to Amplify Console**: https://us-east-1.console.aws.amazon.com/amplify/apps/d7y2o55px1hva
 
 2. **Connect to GitHub**:
    - Click "Hosting" in the left sidebar
@@ -220,7 +219,7 @@ The backend needs a PostgreSQL database:
    - **DB instance class**: `db.t4g.micro` (free tier) or `db.t4g.medium`
    - **Storage**: 20 GB (auto-scaling enabled)
 4. Connectivity:
-   - **VPC**: Default VPC (`vpc-0400ff329c0aa4189`)
+   - **VPC**: Default VPC (`vpc-0842811750dee8e2b`)
    - **Public access**: Yes (for initial setup, change to No later)
    - **Security group**: Create new, allow 5432 from backend security group
 5. Create database
@@ -239,7 +238,7 @@ aws rds create-db-instance \
   --master-username vrem_admin \
   --master-user-password YOUR_SECURE_PASSWORD \
   --allocated-storage 20 \
-  --vpc-security-group-ids sg-006b78b0c3c3f25e4 \
+  --vpc-security-group-ids sg-0c514d127d9d19687 \
   --region us-east-1
 ```
 
@@ -253,9 +252,9 @@ After database is created and secrets are updated:
 # Option 1: Run as a one-off ECS task
 aws ecs run-task \
   --cluster vrem-production \
-  --task-definition vrem-backend:2 \
+  --task-definition vrem-backend:1 \
   --launch-type FARGATE \
-  --network-configuration "awsvpcConfiguration={subnets=[subnet-0b30b78cd4ea79da3,subnet-06f4c3a4667f98bbb],securityGroups=[sg-006b78b0c3c3f25e4],assignPublicIp=ENABLED}" \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-09c75d92478746a1f,subnet-01fe44f3919f1fcb4],securityGroups=[sg-0c514d127d9d19687],assignPublicIp=ENABLED}" \
   --overrides '{"containerOverrides":[{"name":"vrem-backend","command":["npx","prisma","migrate","deploy"]}]}' \
   --region us-east-1
 
@@ -296,11 +295,11 @@ aws ecs describe-services --cluster vrem-production --services vrem-backend --re
   --query 'services[0].{status:status,running:runningCount,desired:desiredCount,pending:pendingCount}'
 
 # Health endpoint
-curl http://vrem-backend-alb-1326461645.us-east-1.elb.amazonaws.com/health
+curl http://vrem-backend-alb-287667160.us-east-1.elb.amazonaws.com/health
 
 # Target group health
 aws elbv2 describe-target-health \
-  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:471112692213:targetgroup/vrem-backend-tg/c129228f5409e153 \
+  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:741448931302:targetgroup/vrem-backend-tg/223e475fd3c01cd7 \
   --region us-east-1
 ```
 
@@ -311,11 +310,11 @@ cd apps/backend
 docker buildx build --platform linux/amd64 -t vrem-backend:latest .
 
 # 2. Authenticate with ECR
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 471112692213.dkr.ecr.us-east-1.amazonaws.com
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 741448931302.dkr.ecr.us-east-1.amazonaws.com
 
 # 3. Tag and push
-docker tag vrem-backend:latest 471112692213.dkr.ecr.us-east-1.amazonaws.com/vrem-backend:latest
-docker push 471112692213.dkr.ecr.us-east-1.amazonaws.com/vrem-backend:latest
+docker tag vrem-backend:latest 741448931302.dkr.ecr.us-east-1.amazonaws.com/vrem-backend:latest
+docker push 741448931302.dkr.ecr.us-east-1.amazonaws.com/vrem-backend:latest
 
 # 4. Force new deployment
 aws ecs update-service --cluster vrem-production --service vrem-backend --force-new-deployment --region us-east-1
@@ -329,7 +328,7 @@ Once connected to GitHub, deployments are automatic on push to `main`.
 
 Manual trigger:
 ```bash
-aws amplify start-job --app-id d2nocyi191c77r --branch-name main --job-type RELEASE --region us-east-1
+aws amplify start-job --app-id d7y2o55px1hva --branch-name main --job-type RELEASE --region us-east-1
 ```
 
 ### Scale Backend
@@ -369,12 +368,12 @@ aws ecs update-service --cluster vrem-production --service vrem-backend --force-
 | `NODE_ENV` | `production` |
 | `PORT` | `3001` |
 | `FRONTEND_URL` | `https://vrem.yourdomain.com` (update after DNS) |
-| `API_URL` | `http://vrem-backend-alb-1326461645.us-east-1.elb.amazonaws.com` |
+| `API_URL` | `http://vrem-backend-alb-287667160.us-east-1.elb.amazonaws.com` |
 
 ### Frontend (Amplify Environment Variables)
 | Variable | Value | Source |
 |----------|-------|--------|
-| `NEXT_PUBLIC_API_URL` | `http://vrem-backend-alb-1326461645.us-east-1.elb.amazonaws.com` | ALB DNS |
+| `NEXT_PUBLIC_API_URL` | `http://vrem-backend-alb-287667160.us-east-1.elb.amazonaws.com` | ALB DNS |
 | `NEXT_PUBLIC_USE_PRODUCTION_API` | `true` | |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_live_xxx` | Clerk Dashboard |
 | `CLERK_SECRET_KEY` | `sk_live_xxx` | Clerk Dashboard |
