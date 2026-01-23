@@ -66,11 +66,33 @@ if (!fs.existsSync(appFrontendDir)) {
   fs.mkdirSync(appFrontendDir, { recursive: true });
 }
 
-// Copy the entire .next directory from the build
-if (!fs.existsSync(appNextDir) || !fs.existsSync(path.join(appNextDir, 'server'))) {
-  console.log('Copying full .next directory to apps/frontend/.next...');
-  copyRecursive(buildDir, appNextDir);
+// Copy only essential .next files (to stay under 230MB limit)
+if (!fs.existsSync(appNextDir)) {
+  fs.mkdirSync(appNextDir, { recursive: true });
 }
+
+// Essential files/directories for App Router SSR
+const essentialItems = [
+  'server',           // Server-side rendering code
+  'BUILD_ID',         // Build identifier
+  'build-manifest.json',
+  'prerender-manifest.json',
+  'react-loadable-manifest.json',
+  'routes-manifest.json',
+  'required-server-files.json',
+  'app-build-manifest.json',
+  'app-path-routes-manifest.json'
+];
+
+console.log('Copying essential .next files...');
+essentialItems.forEach(item => {
+  const src = path.join(buildDir, item);
+  const dest = path.join(appNextDir, item);
+  if (fs.existsSync(src)) {
+    copyRecursive(src, dest);
+    console.log(`  Copied: ${item}`);
+  }
+});
 
 // Copy public directory to static for CDN serving
 const publicDir = path.join(__dirname, '..', 'public');
