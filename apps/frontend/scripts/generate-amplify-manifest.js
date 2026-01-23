@@ -55,24 +55,21 @@ if (fs.existsSync(standaloneDir)) {
   process.exit(1);
 }
 
-// Copy full .next directory to compute for runtime (required for App Router SSR)
+// The standalone output needs the full .next directory at apps/frontend/.next
+// This might not be included in standalone, so copy the entire .next build output
 const appNextDir = path.join(computeDir, 'apps', 'frontend', '.next');
 console.log('Checking .next in standalone:', fs.existsSync(appNextDir) ? 'exists' : 'missing');
 
-// If .next/static is missing from the standalone copy, copy from build dir
-const nextStaticDir = path.join(buildDir, 'static');
-const computeStaticDir = path.join(appNextDir, 'static');
-if (fs.existsSync(nextStaticDir) && !fs.existsSync(computeStaticDir)) {
-  console.log('Copying .next/static to compute...');
-  copyRecursive(nextStaticDir, computeStaticDir);
+// Ensure apps/frontend directory exists
+const appFrontendDir = path.join(computeDir, 'apps', 'frontend');
+if (!fs.existsSync(appFrontendDir)) {
+  fs.mkdirSync(appFrontendDir, { recursive: true });
 }
 
-// Copy server directory if missing (needed for App Router)
-const nextServerDir = path.join(buildDir, 'server');
-const computeServerDir = path.join(appNextDir, 'server');
-if (fs.existsSync(nextServerDir) && !fs.existsSync(computeServerDir)) {
-  console.log('Copying .next/server to compute...');
-  copyRecursive(nextServerDir, computeServerDir);
+// Copy the entire .next directory from the build
+if (!fs.existsSync(appNextDir) || !fs.existsSync(path.join(appNextDir, 'server'))) {
+  console.log('Copying full .next directory to apps/frontend/.next...');
+  copyRecursive(buildDir, appNextDir);
 }
 
 // Copy public directory to static for CDN serving
