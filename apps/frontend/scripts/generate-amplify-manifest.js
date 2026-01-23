@@ -79,6 +79,7 @@ if (fs.existsSync(publicDir)) {
 }
 
 // Copy .next/static to static/_next/static for CDN serving
+const nextStaticDir = path.join(buildDir, 'static');
 if (fs.existsSync(nextStaticDir)) {
   copyRecursive(nextStaticDir, path.join(staticDir, '_next', 'static'));
 }
