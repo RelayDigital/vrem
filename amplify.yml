@@ -14,7 +14,7 @@ applications:
         build:
           commands:
             - npm run build
-            - npx @aws-amplify/adapter-nextjs
+            - node node_modules/@aws-amplify/adapter-nextjs/dist/bin/index.js
       artifacts:
         baseDirectory: .amplify-hosting
         files:
