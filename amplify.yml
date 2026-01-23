@@ -1,0 +1,24 @@
+# ============================================
+# VREM Frontend - AWS Amplify Build Spec
+# For Next.js 15 with App Router (SSR)
+# ============================================
+
+version: 1
+applications:
+  - appRoot: apps/frontend
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm install
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: .next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+          - .next/cache/**/*
