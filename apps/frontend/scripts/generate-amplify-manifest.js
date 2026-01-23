@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 /**
  * Generate deploy-manifest.json for AWS Amplify SSR deployment
- * Uses Next.js standalone output for minimal deployment size
+ * Uses Next.js standalone output - minimal deployment size
+ *
+ * IMPORTANT: Next.js 15 standalone output puts .next at ROOT level,
+ * the server.js expects to find .next relative to itself.
+ * Do NOT create duplicate copies at apps/frontend/.next
  */
 
 const fs = require('fs');
@@ -43,97 +47,44 @@ console.log('Copying standalone build output to .amplify-hosting...');
 if (fs.existsSync(standaloneDir)) {
   console.log('Standalone directory contents:', fs.readdirSync(standaloneDir).join(', '));
 
-  // Check what's in the standalone apps/frontend/.next directory
-  const standaloneAppNext = path.join(standaloneDir, 'apps', 'frontend', '.next');
-  if (fs.existsSync(standaloneAppNext)) {
-    console.log('Standalone .next contents:', fs.readdirSync(standaloneAppNext).join(', '));
+  // Check if standalone has .next at root (Next.js 15 standalone output)
+  const standaloneNextDir = path.join(standaloneDir, '.next');
+  if (fs.existsSync(standaloneNextDir)) {
+    console.log('Found .next at standalone root - using standalone structure as-is');
+    console.log('Standalone .next contents:', fs.readdirSync(standaloneNextDir).slice(0, 15).join(', '));
 
-    // Check for server directory in standalone
-    const standaloneServer = path.join(standaloneAppNext, 'server');
-    if (fs.existsSync(standaloneServer)) {
-      console.log('Standalone server dir contents:', fs.readdirSync(standaloneServer).slice(0, 15).join(', '));
+    // Check for server and app directories
+    const standaloneServerDir = path.join(standaloneNextDir, 'server');
+    if (fs.existsSync(standaloneServerDir)) {
+      console.log('Standalone server dir contents:', fs.readdirSync(standaloneServerDir).slice(0, 15).join(', '));
+
+      const standaloneAppDir = path.join(standaloneServerDir, 'app');
+      if (fs.existsSync(standaloneAppDir)) {
+        console.log('App Router pages found in standalone:', fs.readdirSync(standaloneAppDir).slice(0, 10).join(', '));
+      }
     }
-  } else {
-    console.log('Standalone .next directory not found at:', standaloneAppNext);
   }
 
-  // Copy the entire standalone directory (includes server.js and node_modules)
+  // Copy standalone directory (server.js, node_modules, .next)
+  // This is the complete deployment - no need to add extra copies
   copyRecursive(standaloneDir, computeDir);
 
-  // For monorepo, the actual app might be in apps/frontend subfolder
-  // We need to adjust the server.js to point to the right location
-  const standaloneAppDir = path.join(computeDir, 'apps', 'frontend');
-  if (fs.existsSync(standaloneAppDir)) {
-    console.log('Detected monorepo structure, adjusting paths...');
+  // Remove any apps folder if it exists (monorepo artifact we don't need)
+  const appsDir = path.join(computeDir, 'apps');
+  if (fs.existsSync(appsDir)) {
+    console.log('Removing unnecessary apps folder to save space...');
+    fs.rmSync(appsDir, { recursive: true, force: true });
   }
 } else {
   console.error('Standalone build not found. Make sure output: "standalone" is set in next.config.js');
   process.exit(1);
 }
 
-// The standalone output needs the full .next directory at apps/frontend/.next
-// This might not be included in standalone, so copy the entire .next build output
-const appNextDir = path.join(computeDir, 'apps', 'frontend', '.next');
-console.log('Checking .next in standalone:', fs.existsSync(appNextDir) ? 'exists' : 'missing');
-
-// Ensure apps/frontend directory exists
-const appFrontendDir = path.join(computeDir, 'apps', 'frontend');
-if (!fs.existsSync(appFrontendDir)) {
-  fs.mkdirSync(appFrontendDir, { recursive: true });
-}
-
-// Copy only essential .next files (to stay under 230MB limit)
-if (!fs.existsSync(appNextDir)) {
-  fs.mkdirSync(appNextDir, { recursive: true });
-}
-
-// Essential files/directories for App Router SSR
-const essentialItems = [
-  'server',           // Server-side rendering code (includes app/ for App Router)
-  'BUILD_ID',         // Build identifier
-  'build-manifest.json',
-  'prerender-manifest.json',
-  'react-loadable-manifest.json',
-  'routes-manifest.json',
-  'required-server-files.json',
-  'app-build-manifest.json',
-  'app-path-routes-manifest.json',
-  // Middleware files (critical for Clerk auth)
-  'middleware-manifest.json',
-  'middleware-build-manifest.json',
-  'next-minimal-server.js.nft.json',
-  'next-server.js.nft.json',
-  // Cache and trace files
-  'cache',
-  'trace'
-];
-
-console.log('Copying essential .next files...');
-console.log('Contents of buildDir:', fs.readdirSync(buildDir).join(', '));
-
-essentialItems.forEach(item => {
-  const src = path.join(buildDir, item);
-  const dest = path.join(appNextDir, item);
-  if (fs.existsSync(src)) {
-    copyRecursive(src, dest);
-    console.log(`  Copied: ${item}`);
-  } else {
-    console.log(`  Missing: ${item}`);
-  }
-});
-
-// Debug: Show what's in the server directory
-const serverDir = path.join(buildDir, 'server');
-if (fs.existsSync(serverDir)) {
-  console.log('Contents of .next/server:', fs.readdirSync(serverDir).join(', '));
-
-  // Check for App Router
-  const appDir = path.join(serverDir, 'app');
-  if (fs.existsSync(appDir)) {
-    console.log('App Router pages found:', fs.readdirSync(appDir).slice(0, 10).join(', '));
-  } else {
-    console.log('WARNING: No .next/server/app directory - App Router may not work!');
-  }
+// Verify the compute directory structure
+const computeNextDir = path.join(computeDir, '.next');
+console.log('Compute .next exists:', fs.existsSync(computeNextDir));
+if (fs.existsSync(computeNextDir)) {
+  console.log('Compute .next contents:', fs.readdirSync(computeNextDir).slice(0, 15).join(', '));
 }
 
 // Copy public directory to static for CDN serving
@@ -199,23 +150,24 @@ console.log('Generated deploy-manifest.json');
 console.log('Output directory:', outputDir);
 console.log('Compute dir contents:', fs.readdirSync(computeDir).join(', '));
 
-// Final diagnostics
+// Final diagnostics - check the actual .next at compute root
 console.log('\n=== Final .amplify-hosting structure ===');
-console.log('apps/frontend/.next contents:', fs.existsSync(appNextDir) ? fs.readdirSync(appNextDir).join(', ') : 'NOT FOUND');
+const finalNextDir = path.join(computeDir, '.next');
+console.log('.next contents:', fs.existsSync(finalNextDir) ? fs.readdirSync(finalNextDir).slice(0, 15).join(', ') : 'NOT FOUND');
 
-const finalServerDir = path.join(appNextDir, 'server');
+const finalServerDir = path.join(finalNextDir, 'server');
 if (fs.existsSync(finalServerDir)) {
-  console.log('apps/frontend/.next/server contents:', fs.readdirSync(finalServerDir).slice(0, 15).join(', '));
+  console.log('.next/server contents:', fs.readdirSync(finalServerDir).slice(0, 15).join(', '));
   const finalAppDir = path.join(finalServerDir, 'app');
   if (fs.existsSync(finalAppDir)) {
-    console.log('apps/frontend/.next/server/app found with', fs.readdirSync(finalAppDir).length, 'entries');
+    console.log('.next/server/app found with', fs.readdirSync(finalAppDir).length, 'entries');
   }
-}
 
-// Check for middleware in final build
-const middlewareManifest = path.join(appNextDir, 'server', 'middleware-manifest.json');
-if (fs.existsSync(middlewareManifest)) {
-  console.log('Middleware manifest found in server dir');
-} else {
-  console.log('WARNING: middleware-manifest.json not in server dir - middleware may not work');
+  // Check for middleware
+  const middlewareManifest = path.join(finalServerDir, 'middleware-manifest.json');
+  if (fs.existsSync(middlewareManifest)) {
+    console.log('Middleware manifest found');
+  } else {
+    console.log('WARNING: middleware-manifest.json missing');
+  }
 }
