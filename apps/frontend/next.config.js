@@ -1,7 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Required for Amplify SSR deployment
-  output: 'standalone',
   images: {
     remotePatterns: [
       {
