@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "node scripts/generate-amplify-manifest.js",
     "start": "next start",
     "lint": "eslint"
   },
