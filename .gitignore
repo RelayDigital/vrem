@@ -59,3 +59,4 @@ uploads/
 # --- AWS/S3 Credentials (if any) ---
 .aws/
 aws-credentials.json
+# Trigger rebuild Thu 22 Jan 2026 18:50:38 PST
