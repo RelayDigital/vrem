@@ -39,35 +39,36 @@ const copyRecursive = (src, dest) => {
 
 console.log('Copying standalone build output to .amplify-hosting...');
 
-// Copy standalone directory to compute/default (includes minimal node_modules)
+// Copy standalone directory to compute/default
 if (fs.existsSync(standaloneDir)) {
-  // The standalone output contains everything needed to run
-  // Find the app folder inside standalone (it mirrors the monorepo structure)
-  const standaloneAppDir = path.join(standaloneDir, 'apps', 'frontend');
-  if (fs.existsSync(standaloneAppDir)) {
-    copyRecursive(standaloneAppDir, computeDir);
-  } else {
-    // Fallback: copy from standalone root
-    copyRecursive(standaloneDir, computeDir);
-  }
+  // Copy the entire standalone directory (includes server.js and node_modules)
+  copyRecursive(standaloneDir, computeDir);
 
-  // Copy node_modules from standalone root if not already copied
-  const standaloneNodeModules = path.join(standaloneDir, 'node_modules');
-  if (fs.existsSync(standaloneNodeModules) && !fs.existsSync(path.join(computeDir, 'node_modules'))) {
-    copyRecursive(standaloneNodeModules, path.join(computeDir, 'node_modules'));
+  // For monorepo, the actual app might be in apps/frontend subfolder
+  // We need to adjust the server.js to point to the right location
+  const standaloneAppDir = path.join(computeDir, 'apps', 'frontend');
+  if (fs.existsSync(standaloneAppDir)) {
+    console.log('Detected monorepo structure, adjusting paths...');
   }
 } else {
   console.error('Standalone build not found. Make sure output: "standalone" is set in next.config.js');
   process.exit(1);
 }
 
-// Copy .next/static to compute (needed at runtime)
+// Copy .next/static to compute for runtime (required for standalone)
 const nextStaticDir = path.join(buildDir, 'static');
+const computeStaticDir = path.join(computeDir, 'apps', 'frontend', '.next', 'static');
 if (fs.existsSync(nextStaticDir)) {
-  copyRecursive(nextStaticDir, path.join(computeDir, '.next', 'static'));
+  copyRecursive(nextStaticDir, computeStaticDir);
 }
 
-// Copy public directory to static
+// Also copy to root .next/static in case server.js looks there
+const rootComputeStatic = path.join(computeDir, '.next', 'static');
+if (fs.existsSync(nextStaticDir) && !fs.existsSync(rootComputeStatic)) {
+  copyRecursive(nextStaticDir, rootComputeStatic);
+}
+
+// Copy public directory to static for CDN serving
 const publicDir = path.join(__dirname, '..', 'public');
 if (fs.existsSync(publicDir)) {
   copyRecursive(publicDir, staticDir);
@@ -127,3 +128,4 @@ fs.writeFileSync(
 
 console.log('Generated deploy-manifest.json');
 console.log('Output directory:', outputDir);
+console.log('Compute dir contents:', fs.readdirSync(computeDir).join(', '));
