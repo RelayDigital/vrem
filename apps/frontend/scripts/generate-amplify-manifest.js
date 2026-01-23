@@ -41,6 +41,22 @@ console.log('Copying standalone build output to .amplify-hosting...');
 
 // Copy standalone directory to compute/default
 if (fs.existsSync(standaloneDir)) {
+  console.log('Standalone directory contents:', fs.readdirSync(standaloneDir).join(', '));
+
+  // Check what's in the standalone apps/frontend/.next directory
+  const standaloneAppNext = path.join(standaloneDir, 'apps', 'frontend', '.next');
+  if (fs.existsSync(standaloneAppNext)) {
+    console.log('Standalone .next contents:', fs.readdirSync(standaloneAppNext).join(', '));
+
+    // Check for server directory in standalone
+    const standaloneServer = path.join(standaloneAppNext, 'server');
+    if (fs.existsSync(standaloneServer)) {
+      console.log('Standalone server dir contents:', fs.readdirSync(standaloneServer).slice(0, 15).join(', '));
+    }
+  } else {
+    console.log('Standalone .next directory not found at:', standaloneAppNext);
+  }
+
   // Copy the entire standalone directory (includes server.js and node_modules)
   copyRecursive(standaloneDir, computeDir);
 
@@ -73,7 +89,7 @@ if (!fs.existsSync(appNextDir)) {
 
 // Essential files/directories for App Router SSR
 const essentialItems = [
-  'server',           // Server-side rendering code
+  'server',           // Server-side rendering code (includes app/ for App Router)
   'BUILD_ID',         // Build identifier
   'build-manifest.json',
   'prerender-manifest.json',
@@ -81,18 +97,44 @@ const essentialItems = [
   'routes-manifest.json',
   'required-server-files.json',
   'app-build-manifest.json',
-  'app-path-routes-manifest.json'
+  'app-path-routes-manifest.json',
+  // Middleware files (critical for Clerk auth)
+  'middleware-manifest.json',
+  'middleware-build-manifest.json',
+  'next-minimal-server.js.nft.json',
+  'next-server.js.nft.json',
+  // Cache and trace files
+  'cache',
+  'trace'
 ];
 
 console.log('Copying essential .next files...');
+console.log('Contents of buildDir:', fs.readdirSync(buildDir).join(', '));
+
 essentialItems.forEach(item => {
   const src = path.join(buildDir, item);
   const dest = path.join(appNextDir, item);
   if (fs.existsSync(src)) {
     copyRecursive(src, dest);
     console.log(`  Copied: ${item}`);
+  } else {
+    console.log(`  Missing: ${item}`);
   }
 });
+
+// Debug: Show what's in the server directory
+const serverDir = path.join(buildDir, 'server');
+if (fs.existsSync(serverDir)) {
+  console.log('Contents of .next/server:', fs.readdirSync(serverDir).join(', '));
+
+  // Check for App Router
+  const appDir = path.join(serverDir, 'app');
+  if (fs.existsSync(appDir)) {
+    console.log('App Router pages found:', fs.readdirSync(appDir).slice(0, 10).join(', '));
+  } else {
+    console.log('WARNING: No .next/server/app directory - App Router may not work!');
+  }
+}
 
 // Copy public directory to static for CDN serving
 const publicDir = path.join(__dirname, '..', 'public');
@@ -156,3 +198,24 @@ fs.writeFileSync(
 console.log('Generated deploy-manifest.json');
 console.log('Output directory:', outputDir);
 console.log('Compute dir contents:', fs.readdirSync(computeDir).join(', '));
+
+// Final diagnostics
+console.log('\n=== Final .amplify-hosting structure ===');
+console.log('apps/frontend/.next contents:', fs.existsSync(appNextDir) ? fs.readdirSync(appNextDir).join(', ') : 'NOT FOUND');
+
+const finalServerDir = path.join(appNextDir, 'server');
+if (fs.existsSync(finalServerDir)) {
+  console.log('apps/frontend/.next/server contents:', fs.readdirSync(finalServerDir).slice(0, 15).join(', '));
+  const finalAppDir = path.join(finalServerDir, 'app');
+  if (fs.existsSync(finalAppDir)) {
+    console.log('apps/frontend/.next/server/app found with', fs.readdirSync(finalAppDir).length, 'entries');
+  }
+}
+
+// Check for middleware in final build
+const middlewareManifest = path.join(appNextDir, 'server', 'middleware-manifest.json');
+if (fs.existsSync(middlewareManifest)) {
+  console.log('Middleware manifest found in server dir');
+} else {
+  console.log('WARNING: middleware-manifest.json not in server dir - middleware may not work');
+}

@@ -14,12 +14,13 @@ RUN apk add --no-cache python3 make g++
 # Copy package files
 COPY package*.json ./
 COPY prisma ./prisma/
+COPY prisma.config.ts ./
 
 # Install all dependencies (including dev for build)
 RUN npm ci
 
 # Generate Prisma client
-RUN npx prisma generate
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
 
 # Copy source code
 COPY . .
@@ -40,9 +41,10 @@ RUN addgroup -g 1001 -S nodejs && \
 COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
-# Copy Prisma schema and generate client
+# Copy Prisma schema, config, and generate client
 COPY prisma ./prisma/
-RUN npx prisma generate
+COPY prisma.config.ts ./
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
 
 # Copy built application from builder
 COPY --from=builder /app/dist ./dist
