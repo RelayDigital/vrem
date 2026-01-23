@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * Generate deploy-manifest.json for AWS Amplify SSR deployment
- * This script creates the required manifest for Next.js 14/15 apps
- * Based on Amplify Hosting SSR deployment manifest schema
+ * Uses Next.js standalone output for minimal deployment size
  */
 
 const fs = require('fs');
 const path = require('path');
 
 const buildDir = path.join(__dirname, '..', '.next');
+const standaloneDir = path.join(buildDir, 'standalone');
 const outputDir = path.join(__dirname, '..', '.amplify-hosting');
 
 // Create output directories
@@ -37,22 +37,34 @@ const copyRecursive = (src, dest) => {
   }
 };
 
-console.log('Copying build output to .amplify-hosting...');
+console.log('Copying standalone build output to .amplify-hosting...');
 
-// Copy .next directory to compute/default
-copyRecursive(buildDir, path.join(computeDir, '.next'));
+// Copy standalone directory to compute/default (includes minimal node_modules)
+if (fs.existsSync(standaloneDir)) {
+  // The standalone output contains everything needed to run
+  // Find the app folder inside standalone (it mirrors the monorepo structure)
+  const standaloneAppDir = path.join(standaloneDir, 'apps', 'frontend');
+  if (fs.existsSync(standaloneAppDir)) {
+    copyRecursive(standaloneAppDir, computeDir);
+  } else {
+    // Fallback: copy from standalone root
+    copyRecursive(standaloneDir, computeDir);
+  }
 
-// Copy node_modules to compute/default
-const nodeModulesDir = path.join(__dirname, '..', 'node_modules');
-if (fs.existsSync(nodeModulesDir)) {
-  console.log('Copying node_modules...');
-  copyRecursive(nodeModulesDir, path.join(computeDir, 'node_modules'));
+  // Copy node_modules from standalone root if not already copied
+  const standaloneNodeModules = path.join(standaloneDir, 'node_modules');
+  if (fs.existsSync(standaloneNodeModules) && !fs.existsSync(path.join(computeDir, 'node_modules'))) {
+    copyRecursive(standaloneNodeModules, path.join(computeDir, 'node_modules'));
+  }
+} else {
+  console.error('Standalone build not found. Make sure output: "standalone" is set in next.config.js');
+  process.exit(1);
 }
 
-// Copy package.json to compute/default
-const packageJsonPath = path.join(__dirname, '..', 'package.json');
-if (fs.existsSync(packageJsonPath)) {
-  fs.copyFileSync(packageJsonPath, path.join(computeDir, 'package.json'));
+// Copy .next/static to compute (needed at runtime)
+const nextStaticDir = path.join(buildDir, 'static');
+if (fs.existsSync(nextStaticDir)) {
+  copyRecursive(nextStaticDir, path.join(computeDir, '.next', 'static'));
 }
 
 // Copy public directory to static
@@ -61,31 +73,21 @@ if (fs.existsSync(publicDir)) {
   copyRecursive(publicDir, staticDir);
 }
 
-// Copy .next/static to static/_next/static
-const nextStaticDir = path.join(buildDir, 'static');
+// Copy .next/static to static/_next/static for CDN serving
 if (fs.existsSync(nextStaticDir)) {
   copyRecursive(nextStaticDir, path.join(staticDir, '_next', 'static'));
-}
-
-// Read routes manifest
-const routesManifestPath = path.join(buildDir, 'routes-manifest.json');
-let routesManifest = {};
-if (fs.existsSync(routesManifestPath)) {
-  routesManifest = JSON.parse(fs.readFileSync(routesManifestPath, 'utf-8'));
 }
 
 // Generate Amplify deploy manifest v1
 const deployManifest = {
   version: 1,
   routes: [
-    // Static assets route
     {
       path: '/_next/static/*',
       target: {
         kind: 'Static'
       }
     },
-    // Public assets route
     {
       path: '/*.*',
       target: {
@@ -96,7 +98,6 @@ const deployManifest = {
         src: 'default'
       }
     },
-    // All other routes go to compute
     {
       path: '/*',
       target: {
@@ -124,38 +125,5 @@ fs.writeFileSync(
   JSON.stringify(deployManifest, null, 2)
 );
 
-// Create a simple server.js that starts Next.js
-const serverJs = `
-const { createServer } = require('http');
-const { parse } = require('url');
-const next = require('next');
-
-const dev = false;
-const hostname = '0.0.0.0';
-const port = parseInt(process.env.PORT, 10) || 3000;
-
-const app = next({ dev, hostname, port, dir: __dirname });
-const handle = app.getRequestHandler();
-
-app.prepare().then(() => {
-  createServer(async (req, res) => {
-    try {
-      const parsedUrl = parse(req.url, true);
-      await handle(req, res, parsedUrl);
-    } catch (err) {
-      console.error('Error occurred handling', req.url, err);
-      res.statusCode = 500;
-      res.end('Internal server error');
-    }
-  }).listen(port, (err) => {
-    if (err) throw err;
-    console.log(\`> Ready on http://\${hostname}:\${port}\`);
-  });
-});
-`;
-
-fs.writeFileSync(path.join(computeDir, 'server.js'), serverJs);
-
 console.log('Generated deploy-manifest.json');
-console.log('Generated server.js');
 console.log('Output directory:', outputDir);
