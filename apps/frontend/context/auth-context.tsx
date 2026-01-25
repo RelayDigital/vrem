@@ -399,12 +399,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("organizationId");
       setActiveOrganizationId(null);
 
-      // In development, use backend sign-in token to bypass Clerk's email verification requirement
-      // In production, only test accounts (@example.com) use this flow
-      const isTestAccount = credentials.email.toLowerCase().endsWith("@example.com");
+      // In development only, use backend sign-in token to bypass Clerk's email verification requirement
+      // In production, always use Clerk's direct sign-in flow for security
       const isDevelopment = process.env.NODE_ENV !== "production";
 
-      if (isDevelopment || isTestAccount) {
+      if (isDevelopment) {
         // Get sign-in token from backend
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/test-login`, {
           method: "POST",
