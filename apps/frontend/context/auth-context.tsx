@@ -12,13 +12,21 @@ import { User, OrganizationMember } from "@/types";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
+interface SecondFactorState {
+  required: boolean;
+  supportedStrategies: string[];
+}
+
 interface AuthContextType {
   user: User | null;
   memberships: OrganizationMember[];
   activeOrganizationId: string | null;
   token: string | null;
   isLoading: boolean;
+  secondFactor: SecondFactorState;
   login: (credentials: { email: string; password: string }) => Promise<void>;
+  attemptSecondFactor: (code: string, strategy?: string) => Promise<void>;
+  cancelSecondFactor: () => void;
   register: (data: {
     name: string;
     email: string;
@@ -48,6 +56,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   >(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [secondFactor, setSecondFactor] = useState<SecondFactorState>({
+    required: false,
+    supportedStrategies: [],
+  });
   const router = useRouter();
 
   // Clerk hooks
@@ -439,9 +451,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           supportedSecondFactors: result.supportedSecondFactors,
           firstFactorVerification: result.firstFactorVerification,
         });
-        throw new Error(
-          "This account requires email verification. Please check your email for a verification code."
-        );
+
+        // Extract supported strategies
+        const strategies = result.supportedSecondFactors?.map(
+          (factor: any) => factor.strategy
+        ) || [];
+
+        // Set state to show 2FA input
+        setSecondFactor({
+          required: true,
+          supportedStrategies: strategies,
+        });
+        setIsLoading(false);
+        return; // Don't throw - let the UI handle showing 2FA input
       } else if (result.status === "needs_first_factor") {
         console.log("Sign-in needs first factor:", result.supportedFirstFactors);
         throw new Error("Sign-in requires additional verification. Please try again.");
@@ -469,6 +491,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Note: No finally block - isLoading is handled by:
     // - catch block on error
     // - main useEffect after successful login + bootstrap
+  };
+
+  const attemptSecondFactor = async (code: string, strategy?: string) => {
+    if (!signIn || !setActiveSignIn) {
+      throw new Error("Clerk not initialized");
+    }
+
+    setIsLoading(true);
+    try {
+      // Determine the strategy to use
+      // Default to TOTP if available, otherwise use the first available strategy
+      const strategyToUse = strategy ||
+        (secondFactor.supportedStrategies.includes("totp") ? "totp" :
+         secondFactor.supportedStrategies[0]) || "totp";
+
+      console.log("Attempting second factor with strategy:", strategyToUse);
+
+      const result = await signIn.attemptSecondFactor({
+        strategy: strategyToUse as any,
+        code,
+      });
+
+      if (result.status === "complete") {
+        // Clear 2FA state
+        setSecondFactor({ required: false, supportedStrategies: [] });
+        // Set the active session
+        await setActiveSignIn({ session: result.createdSessionId });
+        router.push("/dashboard");
+      } else {
+        throw new Error(`Second factor verification incomplete: ${result.status}`);
+      }
+    } catch (error: any) {
+      setIsLoading(false);
+      console.error("Second factor verification failed:", error);
+      if (error.errors) {
+        throw new Error(error.errors[0]?.message || "Verification failed");
+      }
+      throw error;
+    }
+  };
+
+  const cancelSecondFactor = () => {
+    setSecondFactor({ required: false, supportedStrategies: [] });
+    setIsLoading(false);
   };
 
   const register = async (data: {
@@ -663,7 +729,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         activeOrganizationId,
         token,
         isLoading,
+        secondFactor,
         login,
+        attemptSecondFactor,
+        cancelSecondFactor,
         register,
         loginWithOAuth,
         completeOnboarding,

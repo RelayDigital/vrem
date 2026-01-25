@@ -12,6 +12,7 @@ import {
   FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { ArrowLeft } from "lucide-react"
 
 import Link from "next/link"
 
@@ -19,9 +20,10 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
-  const { login, loginWithOAuth, isLoading } = useAuth()
+  const { login, loginWithOAuth, attemptSecondFactor, cancelSecondFactor, secondFactor, isLoading } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [twoFactorCode, setTwoFactorCode] = useState("")
   const [error, setError] = useState("")
   const [oauthError, setOauthError] = useState("")
 
@@ -31,9 +33,26 @@ export function LoginForm({
 
     try {
       await login({ email, password })
-    } catch (err) {
-      setError("Invalid email or password")
+    } catch (err: any) {
+      setError(err.message || "Invalid email or password")
     }
+  }
+
+  const handleTwoFactorSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError("")
+
+    try {
+      await attemptSecondFactor(twoFactorCode)
+    } catch (err: any) {
+      setError(err.message || "Invalid verification code")
+    }
+  }
+
+  const handleCancelTwoFactor = () => {
+    setTwoFactorCode("")
+    setError("")
+    cancelSecondFactor()
   }
 
   const handleOAuth = async (provider: "google" | "facebook") => {
@@ -43,6 +62,61 @@ export function LoginForm({
     } catch (err: any) {
       setOauthError(err.message || `${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-in failed. Please try again.`)
     }
+  }
+
+  // Show 2FA form if required
+  if (secondFactor.required) {
+    const strategyLabel = secondFactor.supportedStrategies.includes("totp")
+      ? "authenticator app"
+      : "email";
+
+    return (
+      <form className={cn("flex flex-col gap-6", className)} onSubmit={handleTwoFactorSubmit} {...props}>
+        <FieldGroup>
+          <div className="flex flex-col items-center gap-1 text-center">
+            <h1 className="text-2xl font-bold">Two-factor authentication</h1>
+            <p className="text-muted-foreground text-sm text-balance">
+              Enter the verification code from your {strategyLabel}
+            </p>
+          </div>
+          {error && (
+            <div className="text-red-500 text-sm font-medium text-center">{error}</div>
+          )}
+          <Field>
+            <FieldLabel htmlFor="twoFactorCode">Verification code</FieldLabel>
+            <Input
+              id="twoFactorCode"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="one-time-code"
+              placeholder="000000"
+              required
+              value={twoFactorCode}
+              onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              className="text-center text-lg tracking-widest"
+            />
+          </Field>
+          <Field>
+            <Button type="submit" disabled={isLoading || twoFactorCode.length < 6}>
+              {isLoading ? "Verifying..." : "Verify"}
+            </Button>
+          </Field>
+          <Field>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={handleCancelTwoFactor}
+              disabled={isLoading}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to login
+            </Button>
+          </Field>
+        </FieldGroup>
+      </form>
+    )
   }
 
   return (
