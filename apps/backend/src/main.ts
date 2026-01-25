@@ -23,11 +23,19 @@ async function bootstrap() {
     'http://localhost:3001',
   ].filter(Boolean);
 
-  // Add production URL if configured
-  const productionUrl = process.env.PRODUCTION_API_URL;
-  if (productionUrl) {
-    allowedOrigins.push(productionUrl);
+  // Add production frontend URL if configured
+  const productionFrontendUrl = process.env.PRODUCTION_FRONTEND_URL;
+  if (productionFrontendUrl) {
+    allowedOrigins.push(productionFrontendUrl);
   }
+
+  // Add any additional allowed origins from env (comma-separated)
+  const additionalOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean);
+  if (additionalOrigins) {
+    allowedOrigins.push(...additionalOrigins);
+  }
+
+  logger.log(`CORS allowed origins: ${allowedOrigins.join(', ')}`);
 
   app.enableCors({
     origin: (origin, callback) => {
@@ -37,6 +45,14 @@ async function bootstrap() {
       }
       // Allow if origin is in our list
       if (allowedOrigins.some(allowed => origin.startsWith(allowed.replace(/\/$/, '')))) {
+        return callback(null, true);
+      }
+      // Allow Vercel preview deployments (*.vercel.app)
+      if (origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+      // Allow Amplify deployments (*.amplifyapp.com)
+      if (origin.endsWith('.amplifyapp.com')) {
         return callback(null, true);
       }
       // Allow any localhost origin in development only
