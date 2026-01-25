@@ -52,8 +52,11 @@ export function SignupForm({
 
   const handleOAuth = async (provider: "google" | "facebook") => {
     setOauthError("")
-    // TODO: Implement real OAuth flow with Google/Facebook SDK
-    setOauthError(`${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-in is not yet configured. Please use email/password signup.`)
+    try {
+      await loginWithOAuth(provider, { token: "" })
+    } catch (err: any) {
+      setOauthError(err.message || `${provider.charAt(0).toUpperCase() + provider.slice(1)} sign-up failed. Please try again.`)
+    }
   }
 
   const accountOptions: { value: AccountType; title: string; subtitle: string }[] = [
@@ -193,7 +196,7 @@ export function SignupForm({
             <div className="text-red-500 text-sm font-medium text-center mt-2">{oauthError}</div>
           )}
           <FieldDescription className="px-6 text-center mt-2">
-            Already have an account? <Link href="/">Sign in</Link>
+            Already have an account? <Link href="/sign-in" className="underline underline-offset-4">Sign in</Link>
           </FieldDescription>
         </Field>
       </FieldGroup>
