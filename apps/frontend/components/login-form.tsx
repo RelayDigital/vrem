@@ -20,12 +20,13 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
-  const { login, loginWithOAuth, attemptSecondFactor, cancelSecondFactor, secondFactor, isLoading } = useAuth()
+  const { login, loginWithOAuth, attemptSecondFactor, resendSecondFactorCode, cancelSecondFactor, secondFactor, isLoading } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [twoFactorCode, setTwoFactorCode] = useState("")
   const [error, setError] = useState("")
   const [oauthError, setOauthError] = useState("")
+  const [resendMessage, setResendMessage] = useState("")
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -52,7 +53,19 @@ export function LoginForm({
   const handleCancelTwoFactor = () => {
     setTwoFactorCode("")
     setError("")
+    setResendMessage("")
     cancelSecondFactor()
+  }
+
+  const handleResendCode = async () => {
+    setError("")
+    setResendMessage("")
+    try {
+      await resendSecondFactorCode()
+      setResendMessage("Verification code sent!")
+    } catch (err: any) {
+      setError(err.message || "Failed to resend code")
+    }
   }
 
   const handleOAuth = async (provider: "google" | "facebook") => {
@@ -66,9 +79,28 @@ export function LoginForm({
 
   // Show 2FA form if required
   if (secondFactor.required) {
-    const strategyLabel = secondFactor.supportedStrategies.includes("totp")
-      ? "authenticator app"
-      : "email";
+    const isTotp = secondFactor.currentStrategy === "totp";
+    const isEmailCode = secondFactor.currentStrategy === "email_code";
+    const isPhoneCode = secondFactor.currentStrategy === "phone_code";
+
+    let strategyLabel: string;
+    let strategyDescription: string;
+
+    if (isTotp) {
+      strategyLabel = "authenticator app";
+      strategyDescription = "Enter the 6-digit code from your authenticator app";
+    } else if (isEmailCode) {
+      const emailHint = secondFactor.emailHint ? ` to ${secondFactor.emailHint}` : "";
+      strategyLabel = "email";
+      strategyDescription = `We've sent a verification code${emailHint}`;
+    } else if (isPhoneCode) {
+      const phoneHint = secondFactor.phoneHint ? ` to ${secondFactor.phoneHint}` : "";
+      strategyLabel = "phone";
+      strategyDescription = `We've sent a verification code${phoneHint}`;
+    } else {
+      strategyLabel = "verification";
+      strategyDescription = "Enter the verification code";
+    }
 
     return (
       <form className={cn("flex flex-col gap-6", className)} onSubmit={handleTwoFactorSubmit} {...props}>
@@ -76,11 +108,14 @@ export function LoginForm({
           <div className="flex flex-col items-center gap-1 text-center">
             <h1 className="text-2xl font-bold">Two-factor authentication</h1>
             <p className="text-muted-foreground text-sm text-balance">
-              Enter the verification code from your {strategyLabel}
+              {strategyDescription}
             </p>
           </div>
           {error && (
             <div className="text-red-500 text-sm font-medium text-center">{error}</div>
+          )}
+          {resendMessage && (
+            <div className="text-green-600 text-sm font-medium text-center">{resendMessage}</div>
           )}
           <Field>
             <FieldLabel htmlFor="twoFactorCode">Verification code</FieldLabel>
@@ -102,6 +137,19 @@ export function LoginForm({
               {isLoading ? "Verifying..." : "Verify"}
             </Button>
           </Field>
+          {(isEmailCode || isPhoneCode) && (
+            <Field>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleResendCode}
+                disabled={isLoading}
+              >
+                Resend code
+              </Button>
+            </Field>
+          )}
           <Field>
             <Button
               type="button"

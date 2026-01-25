@@ -15,6 +15,9 @@ import { useRouter } from "next/navigation";
 interface SecondFactorState {
   required: boolean;
   supportedStrategies: string[];
+  currentStrategy: string | null;
+  emailHint?: string;
+  phoneHint?: string;
 }
 
 interface AuthContextType {
@@ -26,6 +29,7 @@ interface AuthContextType {
   secondFactor: SecondFactorState;
   login: (credentials: { email: string; password: string }) => Promise<void>;
   attemptSecondFactor: (code: string, strategy?: string) => Promise<void>;
+  resendSecondFactorCode: () => Promise<void>;
   cancelSecondFactor: () => void;
   register: (data: {
     name: string;
@@ -59,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [secondFactor, setSecondFactor] = useState<SecondFactorState>({
     required: false,
     supportedStrategies: [],
+    currentStrategy: null,
   });
   const router = useRouter();
 
@@ -452,15 +457,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           firstFactorVerification: result.firstFactorVerification,
         });
 
-        // Extract supported strategies
-        const strategies = result.supportedSecondFactors?.map(
-          (factor: any) => factor.strategy
-        ) || [];
+        // Extract supported strategies and hints
+        const factors = result.supportedSecondFactors || [];
+        const strategies = factors.map((factor: any) => factor.strategy);
+
+        // Find email and phone hints if available
+        const emailFactor = factors.find((f: any) => f.strategy === "email_code");
+        const phoneFactor = factors.find((f: any) => f.strategy === "phone_code");
+        const emailHint = emailFactor?.safeIdentifier || emailFactor?.emailAddressId;
+        const phoneHint = phoneFactor?.safeIdentifier || phoneFactor?.phoneNumberId;
+
+        // Determine which strategy to use - prefer TOTP, then email, then phone
+        let strategyToUse: string;
+        if (strategies.includes("totp")) {
+          strategyToUse = "totp";
+        } else if (strategies.includes("email_code")) {
+          strategyToUse = "email_code";
+        } else if (strategies.includes("phone_code")) {
+          strategyToUse = "phone_code";
+        } else {
+          strategyToUse = strategies[0] || "totp";
+        }
+
+        // For email_code and phone_code, we need to prepare (send the code)
+        if (strategyToUse === "email_code" || strategyToUse === "phone_code") {
+          console.log(`Preparing ${strategyToUse} second factor...`);
+          await signIn.prepareSecondFactor({
+            strategy: strategyToUse as "email_code" | "phone_code",
+          });
+          console.log(`${strategyToUse} verification code sent`);
+        }
 
         // Set state to show 2FA input
         setSecondFactor({
           required: true,
           supportedStrategies: strategies,
+          currentStrategy: strategyToUse,
+          emailHint,
+          phoneHint,
         });
         setIsLoading(false);
         return; // Don't throw - let the UI handle showing 2FA input
@@ -500,9 +534,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setIsLoading(true);
     try {
-      // Determine the strategy to use
-      // Default to TOTP if available, otherwise use the first available strategy
-      const strategyToUse = strategy ||
+      // Use the provided strategy, current strategy from state, or determine from supported strategies
+      const strategyToUse = strategy || secondFactor.currentStrategy ||
         (secondFactor.supportedStrategies.includes("totp") ? "totp" :
          secondFactor.supportedStrategies[0]) || "totp";
 
@@ -515,7 +548,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (result.status === "complete") {
         // Clear 2FA state
-        setSecondFactor({ required: false, supportedStrategies: [] });
+        setSecondFactor({ required: false, supportedStrategies: [], currentStrategy: null });
         // Set the active session
         await setActiveSignIn({ session: result.createdSessionId });
         router.push("/dashboard");
@@ -532,8 +565,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const resendSecondFactorCode = async () => {
+    if (!signIn) {
+      throw new Error("Clerk not initialized");
+    }
+
+    const strategy = secondFactor.currentStrategy;
+    if (strategy !== "email_code" && strategy !== "phone_code") {
+      throw new Error("Resend is only available for email or phone verification");
+    }
+
+    setIsLoading(true);
+    try {
+      console.log(`Resending ${strategy} verification code...`);
+      await signIn.prepareSecondFactor({
+        strategy: strategy as "email_code" | "phone_code",
+      });
+      console.log(`${strategy} verification code resent`);
+    } catch (error: any) {
+      console.error("Failed to resend code:", error);
+      if (error.errors) {
+        throw new Error(error.errors[0]?.message || "Failed to resend code");
+      }
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const cancelSecondFactor = () => {
-    setSecondFactor({ required: false, supportedStrategies: [] });
+    setSecondFactor({ required: false, supportedStrategies: [], currentStrategy: null });
     setIsLoading(false);
   };
 
@@ -732,6 +793,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         secondFactor,
         login,
         attemptSecondFactor,
+        resendSecondFactorCode,
         cancelSecondFactor,
         register,
         loginWithOAuth,
