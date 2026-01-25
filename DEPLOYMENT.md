@@ -1,6 +1,6 @@
 # VREM - Complete Manual Deployment Guide
 
-This guide provides step-by-step instructions for manually deploying the VREM application to AWS.
+This guide provides step-by-step instructions for manually deploying the VREM application using Vercel (frontend) and AWS (backend).
 
 ---
 
@@ -11,7 +11,7 @@ This guide provides step-by-step instructions for manually deploying the VREM ap
 3. [Part 1: AWS Account Setup](#part-1-aws-account-setup)
 4. [Part 2: Backend Deployment (ECS Fargate)](#part-2-backend-deployment-ecs-fargate)
 5. [Part 3: Database Setup (RDS PostgreSQL)](#part-3-database-setup-rds-postgresql)
-6. [Part 4: Frontend Deployment (AWS Amplify)](#part-4-frontend-deployment-aws-amplify)
+6. [Part 4: Frontend Deployment (Vercel)](#part-4-frontend-deployment-vercel)
 7. [Part 5: Domain & SSL Configuration](#part-5-domain--ssl-configuration)
 8. [Part 6: Third-Party Services Configuration](#part-6-third-party-services-configuration)
 9. [Ongoing Operations](#ongoing-operations)
@@ -50,6 +50,9 @@ npm --version
 
 # 4. Git
 git --version
+
+# 5. Vercel CLI (optional, for CLI deployments)
+npm install -g vercel
 ```
 
 ### Required Accounts
@@ -58,7 +61,8 @@ You'll need accounts with these services:
 
 | Service | Purpose | Sign Up URL |
 |---------|---------|-------------|
-| **AWS** | Cloud hosting | https://aws.amazon.com/ |
+| **AWS** | Backend hosting, database | https://aws.amazon.com/ |
+| **Vercel** | Frontend hosting | https://vercel.com/ |
 | **Clerk** | Authentication | https://dashboard.clerk.com/ |
 | **Stripe** | Payments | https://dashboard.stripe.com/ |
 | **Resend** | Email delivery | https://resend.com/ |
@@ -100,7 +104,7 @@ UPLOADCARE_PRIVATE_KEY=xxxxx
                     │                             │
                     ▼                             ▼
          ┌──────────────────┐         ┌──────────────────────────┐
-         │   AWS Amplify    │         │  Application Load        │
+         │     Vercel       │         │  Application Load        │
          │   (Frontend)     │         │  Balancer (ALB)          │
          │   Next.js SSR    │         │  Port 80 → 443           │
          └──────────────────┘         └──────────────────────────┘
@@ -119,6 +123,11 @@ UPLOADCARE_PRIVATE_KEY=xxxxx
                           │  PostgreSQL  │ │   Manager    │ │   Logs   │
                           └──────────────┘ └──────────────┘ └──────────┘
 ```
+
+**Why This Architecture?**
+- **Vercel**: Native Next.js platform with zero-config SSR, edge functions, and excellent Clerk integration
+- **AWS ECS Fargate**: Serverless containers for the NestJS backend - no server management
+- **AWS RDS**: Managed PostgreSQL with automated backups and scaling
 
 ---
 
@@ -174,9 +183,6 @@ aws iam attach-user-policy --user-name vrem-deployer \
 aws iam attach-user-policy --user-name vrem-deployer \
   --policy-arn arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess
 
-aws iam attach-user-policy --user-name vrem-deployer \
-  --policy-arn arn:aws:iam::aws:policy/AdministratorAccess-Amplify
-
 # Create access key for CLI use
 aws iam create-access-key --user-name vrem-deployer
 ```
@@ -203,13 +209,6 @@ aws ecr create-repository \
 # Verify creation
 aws ecr describe-repositories --repository-names vrem-backend --region $AWS_REGION
 ```
-
-**Console Alternative:**
-1. Go to: https://console.aws.amazon.com/ecr/
-2. Click "Create repository"
-3. Name: `vrem-backend`
-4. Enable "Scan on push"
-5. Click "Create repository"
 
 ### Step 2.2: Build and Push Docker Image
 
@@ -307,13 +306,6 @@ aws secretsmanager put-secret-value \
   --region $AWS_REGION
 ```
 
-**Console Alternative:**
-1. Go to: https://console.aws.amazon.com/secretsmanager/
-2. Click "Store a new secret"
-3. Select "Other type of secret"
-4. Enter key/value pairs
-5. Name the secret (e.g., `vrem/clerk-secret`)
-
 ### Step 2.4: Create ECS Cluster
 
 ```bash
@@ -328,13 +320,6 @@ aws ecs create-cluster \
 # Verify
 aws ecs describe-clusters --clusters vrem-production --region $AWS_REGION
 ```
-
-**Console Alternative:**
-1. Go to: https://console.aws.amazon.com/ecs/
-2. Click "Create cluster"
-3. Name: `vrem-production`
-4. Infrastructure: AWS Fargate (serverless)
-5. Click "Create"
 
 ### Step 2.5: Create CloudWatch Log Group
 
@@ -405,8 +390,6 @@ aws iam put-role-policy \
 
 ### Step 2.7: Get VPC and Subnet Information
 
-You'll need VPC details for ALB and ECS:
-
 ```bash
 # Get default VPC ID
 export VPC_ID=$(aws ec2 describe-vpcs \
@@ -436,8 +419,6 @@ echo "Subnet 2: $SUBNET_2"
 ```
 
 ### Step 2.8: Create Security Groups
-
-Create security groups for ALB and backend:
 
 ```bash
 # Security group for ALB (allows HTTP/HTTPS from internet)
@@ -543,8 +524,6 @@ aws elbv2 create-listener \
 ```
 
 ### Step 2.10: Create ECS Task Definition
-
-Create the task definition JSON file:
 
 ```bash
 # Get secret ARNs
@@ -693,21 +672,11 @@ aws ec2 authorize-security-group-ingress \
   --port 5432 \
   --source-group $BACKEND_SG_ID \
   --region $AWS_REGION
-
-# (Optional) Allow from your IP for direct access during setup
-# Replace YOUR_IP with your actual IP (find it at https://checkip.amazonaws.com)
-# aws ec2 authorize-security-group-ingress \
-#   --group-id $RDS_SG_ID \
-#   --protocol tcp \
-#   --port 5432 \
-#   --cidr YOUR_IP/32 \
-#   --region $AWS_REGION
 ```
 
 ### Step 3.2: Create DB Subnet Group
 
 ```bash
-# Create subnet group for RDS
 aws rds create-db-subnet-group \
   --db-subnet-group-name vrem-db-subnet-group \
   --db-subnet-group-description "Subnet group for VREM database" \
@@ -750,7 +719,7 @@ echo "RDS instance creation started. This takes 5-10 minutes..."
 ### Step 3.4: Wait for RDS and Get Endpoint
 
 ```bash
-# Wait for RDS to be available (check periodically)
+# Wait for RDS to be available
 aws rds wait db-instance-available \
   --db-instance-identifier vrem-production \
   --region $AWS_REGION
@@ -774,7 +743,6 @@ echo "DATABASE_URL: $DATABASE_URL"
 ### Step 3.5: Update Database URL Secret
 
 ```bash
-# Update the secret with real database URL
 aws secretsmanager put-secret-value \
   --secret-id vrem/database-url \
   --secret-string "$DATABASE_URL" \
@@ -785,12 +753,8 @@ echo "Database URL secret updated!"
 
 ### Step 3.6: Run Database Migrations
 
-You have two options:
-
-**Option A: Run as ECS Task (Recommended)**
-
 ```bash
-# Run migration as one-off task
+# Run migration as one-off ECS task
 aws ecs run-task \
   --cluster vrem-production \
   --task-definition vrem-backend \
@@ -808,25 +772,6 @@ aws ecs run-task \
 aws logs tail /ecs/vrem-backend --follow --region $AWS_REGION
 ```
 
-**Option B: Run Locally (if RDS is publicly accessible)**
-
-```bash
-# Set DATABASE_URL
-export DATABASE_URL="postgresql://vrem_admin:${DB_PASSWORD}@${RDS_ENDPOINT}:5432/vrem"
-
-# Navigate to backend
-cd apps/backend
-
-# Generate Prisma client
-npx prisma generate
-
-# Run migrations
-npx prisma migrate deploy
-
-# Verify
-npx prisma migrate status
-```
-
 ### Step 3.7: Force New Backend Deployment
 
 After updating the database secret, restart the backend:
@@ -841,115 +786,118 @@ aws ecs update-service \
 
 ---
 
-## Part 4: Frontend Deployment (AWS Amplify)
+## Part 4: Frontend Deployment (Vercel)
 
-### Step 4.1: Create Amplify App
+Vercel is the native platform for Next.js and provides zero-config deployment with excellent performance.
 
-**Via Console (Recommended for first-time setup):**
+### Step 4.1: Connect Repository to Vercel
 
-1. Go to: https://console.aws.amazon.com/amplify/
-2. Click "Create new app"
-3. Select "Host web app"
-4. Choose "GitHub" as the repository source
-5. Authorize AWS Amplify to access your GitHub
-6. Select repository: `your-username/vrem`
-7. Select branch: `main`
-8. **Important:** Set App root to `apps/frontend`
-9. Click "Next"
+**Via Vercel Dashboard (Recommended):**
 
-**Build Settings:**
-The `amplify.yml` in `apps/frontend/` will be auto-detected. If not, use:
+1. Go to https://vercel.com/new
+2. Click "Import Git Repository"
+3. Select your GitHub/GitLab/Bitbucket account
+4. Choose the `vrem` repository
+5. Configure the project:
+   - **Framework Preset**: Next.js (auto-detected)
+   - **Root Directory**: `apps/frontend`
+   - **Build Command**: `npm run build` (default)
+   - **Output Directory**: `.next` (default)
+6. Click "Deploy"
 
-```yaml
-version: 1
-applications:
-  - appRoot: apps/frontend
-    frontend:
-      phases:
-        preBuild:
-          commands:
-            - npm ci
-        build:
-          commands:
-            - npm run build
-      artifacts:
-        baseDirectory: .next
-        files:
-          - '**/*'
-      cache:
-        paths:
-          - node_modules/**/*
-          - .next/cache/**/*
+**Via Vercel CLI:**
+
+```bash
+# Login to Vercel
+vercel login
+
+# Navigate to frontend directory
+cd apps/frontend
+
+# Link to Vercel (creates new project)
+vercel link
+
+# Deploy to production
+vercel --prod
 ```
 
 ### Step 4.2: Configure Environment Variables
 
-In the Amplify Console:
+In the Vercel Dashboard:
 
-1. Go to your app → Hosting → Environment variables
-2. Click "Manage variables"
-3. Add each variable:
+1. Go to your project → Settings → Environment Variables
+2. Add the following variables for **Production** environment:
 
-| Variable | Value |
-|----------|-------|
-| `NEXT_PUBLIC_API_URL` | `http://your-alb-dns.us-east-1.elb.amazonaws.com` |
-| `NEXT_PUBLIC_USE_PRODUCTION_API` | `true` |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_live_xxxxx` |
-| `CLERK_SECRET_KEY` | `sk_live_xxxxx` |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | `/login` |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | `/signup` |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | `/dashboard` |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | `/dashboard` |
-| `NEXT_PUBLIC_MAPBOX_TOKEN` | `pk.xxxxx` |
-| `NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY` | `xxxxx` |
+| Variable | Value | Notes |
+|----------|-------|-------|
+| `NEXT_PUBLIC_API_URL` | `https://api.yourdomain.com` | Your backend ALB URL |
+| `NEXT_PUBLIC_USE_PRODUCTION_API` | `true` | |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_live_xxxxx` | From Clerk Dashboard |
+| `CLERK_SECRET_KEY` | `sk_live_xxxxx` | From Clerk Dashboard |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | `/login` | |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | `/signup` | |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | `/dashboard` | |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | `/dashboard` | |
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | `pk.xxxxx` | From Mapbox |
+| `NEXT_PUBLIC_UPLOADCARE_PUBLIC_KEY` | `xxxxx` | From Uploadcare |
 
-4. Click "Save"
+3. Click "Save"
 
-### Step 4.3: Deploy Frontend
-
-The first deployment happens automatically when you connect the repository.
-
-**Manual trigger:**
-```bash
-# Get app ID (from console or CLI)
-export AMPLIFY_APP_ID="your-app-id"
-
-# Trigger deployment
-aws amplify start-job \
-  --app-id $AMPLIFY_APP_ID \
-  --branch-name main \
-  --job-type RELEASE \
-  --region $AWS_REGION
-```
-
-### Step 4.4: Get Frontend URL
-
-After deployment completes:
+**Via Vercel CLI:**
 
 ```bash
-# Get the default domain
-aws amplify get-branch \
-  --app-id $AMPLIFY_APP_ID \
-  --branch-name main \
-  --query 'branch.displayName' \
-  --output text \
-  --region $AWS_REGION
+# Add environment variables
+vercel env add NEXT_PUBLIC_API_URL production
+vercel env add CLERK_SECRET_KEY production
+# ... repeat for each variable
 ```
 
-Your frontend will be available at:
-`https://main.{app-id}.amplifyapp.com`
+### Step 4.3: Configure Project Settings
+
+In Vercel Dashboard → Settings:
+
+1. **General**:
+   - Root Directory: `apps/frontend`
+   - Framework Preset: Next.js
+
+2. **Git**:
+   - Production Branch: `main`
+   - Automatic deployments enabled
+
+3. **Functions** (optional):
+   - Region: Choose closest to your users (e.g., `iad1` for US East)
+
+### Step 4.4: Trigger Deployment
+
+Deployments happen automatically on push to `main`. For manual deployment:
+
+```bash
+# Via CLI
+cd apps/frontend
+vercel --prod
+
+# Or trigger from dashboard
+# Go to Deployments → Create Deployment
+```
+
+### Step 4.5: Get Frontend URL
+
+After deployment, your frontend will be available at:
+- **Production**: `https://your-project.vercel.app`
+- **Preview**: `https://your-project-git-branch.vercel.app`
+
+To use a custom domain, see [Part 5: Domain Configuration](#step-54-configure-custom-domain-in-vercel).
 
 ---
 
 ## Part 5: Domain & SSL Configuration
 
-### Step 5.1: Request SSL Certificate (ACM)
+### Step 5.1: Request SSL Certificate for Backend (ACM)
 
 ```bash
-# Request certificate for your domain
+# Request certificate for API domain
 aws acm request-certificate \
   --domain-name api.yourdomain.com \
-  --subject-alternative-names yourdomain.com www.yourdomain.com \
   --validation-method DNS \
   --region $AWS_REGION
 
@@ -979,28 +927,28 @@ aws elbv2 create-listener \
   --default-actions Type=forward,TargetGroupArn=$TG_ARN \
   --region $AWS_REGION
 
-# Redirect HTTP to HTTPS (optional but recommended)
-# First, get the HTTP listener ARN
+# Redirect HTTP to HTTPS
 HTTP_LISTENER_ARN=$(aws elbv2 describe-listeners \
   --load-balancer-arn $ALB_ARN \
   --query 'Listeners[?Port==`80`].ListenerArn' \
   --output text \
   --region $AWS_REGION)
 
-# Modify HTTP listener to redirect
 aws elbv2 modify-listener \
   --listener-arn $HTTP_LISTENER_ARN \
   --default-actions Type=redirect,RedirectConfig='{Protocol=HTTPS,Port=443,StatusCode=HTTP_301}' \
   --region $AWS_REGION
 ```
 
-### Step 5.4: Configure Custom Domain in Amplify
+### Step 5.4: Configure Custom Domain in Vercel
 
-1. In Amplify Console, go to your app
-2. Click "Domain management" in the left sidebar
-3. Click "Add domain"
-4. Enter your domain name
-5. Follow the instructions to configure DNS
+1. In Vercel Dashboard, go to your project → Settings → Domains
+2. Click "Add Domain"
+3. Enter your domain (e.g., `yourdomain.com` or `app.yourdomain.com`)
+4. Vercel will provide DNS records to add:
+   - For apex domain: Add an `A` record pointing to Vercel's IP
+   - For subdomain: Add a `CNAME` record pointing to `cname.vercel-dns.com`
+5. Vercel automatically provisions SSL certificates
 
 ### Step 5.5: Update Environment Variables
 
@@ -1010,7 +958,7 @@ After setting up domains, update:
 - `FRONTEND_URL`: `https://yourdomain.com`
 - `API_URL`: `https://api.yourdomain.com`
 
-**Frontend (Amplify):**
+**Frontend (Vercel):**
 - `NEXT_PUBLIC_API_URL`: `https://api.yourdomain.com`
 
 ---
@@ -1022,16 +970,19 @@ After setting up domains, update:
 1. Go to https://dashboard.clerk.com
 2. Create or select your application
 3. Go to Settings → Domains
-4. Add your production domain
-5. Update JWT settings if needed
-6. Copy the production keys to AWS Secrets Manager
+4. Add your production domains:
+   - Frontend: `yourdomain.com`
+   - Backend: `api.yourdomain.com`
+5. Copy the production keys and update:
+   - Vercel environment variables
+   - AWS Secrets Manager
 
 ### Step 6.2: Configure Stripe Webhook
 
 1. Go to https://dashboard.stripe.com/webhooks
 2. Click "Add endpoint"
 3. Endpoint URL: `https://api.yourdomain.com/payments/webhook`
-4. Select events to listen for:
+4. Select events:
    - `checkout.session.completed`
    - `customer.subscription.created`
    - `customer.subscription.updated`
@@ -1090,23 +1041,16 @@ aws logs get-log-events \
   --limit 100
 ```
 
-### Check Service Health
+### View Frontend Logs
 
+In Vercel Dashboard:
+1. Go to your project → Deployments
+2. Click on a deployment → Functions tab
+3. View function logs and errors
+
+Or via CLI:
 ```bash
-# ECS service status
-aws ecs describe-services \
-  --cluster vrem-production \
-  --services vrem-backend \
-  --query 'services[0].{status:status,running:runningCount,desired:desiredCount}' \
-  --region $AWS_REGION
-
-# Health endpoint
-curl https://api.yourdomain.com/health
-
-# Target group health
-aws elbv2 describe-target-health \
-  --target-group-arn $TG_ARN \
-  --region $AWS_REGION
+vercel logs your-project.vercel.app
 ```
 
 ### Deploy New Backend Version
@@ -1132,32 +1076,16 @@ aws ecs update-service \
   --service vrem-backend \
   --force-new-deployment \
   --region $AWS_REGION
-
-# 5. Monitor deployment (optional)
-watch -n 5 'aws ecs describe-services \
-  --cluster vrem-production \
-  --services vrem-backend \
-  --query "services[0].{running:runningCount,pending:pendingCount,desired:desiredCount}" \
-  --region us-east-1'
-```
-
-Or use the deployment script:
-```bash
-export AWS_ACCOUNT_ID=your-account-id
-./scripts/deploy-backend.sh
 ```
 
 ### Deploy New Frontend Version
 
 Frontend deploys automatically when you push to `main`.
 
-Manual trigger:
+Manual deployment:
 ```bash
-aws amplify start-job \
-  --app-id $AMPLIFY_APP_ID \
-  --branch-name main \
-  --job-type RELEASE \
-  --region $AWS_REGION
+cd apps/frontend
+vercel --prod
 ```
 
 ### Scale Backend
@@ -1169,36 +1097,11 @@ aws ecs update-service \
   --service vrem-backend \
   --desired-count 2 \
   --region $AWS_REGION
-
-# Scale down to 1 task
-aws ecs update-service \
-  --cluster vrem-production \
-  --service vrem-backend \
-  --desired-count 1 \
-  --region $AWS_REGION
-```
-
-### Update a Secret
-
-```bash
-# Update secret value
-aws secretsmanager put-secret-value \
-  --secret-id vrem/your-secret-name \
-  --secret-string "new-value" \
-  --region $AWS_REGION
-
-# Restart backend to pick up new value
-aws ecs update-service \
-  --cluster vrem-production \
-  --service vrem-backend \
-  --force-new-deployment \
-  --region $AWS_REGION
 ```
 
 ### Run Database Migrations
 
 ```bash
-# Option 1: As ECS task
 aws ecs run-task \
   --cluster vrem-production \
   --task-definition vrem-backend \
@@ -1206,11 +1109,6 @@ aws ecs run-task \
   --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_1,$SUBNET_2],securityGroups=[$BACKEND_SG_ID],assignPublicIp=ENABLED}" \
   --overrides '{"containerOverrides":[{"name":"vrem-backend","command":["npx","prisma","migrate","deploy"]}]}' \
   --region $AWS_REGION
-
-# Option 2: Locally (if you have direct DB access)
-export DATABASE_URL="postgresql://..."
-cd apps/backend
-npx prisma migrate deploy
 ```
 
 ---
@@ -1226,7 +1124,6 @@ aws logs tail /ecs/vrem-backend --follow --region $AWS_REGION
 
 2. **Check task status:**
 ```bash
-# Get task ARN
 TASK_ARN=$(aws ecs list-tasks \
   --cluster vrem-production \
   --service-name vrem-backend \
@@ -1234,7 +1131,6 @@ TASK_ARN=$(aws ecs list-tasks \
   --output text \
   --region $AWS_REGION)
 
-# Describe task for errors
 aws ecs describe-tasks \
   --cluster vrem-production \
   --tasks $TASK_ARN \
@@ -1242,10 +1138,18 @@ aws ecs describe-tasks \
 ```
 
 3. **Common issues:**
-   - **Secrets not found:** Check IAM role has secrets access
-   - **Image pull failed:** Check ECR repository exists and has image
-   - **Health check failed:** Ensure `/health` endpoint returns 200
-   - **Database connection failed:** Check security groups allow connection
+   - Secrets not found: Check IAM role has secrets access
+   - Image pull failed: Check ECR repository exists
+   - Health check failed: Ensure `/health` endpoint returns 200
+   - Database connection failed: Check security groups
+
+### Frontend Build Errors
+
+1. Check build logs in Vercel Dashboard → Deployments
+2. Common issues:
+   - Missing environment variables
+   - TypeScript errors
+   - Dependency issues
 
 ### Database Connection Issues
 
@@ -1259,28 +1163,6 @@ aws ec2 describe-security-groups \
 aws rds describe-db-instances \
   --db-instance-identifier vrem-production \
   --query 'DBInstances[0].{Status:DBInstanceStatus,Endpoint:Endpoint.Address}' \
-  --region $AWS_REGION
-```
-
-### Frontend 404 or Build Errors
-
-1. Check build logs in Amplify Console
-2. Verify environment variables are set correctly
-3. Ensure `apps/frontend` is set as the app root
-4. Check that `amplify.yml` is in the correct location
-
-### ALB Health Checks Failing
-
-```bash
-# Check target health
-aws elbv2 describe-target-health \
-  --target-group-arn $TG_ARN \
-  --region $AWS_REGION
-
-# Verify health check configuration
-aws elbv2 describe-target-groups \
-  --target-group-arns $TG_ARN \
-  --query 'TargetGroups[0].{HealthCheckPath:HealthCheckPath,HealthCheckPort:HealthCheckPort}' \
   --region $AWS_REGION
 ```
 
@@ -1298,19 +1180,17 @@ aws elbv2 describe-target-groups \
 | **ECR** | < 1 GB storage | ~$0.10/month |
 | **Secrets Manager** | 9 secrets | ~$3.60/month |
 | **CloudWatch Logs** | ~5 GB/month | ~$2.50/month |
-| **Amplify Hosting** | SSR, moderate traffic | ~$5-20/month |
+| **Vercel** | Pro plan (recommended) | $20/month |
+| **Vercel** | Hobby plan (free tier) | $0/month |
 | **Data Transfer** | Moderate | ~$5-10/month |
-| **Route 53** | 1 hosted zone | ~$0.50/month |
-| **ACM Certificate** | SSL certificate | Free |
-| **Total** | | **~$70-90/month** |
+| **Total (Pro)** | | **~$80-90/month** |
+| **Total (Hobby)** | | **~$60-70/month** |
 
-### Cost Optimization Tips
+### Vercel Pricing Notes
 
-1. **Use Fargate Spot** for non-critical workloads (70% savings)
-2. **Set CloudWatch log retention** to 7-30 days
-3. **Use RDS reserved instances** for 1-year commitment (30% savings)
-4. **Enable auto-scaling** to scale down during low traffic
-5. **Use smaller RDS instance** (db.t4g.micro) during development
+- **Hobby (Free)**: Good for personal projects, limited to 100GB bandwidth
+- **Pro ($20/month)**: Recommended for production, includes team features, more bandwidth
+- Both include unlimited deployments, automatic HTTPS, and edge functions
 
 ---
 
@@ -1320,11 +1200,10 @@ aws elbv2 describe-target-groups \
 
 | Resource | URL |
 |----------|-----|
+| **Vercel Dashboard** | https://vercel.com/dashboard |
 | **AWS Console** | https://console.aws.amazon.com/ |
 | **ECS Console** | https://console.aws.amazon.com/ecs/ |
-| **ECR Console** | https://console.aws.amazon.com/ecr/ |
 | **RDS Console** | https://console.aws.amazon.com/rds/ |
-| **Amplify Console** | https://console.aws.amazon.com/amplify/ |
 | **Secrets Manager** | https://console.aws.amazon.com/secretsmanager/ |
 | **CloudWatch Logs** | https://console.aws.amazon.com/cloudwatch/ |
 | **Clerk Dashboard** | https://dashboard.clerk.com/ |
@@ -1333,29 +1212,32 @@ aws elbv2 describe-target-groups \
 ### Common Commands Cheat Sheet
 
 ```bash
-# View logs
+# View backend logs
 aws logs tail /ecs/vrem-backend --follow --region us-east-1
 
-# Check service status
+# Check backend service status
 aws ecs describe-services --cluster vrem-production --services vrem-backend --region us-east-1
 
-# Force redeploy
+# Force backend redeploy
 aws ecs update-service --cluster vrem-production --service vrem-backend --force-new-deployment --region us-east-1
 
-# Scale service
+# Scale backend
 aws ecs update-service --cluster vrem-production --service vrem-backend --desired-count 2 --region us-east-1
 
-# Update secret
+# Update a secret
 aws secretsmanager put-secret-value --secret-id vrem/secret-name --secret-string "value" --region us-east-1
 
-# Run migrations
+# Run database migrations
 aws ecs run-task --cluster vrem-production --task-definition vrem-backend --launch-type FARGATE \
   --network-configuration "awsvpcConfiguration={subnets=[subnet-xxx],securityGroups=[sg-xxx],assignPublicIp=ENABLED}" \
   --overrides '{"containerOverrides":[{"name":"vrem-backend","command":["npx","prisma","migrate","deploy"]}]}' \
   --region us-east-1
 
-# Deploy frontend
-aws amplify start-job --app-id xxx --branch-name main --job-type RELEASE --region us-east-1
+# Deploy frontend (from apps/frontend directory)
+vercel --prod
+
+# View frontend logs
+vercel logs your-project.vercel.app
 ```
 
 ---
@@ -1366,11 +1248,11 @@ Before going live, ensure:
 
 - [ ] All placeholder secrets replaced with real values
 - [ ] HTTPS enabled on ALB
+- [ ] Custom domain configured in Vercel with SSL
 - [ ] RDS not publicly accessible
 - [ ] Security groups properly restricted
 - [ ] IAM roles follow least privilege
 - [ ] MFA enabled on AWS root account
-- [ ] CloudTrail enabled for audit logging
 - [ ] Billing alerts configured
 - [ ] Backup retention configured for RDS
 - [ ] Clerk production keys in use
