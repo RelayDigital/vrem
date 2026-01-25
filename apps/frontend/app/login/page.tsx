@@ -33,7 +33,9 @@ export default function LoginPage() {
   if (isSignedIn) {
     return (
       <div className="min-h-svh flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">Redirecting to dashboard...</div>
+        <div className="animate-pulse text-muted-foreground">
+          Redirecting to dashboard...
+        </div>
       </div>
     );
   }

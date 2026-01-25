@@ -108,15 +108,16 @@ export class AuthController {
 
   /**
    * Get a Clerk sign-in token for test accounts.
-   * DISABLED in production - only available in development.
+   * In production, only @example.com test accounts are allowed.
+   * In development, all accounts are allowed.
    */
   @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Public()
   @Post('test-login')
   async testLogin(@Body() body: { email: string; password: string }) {
-    // Completely disable in production
-    if (process.env.NODE_ENV === 'production') {
-      throw new ForbiddenException('This endpoint is disabled in production');
+    // In production, only allow @example.com test accounts
+    if (process.env.NODE_ENV === 'production' && !body.email?.endsWith('@example.com')) {
+      throw new ForbiddenException('This endpoint is only for test accounts in production');
     }
     return this.authService.getTestAccountSignInToken(body.email, body.password);
   }

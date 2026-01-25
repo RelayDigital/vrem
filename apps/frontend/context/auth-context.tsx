@@ -399,11 +399,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("organizationId");
       setActiveOrganizationId(null);
 
-      // In development only, use backend sign-in token to bypass Clerk's email verification requirement
-      // In production, always use Clerk's direct sign-in flow for security
+      // Use backend sign-in token (ticket strategy) for:
+      // - All accounts in development (bypasses Clerk's email verification)
+      // - @example.com test accounts in production (bypasses 2FA since they can't receive codes)
       const isDevelopment = process.env.NODE_ENV !== "production";
+      const isTestAccount = credentials.email.endsWith("@example.com");
 
-      if (isDevelopment) {
+      if (isDevelopment || isTestAccount) {
         // Get sign-in token from backend
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/test-login`, {
           method: "POST",
