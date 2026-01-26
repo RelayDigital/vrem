@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { OrgContextGuard } from './auth/org-context.guard';
@@ -71,6 +72,46 @@ async function bootstrap() {
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
+
+  // OpenAPI / Swagger setup
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('VREM API')
+    .setDescription('VX Real Estate Media — Backend API Reference')
+    .setVersion('1.0')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'bearer',
+    )
+    .addApiKey(
+      { type: 'apiKey', name: 'x-org-id', in: 'header' },
+      'x-org-id',
+    )
+    .addTag('App', 'Health check')
+    .addTag('Auth', 'Authentication & session management')
+    .addTag('OTP', 'One-time password verification')
+    .addTag('Onboarding', 'User onboarding flow')
+    .addTag('Users', 'User management')
+    .addTag('Organizations', 'Organization management')
+    .addTag('Projects', 'Project CRUD & workflow')
+    .addTag('Orders', 'Order management')
+    .addTag('Customers', 'Customer management')
+    .addTag('Messages', 'In-app messaging')
+    .addTag('Inquiries', 'Public inquiry forms')
+    .addTag('Media', 'Media file management')
+    .addTag('Dashboard', 'Dashboard metrics & analytics')
+    .addTag('Notifications', 'Notification management')
+    .addTag('Packages', 'Service packages & add-ons')
+    .addTag('Availability', 'Scheduling & availability')
+    .addTag('Cronofy', 'Cronofy calendar integration')
+    .addTag('Delivery', 'Project delivery & public galleries')
+    .addTag('Tours', 'Virtual tour management')
+    .addTag('Nylas', 'Nylas email integration')
+    .addTag('Calendar', 'ICS calendar feeds')
+    .addTag('Stripe', 'Stripe payments & webhooks')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api', app, document);
 
   app.useGlobalGuards(app.get(JwtAuthGuard), app.get(OrgContextGuard));
 

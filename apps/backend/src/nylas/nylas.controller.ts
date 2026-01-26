@@ -14,6 +14,7 @@ import {
   Logger,
   Headers,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Response } from 'express';
 import { NylasService } from './nylas.service';
@@ -25,6 +26,7 @@ import type { AuthenticatedUser } from '../auth/auth-context';
 import { FRONTEND_URL } from '../config/urls.config';
 import * as crypto from 'crypto';
 
+@ApiTags('Nylas')
 @Controller('nylas')
 export class NylasController {
   private readonly logger = new Logger(NylasController.name);
@@ -41,6 +43,8 @@ export class NylasController {
   /**
    * Start OAuth flow - returns URL to redirect user to
    */
+  @ApiOperation({ summary: 'Start OAuth flow for calendar connection' })
+  @ApiBearerAuth('bearer')
   @Get('oauth/start')
   @UseGuards(JwtAuthGuard)
   getOAuthUrl(
@@ -59,6 +63,7 @@ export class NylasController {
   /**
    * OAuth callback - handles the redirect from Nylas
    */
+  @ApiOperation({ summary: 'Handle OAuth callback redirect' })
   @Public()
   @Get('oauth/callback')
   async handleOAuthCallback(
@@ -99,6 +104,8 @@ export class NylasController {
   /**
    * Disconnect calendar
    */
+  @ApiOperation({ summary: 'Disconnect calendar integration' })
+  @ApiBearerAuth('bearer')
   @Delete('connection/:integrationId')
   @UseGuards(JwtAuthGuard)
   async disconnect(
@@ -116,6 +123,8 @@ export class NylasController {
   /**
    * Get calendar connection status
    */
+  @ApiOperation({ summary: 'Get calendar connection status' })
+  @ApiBearerAuth('bearer')
   @Get('connection')
   @UseGuards(JwtAuthGuard)
   async getConnectionStatus(@CurrentUser() user: AuthenticatedUser) {
@@ -125,6 +134,7 @@ export class NylasController {
   /**
    * Check if Nylas is configured
    */
+  @ApiOperation({ summary: 'Check if Nylas is configured' })
   @Public()
   @Get('configured')
   isConfigured(): { configured: boolean } {
@@ -138,6 +148,8 @@ export class NylasController {
   /**
    * Get user's calendars
    */
+  @ApiOperation({ summary: 'Get user calendars' })
+  @ApiBearerAuth('bearer')
   @Get('calendars')
   @UseGuards(JwtAuthGuard)
   async getCalendars(@CurrentUser() user: AuthenticatedUser) {
@@ -148,6 +160,8 @@ export class NylasController {
   /**
    * Set write target calendar
    */
+  @ApiOperation({ summary: 'Set write target calendar' })
+  @ApiBearerAuth('bearer')
   @Patch('calendars/:integrationId/write-target')
   @UseGuards(JwtAuthGuard)
   async setWriteTarget(
@@ -169,6 +183,8 @@ export class NylasController {
   /**
    * Get available time slots for scheduling
    */
+  @ApiOperation({ summary: 'Get available time slots' })
+  @ApiBearerAuth('bearer')
   @Get('availability')
   @UseGuards(JwtAuthGuard)
   async getAvailability(
@@ -218,6 +234,8 @@ export class NylasController {
   /**
    * Get sync status for a project
    */
+  @ApiOperation({ summary: 'Get project calendar sync status' })
+  @ApiBearerAuth('bearer')
   @Get('projects/:projectId/sync-status')
   @UseGuards(JwtAuthGuard)
   async getProjectSyncStatus(@Param('projectId') projectId: string) {
@@ -227,6 +245,8 @@ export class NylasController {
   /**
    * Reconcile a project's calendar event
    */
+  @ApiOperation({ summary: 'Reconcile project calendar event' })
+  @ApiBearerAuth('bearer')
   @Post('projects/:projectId/reconcile')
   @UseGuards(JwtAuthGuard)
   async reconcileProject(@Param('projectId') projectId: string) {
@@ -237,6 +257,8 @@ export class NylasController {
    * Sync all assigned projects to calendar
    * Useful after initially connecting a calendar
    */
+  @ApiOperation({ summary: 'Sync all assigned projects to calendar' })
+  @ApiBearerAuth('bearer')
   @Post('sync-all')
   @UseGuards(JwtAuthGuard)
   async syncAllProjects(@CurrentUser() user: AuthenticatedUser) {
@@ -251,6 +273,7 @@ export class NylasController {
    * Nylas webhook endpoint
    * Handles calendar event changes from Nylas
    */
+  @ApiExcludeEndpoint()
   @Public()
   @Post('webhooks')
   async handleWebhook(
@@ -302,6 +325,7 @@ export class NylasController {
   /**
    * Webhook challenge verification (Nylas sends GET request to verify)
    */
+  @ApiExcludeEndpoint()
   @Public()
   @Get('webhooks')
   verifyWebhook(@Query('challenge') challenge: string): string {

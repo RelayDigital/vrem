@@ -5,11 +5,14 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth-context';
 
+@ApiTags('Notifications')
+@ApiBearerAuth('bearer')
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {
@@ -19,6 +22,7 @@ export class NotificationsController {
    * GET /me/notifications
    * Returns all notifications for the current user (invitations + project assignments)
    */
+  @ApiOperation({ summary: 'Get my notifications' })
   @Get('me/notifications')
   async getMyNotifications(@CurrentUser() user: AuthenticatedUser) {
     return this.notificationsService.getNotificationsForUser(user);
@@ -28,6 +32,7 @@ export class NotificationsController {
    * POST /invitations/:id/accept
    * Accept an invitation
    */
+  @ApiOperation({ summary: 'Accept an invitation' })
   @Post('invitations/:id/accept')
   async acceptInvitation(
     @Param('id') id: string,
@@ -41,6 +46,7 @@ export class NotificationsController {
    * POST /invitations/:id/decline
    * Decline an invitation
    */
+  @ApiOperation({ summary: 'Decline an invitation' })
   @Post('invitations/:id/decline')
   async declineInvitation(
     @Param('id') id: string,
@@ -54,6 +60,7 @@ export class NotificationsController {
    * POST /notifications/:id/read
    * Mark a notification as read
    */
+  @ApiOperation({ summary: 'Mark a notification as read' })
   @Post('notifications/:id/read')
   async markAsRead(
     @Param('id') id: string,
@@ -67,6 +74,7 @@ export class NotificationsController {
    * POST /notifications/read-all
    * Mark all notifications as read
    */
+  @ApiOperation({ summary: 'Mark all notifications as read' })
   @Post('notifications/read-all')
   async markAllAsRead(@CurrentUser() user: AuthenticatedUser) {
     return this.notificationsService.markAllNotificationsAsRead(user);
@@ -76,6 +84,7 @@ export class NotificationsController {
    * GET /notifications/count
    * Get unread notification count
    */
+  @ApiOperation({ summary: 'Get unread notification count' })
   @Get('notifications/count')
   async getUnreadCount(@CurrentUser() user: AuthenticatedUser) {
     return this.notificationsService.getUnreadCount(user);
@@ -85,6 +94,7 @@ export class NotificationsController {
    * GET /organizations/:id/public
    * Get public organization info for viewing from an invitation
    */
+  @ApiOperation({ summary: 'Get public organization info' })
   @Get('organizations/:id/public')
   async getOrganizationPublic(
     @Param('id') id: string,

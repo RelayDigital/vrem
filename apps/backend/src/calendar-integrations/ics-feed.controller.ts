@@ -8,11 +8,13 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { IcsFeedService } from './ics-feed.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 
+@ApiTags('Calendar')
 @Controller()
 export class IcsFeedController {
   private readonly logger = new Logger(IcsFeedController.name);
@@ -22,6 +24,8 @@ export class IcsFeedController {
   /**
    * Get or create ICS feed URL for current user
    */
+  @ApiOperation({ summary: 'Get or create ICS feed URL' })
+  @ApiBearerAuth('bearer')
   @Get('calendar-integrations/ics-feed')
   @UseGuards(JwtAuthGuard)
   async getIcsFeed(@CurrentUser() user: { id: string }) {
@@ -32,6 +36,8 @@ export class IcsFeedController {
   /**
    * Regenerate ICS feed token (invalidates old URL)
    */
+  @ApiOperation({ summary: 'Regenerate ICS feed token' })
+  @ApiBearerAuth('bearer')
   @Post('calendar-integrations/ics-feed/regenerate')
   @UseGuards(JwtAuthGuard)
   async regenerateIcsFeed(@CurrentUser() user: { id: string }) {
@@ -43,6 +49,7 @@ export class IcsFeedController {
    * Public endpoint to serve ICS calendar file
    * No auth required - security is via the unique feed token
    */
+  @ApiOperation({ summary: 'Serve ICS calendar file' })
   @Get('ics/:token.ics')
   async serveIcsFile(
     @Param('token') token: string,

@@ -1,35 +1,29 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { OtpService } from './otp.service';
 import { SendOtpDto, VerifyOtpDto } from './dto';
 import { Public } from '../auth/public.decorator';
 
+@ApiTags('OTP')
 @Controller('auth/otp')
 export class OtpController {
   constructor(private otpService: OtpService) {}
 
-  /**
-   * Send an OTP to the provided email address.
-   * Rate limited to 3 requests per email per hour.
-   */
+  @ApiOperation({ summary: 'Send OTP to email address' })
   @Public()
   @Post('send')
   async sendOtp(@Body() dto: SendOtpDto) {
     return this.otpService.sendOtp(dto.email);
   }
 
-  /**
-   * Verify an OTP code.
-   * Returns a verification token on success.
-   */
+  @ApiOperation({ summary: 'Verify OTP code' })
   @Public()
   @Post('verify')
   async verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.otpService.verifyOtp(dto.email, dto.code);
   }
 
-  /**
-   * Check if an email is already registered.
-   */
+  @ApiOperation({ summary: 'Check if email is registered' })
   @Public()
   @Get('check-email/:email')
   async checkEmail(@Param('email') email: string) {

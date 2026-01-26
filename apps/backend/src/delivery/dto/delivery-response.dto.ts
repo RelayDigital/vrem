@@ -1,3 +1,4 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ClientApprovalStatus, MediaType, ProjectStatus } from '@prisma/client';
 
 export class MediaDto {
@@ -65,17 +66,21 @@ export class DeliveryResponseDto {
 }
 
 export class AddCommentDto {
+  @ApiProperty({ description: 'Comment content' })
   content: string;
 }
 
 export class RequestChangesDto {
+  @ApiProperty({ description: 'Feedback text for requested changes' })
   feedback: string;
 }
 
 export class DownloadAllDto {
+  @ApiPropertyOptional({ description: 'Filter download by media types', enum: MediaType, isArray: true })
   mediaTypes?: MediaType[];
 }
 
 export class RetryArtifactDto {
+  @ApiProperty({ description: 'ID of the artifact to retry' })
   artifactId: string;
 }

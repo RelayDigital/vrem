@@ -8,6 +8,7 @@ import {
   Req,
   Param,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OrgContextGuard } from '../auth/org-context.guard';
@@ -15,7 +16,10 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { CreateOrderDto } from './dto/create-order.dto';
 import type { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { OrderFulfillmentService } from '../stripe/order-fulfillment.service';
+import { ApiOrgScoped } from '../common/decorators/api-org-scoped.decorator';
 
+@ApiTags('Orders')
+@ApiOrgScoped()
 @Controller('orders')
 @UseGuards(JwtAuthGuard, OrgContextGuard)
 export class OrdersController {
@@ -28,6 +32,7 @@ export class OrdersController {
    * Creates a new order (Project + Customer + CalendarEvent)
    * POST /orders/create
    */
+  @ApiOperation({ summary: 'Create a new order' })
   @Post('create')
   async createOrder(
     @Req() req: any,
@@ -42,6 +47,7 @@ export class OrdersController {
    * Creates a Stripe Checkout session for an agent order.
    * POST /orders/checkout
    */
+  @ApiOperation({ summary: 'Create Stripe checkout session for an order' })
   @Post('checkout')
   async createCheckout(
     @Req() req: any,
@@ -56,6 +62,7 @@ export class OrdersController {
    * Gets the status of a pending order by Stripe session ID.
    * GET /orders/status/:sessionId
    */
+  @ApiOperation({ summary: 'Get order status by Stripe session ID' })
   @Get('status/:sessionId')
   async getOrderStatus(@Param('sessionId') sessionId: string) {
     return this.orderFulfillment.getOrderStatus(sessionId);
@@ -65,6 +72,7 @@ export class OrdersController {
    * Lists all orders for the organization
    * GET /orders
    */
+  @ApiOperation({ summary: 'List all orders for organization' })
   @Get()
   async listOrders(
     @Req() req: any,
@@ -81,6 +89,8 @@ export class OrdersController {
    *
    * Note: Uses only JwtAuthGuard (not OrgContextGuard) since agents aren't org members.
    */
+  @ApiOperation({ summary: 'Cancel an order as customer' })
+  @ApiBearerAuth('bearer')
   @Delete(':projectId/cancel')
   @UseGuards(JwtAuthGuard)
   async cancelOrder(

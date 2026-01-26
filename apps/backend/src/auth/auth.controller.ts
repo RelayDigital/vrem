@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
   ForbiddenException,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { Public } from './public.decorator';
@@ -14,11 +15,12 @@ import { RegisterDto } from './dto/register.dto';
 import { OAuthLoginDto } from './dto/oauth-login.dto';
 import { OnboardingRegisterDto } from './dto/onboarding-register.dto';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
-  // Rate limit: 3 registrations per minute per IP
+  @ApiOperation({ summary: 'Register a new account' })
   @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Public()
   @Post('register')
@@ -33,7 +35,7 @@ export class AuthController {
     );
   }
 
-  // Rate limit: 5 login attempts per minute per IP
+  @ApiOperation({ summary: 'Login with email and password' })
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Public()
   @Post('login')
@@ -41,7 +43,7 @@ export class AuthController {
     return this.authService.login(body.email, body.password);
   }
 
-  // Rate limit: 10 OAuth attempts per minute per IP
+  @ApiOperation({ summary: 'Login or register via Google OAuth' })
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Public()
   @Post('oauth/google')
@@ -53,7 +55,7 @@ export class AuthController {
     });
   }
 
-  // Rate limit: 10 OAuth attempts per minute per IP
+  @ApiOperation({ summary: 'Login or register via Facebook OAuth' })
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Public()
   @Post('oauth/facebook')
@@ -65,6 +67,8 @@ export class AuthController {
     });
   }
 
+  @ApiOperation({ summary: 'Get current authenticated user' })
+  @ApiBearerAuth('bearer')
   @Get('me')
   async me(@Req() req: Request & { user: { id: string } }) {
     if (!req.user?.id) {
@@ -81,6 +85,8 @@ export class AuthController {
    * - User has a personal org
    * - Returns dbUser, personalOrgId, accessible org contexts, recommended active org
    */
+  @ApiOperation({ summary: 'Bootstrap user session — ensures provisioning and returns app state' })
+  @ApiBearerAuth('bearer')
   @Get('me/bootstrap')
   async bootstrap(@Req() req: Request & { user: { id: string } }) {
     if (!req.user?.id) {
@@ -90,7 +96,7 @@ export class AuthController {
     return this.authService.bootstrap(req.user.id);
   }
 
-  // Rate limit: 3 registrations per minute per IP
+  @ApiOperation({ summary: 'Register via onboarding flow with OTP verification' })
   @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Public()
   @Post('register/onboarding')
@@ -111,6 +117,7 @@ export class AuthController {
    * In production, only @example.com test accounts are allowed.
    * In development, all accounts are allowed.
    */
+  @ApiOperation({ summary: 'Get Clerk sign-in token for test accounts' })
   @Throttle({ default: { ttl: 60000, limit: 3 } })
   @Public()
   @Post('test-login')

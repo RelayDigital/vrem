@@ -11,6 +11,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { OrganizationsService } from './organizations.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -23,7 +24,10 @@ import type { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { OrgContextGuard } from '../auth/org-context.guard';
 import { Public } from '../auth/public.decorator';
 import { AuditLogger, AuditEventType, maskToken } from '../config/audit-log';
+import { ApiOrgScoped } from '../common/decorators/api-org-scoped.decorator';
 
+@ApiTags('Organizations')
+@ApiOrgScoped()
 @Controller('organizations')
 @UseGuards(JwtAuthGuard, OrgContextGuard)
 export class OrganizationsController {
@@ -38,6 +42,7 @@ export class OrganizationsController {
    * Returns organization info if valid.
    */
   // Rate limit: 20 requests per minute per IP (prevent enumeration)
+  @ApiOperation({ summary: 'Validate an invite code (public)' })
   @Throttle({ default: { ttl: 60000, limit: 20 } })
   @Public()
   @Get('invite/validate/:token')
@@ -58,6 +63,7 @@ export class OrganizationsController {
    * Used during onboarding to detect if a user was invited.
    */
   // Rate limit: 10 requests per minute per IP (prevent email enumeration)
+  @ApiOperation({ summary: 'Get pending invitations by email (public)' })
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Public()
   @Get('invitations/by-email/:email')
@@ -78,6 +84,7 @@ export class OrganizationsController {
     return result;
   }
 
+  @ApiOperation({ summary: 'Create a new organization' })
   @Post()
   async createOrg(
     @CurrentUser() user: AuthenticatedUser,
@@ -89,12 +96,14 @@ export class OrganizationsController {
 
   // GET /organizations - Returns the current user's organization memberships
   // This route must come before @Get(':orgId') to ensure proper route matching
+  @ApiOperation({ summary: 'List my organizations' })
   @Get()
   listMyOrgs(@CurrentUser() user) {
     return this.orgs.listUserOrganizations(user.id);
   }
 
   // Invite someone into an org
+  @ApiOperation({ summary: 'Invite a user to an organization' })
   @Post(':orgId/invite')
   invite(
     @Param('orgId') orgId: string,
@@ -111,6 +120,7 @@ export class OrganizationsController {
 
   // Accept invite
   // Rate limit: 10 requests per minute per IP (user-initiated action)
+  @ApiOperation({ summary: 'Accept an organization invite' })
   @Throttle({ default: { ttl: 60000, limit: 10 } })
   @Post('accept-invite')
   async acceptInvite(
@@ -130,6 +140,7 @@ export class OrganizationsController {
   }
 
   // Get organization by ID
+  @ApiOperation({ summary: 'Get organization by ID' })
   @Get(':orgId')
   getOrganization(
     @Param('orgId') orgId: string,
@@ -141,6 +152,7 @@ export class OrganizationsController {
   }
 
   // List organization members (with user details)
+  @ApiOperation({ summary: 'List organization members' })
   @Get(':orgId/members')
   listMembers(@Param('orgId') orgId: string, @Req() req) {
     const ctx = req.orgContext as OrgContext;
@@ -151,6 +163,7 @@ export class OrganizationsController {
   }
 
   // Update organization settings
+  @ApiOperation({ summary: 'Update organization settings' })
   @Patch(':orgId/settings')
   updateOrganizationSettings(
     @Param('orgId') orgId: string,
@@ -166,6 +179,7 @@ export class OrganizationsController {
     return this.orgs.updateOrganizationSettings(ctx, dto, user);
   }
 
+  @ApiOperation({ summary: 'Update a member role' })
   @Patch(':orgId/members/:memberId/role')
   async updateMemberRole(
     @Param('orgId') orgId: string,

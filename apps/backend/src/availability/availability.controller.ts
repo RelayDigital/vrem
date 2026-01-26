@@ -6,12 +6,15 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AvailabilityService } from './availability.service';
 import { AvailabilityStatusDto, WorkHoursDto } from './dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth-context';
 
+@ApiTags('Availability')
+@ApiBearerAuth('bearer')
 @Controller('user-availability')
 @UseGuards(JwtAuthGuard)
 export class AvailabilityController {
@@ -20,6 +23,7 @@ export class AvailabilityController {
   /**
    * Get current user's availability settings (status + work hours)
    */
+  @ApiOperation({ summary: 'Get current user availability settings' })
   @Get()
   getMyAvailability(@CurrentUser() user: AuthenticatedUser) {
     return this.availabilityService.getUserAvailability(user.id);
@@ -28,6 +32,7 @@ export class AvailabilityController {
   /**
    * Update current user's availability status (available/unavailable toggle)
    */
+  @ApiOperation({ summary: 'Update availability status' })
   @Patch('status')
   updateAvailabilityStatus(
     @CurrentUser() user: AuthenticatedUser,
@@ -39,6 +44,7 @@ export class AvailabilityController {
   /**
    * Update work hours for a specific day
    */
+  @ApiOperation({ summary: 'Update work hours for a specific day' })
   @Patch('work-hours')
   updateWorkHours(
     @CurrentUser() user: AuthenticatedUser,
@@ -50,6 +56,7 @@ export class AvailabilityController {
   /**
    * Update all work hours at once
    */
+  @ApiOperation({ summary: 'Update all work hours at once' })
   @Put('work-hours')
   updateAllWorkHours(
     @CurrentUser() user: AuthenticatedUser,

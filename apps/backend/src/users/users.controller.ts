@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -22,13 +23,9 @@ import { OrgRoles } from '../auth/org-roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth-context';
 import { UserAccountType } from '@prisma/client';
+import { ApiOrgScoped } from '../common/decorators/api-org-scoped.decorator';
 
-/**
- * User account management endpoints
- *
- * /me/* endpoints - Authenticated user managing their own account
- * Other endpoints - Admin-level access for managing users
- */
+@ApiTags('Users')
 @Controller('users')
 export class UsersController {
   constructor(private usersService: UsersService) {}
@@ -41,6 +38,8 @@ export class UsersController {
    * Update the current user's profile (name, avatar)
    * Self-service endpoint - no org context required
    */
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiBearerAuth('bearer')
   @Patch('me')
   @UseGuards(JwtAuthGuard)
   updateMyProfile(
@@ -54,6 +53,8 @@ export class UsersController {
    * Deactivate the current user's account
    * Requires password confirmation
    */
+  @ApiOperation({ summary: 'Deactivate current user account' })
+  @ApiBearerAuth('bearer')
   @Post('me/deactivate')
   @UseGuards(JwtAuthGuard)
   deactivateMyAccount(
@@ -67,6 +68,8 @@ export class UsersController {
    * Reactivate the current user's account
    * Only works if account was previously deactivated
    */
+  @ApiOperation({ summary: 'Reactivate current user account' })
+  @ApiBearerAuth('bearer')
   @Post('me/reactivate')
   @UseGuards(JwtAuthGuard)
   reactivateMyAccount(@CurrentUser() user: AuthenticatedUser) {
@@ -78,6 +81,8 @@ export class UsersController {
    * Requires password confirmation
    * This action cannot be undone
    */
+  @ApiOperation({ summary: 'Permanently delete current user account' })
+  @ApiBearerAuth('bearer')
   @Delete('me')
   @UseGuards(JwtAuthGuard)
   deleteMyAccount(
@@ -91,6 +96,8 @@ export class UsersController {
    * Get the current user's use cases (services they provide)
    * Only applicable for PROVIDER accounts
    */
+  @ApiOperation({ summary: 'Get current user use cases' })
+  @ApiBearerAuth('bearer')
   @Get('me/use-cases')
   @UseGuards(JwtAuthGuard)
   getMyUseCases(@CurrentUser() user: AuthenticatedUser) {
@@ -101,6 +108,8 @@ export class UsersController {
    * Update the current user's use cases (services they provide)
    * Only applicable for PROVIDER accounts
    */
+  @ApiOperation({ summary: 'Update current user use cases' })
+  @ApiBearerAuth('bearer')
   @Patch('me/use-cases')
   @UseGuards(JwtAuthGuard)
   updateMyUseCases(
@@ -122,6 +131,8 @@ export class UsersController {
    *
    * Self-service endpoint - no org context required
    */
+  @ApiOperation({ summary: 'Get org context for org switcher UI' })
+  @ApiBearerAuth('bearer')
   @Get('me/org-context')
   @UseGuards(JwtAuthGuard)
   getMyOrgContext(@CurrentUser() user: AuthenticatedUser) {
@@ -132,6 +143,8 @@ export class UsersController {
   // Admin endpoints
   // =============================
 
+  @ApiOperation({ summary: 'Create a user (admin)' })
+  @ApiOrgScoped()
   @Post()
   @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
   @OrgRoles('OWNER', 'ADMIN')
@@ -139,6 +152,8 @@ export class UsersController {
     return this.usersService.create(dto);
   }
 
+  @ApiOperation({ summary: 'List all users (admin)' })
+  @ApiOrgScoped()
   @Get()
   @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
   @OrgRoles('OWNER', 'ADMIN')
@@ -147,6 +162,8 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
+  @ApiOperation({ summary: 'Get user by ID (admin)' })
+  @ApiOrgScoped()
   @Get(':id')
   @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
   @OrgRoles('OWNER', 'ADMIN')
@@ -154,6 +171,8 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
+  @ApiOperation({ summary: 'Update user by ID (admin)' })
+  @ApiOrgScoped()
   @Patch(':id')
   @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
   @OrgRoles('OWNER', 'ADMIN')
@@ -161,6 +180,8 @@ export class UsersController {
     return this.usersService.update(id, dto);
   }
 
+  @ApiOperation({ summary: 'Delete user by ID (admin)' })
+  @ApiOrgScoped()
   @Delete(':id')
   @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
   @OrgRoles('OWNER', 'ADMIN')

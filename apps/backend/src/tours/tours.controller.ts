@@ -10,6 +10,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ToursService } from './tours.service';
 import {
   UpdateTourProgressDto,
@@ -20,6 +21,8 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth-context';
 import { TourTrack } from '@prisma/client';
 
+@ApiTags('Tours')
+@ApiBearerAuth('bearer')
 @Controller('tours')
 @UseGuards(JwtAuthGuard)
 export class ToursController {
@@ -28,6 +31,7 @@ export class ToursController {
   /**
    * Get the current user's overall tour status and progress
    */
+  @ApiOperation({ summary: 'Get user tour status and progress' })
   @Get('status')
   getTourStatus(@CurrentUser() user: AuthenticatedUser) {
     return this.toursService.getUserTourStatus(user.id);
@@ -36,6 +40,7 @@ export class ToursController {
   /**
    * Get progress for a specific tour track
    */
+  @ApiOperation({ summary: 'Get progress for a tour track' })
   @Get('progress/:track')
   getTrackProgress(
     @CurrentUser() user: AuthenticatedUser,
@@ -47,6 +52,7 @@ export class ToursController {
   /**
    * Update progress for a specific step
    */
+  @ApiOperation({ summary: 'Update progress for a tour step' })
   @Patch('progress')
   updateProgress(
     @CurrentUser() user: AuthenticatedUser,
@@ -58,6 +64,7 @@ export class ToursController {
   /**
    * Mark an entire track as completed
    */
+  @ApiOperation({ summary: 'Mark a tour track as completed' })
   @Post('complete/:track')
   completeTrack(
     @CurrentUser() user: AuthenticatedUser,
@@ -69,6 +76,7 @@ export class ToursController {
   /**
    * Skip/dismiss a specific track
    */
+  @ApiOperation({ summary: 'Skip a tour track' })
   @Post('skip/:track')
   skipTrack(
     @CurrentUser() user: AuthenticatedUser,
@@ -80,6 +88,7 @@ export class ToursController {
   /**
    * Dismiss the setup guide widget permanently
    */
+  @ApiOperation({ summary: 'Dismiss the setup guide' })
   @Post('dismiss-guide')
   dismissGuide(@CurrentUser() user: AuthenticatedUser) {
     return this.toursService.dismissGuide(user.id);
@@ -88,6 +97,7 @@ export class ToursController {
   /**
    * Reset all tour progress (for testing or re-onboarding)
    */
+  @ApiOperation({ summary: 'Reset all tour progress' })
   @Post('reset')
   resetProgress(@CurrentUser() user: AuthenticatedUser) {
     return this.toursService.resetProgress(user.id);
@@ -96,6 +106,7 @@ export class ToursController {
   /**
    * Create a demo project for tour walkthrough
    */
+  @ApiOperation({ summary: 'Create a demo project for tour' })
   @Post('demo-project')
   createDemoProject(
     @CurrentUser() user: AuthenticatedUser,
@@ -110,6 +121,7 @@ export class ToursController {
   /**
    * Get the demo project for the current user
    */
+  @ApiOperation({ summary: 'Get demo project' })
   @Get('demo-project')
   getDemoProject(@CurrentUser() user: AuthenticatedUser) {
     return this.toursService.getDemoProject(user.id);
@@ -118,6 +130,7 @@ export class ToursController {
   /**
    * Delete the demo project
    */
+  @ApiOperation({ summary: 'Delete demo project' })
   @Delete('demo-project')
   deleteDemoProject(@CurrentUser() user: AuthenticatedUser) {
     return this.toursService.deleteDemoProject(user.id);

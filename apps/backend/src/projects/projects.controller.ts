@@ -10,6 +10,7 @@ import {
   Post,
   Delete,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ProjectsService } from './projects.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OrgContextGuard } from '../auth/org-context.guard';
@@ -23,7 +24,10 @@ import { UpdateProjectStatusDto } from './dto/update-project-status.dto';
 import { CreateProjectMediaDto } from '../media/dto/create-project-media.dto';
 import { MediaService } from '../media/media.service';
 import type { AuthenticatedUser, OrgContext } from '../auth/auth-context';
+import { ApiOrgScoped } from '../common/decorators/api-org-scoped.decorator';
 
+@ApiTags('Projects')
+@ApiOrgScoped()
 @Controller('projects')
 @UseGuards(JwtAuthGuard, OrgContextGuard)
 export class ProjectsController {
@@ -33,6 +37,7 @@ export class ProjectsController {
   ) {}
 
   // GET all projects in this organization
+  @ApiOperation({ summary: 'List all projects in organization' })
   @Get()
   getProjects(@Req() req) {
     const ctx = req.orgContext as OrgContext;
@@ -40,6 +45,7 @@ export class ProjectsController {
   }
 
   // MEDIA: list all media for a project scoped to org
+  @ApiOperation({ summary: 'List media for a project' })
   @Get(':projectId/media')
   getProjectMedia(@Param('projectId') projectId: string, @Req() req) {
     const ctx = req.orgContext as OrgContext;
@@ -48,6 +54,7 @@ export class ProjectsController {
   }
 
   // MEDIA: create media entry for a project
+  @ApiOperation({ summary: 'Add media to a project' })
   @Post(':projectId/media')
   addProjectMedia(
     @Param('projectId') projectId: string,
@@ -64,6 +71,7 @@ export class ProjectsController {
   }
 
   // MEDIA: delete media entry from a project
+  @ApiOperation({ summary: 'Delete media from a project' })
   @Delete(':projectId/media/:mediaId')
   deleteProjectMedia(
     @Param('projectId') projectId: string,
@@ -76,6 +84,7 @@ export class ProjectsController {
   }
 
   // GET only user's projects for this org
+  @ApiOperation({ summary: 'List current user projects' })
   @Get('mine')
   findMine(@Req() req: any, @CurrentUser() user: AuthenticatedUser) {
     const ctx = req.orgContext as OrgContext;
@@ -83,6 +92,7 @@ export class ProjectsController {
   }
 
   // GET messages for a project
+  @ApiOperation({ summary: 'Get messages for a project' })
   @Get(':id/messages')
   getMessages(
     @Param('id') id: string,
@@ -103,6 +113,7 @@ export class ProjectsController {
   }
 
   // POST message
+  @ApiOperation({ summary: 'Add a message to a project' })
   @Post(':id/messages')
   addMessage(
     @Param('id') id: string,
@@ -126,6 +137,7 @@ export class ProjectsController {
   }
 
   // CREATE project
+  @ApiOperation({ summary: 'Create a new project' })
   @Post('create')
   createProject(@Req() req, @Body() dto: CreateProjectDto) {
     const ctx = req.orgContext as OrgContext;
@@ -133,6 +145,7 @@ export class ProjectsController {
   }
 
   // GET one project scoped to org
+  @ApiOperation({ summary: 'Get project by ID' })
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req, @CurrentUser() user: AuthenticatedUser) {
     const ctx = req.orgContext as OrgContext;
@@ -140,6 +153,7 @@ export class ProjectsController {
   }
 
   // ASSIGN tech + editor
+  @ApiOperation({ summary: 'Assign technician and editor to a project' })
   @Patch(':id/assign')
   assign(
     @Param('id') id: string,
@@ -152,6 +166,7 @@ export class ProjectsController {
   }
 
   // UPDATE project
+  @ApiOperation({ summary: 'Update a project' })
   @Patch(':id')
   updateProject(
     @Param('id') id: string,
@@ -164,6 +179,7 @@ export class ProjectsController {
   }
 
   // REMOVE
+  @ApiOperation({ summary: 'Delete a project' })
   @Delete(':id')
   remove(@Param('id') id: string, @Req() req) {
     const ctx = req.orgContext as OrgContext;
@@ -171,6 +187,7 @@ export class ProjectsController {
   }
 
   // ASSIGN TECHNICIAN
+  @ApiOperation({ summary: 'Assign technician to a project' })
   @Patch(':id/assign-technician')
   assignTechnician(
     @Param('id') id: string,
@@ -183,6 +200,7 @@ export class ProjectsController {
   }
 
   // ASSIGN CUSTOMER - Note: Only OWNER/ADMIN can change customer (not PM)
+  @ApiOperation({ summary: 'Assign customer to a project' })
   @Patch(':id/assign-customer')
   assignCustomer(
     @Param('id') id: string,
@@ -194,6 +212,7 @@ export class ProjectsController {
   }
 
   // ASSIGN PROJECT MANAGER
+  @ApiOperation({ summary: 'Assign project manager' })
   @Patch(':id/assign-project-manager')
   assignProjectManager(
     @Param('id') id: string,
@@ -206,6 +225,7 @@ export class ProjectsController {
   }
 
   // ASSIGN EDITOR
+  @ApiOperation({ summary: 'Assign editor to a project' })
   @Patch(':id/assign-editor')
   assignEditor(
     @Param('id') id: string,
@@ -218,6 +238,7 @@ export class ProjectsController {
   }
 
   // SCHEDULE
+  @ApiOperation({ summary: 'Schedule a project' })
   @Patch(':id/schedule')
   scheduleProject(
     @Param('id') id: string,
@@ -230,6 +251,7 @@ export class ProjectsController {
   }
 
   // STATUS UPDATES
+  @ApiOperation({ summary: 'Update project status' })
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,
@@ -244,6 +266,7 @@ export class ProjectsController {
   // DELIVERY MANAGEMENT
 
   // GET delivery status for a project
+  @ApiOperation({ summary: 'Get delivery status for a project' })
   @Get(':id/delivery')
   getDeliveryStatus(
     @Param('id') id: string,
@@ -255,6 +278,7 @@ export class ProjectsController {
   }
 
   // ENABLE delivery for a project
+  @ApiOperation({ summary: 'Enable delivery for a project' })
   @Post(':id/delivery/enable')
   enableDelivery(
     @Param('id') id: string,
@@ -266,6 +290,7 @@ export class ProjectsController {
   }
 
   // DISABLE delivery for a project
+  @ApiOperation({ summary: 'Disable delivery for a project' })
   @Post(':id/delivery/disable')
   disableDelivery(
     @Param('id') id: string,
@@ -277,6 +302,7 @@ export class ProjectsController {
   }
 
   // REGENERATE delivery token for a project
+  @ApiOperation({ summary: 'Regenerate delivery token' })
   @Post(':id/delivery/regenerate-token')
   regenerateDeliveryToken(
     @Param('id') id: string,
@@ -288,6 +314,7 @@ export class ProjectsController {
   }
 
   // ROTATE delivery token for a project (alias for regenerate-token)
+  @ApiOperation({ summary: 'Rotate delivery token' })
   @Post(':id/delivery/rotate-token')
   rotateDeliveryToken(
     @Param('id') id: string,

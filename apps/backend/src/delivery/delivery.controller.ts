@@ -11,6 +11,7 @@ import {
   Headers,
   Logger,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { DeliveryService } from './delivery.service';
 import { ArtifactWorkerService } from './artifact-worker.service';
@@ -25,7 +26,9 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth-context';
 import { DownloadAllDto, AddCommentDto, RequestChangesDto, RetryArtifactDto } from './dto/delivery-response.dto';
 import { AuditLogger, AuditEventType, maskToken } from '../config/audit-log';
+import { ApiOrgScoped } from '../common/decorators/api-org-scoped.decorator';
 
+@ApiTags('Delivery')
 @Controller('delivery')
 export class DeliveryController {
   private readonly audit: AuditLogger;
@@ -43,6 +46,7 @@ export class DeliveryController {
    * If user is authenticated, determines if they can approve.
    */
   // Rate limit: 30 requests per minute per IP (generous for page loads)
+  @ApiOperation({ summary: 'Get delivery data by public token' })
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   @Public()
   @UseGuards(JwtAuthGuard) // Still runs but allows public access - populates user if authenticated
@@ -67,6 +71,7 @@ export class DeliveryController {
    * PUBLIC: Get comments for a delivery by token.
    */
   // Rate limit: 30 requests per minute per IP
+  @ApiOperation({ summary: 'Get comments for a delivery' })
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   @Public()
   @Get(':token/comments')
@@ -87,6 +92,7 @@ export class DeliveryController {
    * Client should poll download-status endpoint if not immediately ready.
    */
   // Rate limit: 5 download requests per minute per IP (expensive operation)
+  @ApiOperation({ summary: 'Request a download artifact' })
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @Public()
   @Post(':token/download-request')
@@ -112,6 +118,7 @@ export class DeliveryController {
    * Returns the current status and CDN URL when ready.
    */
   // Rate limit: 60 requests per minute per IP (polling endpoint)
+  @ApiOperation({ summary: 'Get download artifact status' })
   @Throttle({ default: { ttl: 60000, limit: 60 } })
   @Public()
   @Get(':token/download-status/:artifactId')
@@ -138,6 +145,8 @@ export class DeliveryController {
    * PROTECTED: Approve a delivery.
    * Requires authentication as the linked customer.
    */
+  @ApiOperation({ summary: 'Approve a delivery' })
+  @ApiBearerAuth('bearer')
   @UseGuards(JwtAuthGuard, DeliveryCustomerGuard)
   @Post(':token/approve')
   async approveDelivery(
@@ -159,6 +168,8 @@ export class DeliveryController {
    * PROTECTED: Request changes on a delivery.
    * Requires authentication as the linked customer.
    */
+  @ApiOperation({ summary: 'Request changes on a delivery' })
+  @ApiBearerAuth('bearer')
   @UseGuards(JwtAuthGuard, DeliveryCustomerGuard)
   @Post(':token/request-changes')
   async requestChanges(
@@ -182,6 +193,8 @@ export class DeliveryController {
    * PROTECTED: Add a comment to a delivery.
    * Requires authentication as the linked customer OR org admin/PM.
    */
+  @ApiOperation({ summary: 'Add a comment to a delivery' })
+  @ApiBearerAuth('bearer')
   @UseGuards(JwtAuthGuard, DeliveryCommentGuard)
   @Post(':token/comments')
   async addComment(
@@ -209,6 +222,8 @@ export class DeliveryController {
    * Only OWNER, ADMIN, or PROJECT_MANAGER roles can retry artifacts.
    * The artifact must belong to a project in the user's org.
    */
+  @ApiOperation({ summary: 'Retry a failed artifact generation' })
+  @ApiOrgScoped()
   @UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
   @OrgRoles('PERSONAL_OWNER', 'OWNER', 'ADMIN', 'PROJECT_MANAGER')
   @Post('admin/retry-artifact')
@@ -232,6 +247,7 @@ export class DeliveryController {
    * For serverless deployments, this can be called periodically by an external scheduler.
    * Protected by a secret token in the Authorization header.
    */
+  @ApiExcludeEndpoint()
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 12 } }) // Max 12 calls per minute
   @Post('internal/process-artifacts')
@@ -273,6 +289,7 @@ export class DeliveryController {
    * - processed: Number of artifacts moved from PENDING to GENERATING/READY
    * - recovered: Number of stuck GENERATING artifacts reset to PENDING for retry
    */
+  @ApiExcludeEndpoint()
   @Public()
   @Throttle({ default: { ttl: 60000, limit: 12 } }) // Max 12 calls per minute
   @Post('admin/run-artifact-worker')

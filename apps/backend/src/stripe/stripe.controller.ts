@@ -6,12 +6,14 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
+import { ApiTags, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import Stripe from 'stripe';
 import { StripeService } from './stripe.service';
 import { OrderFulfillmentService } from './order-fulfillment.service';
 import { Public } from '../auth/public.decorator';
 
+@ApiTags('Stripe')
 @Controller('webhooks')
 export class StripeWebhookController {
   private readonly logger = new Logger(StripeWebhookController.name);
@@ -23,6 +25,7 @@ export class StripeWebhookController {
 
   // Webhook endpoints must be public (no auth) but protected by signature verification
   // Skip rate limiting since Stripe controls the request frequency
+  @ApiExcludeEndpoint()
   @Public()
   @SkipThrottle()
   @Post('stripe')

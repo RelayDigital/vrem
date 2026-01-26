@@ -6,11 +6,15 @@ import {
   Req,
   BadRequestException,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CronofyService } from './cronofy.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OrgContextGuard } from '../auth/org-context.guard';
+import { ApiOrgScoped } from '../common/decorators/api-org-scoped.decorator';
 import type { OrgContext } from '../auth/auth-context';
 
+@ApiTags('Cronofy')
+@ApiOrgScoped()
 @Controller('availability')
 @UseGuards(JwtAuthGuard, OrgContextGuard)
 export class CronofyController {
@@ -20,6 +24,7 @@ export class CronofyController {
    * Get availability for technicians in the organization
    * GET /availability?startDate=2024-01-01&endDate=2024-01-07&technicianIds=id1,id2&duration=60
    */
+  @ApiOperation({ summary: 'Get technician availability slots' })
   @Get()
   async getAvailability(
     @Req() req: any,
@@ -51,6 +56,7 @@ export class CronofyController {
    * Check if a specific slot is available
    * GET /availability/check?technicianId=xxx&scheduledTime=2024-01-01T10:00:00Z&duration=60
    */
+  @ApiOperation({ summary: 'Check if a specific time slot is available' })
   @Get('check')
   async checkSlot(
     @Req() req: any,
