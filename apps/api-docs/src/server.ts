@@ -11,9 +11,9 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve Scalar API Reference at root
+// Serve Scalar API Reference at /reference
 app.use(
-  '/',
+  '/reference',
   apiReference({
     url: `${API_URL}/api-json`,
     theme: 'kepler',
@@ -21,7 +21,12 @@ app.use(
   }),
 );
 
+// Redirect root to /reference
+app.get('/', (_req, res) => {
+  res.redirect('/reference');
+});
+
 app.listen(port, () => {
-  console.log(`API docs server running at http://localhost:${port}`);
+  console.log(`API docs server running at http://localhost:${port}/reference`);
   console.log(`OpenAPI spec from: ${API_URL}/api-json`);
 });
