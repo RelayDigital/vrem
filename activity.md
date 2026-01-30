@@ -1,9 +1,10 @@
 # YedaTechs Build - Activity Log
 
 ## Current Status
-**Last Updated:** 2026-01-17
-**Tasks Completed:** 55 / 55
-**Current Task:** None - MVP Complete
+**Last Updated:** 2026-01-30
+**MVP Features:** 55 / 55
+**Post-MVP Features:** 10 (implemented, uncommitted)
+**Current Task:** Documentation sync & commit
 
 ---
 
@@ -30,6 +31,44 @@ After completing each task, add an entry below in this format:
 
 ---
 -->
+
+### 2026-01-30
+**Completed:**
+- Documentation audit and sync for production readiness
+- All post-MVP features documented in activity log, feature list, plan, PRD, and API reference
+
+**Post-MVP Features Built (since 2026-01-17):**
+- Invoicing system: full CRUD, send via email, mark paid, void, auto-create on delivery, public payment links
+- User onboarding flow: account type selection (AGENT/PROVIDER) for SSO-provisioned users with provider use case selection
+- Notification preferences: granular email notification control for 8 event types with digest frequency
+- Account type switching: users can switch between AGENT and PROVIDER
+- Payment mode configuration: orgs can set NO_PAYMENT, UPFRONT_PAYMENT, or INVOICE_AFTER_DELIVERY
+- Global exception filter: unified error handling with production-safe messages
+- Security headers: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy
+- Enhanced auth service: bootstrap flow, deactivation checks, enhanced /me endpoint with full org context
+- Password management: Clerk-integrated password change in security settings
+- Billing settings page: plan display and feature list
+- Cleaned up 8 unused test/debug scripts from scripts/
+
+**Changes Made:**
+- Added Invoices Swagger tag to main.ts
+- Fixed role validation query in ARCHITECTURE_VERIFICATION_CHECKLIST.md (DISPATCHER/VIEWER → EDITOR/PROJECT_MANAGER/AGENT)
+- Updated activity.md, feature_list.json, plan.md, prd.md, API-REFERENCE.md
+
+**Status:**
+- Frontend: Next.js 16 with TypeScript, Tailwind CSS, Clerk auth
+- Backend: NestJS with Prisma, Clerk, Stripe, WebSockets, Invoicing
+- All post-MVP features implemented and wired end-to-end
+
+**Next:**
+- Commit all uncommitted changes
+- Verify database migrations for new models (Invoice, UserNotificationPreferences, ProviderUseCase)
+- Production deployment
+
+**Blockers:**
+- None
+
+---
 
 ### 2026-01-17 15:00
 **Completed:**
@@ -126,12 +165,15 @@ BOOKED → SHOOTING → EDITING → DELIVERED
 *Document any important decisions, architecture choices, or lessons learned here.*
 
 ### Tech Stack Confirmed
-- **Frontend:** Next.js 14+ with App Router, TypeScript, Tailwind CSS
+- **Frontend:** Next.js 16 with App Router, React 19, TypeScript, Tailwind CSS, shadcn/ui
 - **Backend:** NestJS with TypeScript
 - **Database:** PostgreSQL with Prisma ORM
-- **Storage:** AWS S3 + CloudFront
-- **Auth:** JWT with RBAC
+- **Storage:** Uploadcare + AWS S3 + CloudFront
+- **Auth:** Clerk + JWT with RBAC
 - **Payments:** Stripe
+- **Email:** Resend
+- **Calendar:** Nylas
+- **Maps:** Mapbox
 
 ### Design Decisions
 - *[Add decisions as they're made]*
@@ -153,7 +195,9 @@ BOOKED → SHOOTING → EDITING → DELIVERED
 | 5 - Media | 7 | 7 | 0 |
 | 6 - Messaging | 6 | 6 | 0 |
 | 7 - Payments | 5 | 5 | 0 |
-| **Total** | **55** | **55** | **0** |
+| **MVP Total** | **55** | **55** | **0** |
+| 8 - Post-MVP | 10 | 10 | 0 |
+| **Grand Total** | **65** | **65** | **0** |
 
 ---
 

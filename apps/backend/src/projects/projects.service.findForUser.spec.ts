@@ -30,6 +30,7 @@ describe('ProjectsService.findForUser', () => {
       logo: null,
       brandColor: null,
       brandingSettings: null,
+      paymentMode: 'NO_PAYMENT' as any,
     },
     membership: null,
     effectiveRole: 'OWNER',

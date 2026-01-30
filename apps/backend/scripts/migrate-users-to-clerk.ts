@@ -103,9 +103,6 @@ async function main() {
   let successCount = 0;
   let failCount = 0;
 
-  // Test password for @example.com accounts
-  const TEST_PASSWORD = 'password123';
-
   for (const user of usersWithoutClerk) {
     try {
       // Parse first and last name from full name
@@ -113,32 +110,18 @@ async function main() {
       const firstName = nameParts[0] || 'User';
       const lastName = nameParts.slice(1).join(' ') || '';
 
-      // Check if this is a test account (@example.com)
-      const isTestAccount = user.email.endsWith('@example.com');
-
-      // Create Clerk user
-      // For test accounts, set the password to "password123"
-      // For real accounts, skip password requirement (they'll need to reset)
-      const createUserParams: Parameters<typeof clerkClient.users.createUser>[0] = {
+      // Create Clerk user (they'll need to reset their password)
+      const clerkUser = await clerkClient.users.createUser({
         emailAddress: [user.email],
         firstName,
         lastName,
+        skipPasswordRequirement: true,
         unsafeMetadata: {
           accountType: user.accountType,
           migratedFromDb: true,
           migratedAt: new Date().toISOString(),
         },
-      };
-
-      if (isTestAccount) {
-        createUserParams.password = TEST_PASSWORD;
-        // Skip email verification for test accounts
-        createUserParams.skipPasswordChecks = true;
-      } else {
-        createUserParams.skipPasswordRequirement = true;
-      }
-
-      const clerkUser = await clerkClient.users.createUser(createUserParams);
+      });
 
       // Update database with Clerk user ID
       await prisma.user.update({
@@ -146,8 +129,7 @@ async function main() {
         data: { clerkUserId: clerkUser.id },
       });
 
-      const authMethod = isTestAccount ? 'password: password123' : 'needs password reset';
-      console.log(`  ✅ Migrated: ${user.email} -> ${clerkUser.id} (${authMethod})`);
+      console.log(`  ✅ Migrated: ${user.email} -> ${clerkUser.id} (needs password reset)`);
       successCount++;
     } catch (error: any) {
       console.error(`  ❌ Failed to migrate ${user.email}: ${error.message}`);

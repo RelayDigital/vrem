@@ -14,7 +14,14 @@ import { SettingsRightContentSection } from "@/components/shared/settings/Settin
 import { api } from "@/lib/api";
 import { useTour } from "@/context/tour-context";
 import { useAuth } from "@/context/auth-context";
-import { GraduationCap, RotateCcw, AlertTriangle, UserX, Trash2, User2 } from "lucide-react";
+import { GraduationCap, RotateCcw, AlertTriangle, UserX, Trash2, User2, ArrowRightLeft } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AvatarUploader } from "@/components/shared/AvatarUploader";
 import { ServicesEditor } from "@/components/shared/settings/ServicesEditor";
 import { Progress } from "@/components/ui/progress";
@@ -53,6 +60,11 @@ export default function AccountPage() {
   const [email, setEmail] = useState(user?.email || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isResettingTour, setIsResettingTour] = useState(false);
+
+  // Account type switching state
+  const [isSwitchingAccountType, setIsSwitchingAccountType] = useState(false);
+  const [showAccountTypeSwitchDialog, setShowAccountTypeSwitchDialog] = useState(false);
+  const [pendingAccountType, setPendingAccountType] = useState<string | null>(null);
 
   // Danger zone state
   const [deactivatePassword, setDeactivatePassword] = useState("");
@@ -127,6 +139,31 @@ export default function AccountPage() {
       );
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleAccountTypeChange = (newType: string) => {
+    if (newType === user?.accountType) return;
+    setPendingAccountType(newType);
+    setShowAccountTypeSwitchDialog(true);
+  };
+
+  const confirmAccountTypeSwitch = async () => {
+    if (!pendingAccountType) return;
+    setIsSwitchingAccountType(true);
+    try {
+      await api.users.switchAccountType(pendingAccountType);
+      toast.success(`Account type changed to ${pendingAccountType === "AGENT" ? "Agent" : "Provider"}`);
+      setShowAccountTypeSwitchDialog(false);
+      setPendingAccountType(null);
+      // Reload to refresh auth state
+      window.location.reload();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to switch account type"
+      );
+    } finally {
+      setIsSwitchingAccountType(false);
     }
   };
 
@@ -244,6 +281,58 @@ export default function AccountPage() {
           />
           <Muted className="text-xs">Email cannot be changed</Muted>
         </div>
+
+        {/* Account Type Section */}
+        {(user.accountType === "AGENT" || user.accountType === "PROVIDER") && (
+          <div className="space-y-3 md:col-span-2 pt-4 border-t">
+            <div className="flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5 text-muted-foreground" />
+              <Label className="text-base">Account Type</Label>
+            </div>
+            <Select
+              value={user.accountType}
+              onValueChange={handleAccountTypeChange}
+            >
+              <SelectTrigger className="w-full max-w-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="AGENT">Agent - Book media services</SelectItem>
+                <SelectItem value="PROVIDER">Provider - Offer media services</SelectItem>
+              </SelectContent>
+            </Select>
+            <Muted className="text-xs">
+              Switching account type changes the features available to you.
+            </Muted>
+
+            <AlertDialog open={showAccountTypeSwitchDialog} onOpenChange={setShowAccountTypeSwitchDialog}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Switch account type?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {pendingAccountType === "PROVIDER"
+                      ? "Switching to Provider will give you access to media service management features. You can switch back anytime."
+                      : "Switching to Agent will give you access to booking and ordering features. Provider-specific settings will be hidden but not deleted. You can switch back anytime."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setPendingAccountType(null)}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <Button
+                    onClick={confirmAccountTypeSwitch}
+                    disabled={isSwitchingAccountType}
+                  >
+                    {isSwitchingAccountType ? (
+                      <Spinner className="h-4 w-4 mr-2" />
+                    ) : null}
+                    Switch to {pendingAccountType === "PROVIDER" ? "Provider" : "Agent"}
+                  </Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
 
         {/* Services Section - Only for Provider accounts */}
         {user.accountType === "PROVIDER" && (

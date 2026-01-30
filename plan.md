@@ -27,39 +27,53 @@ cat activity.md
 ## Project Structure
 
 ```
-yedatechs/
-├── frontend/               # Next.js application
-│   ├── src/
-│   │   ├── app/           # App router pages
-│   │   ├── components/    # React components
-│   │   │   ├── ui/        # Base UI components
-│   │   │   ├── dashboard/ # Dashboard components
-│   │   │   ├── booking/   # Booking flow components
-│   │   │   └── projects/  # Project management components
-│   │   ├── lib/           # Utilities and helpers
-│   │   ├── hooks/         # Custom React hooks
-│   │   ├── types/         # TypeScript types
-│   │   └── styles/        # Global styles
-│   └── public/            # Static assets
+vrem/
+├── apps/
+│   ├── frontend/                 # Next.js 16 application
+│   │   ├── app/                  # App Router pages
+│   │   │   ├── (protected)/      # Auth-required routes
+│   │   │   │   ├── booking/      # Booking flow
+│   │   │   │   ├── invoices/     # Invoice management
+│   │   │   │   └── settings/     # User/org settings
+│   │   │   └── onboarding/       # SSO onboarding flow
+│   │   ├── components/           # React components
+│   │   │   ├── ui/               # shadcn/ui design system (62 components)
+│   │   │   └── features/         # Feature-specific components
+│   │   ├── context/              # React context (auth, etc.)
+│   │   ├── lib/                  # Utilities and API client
+│   │   ├── hooks/                # Custom React hooks
+│   │   ├── types/                # TypeScript types
+│   │   └── public/               # Static assets
+│   │
+│   └── backend/                  # NestJS application
+│       ├── src/
+│       │   ├── auth/             # Authentication (Clerk + JWT)
+│       │   ├── users/            # User management
+│       │   ├── organizations/    # Multi-tenant organizations
+│       │   ├── projects/         # Project/job management
+│       │   ├── orders/           # Order processing
+│       │   ├── invoices/         # Invoice management
+│       │   ├── media/            # Media upload/delivery
+│       │   ├── messages/         # Project messaging
+│       │   ├── email/            # Email service (Resend)
+│       │   ├── otp/              # OTP verification
+│       │   ├── common/           # Shared utilities & filters
+│       │   └── prisma/           # Database service
+│       ├── prisma/
+│       │   ├── schema.prisma     # Database schema
+│       │   └── migrations/       # Database migrations
+│       └── docs/                 # Backend documentation
 │
-├── backend/               # NestJS application
-│   ├── src/
-│   │   ├── modules/       # Feature modules
-│   │   │   ├── auth/      # Authentication
-│   │   │   ├── users/     # User management
-│   │   │   ├── projects/  # Project/job management
-│   │   │   ├── media/     # Media upload/delivery
-│   │   │   ├── messages/  # Project messaging
-│   │   │   └── payments/  # Stripe integration
-│   │   ├── common/        # Shared utilities
-│   │   └── prisma/        # Database schema
-│   └── test/              # Tests
-│
-├── init.sh                # Environment setup script
-├── plan.md               # This file
-├── prd.md                # Product requirements
-├── activity.md           # Session activity log
-└── feature_list.json     # Feature tracking (DO NOT EDIT descriptions)
+├── docs/                         # Additional documentation
+│   ├── nylas-setup.md            # Nylas calendar integration
+│   └── stripe-testing.md         # Stripe testing guide
+├── init.sh                       # Environment setup script
+├── plan.md                       # This file
+├── prd.md                        # Product requirements
+├── activity.md                   # Session activity log
+├── feature_list.json             # Feature tracking (DO NOT EDIT descriptions)
+├── API-REFERENCE.md              # API endpoint documentation
+└── DEPLOYMENT.md                 # Deployment guide
 ```
 
 ---
@@ -92,7 +106,7 @@ yedatechs/
 
 ### Phase 4: Booking & Scheduling
 - Booking form and flow
-- Calendar integration (Cronofy)
+- Calendar integration (Nylas)
 - Time slot selection
 
 ### Phase 5: Media Management
@@ -109,6 +123,15 @@ yedatechs/
 - Stripe checkout
 - Payment status webhooks
 - Invoice tracking
+
+### Phase 8: Post-MVP Enhancements
+- Invoicing system (CRUD, email sending, public payment links)
+- SSO onboarding flow (account type + provider use case selection)
+- Notification preferences (granular email controls)
+- Account type switching (AGENT ↔ PROVIDER)
+- Payment mode configuration (NO_PAYMENT, UPFRONT, INVOICE_AFTER_DELIVERY)
+- Global exception filter & security headers
+- Enhanced auth bootstrap & account deactivation
 
 ---
 
@@ -202,21 +225,29 @@ Before marking any feature as passing:
 ### Frontend (.env.local)
 ```
 NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_xxx
+CLERK_SECRET_KEY=sk_xxx
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+NEXT_PUBLIC_MAPBOX_TOKEN=pk.xxx
 ```
 
 ### Backend (.env)
 ```
-DATABASE_URL=postgresql://user:pass@localhost:5432/yedatechs
-JWT_SECRET=your-secret-key
+DATABASE_URL=postgresql://user:pass@localhost:5432/vrem
+CLERK_SECRET_KEY=sk_xxx
+CLERK_PUBLISHABLE_KEY=pk_xxx
 STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
+RESEND_API_KEY=re_xxx
+NYLAS_CLIENT_ID=xxx
+NYLAS_API_KEY=xxx
+UPLOADCARE_PUBLIC_KEY=xxx
+UPLOADCARE_SECRET_KEY=xxx
 AWS_ACCESS_KEY_ID=xxx
 AWS_SECRET_ACCESS_KEY=xxx
-AWS_S3_BUCKET=yedatechs-media
+AWS_S3_BUCKET=vrem-media
 AWS_REGION=us-east-1
-CRONOFY_CLIENT_ID=xxx
-CRONOFY_CLIENT_SECRET=xxx
+CRON_SECRET=xxx
 ```
 
 ---
@@ -225,15 +256,16 @@ CRONOFY_CLIENT_SECRET=xxx
 
 ### Development
 ```bash
-# Frontend (from /frontend)
+# Frontend (from apps/frontend)
 npm run dev          # Start dev server on :3000
 
-# Backend (from /backend)
+# Backend (from apps/backend)
 npm run start:dev    # Start dev server on :3001
 
-# Database
+# Database (from apps/backend)
 npx prisma migrate dev    # Run migrations
 npx prisma studio         # Open DB GUI
+npx prisma generate       # Regenerate Prisma client
 ```
 
 ### Testing
@@ -287,12 +319,13 @@ npx prisma db push
 ## Architecture Notes
 
 ### Authentication Flow
-1. User submits credentials
-2. Backend validates and returns JWT
-3. Frontend stores JWT in httpOnly cookie
-4. Subsequent requests include JWT
-5. Backend middleware validates JWT and extracts user role
-6. RBAC policies enforce access based on role
+1. User authenticates via Clerk (email/password, SSO, or OTP)
+2. Clerk issues JWT token
+3. Frontend includes Clerk JWT in Authorization header
+4. Backend validates Clerk JWT and provisions/upserts user in Postgres
+5. Bootstrap flow ensures personal org exists for new users
+6. OrgContextGuard validates x-org-id header for org-scoped routes
+7. RBAC policies enforce access based on org role
 
 ### Project Pipeline Flow
 ```
@@ -326,13 +359,14 @@ Agent can rebook
 
 ---
 
-## Next Steps After MVP
+## Next Steps
 
-Once all Phase 0-7 features pass:
-1. Deploy to staging environment
-2. Internal dogfooding (use for VX operations)
-3. Bug fixes and polish
-4. Prepare for Phase 3 (Private Alpha)
+MVP (Phases 0-7) and post-MVP enhancements (Phase 8) are complete:
+1. Commit all uncommitted work and verify database migrations
+2. Deploy to staging environment
+3. Internal dogfooding (use for VX operations)
+4. Bug fixes and polish
+5. Prepare for Private Alpha
 
 ---
 

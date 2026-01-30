@@ -4,6 +4,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 import { UserAccountType, ProviderUseCaseType, OrgType, OrgRole } from '@prisma/client';
+import { createClerkClient } from '@clerk/backend';
 
 /**
  * Org metadata returned for org switcher display
@@ -51,7 +52,13 @@ export interface OrgContextResponse {
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  private clerkClient: ReturnType<typeof createClerkClient> | null;
+
+  constructor(private prisma: PrismaService) {
+    this.clerkClient = process.env.CLERK_SECRET_KEY
+      ? createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY })
+      : null;
+  }
 
   async create(dto: CreateUserDto) {
     const hashed = await bcrypt.hash(dto.password, 10);
@@ -340,6 +347,33 @@ export class UsersService {
   }
 
   /**
+   * Get notification preferences for a user.
+   * Creates default preferences if none exist.
+   */
+  async getNotificationPreferences(userId: string) {
+    let prefs = await this.prisma.userNotificationPreferences.findUnique({
+      where: { userId },
+    });
+    if (!prefs) {
+      prefs = await this.prisma.userNotificationPreferences.create({
+        data: { userId },
+      });
+    }
+    return prefs;
+  }
+
+  /**
+   * Update notification preferences for a user.
+   */
+  async updateNotificationPreferences(userId: string, dto: any) {
+    return this.prisma.userNotificationPreferences.upsert({
+      where: { userId },
+      create: { userId, ...dto },
+      update: dto,
+    });
+  }
+
+  /**
    * Get the org context for the current user.
    * This is the canonical endpoint for the org switcher UI.
    *
@@ -447,6 +481,54 @@ export class UsersService {
       memberships: orgMemberships,
       customerOfOrgs,
       accountType: user.accountType,
+    };
+  }
+
+  /**
+   * Switch account type between AGENT and PROVIDER.
+   * Syncs the change to Clerk metadata.
+   */
+  async switchAccountType(userId: string, newAccountType: UserAccountType) {
+    if (newAccountType !== UserAccountType.AGENT && newAccountType !== UserAccountType.PROVIDER) {
+      throw new BadRequestException('Can only switch between AGENT and PROVIDER account types');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, accountType: true, clerkUserId: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.accountType === newAccountType) {
+      throw new BadRequestException(`Account is already ${newAccountType}`);
+    }
+
+    if (user.accountType !== UserAccountType.AGENT && user.accountType !== UserAccountType.PROVIDER) {
+      throw new BadRequestException('Can only switch between AGENT and PROVIDER account types');
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: { accountType: newAccountType },
+    });
+
+    // Sync to Clerk metadata
+    if (user.clerkUserId && this.clerkClient) {
+      try {
+        await this.clerkClient.users.updateUserMetadata(user.clerkUserId, {
+          unsafeMetadata: { accountType: newAccountType },
+        });
+      } catch (error) {
+        console.warn('Failed to sync accountType to Clerk:', error);
+      }
+    }
+
+    return {
+      id: updatedUser.id,
+      accountType: updatedUser.accountType,
     };
   }
 }

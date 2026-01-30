@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
+import { FRONTEND_URL } from '../config/urls.config';
 
 @Injectable()
 export class EmailService {
@@ -343,6 +344,165 @@ export class EmailService {
       </div>
     `;
 
+    return this.sendEmail(to, subject, html);
+  }
+
+  /**
+   * Send new order received notification to company
+   */
+  async sendNewOrderEmail(
+    to: string,
+    companyName: string,
+    customerName: string,
+    address: string,
+    scheduledTime: Date | null,
+    projectId: string,
+  ): Promise<boolean> {
+    const subject = `New order from ${customerName}`;
+    const timeStr = scheduledTime
+      ? new Date(scheduledTime).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+      : 'Time to be scheduled';
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #333; font-size: 24px;">New Order Received</h1>
+        <p style="color: #666; font-size: 16px;">A new order has been placed by <strong>${customerName}</strong>.</p>
+        <div style="background: #f4f4f5; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <p style="margin: 4px 0; color: #333;"><strong>Address:</strong> ${address}</p>
+          <p style="margin: 4px 0; color: #333;"><strong>Scheduled:</strong> ${timeStr}</p>
+        </div>
+        <a href="${FRONTEND_URL}/jobs/${projectId}" style="display: inline-block; background: #18181b; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">View Order</a>
+        <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;" />
+        <p style="color: #a1a1aa; font-size: 12px;">VREM - Visual Real Estate Media</p>
+      </div>
+    `;
+    return this.sendEmail(to, subject, html);
+  }
+
+  /**
+   * Send order confirmed notification to agent/customer
+   */
+  async sendOrderConfirmedEmail(
+    to: string,
+    customerName: string,
+    address: string,
+    scheduledTime: Date,
+    companyName: string,
+  ): Promise<boolean> {
+    const subject = `Your order has been confirmed - ${companyName}`;
+    const timeStr = new Date(scheduledTime).toLocaleDateString('en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #333; font-size: 24px;">Order Confirmed</h1>
+        <p style="color: #666; font-size: 16px;">Hi ${customerName}, your order with <strong>${companyName}</strong> has been confirmed.</p>
+        <div style="background: #f4f4f5; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <p style="margin: 4px 0; color: #333;"><strong>Address:</strong> ${address}</p>
+          <p style="margin: 4px 0; color: #333;"><strong>Scheduled:</strong> ${timeStr}</p>
+        </div>
+        <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;" />
+        <p style="color: #a1a1aa; font-size: 12px;">VREM - Visual Real Estate Media</p>
+      </div>
+    `;
+    return this.sendEmail(to, subject, html);
+  }
+
+  /**
+   * Send project status change notification
+   */
+  async sendStatusChangeEmail(
+    to: string,
+    recipientName: string,
+    address: string,
+    oldStatus: string,
+    newStatus: string,
+    projectId: string,
+  ): Promise<boolean> {
+    const statusLabels: Record<string, string> = {
+      PENDING: 'Pending',
+      BOOKED: 'Booked',
+      SHOOTING: 'In Progress (Shooting)',
+      EDITING: 'Editing',
+      DELIVERED: 'Delivered',
+      CANCELLED: 'Cancelled',
+    };
+    const subject = `Project status updated: ${statusLabels[newStatus] || newStatus}`;
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #333; font-size: 24px;">Project Status Update</h1>
+        <p style="color: #666; font-size: 16px;">Hi ${recipientName}, the project at <strong>${address}</strong> has been updated.</p>
+        <div style="background: #f4f4f5; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <p style="margin: 4px 0; color: #333;"><strong>Previous status:</strong> ${statusLabels[oldStatus] || oldStatus}</p>
+          <p style="margin: 4px 0; color: #333;"><strong>New status:</strong> ${statusLabels[newStatus] || newStatus}</p>
+        </div>
+        <a href="${FRONTEND_URL}/jobs/${projectId}" style="display: inline-block; background: #18181b; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">View Project</a>
+        <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;" />
+        <p style="color: #a1a1aa; font-size: 12px;">VREM - Visual Real Estate Media</p>
+      </div>
+    `;
+    return this.sendEmail(to, subject, html);
+  }
+
+  /**
+   * Send invoice email to customer
+   */
+  async sendInvoiceEmail(
+    to: string,
+    customerName: string,
+    companyName: string,
+    invoiceNumber: number,
+    total: number,
+    currency: string,
+    dueDate: Date | null,
+    paymentToken: string,
+  ): Promise<boolean> {
+    const amountStr = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(total / 100);
+    const dueDateStr = dueDate
+      ? new Date(dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      : 'Upon receipt';
+    const subject = `Invoice #${invoiceNumber} from ${companyName} - ${amountStr}`;
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #333; font-size: 24px;">Invoice #${invoiceNumber}</h1>
+        <p style="color: #666; font-size: 16px;">Hi ${customerName}, you have a new invoice from <strong>${companyName}</strong>.</p>
+        <div style="background: #f4f4f5; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <p style="margin: 4px 0; color: #333;"><strong>Amount:</strong> ${amountStr}</p>
+          <p style="margin: 4px 0; color: #333;"><strong>Due date:</strong> ${dueDateStr}</p>
+        </div>
+        <a href="${FRONTEND_URL}/invoices/pay/${paymentToken}" style="display: inline-block; background: #18181b; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600;">View Invoice</a>
+        <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;" />
+        <p style="color: #a1a1aa; font-size: 12px;">VREM - Visual Real Estate Media</p>
+      </div>
+    `;
+    return this.sendEmail(to, subject, html);
+  }
+
+  /**
+   * Send payment received confirmation
+   */
+  async sendPaymentReceivedEmail(
+    to: string,
+    recipientName: string,
+    amount: number,
+    currency: string,
+    projectAddress: string,
+  ): Promise<boolean> {
+    const amountStr = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(amount / 100);
+    const subject = `Payment received: ${amountStr}`;
+    const html = `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #333; font-size: 24px;">Payment Received</h1>
+        <p style="color: #666; font-size: 16px;">Hi ${recipientName}, a payment of <strong>${amountStr}</strong> has been received for the project at <strong>${projectAddress}</strong>.</p>
+        <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;" />
+        <p style="color: #a1a1aa; font-size: 12px;">VREM - Visual Real Estate Media</p>
+      </div>
+    `;
     return this.sendEmail(to, subject, html);
   }
 

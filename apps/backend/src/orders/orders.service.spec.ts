@@ -42,6 +42,7 @@ describe('OrdersService', () => {
       slug: null,
       timezone: null,
       websiteUrl: null,
+      paymentMode: 'NO_PAYMENT' as any,
     },
     membership: {
       id: 'member-1',
@@ -78,6 +79,7 @@ describe('OrdersService', () => {
       slug: null,
       timezone: null,
       websiteUrl: null,
+      paymentMode: 'NO_PAYMENT' as any,
     },
     membership: {
       id: 'member-2',
@@ -251,7 +253,7 @@ describe('OrdersService', () => {
         dtoWithExistingCustomer,
       );
 
-      expect(result.isNewCustomer).toBe(false);
+      expect((result as any).isNewCustomer).toBe(false);
       expect(mockPrismaService.organizationCustomer.create).not.toHaveBeenCalled();
     });
 

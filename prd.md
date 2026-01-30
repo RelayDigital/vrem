@@ -45,13 +45,14 @@ A purpose-built vertical SaaS platform that unifies the entire media workflow:
 - **Redis** for caching
 
 ### Storage & Media Delivery
+- **Uploadcare** for file uploads
 - **AWS S3** for file storage
 - **AWS CloudFront** (CDN) for delivery
 
 ### Authentication & Authorization
-- **JWT** or **OAuth** for authentication
-- **RBAC** (Role-Based Access Control)
-- **Row-based multi-tenancy**
+- **Clerk** for authentication (JWT, SSO, OTP)
+- **RBAC** (Role-Based Access Control) via org roles
+- **Row-based multi-tenancy** via organization context
 
 ### DevOps/Infrastructure
 - **AWS** hosting
@@ -68,7 +69,7 @@ The MVP replaces:
 | Asana (Task/Project Ops) | Shoot Pipeline / Job Status stages | **Yes** |
 | Slack (Per-job communication) | In-app project messaging | **Yes** |
 | Google Drive | S3-backed uploads + delivery UI | **Yes** |
-| Stripe manual billing | Integrated payment + invoicing | **Eventually** |
+| Stripe manual billing | Integrated payment + invoicing | **Yes** |
 | Social distribution tools | Post-launch feature | **No** |
 
 ### Core Pipeline Flow
@@ -85,32 +86,42 @@ Booked → Shooting → Editing → Delivered
 
 ## User Roles & Permissions
 
-### 1. Admin
+Users have an **account type** (AGENT, PROVIDER, COMPANY) and an **organization role** that determines their permissions within each organization.
+
+### Organization Roles (OrgRole)
+
+### 1. Owner
+- Full organization management, can delete org
 - Manages users/roles and global settings
 - Full access to all projects and data
-- Can create/deactivate accounts and adjust system configurations
 
-### 2. Project Manager (PM)
+### 2. Admin
+- Can update settings and manage members
+- Full access to all projects and data
+- Cannot transfer ownership or delete org
+
+### 3. Project Manager
 - Oversees projects; assigns technicians and editors
 - Sees pipeline of all jobs in all stages
 - Handles exceptions (reschedules, cancellations)
 
-### 3. Technician
+### 4. Technician
 - Field personnel conducting photo/video shoots
 - Sees only assigned jobs in calendar
 - Updates job status: Booked → Shooting → Editing
 - Uploads raw files/notes and communicates via project chat
 
-### 4. Editor
+### 5. Editor
 - Post-production staff
 - Sees projects in Editing stage
 - Uploads final media, marks job as Delivered
 
-### 5. Agent (Customer)
-- Books new shoots
+### 6. Agent (Customer)
+- Books new shoots via provider organizations
 - Views upcoming jobs and downloads delivered media
 - Sees only their own projects and messages
 - Can rebook after delivery
+- Can be a customer of multiple provider organizations
 
 ---
 
@@ -119,17 +130,17 @@ Booked → Shooting → Editing → Delivered
 ### 1. Booking & Scheduling Module
 
 **Features:**
-- Availability calendar (powered by Cronofy)
+- Availability calendar (powered by Nylas)
 - Property details form (address, service type, notes)
 - Date/time slot selection with real-time availability
-- Stripe payment integration
+- Flexible payment modes: upfront (Stripe), invoice after delivery, or no payment
 - Automatic calendar event creation on booking
 
 **UI Flow:**
 1. Agent clicks "Book New Shoot"
 2. Fills property address and service details
-3. Views available slots via Cronofy calendar
-4. Selects slot and proceeds to Stripe checkout
+3. Views available slots via Nylas calendar integration
+4. Selects slot and proceeds (Stripe checkout if upfront payment, or direct order)
 5. Receives confirmation; new job appears in dashboard
 
 ### 2. Job Assignment & Pipeline Management
@@ -158,7 +169,7 @@ Booked → Shooting → Editing → Delivered
 
 **Features:**
 - Drag-and-drop upload interface for editors
-- Supabase/S3 storage backend
+- Uploadcare + S3 storage backend
 - Secure pre-signed URLs for downloads
 - Thumbnail previews in agent dashboard
 - Support for multiple file types (photos, video, zip)
@@ -179,7 +190,23 @@ Booked → Shooting → Editing → Delivered
 - File attachments (optional extension)
 - In-app and email notifications
 
-### 6. Role-Based Dashboards
+### 6. Invoicing Module
+
+**Features:**
+- Invoice CRUD with line items, tax calculation, and auto-totaling
+- Status workflow: Draft → Sent → Paid/Void
+- Auto-generate draft invoices when projects are delivered
+- Email invoices with public payment link (via unique payment token)
+- Invoice list with status filtering and summary statistics (outstanding balance, paid, overdue)
+
+**UI Flow:**
+1. Provider navigates to Invoices page
+2. Creates invoice with customer, line items, tax rate, due date
+3. Sends invoice (email with payment link)
+4. Customer pays via public payment page
+5. Invoice status updates to Paid
+
+### 7. Role-Based Dashboards
 
 **Admin Dashboard:**
 - System metrics (total projects, active users)
@@ -211,83 +238,112 @@ Booked → Shooting → Editing → Delivered
 
 ## Data Model (Core Tables)
 
-### users
+### User
 ```
-id: UUID (PK)
-name: string
-email: string
-role: enum ('admin', 'pm', 'technician', 'editor', 'agent')
+id, clerkUserId, email, name, password, avatarUrl, accountType (AGENT|PROVIDER|COMPANY),
+onboardingCompletedAt, deactivatedAt, createdAt, updatedAt
 ```
 
-### projects
+### Organization
 ```
-id: UUID (PK)
-agent_id: UUID (FK → users)
-address: string
-scheduled_time: timestamp
-status: enum ('booked', 'shooting', 'editing', 'delivered')
-technician_id: UUID (FK → users)
-editor_id: UUID (FK → users)
-created_at: timestamp
-updated_at: timestamp
+id, name, type (COMPANY|PERSONAL|TEAM), paymentMode (NO_PAYMENT|UPFRONT_PAYMENT|INVOICE_AFTER_DELIVERY),
+legalName, logoUrl, phone, primaryEmail, websiteUrl, timezone,
+addressLine1, city, region, postalCode, countryCode, lat, lng, createdAt
 ```
 
-### messages
+### OrganizationMember
 ```
-id: UUID (PK)
-project_id: UUID (FK → projects)
-sender_id: UUID (FK → users)
-content: text
-timestamp: timestamp
+id, userId (FK → User), orgId (FK → Organization), role (OWNER|ADMIN|TECHNICIAN|EDITOR|PROJECT_MANAGER|AGENT), createdAt
 ```
 
-### media_items
+### OrganizationCustomer
 ```
-id: UUID (PK)
-project_id: UUID (FK → projects)
-file_url: text
-file_type: enum ('image', 'video')
-created_at: timestamp
+id, orgId (FK → Organization), userId (FK → User), name, email, phone, notes, createdAt
 ```
 
-### payments
+### Project
 ```
-id: UUID (PK)
-project_id: UUID (FK → projects)
-stripe_payment_id: string
-amount: decimal
-currency: string
-status: string
-created_at: timestamp
+id, orgId (FK → Organization), customerId (FK → OrganizationCustomer),
+status (PENDING|BOOKED|SHOOTING|EDITING|DELIVERED|CANCELLED),
+scheduledTime, addressLine1, city, region, postalCode, lat, lng,
+technicianId, editorId, projectManagerId,
+clientApprovalStatus, deliveryToken, paymentAmount, stripePaymentIntentId,
+createdAt, updatedAt
 ```
 
-### calendar_events
+### Invoice
 ```
-id: UUID (PK)
-project_id: UUID (FK → projects)
-cronofy_event_id: string
-calendar_id: string
-created_at: timestamp
+id, invoiceNumber (auto-increment), orgId, customerId, projectId,
+status (DRAFT|SENT|PAID|OVERDUE|CANCELLED|VOID),
+items (JSON line items), subtotal, taxRate, taxAmount, total, currency,
+dueDate, paidAt, sentAt, voidedAt, notes, paymentToken,
+createdAt, updatedAt
 ```
+
+### Message
+```
+id, projectId (FK → Project), userId (FK → User), content, channel (TEAM|CUSTOMER), timestamp
+```
+
+### Media
+```
+id, projectId (FK → Project), key, cdnUrl, externalUrl, filename, size, type (PHOTO|VIDEO|FLOORPLAN|DOCUMENT|VIRTUAL_TOUR), createdAt
+```
+
+### CalendarEvent
+```
+id, projectId (FK → Project), nylasEventId, nylasCalendarId, nylasGrantId, syncStatus, createdAt
+```
+
+### ServicePackage
+```
+id, orgId, name, description, price, currency, mediaTypes, turnaroundDays, photoCount, videoMinutes, features, isActive
+```
+
+### UserNotificationPreferences
+```
+id, userId, emailNewOrder, emailOrderConfirmed, emailProjectAssigned, emailStatusChange,
+emailDeliveryReady, emailApprovalChange, emailNewMessage, emailInvoice, emailDigestFrequency
+```
+
+### Additional models: PendingOrder, PackageAddOn, Invitation, Notification, DownloadArtifact,
+### UserCalendarIntegration, UserAvailability, ProviderUseCase, EmailOtp, TourProgress, TourStatus
 
 ---
 
-## Third-Party Integrations (MVP)
+## Third-Party Integrations
 
-### Cronofy (Scheduling)
+### Clerk (Authentication)
+- User authentication (email/password, SSO, OTP)
+- JWT token issuance and validation
+- User profile and metadata sync
+
+### Nylas (Calendar)
 - Calendar syncing and availability checks
-- Slot Picker UI component for booking page
-- Real-time scheduling engine
+- Google Calendar and Microsoft Outlook integration
+- Event creation and management via API
 
 ### Stripe (Payments)
-- Checkout sessions for bookings
+- Checkout sessions for bookings (upfront payment mode)
 - Webhook integration for payment status
 - Customer and payment record sync
 
-### AWS S3 / Supabase Storage
-- File uploads and serving
-- CDN delivery
-- Secure pre-signed URLs
+### Uploadcare (File Upload)
+- Direct file uploads from browser
+- File processing and transformation
+
+### AWS S3 + CloudFront (Storage & CDN)
+- File storage backend
+- CDN delivery with signed URLs
+- Download artifact generation (ZIP archives)
+
+### Resend (Email)
+- Transactional emails (invitations, invoices, notifications)
+- Email template rendering
+
+### Mapbox (Maps)
+- Address geocoding and display
+- Service area visualization
 
 ---
 

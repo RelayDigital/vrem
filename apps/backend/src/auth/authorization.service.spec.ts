@@ -37,6 +37,7 @@ describe('AuthorizationService', () => {
     slug: null,
     timezone: null,
     websiteUrl: null,
+    paymentMode: 'NO_PAYMENT' as any,
     ...overrides,
   });
 

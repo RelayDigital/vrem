@@ -293,8 +293,7 @@ export default function BookingPage() {
       // Generate idempotency key to prevent duplicate submissions
       const idempotencyKey = `${user.id}-${job.providerOrgId}-${job.addressLine1 || job.propertyAddress}-${Date.now()}`;
 
-      // Create order directly (no Stripe checkout for MVP)
-      const result = await api.orders.create({
+      const orderPayload = {
         // Agent flow: specify the provider org
         providerOrgId: job.providerOrgId,
         // Address - use parsed components from Mapbox, fallback to full address string
@@ -315,16 +314,28 @@ export default function BookingPage() {
         notes: job.requirements || "",
         // Idempotency key for duplicate prevention
         idempotencyKey,
-      });
+      };
 
+      // Create order - backend returns either a project or a checkout redirect
+      const result = await api.orders.create(orderPayload);
+
+      // If the provider requires upfront payment, redirect to Stripe Checkout
+      if ('requiresPayment' in result && result.requiresPayment && result.checkoutUrl) {
+        toast.info("Redirecting to payment...");
+        window.location.href = result.checkoutUrl;
+        return;
+      }
+
+      // Direct order creation (NO_PAYMENT or INVOICE_AFTER_DELIVERY modes)
       // Dispatch event to refresh job lists across the app
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('orderCreated'));
       }
 
       // Show success screen
+      const orderResult = result as { project: any; customer: any; calendarEvent: any; isNewCustomer: boolean };
       setOrderSuccess({
-        project: result.project,
+        project: orderResult.project,
         providerName: job.providerName || 'Provider',
         address: job.propertyAddress || job.addressLine1 || 'Address',
         scheduledDate: job.scheduledDate,

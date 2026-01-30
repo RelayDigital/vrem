@@ -128,6 +128,7 @@ export class AuthService {
           name,
           password: hashedPassword,
           accountType: accountTypeToStore,
+          onboardingCompletedAt: new Date(),
         },
       });
 
@@ -190,6 +191,7 @@ export class AuthService {
           name,
           password: hashedPassword,
           accountType: accountTypeIntent,
+          onboardingCompletedAt: new Date(),
         },
       });
 
@@ -640,6 +642,7 @@ export class AuthService {
           name: data.name,
           password: hashedPassword,
           accountType: data.accountType,
+          onboardingCompletedAt: new Date(),
         },
       });
 
@@ -723,63 +726,59 @@ export class AuthService {
   }
 
   /**
-   * Get a Clerk sign-in token that bypasses email verification.
-   * In development: works for all accounts.
-   * In production: only works for @example.com test accounts.
+   * Complete onboarding for SSO-provisioned users who haven't chosen their account type yet.
+   * Updates accountType, sets onboardingCompletedAt, and optionally saves provider use cases.
    */
-  async getTestAccountSignInToken(email: string, password: string): Promise<{ token: string }> {
-    const isTestAccount = email.endsWith('@example.com');
-    const isProduction = process.env.NODE_ENV === 'production';
-
-    // In production, only allow test accounts
-    if (isProduction && !isTestAccount) {
-      throw new BadRequestException('This endpoint is only for test accounts in production');
-    }
-
-    if (!this.clerkClient) {
-      throw new BadRequestException('Clerk not configured');
-    }
-
-    // Find user in our database first
-    const user = await this.prisma.user.findUnique({ where: { email } });
+  async completeOnboarding(
+    userId: string,
+    accountType: UserAccountType,
+    useCases?: ProviderUseCaseType[],
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('User not found');
     }
 
-    // Verify password
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      throw new UnauthorizedException('Invalid credentials');
+    // Validate account type
+    if (accountType !== UserAccountType.AGENT && accountType !== UserAccountType.PROVIDER) {
+      throw new BadRequestException('Account type must be AGENT or PROVIDER');
     }
 
-    // Get the Clerk user
-    if (!user.clerkUserId) {
-      throw new BadRequestException('User not linked to Clerk');
-    }
-
-    // Verify password with Clerk too
-    try {
-      const verified = await this.clerkClient.users.verifyPassword({
-        userId: user.clerkUserId,
-        password,
+    // Update user in a transaction
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          accountType,
+          onboardingCompletedAt: new Date(),
+        },
       });
-      if (!verified.verified) {
-        throw new UnauthorizedException('Invalid credentials');
-      }
-    } catch (err: any) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
 
-    // Create a sign-in token
-    const signInToken = await this.clerkClient.signInTokens.createSignInToken({
-      userId: user.clerkUserId,
-      expiresInSeconds: 60,
+      // Save use cases for provider accounts
+      if (accountType === UserAccountType.PROVIDER && useCases?.length) {
+        // Clear any existing use cases first
+        await tx.providerUseCase.deleteMany({ where: { userId } });
+        await tx.providerUseCase.createMany({
+          data: useCases.map((useCase) => ({
+            userId,
+            useCase,
+          })),
+        });
+      }
     });
 
-    if (!signInToken.token) {
-      throw new BadRequestException('Failed to create sign-in token');
+    // Sync accountType to Clerk metadata
+    if (user.clerkUserId && this.clerkClient) {
+      try {
+        await this.clerkClient.users.updateUserMetadata(user.clerkUserId, {
+          unsafeMetadata: { accountType },
+        });
+      } catch (error) {
+        console.warn('Failed to sync accountType to Clerk:', error);
+      }
     }
 
-    return { token: signInToken.token };
+    return this.me(userId);
   }
+
 }

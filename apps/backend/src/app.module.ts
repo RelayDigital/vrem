@@ -24,6 +24,7 @@ import { NylasModule } from './nylas/nylas.module';
 import { OtpModule } from './otp/otp.module';
 import { EmailModule } from './email/email.module';
 import { ToursModule } from './tours/tours.module';
+import { InvoicesModule } from './invoices/invoices.module';
 import { OrgRolesGuard } from './auth/org-roles.guard';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { Reflector } from '@nestjs/core';
@@ -54,6 +55,7 @@ import { THROTTLE_CONFIG } from './config/throttle.config';
     AvailabilityModule,
     NylasModule,
     ToursModule,
+    InvoicesModule,
   ],
   controllers: [AppController],
   providers: [

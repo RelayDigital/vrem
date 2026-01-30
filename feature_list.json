@@ -1,7 +1,7 @@
 {
   "project": "YedaTechs - Real Estate Media Production Platform",
   "version": "MVP",
-  "last_updated": null,
+  "last_updated": "2026-01-30",
   "instructions": "DO NOT remove or edit feature descriptions. Only update 'passes' to true after thorough testing.",
   "features": [
     {
@@ -779,6 +779,143 @@
         "Display date, amount, status",
         "Link to related project",
         "Show invoice download"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P8-001",
+      "phase": 8,
+      "category": "invoicing",
+      "description": "Invoice CRUD with line items, tax calculation, and status workflow",
+      "steps": [
+        "Create Invoice model in Prisma schema with auto-incrementing invoice number",
+        "Create invoices module with controller, service, DTOs",
+        "Implement list, get, create, update endpoints with role-based access",
+        "Support line items with quantity, unit price, and automatic total calculation",
+        "Implement tax rate and tax amount calculation",
+        "Add status workflow: DRAFT → SENT → PAID/VOID"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P8-002",
+      "phase": 8,
+      "category": "invoicing",
+      "description": "Invoice sending via email with public payment link",
+      "steps": [
+        "Generate unique payment token per invoice",
+        "Create public /invoices/public/:token endpoint for unauthenticated access",
+        "Integrate with email service to send invoice with payment link",
+        "Track sentAt timestamp on send"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P8-003",
+      "phase": 8,
+      "category": "invoicing",
+      "description": "Invoice frontend pages with list, detail, and create dialog",
+      "steps": [
+        "Create invoice list page with status filtering and summary stats",
+        "Create invoice detail page with full invoice data",
+        "Create CreateInvoiceDialog with line item editor",
+        "Add Invoices link to sidebar navigation",
+        "Wire up API client methods for all invoice endpoints"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P8-004",
+      "phase": 8,
+      "category": "onboarding",
+      "description": "SSO user onboarding with account type and provider use case selection",
+      "steps": [
+        "Create POST /auth/complete-onboarding endpoint",
+        "Create onboarding/account-type page with AGENT/PROVIDER selection",
+        "Add provider use case multi-select (photography, videography, drone, etc.)",
+        "Add onboarding completion check in auth context with redirect",
+        "Sync account type to Clerk metadata"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P8-005",
+      "phase": 8,
+      "category": "settings",
+      "description": "Notification preferences with granular email controls",
+      "steps": [
+        "Create UserNotificationPreferences model in schema",
+        "Create get/update endpoints for notification preferences",
+        "Build notification settings page with toggles for 8 event types",
+        "Support digest frequency preference (instant/daily/off)",
+        "Wire up API client methods"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P8-006",
+      "phase": 8,
+      "category": "settings",
+      "description": "Account type switching between AGENT and PROVIDER",
+      "steps": [
+        "Create switch-account-type endpoint",
+        "Add account type dropdown in account settings page",
+        "Add confirmation dialog warning about implications",
+        "Wire up API client method"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P8-007",
+      "phase": 8,
+      "category": "settings",
+      "description": "Organization payment mode configuration",
+      "steps": [
+        "Add PaymentMode enum to schema (NO_PAYMENT, UPFRONT_PAYMENT, INVOICE_AFTER_DELIVERY)",
+        "Add payment mode field to Organization model",
+        "Add payment mode selector in org general settings",
+        "Update booking flow to respect payment mode"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P8-008",
+      "phase": 8,
+      "category": "infrastructure",
+      "description": "Global exception filter with production-safe error handling",
+      "steps": [
+        "Create AllExceptionsFilter in common/filters",
+        "Register globally in main.ts",
+        "Distinguish HTTP exceptions from unexpected errors",
+        "Return structured error responses with validation details",
+        "Hide internal details in production"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P8-009",
+      "phase": 8,
+      "category": "infrastructure",
+      "description": "Security headers and enhanced CORS configuration",
+      "steps": [
+        "Add X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy headers",
+        "Support Vercel preview and Amplify deployment origins in CORS",
+        "Support configurable ALLOWED_ORIGINS env var",
+        "Allow localhost origins in development only"
+      ],
+      "passes": true
+    },
+    {
+      "id": "P8-010",
+      "phase": 8,
+      "category": "auth",
+      "description": "Enhanced auth with bootstrap, deactivation, and password management",
+      "steps": [
+        "Implement idempotent bootstrap flow ensuring personal org exists",
+        "Add deactivation check preventing deactivated users from logging in",
+        "Add account deactivation, reactivation, and deletion endpoints",
+        "Implement Clerk-integrated password change in security settings",
+        "Add billing settings page with plan display"
       ],
       "passes": true
     }

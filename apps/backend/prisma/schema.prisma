@@ -17,6 +17,7 @@ model User {
   createdAt            DateTime                  @default(now())
   updatedAt            DateTime                  @updatedAt
   deactivatedAt        DateTime?                 // Account deactivation timestamp (soft delete)
+  onboardingCompletedAt DateTime?                // When user completed account type selection onboarding
   accountType          UserAccountType           @default(AGENT)
   messages             Message[]
   messageReads         MessageRead[]
@@ -31,10 +32,11 @@ model User {
   availability         UserAvailability[]
   availabilityStatus   UserAvailabilityStatus?
   calendarIntegrations UserCalendarIntegration[]
-  icsFeed              UserIcsFeed?
-  useCases             ProviderUseCase[]
-  tourProgress         TourProgress[]
-  tourStatus           TourStatus?
+  icsFeed                  UserIcsFeed?
+  useCases                 ProviderUseCase[]
+  tourProgress             TourProgress[]
+  tourStatus               TourStatus?
+  notificationPreferences  UserNotificationPreferences?
 }
 
 model Organization {
@@ -50,6 +52,7 @@ model Organization {
   timezone      String?
   websiteUrl    String?
   type          OrgType                @default(COMPANY)
+  paymentMode   PaymentMode            @default(NO_PAYMENT)
   addressLine1  String?
   addressLine2  String?
   city          String?
@@ -59,6 +62,7 @@ model Organization {
   lat           Float?
   lng           Float?
   invitations   Invitation[]
+  invoices      Invoice[]
   notifications Notification[]
   customers     OrganizationCustomer[]
   members       OrganizationMember[]
@@ -193,6 +197,7 @@ model Project {
   media                 Media[]
   messages              Message[]
   notifications         Notification[]
+  invoices              Invoice[]
   pendingOrder          PendingOrder?
   clientApprovedBy      User?                     @relation("ApprovedProjects", fields: [clientApprovedById], references: [id])
   customer              OrganizationCustomer?     @relation(fields: [customerId], references: [id])
@@ -216,6 +221,7 @@ model OrganizationCustomer {
   organization Organization @relation(fields: [orgId], references: [id])
   user         User?        @relation(fields: [userId], references: [id])
   projects     Project[]
+  invoices     Invoice[]
 }
 
 model Inquiry {
@@ -532,6 +538,75 @@ enum AddOnCategory {
   FLOORPLAN
   RUSH
   OTHER
+}
+
+enum PaymentMode {
+  UPFRONT_PAYMENT       // Agent pays via Stripe before order is confirmed
+  INVOICE_AFTER_DELIVERY // Order goes through, company invoices after delivery
+  NO_PAYMENT            // No payment required (direct order creation)
+}
+
+// ==================== INVOICING ====================
+
+model Invoice {
+  id                    String        @id @default(uuid())
+  invoiceNumber         Int           @default(autoincrement())
+  orgId                 String
+  customerId            String?
+  projectId             String?
+  status                InvoiceStatus @default(DRAFT)
+  items                 Json          // Array of line items: [{description, quantity, unitPrice, total}]
+  subtotal              Int           // Amount in cents
+  taxRate               Float?        @default(0)
+  taxAmount             Int           @default(0)
+  total                 Int           // Amount in cents
+  currency              String        @default("usd")
+  dueDate               DateTime?
+  paidAt                DateTime?
+  sentAt                DateTime?
+  voidedAt              DateTime?
+  notes                 String?
+  paymentToken          String?       @unique @default(uuid()) // For public payment page
+  stripePaymentIntentId String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  organization          Organization         @relation(fields: [orgId], references: [id])
+  customer              OrganizationCustomer? @relation(fields: [customerId], references: [id])
+  project               Project?              @relation(fields: [projectId], references: [id])
+
+  @@index([orgId])
+  @@index([customerId])
+  @@index([projectId])
+  @@index([status])
+  @@index([paymentToken])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+  VOID
+}
+
+// ==================== NOTIFICATION PREFERENCES ====================
+
+model UserNotificationPreferences {
+  id                    String   @id @default(uuid())
+  userId                String   @unique
+  emailNewOrder         Boolean  @default(true)
+  emailOrderConfirmed   Boolean  @default(true)
+  emailProjectAssigned  Boolean  @default(true)
+  emailStatusChange     Boolean  @default(true)
+  emailDeliveryReady    Boolean  @default(true)
+  emailApprovalChange   Boolean  @default(true)
+  emailNewMessage       Boolean  @default(true)
+  emailInvoice          Boolean  @default(true)
+  emailDigestFrequency  String   @default("instant") // instant | daily | off
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum CalendarProvider {

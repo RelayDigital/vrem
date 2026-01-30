@@ -27,7 +27,9 @@ x-org-id: <organization-id>
 5. [Media](#media)
 6. [Messages](#messages)
 7. [Users](#users)
-8. [Inquiries](#inquiries)
+8. [Invoices](#invoices)
+9. [Onboarding](#onboarding)
+10. [Notification Preferences](#notification-preferences)
 
 ---
 
@@ -1261,6 +1263,362 @@ MESSAGE_ID="message-id-here"
 
 curl -X GET "http://localhost:3001/messages/$MESSAGE_ID" \
   -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Invoices
+
+### List Invoices
+
+**GET** `/invoices`
+
+**Requires:**
+- JWT Authentication
+- Organization membership with `OWNER`, `ADMIN`, or `PROJECT_MANAGER` role
+- `x-org-id` header
+
+**Example:**
+```bash
+TOKEN="your-jwt-token"
+ORG_ID="org-id-here"
+
+curl -X GET http://localhost:3001/invoices \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "x-org-id: $ORG_ID"
+```
+
+---
+
+### Get Invoice
+
+**GET** `/invoices/:id`
+
+**Requires:**
+- JWT Authentication
+- Organization membership with `OWNER`, `ADMIN`, or `PROJECT_MANAGER` role
+- `x-org-id` header
+
+**Example:**
+```bash
+TOKEN="your-jwt-token"
+ORG_ID="org-id-here"
+INVOICE_ID="invoice-id-here"
+
+curl -X GET "http://localhost:3001/invoices/$INVOICE_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "x-org-id: $ORG_ID"
+```
+
+---
+
+### Get Invoice by Payment Token (Public)
+
+**GET** `/invoices/public/:token`
+
+**Public endpoint** - No authentication required.
+
+Used for public invoice payment pages.
+
+**Example:**
+```bash
+curl -X GET "http://localhost:3001/invoices/public/payment-token-uuid"
+```
+
+---
+
+### Create Invoice
+
+**POST** `/invoices`
+
+**Requires:**
+- JWT Authentication
+- Organization membership with `OWNER`, `ADMIN`, or `PROJECT_MANAGER` role
+- `x-org-id` header
+
+**Request Body:**
+```json
+{
+  "customerId": "customer-id",
+  "projectId": "project-id",
+  "items": [
+    {
+      "description": "Photography session",
+      "quantity": 1,
+      "unitPrice": 25000
+    }
+  ],
+  "taxRate": 0.13,
+  "dueDate": "2026-02-28T00:00:00.000Z",
+  "notes": "Payment due within 30 days",
+  "currency": "usd"
+}
+```
+
+**Note:** All monetary amounts are in cents (e.g., 25000 = $250.00).
+
+**Example:**
+```bash
+TOKEN="your-jwt-token"
+ORG_ID="org-id-here"
+
+curl -X POST http://localhost:3001/invoices \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "x-org-id: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customerId": "customer-id",
+    "items": [{"description": "Photo shoot", "quantity": 1, "unitPrice": 25000}],
+    "taxRate": 0.13,
+    "dueDate": "2026-02-28T00:00:00.000Z"
+  }'
+```
+
+---
+
+### Update Invoice
+
+**PATCH** `/invoices/:id`
+
+**Requires:**
+- JWT Authentication
+- Organization membership with `OWNER`, `ADMIN`, or `PROJECT_MANAGER` role
+- `x-org-id` header
+
+**Request Body:** (all fields optional)
+```json
+{
+  "items": [{"description": "Updated item", "quantity": 2, "unitPrice": 15000}],
+  "taxRate": 0.13,
+  "dueDate": "2026-03-15T00:00:00.000Z",
+  "notes": "Updated notes",
+  "status": "DRAFT"
+}
+```
+
+---
+
+### Send Invoice
+
+**POST** `/invoices/:id/send`
+
+**Requires:**
+- JWT Authentication
+- Organization membership with `OWNER`, `ADMIN`, or `PROJECT_MANAGER` role
+- `x-org-id` header
+
+Sends the invoice to the customer via email with a payment link. Updates status to `SENT`.
+
+**Example:**
+```bash
+TOKEN="your-jwt-token"
+ORG_ID="org-id-here"
+INVOICE_ID="invoice-id-here"
+
+curl -X POST "http://localhost:3001/invoices/$INVOICE_ID/send" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "x-org-id: $ORG_ID"
+```
+
+---
+
+### Mark Invoice as Paid
+
+**POST** `/invoices/:id/mark-paid`
+
+**Requires:**
+- JWT Authentication
+- Organization membership with `OWNER`, `ADMIN`, or `PROJECT_MANAGER` role
+- `x-org-id` header
+
+Updates invoice status to `PAID` and records the payment timestamp.
+
+---
+
+### Void Invoice
+
+**POST** `/invoices/:id/void`
+
+**Requires:**
+- JWT Authentication
+- Organization membership with `OWNER`, `ADMIN`, or `PROJECT_MANAGER` role
+- `x-org-id` header
+
+Voids an invoice, preventing further actions on it.
+
+---
+
+## Onboarding
+
+### Complete SSO Onboarding
+
+**POST** `/auth/complete-onboarding`
+
+**Requires:** JWT Authentication
+
+Called after an SSO-provisioned user selects their account type. Sets the account type and optionally records provider use cases.
+
+**Request Body:**
+```json
+{
+  "accountType": "PROVIDER",
+  "useCases": ["PHOTOGRAPHY", "VIDEOGRAPHY", "DRONE_AERIAL"]
+}
+```
+
+**Valid Account Types:** `AGENT`, `PROVIDER`
+
+**Valid Use Cases:** `PHOTOGRAPHY`, `VIDEOGRAPHY`, `DRONE_AERIAL`, `VIRTUAL_TOURS`, `FLOOR_PLANS`, `EDITING`, `STAGING`, `MEASUREMENTS`
+
+**Example:**
+```bash
+TOKEN="your-jwt-token"
+
+curl -X POST http://localhost:3001/auth/complete-onboarding \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accountType": "PROVIDER",
+    "useCases": ["PHOTOGRAPHY", "VIDEOGRAPHY"]
+  }'
+```
+
+---
+
+### Bootstrap User Session
+
+**GET** `/auth/me/bootstrap`
+
+**Requires:** JWT Authentication
+
+Idempotent endpoint that ensures the user is fully provisioned (personal org exists) and returns complete app state including all org contexts.
+
+**Example:**
+```bash
+TOKEN="your-jwt-token"
+
+curl -X GET http://localhost:3001/auth/me/bootstrap \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+---
+
+## Notification Preferences
+
+### Get Notification Preferences
+
+**GET** `/users/me/notification-preferences`
+
+**Requires:** JWT Authentication
+
+Returns the current user's email notification settings.
+
+**Example:**
+```bash
+TOKEN="your-jwt-token"
+
+curl -X GET http://localhost:3001/users/me/notification-preferences \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response:**
+```json
+{
+  "emailNewOrder": true,
+  "emailOrderConfirmed": true,
+  "emailProjectAssigned": true,
+  "emailStatusChange": true,
+  "emailDeliveryReady": true,
+  "emailApprovalChange": true,
+  "emailNewMessage": true,
+  "emailInvoice": true,
+  "emailDigestFrequency": "instant"
+}
+```
+
+---
+
+### Update Notification Preferences
+
+**PATCH** `/users/me/notification-preferences`
+
+**Requires:** JWT Authentication
+
+**Request Body:** (all fields optional)
+```json
+{
+  "emailNewOrder": false,
+  "emailNewMessage": true,
+  "emailInvoice": true,
+  "emailDigestFrequency": "daily"
+}
+```
+
+**Valid Digest Frequencies:** `instant`, `daily`, `off`
+
+---
+
+## Account Management
+
+### Switch Account Type
+
+**PATCH** `/users/me/account-type`
+
+**Requires:** JWT Authentication
+
+Switches the user's account type between AGENT and PROVIDER.
+
+**Request Body:**
+```json
+{
+  "accountType": "PROVIDER"
+}
+```
+
+**Valid Account Types:** `AGENT`, `PROVIDER`
+
+---
+
+### Deactivate Account
+
+**POST** `/users/me/deactivate`
+
+**Requires:** JWT Authentication
+
+Soft-deletes the user's account. Requires password confirmation.
+
+**Request Body:**
+```json
+{
+  "password": "current-password"
+}
+```
+
+---
+
+### Reactivate Account
+
+**POST** `/users/me/reactivate`
+
+**Requires:** JWT Authentication
+
+Restores a previously deactivated account.
+
+---
+
+### Delete Account
+
+**DELETE** `/users/me`
+
+**Requires:** JWT Authentication
+
+Permanently deletes the user's account. This action cannot be undone. Requires password confirmation.
+
+**Request Body:**
+```json
+{
+  "password": "current-password"
+}
 ```
 
 ---

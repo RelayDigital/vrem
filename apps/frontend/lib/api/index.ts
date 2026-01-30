@@ -1,4 +1,4 @@
-import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization, DeliveryResponse, DeliveryComment, MediaType, ServicePackage, PackageAddOn, CreatePackagePayload, CreateAddOnPayload, DayOfWeek, TourTrack, TourStatusResponse, TourTrackProgress, TourProgressStep, UpdateTourProgressRequest, ClientApprovalStatus, OrgContextResponse } from '@/types';
+import { User, Metrics, JobRequest, Technician, AuditLogEntry, Project, ProjectStatus, Media, OrganizationMember, Organization, AnalyticsSummary, MarketplaceJob, JobApplication, Transaction, Customer, NotificationItem, OrganizationPublicInfo, CustomerCreateResponse, CustomerOrganization, DeliveryResponse, DeliveryComment, MediaType, ServicePackage, PackageAddOn, CreatePackagePayload, CreateAddOnPayload, DayOfWeek, TourTrack, TourStatusResponse, TourTrackProgress, TourProgressStep, UpdateTourProgressRequest, ClientApprovalStatus, OrgContextResponse, Invoice, InvoiceStatus, PaymentMode } from '@/types';
 import {
   currentUser,
   jobRequests,
@@ -532,6 +532,18 @@ class ApiClient {
         body: JSON.stringify(payload),
       });
     },
+    completeOnboarding: async (data: {
+      accountType: string;
+      useCases?: string[];
+    }) => {
+      return this.request<User>('/auth/complete-onboarding', {
+        method: 'POST',
+        body: JSON.stringify({
+          accountType: data.accountType.toUpperCase(),
+          useCases: data.useCases,
+        }),
+      });
+    },
   };
 
   // OTP API - Email verification endpoints
@@ -687,6 +699,16 @@ class ApiClient {
       return this.request<{ success: boolean; message: string }>('/users/me', {
         method: 'DELETE',
         body: JSON.stringify({ password }),
+      });
+    },
+
+    /**
+     * Switch account type between AGENT and PROVIDER
+     */
+    switchAccountType: async (accountType: string): Promise<{ id: string; accountType: string }> => {
+      return this.request<{ id: string; accountType: string }>('/users/me/account-type', {
+        method: 'PATCH',
+        body: JSON.stringify({ accountType: accountType.toUpperCase() }),
       });
     },
 
@@ -1636,6 +1658,10 @@ class ApiClient {
       customer: any;
       calendarEvent: any;
       isNewCustomer: boolean;
+    } | {
+      requiresPayment: true;
+      checkoutUrl: string;
+      sessionId: string;
     }> => {
       if (USE_MOCK_DATA) {
         const now = new Date();
@@ -1658,6 +1684,10 @@ class ApiClient {
         method: 'POST',
         body: JSON.stringify(payload),
       });
+      // Backend returns { requiresPayment, checkoutUrl, sessionId } for upfront payment
+      if (result.requiresPayment) {
+        return result;
+      }
       return {
         ...result,
         project: this.normalizeProject(result.project),
@@ -1724,6 +1754,104 @@ class ApiClient {
     cancel: async (projectId: string): Promise<{ success: boolean; action: 'deleted' | 'cancelled' }> => {
       return this.request(`/orders/${projectId}/cancel`, {
         method: 'DELETE',
+      });
+    },
+
+    /**
+     * Get a provider organization's payment mode.
+     */
+    getProviderPaymentMode: async (orgId: string): Promise<{ paymentMode: PaymentMode }> => {
+      return this.request(`/orders/provider/${orgId}/payment-mode`);
+    },
+  };
+
+  // Invoices API
+  invoices = {
+    list: async (params?: { status?: InvoiceStatus }): Promise<Invoice[]> => {
+      const query = params?.status ? `?status=${params.status}` : '';
+      return this.request<Invoice[]>(`/invoices${query}`);
+    },
+
+    get: async (id: string): Promise<Invoice> => {
+      return this.request<Invoice>(`/invoices/${id}`);
+    },
+
+    create: async (payload: {
+      customerId?: string;
+      projectId?: string;
+      items: { description: string; quantity: number; unitPrice: number }[];
+      taxRate?: number;
+      dueDate?: string;
+      notes?: string;
+      currency?: string;
+    }): Promise<Invoice> => {
+      return this.request<Invoice>('/invoices', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    update: async (id: string, payload: {
+      items?: { description: string; quantity: number; unitPrice: number }[];
+      taxRate?: number;
+      dueDate?: string;
+      notes?: string;
+    }): Promise<Invoice> => {
+      return this.request<Invoice>(`/invoices/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      });
+    },
+
+    send: async (id: string): Promise<Invoice> => {
+      return this.request<Invoice>(`/invoices/${id}/send`, {
+        method: 'POST',
+      });
+    },
+
+    markPaid: async (id: string): Promise<Invoice> => {
+      return this.request<Invoice>(`/invoices/${id}/mark-paid`, {
+        method: 'POST',
+      });
+    },
+
+    void: async (id: string): Promise<Invoice> => {
+      return this.request<Invoice>(`/invoices/${id}/void`, {
+        method: 'POST',
+      });
+    },
+  };
+
+  // Notification Preferences API
+  notificationPreferences = {
+    get: async (): Promise<{
+      emailNewOrder: boolean;
+      emailOrderConfirmed: boolean;
+      emailProjectAssigned: boolean;
+      emailStatusChange: boolean;
+      emailDeliveryReady: boolean;
+      emailApprovalChange: boolean;
+      emailNewMessage: boolean;
+      emailInvoice: boolean;
+      emailDigestFrequency: string;
+    }> => {
+      return this.request('/users/me/notification-preferences');
+    },
+
+    update: async (prefs: {
+      emailNewOrder?: boolean;
+      emailOrderConfirmed?: boolean;
+      emailProjectAssigned?: boolean;
+      emailStatusChange?: boolean;
+      emailDeliveryReady?: boolean;
+      emailApprovalChange?: boolean;
+      emailNewMessage?: boolean;
+      emailInvoice?: boolean;
+      emailDigestFrequency?: string;
+    }): Promise<any> => {
+      return this.request('/users/me/notification-preferences', {
+        method: 'PATCH',
+        body: JSON.stringify(prefs),
       });
     },
   };

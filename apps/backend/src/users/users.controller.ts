@@ -15,6 +15,8 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUseCasesDto } from './dto/update-use-cases.dto';
+import { UpdateNotificationPrefsDto } from './dto/update-notification-prefs.dto';
+import { SwitchAccountTypeDto } from './dto/switch-account-type.dto';
 import { AccountActionDto } from './dto/account-action.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OrgContextGuard } from '../auth/org-context.guard';
@@ -117,6 +119,45 @@ export class UsersController {
     @Body() dto: UpdateUseCasesDto,
   ) {
     return this.usersService.updateUseCases(user.id, dto.useCases);
+  }
+
+  /**
+   * Get the current user's notification preferences
+   */
+  @ApiOperation({ summary: 'Get notification preferences' })
+  @ApiBearerAuth('bearer')
+  @Get('me/notification-preferences')
+  @UseGuards(JwtAuthGuard)
+  getMyNotificationPreferences(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.getNotificationPreferences(user.id);
+  }
+
+  /**
+   * Update the current user's notification preferences
+   */
+  @ApiOperation({ summary: 'Update notification preferences' })
+  @ApiBearerAuth('bearer')
+  @Patch('me/notification-preferences')
+  @UseGuards(JwtAuthGuard)
+  updateMyNotificationPreferences(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateNotificationPrefsDto,
+  ) {
+    return this.usersService.updateNotificationPreferences(user.id, dto);
+  }
+
+  /**
+   * Switch account type between AGENT and PROVIDER
+   */
+  @ApiOperation({ summary: 'Switch account type (AGENT ↔ PROVIDER)' })
+  @ApiBearerAuth('bearer')
+  @Patch('me/account-type')
+  @UseGuards(JwtAuthGuard)
+  switchAccountType(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: SwitchAccountTypeDto,
+  ) {
+    return this.usersService.switchAccountType(user.id, dto.accountType);
   }
 
   /**

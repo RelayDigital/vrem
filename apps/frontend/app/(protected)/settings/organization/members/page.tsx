@@ -14,13 +14,16 @@ export default function OrganizationMembersPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to the canonical organization settings page
-    if (!isLoading && isAllowed && user?.organizationId) {
-      router.replace(`/organization/${user.organizationId}/settings`);
+    // Redirect to the Team page which has full member management
+    if (!isLoading && isAllowed) {
+      router.replace("/team");
     }
-  }, [isLoading, isAllowed, router, user?.organizationId]);
+  }, [isLoading, isAllowed, router]);
 
-  // Layout already handles auth loading - if we reach here, user exists
+  if (isLoading) {
+    return <TeamLoadingSkeleton />;
+  }
+
   if (!user) {
     return null;
   }
@@ -34,5 +37,5 @@ export default function OrganizationMembersPage() {
     );
   }
 
-  return null;
+  return <TeamLoadingSkeleton />;
 }

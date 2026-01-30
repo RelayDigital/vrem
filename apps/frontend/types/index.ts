@@ -106,6 +106,7 @@ export interface Organization {
   lng?: number;
   timezone?: string;
   serviceArea?: any;
+  paymentMode?: PaymentMode;
 }
 
 export interface OrganizationMember {
@@ -953,4 +954,60 @@ export interface UpdateTourProgressRequest {
   stepId: string;
   completed?: boolean;
   skipped?: boolean;
+}
+
+// =============================
+// Payment & Invoicing
+// =============================
+
+export type PaymentMode = "UPFRONT_PAYMENT" | "INVOICE_AFTER_DELIVERY" | "NO_PAYMENT";
+
+export enum InvoiceStatus {
+  DRAFT = "DRAFT",
+  SENT = "SENT",
+  PAID = "PAID",
+  OVERDUE = "OVERDUE",
+  CANCELLED = "CANCELLED",
+  VOID = "VOID",
+}
+
+export interface InvoiceLineItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: number;
+  orgId: string;
+  customerId?: string;
+  projectId?: string;
+  status: InvoiceStatus;
+  items: InvoiceLineItem[];
+  subtotal: number;
+  taxRate?: number;
+  taxAmount: number;
+  total: number;
+  currency: string;
+  dueDate?: string;
+  paidAt?: string;
+  sentAt?: string;
+  voidedAt?: string;
+  notes?: string;
+  paymentToken?: string;
+  stripePaymentIntentId?: string;
+  createdAt: string;
+  updatedAt: string;
+  customer?: {
+    id: string;
+    name: string;
+    email?: string;
+  };
+  project?: {
+    id: string;
+    addressLine1?: string;
+    status: ProjectStatus;
+  };
 }

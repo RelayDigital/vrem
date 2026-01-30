@@ -54,6 +54,7 @@ export default function OrganizationGeneralPage() {
   const [postalCode, setPostalCode] = useState("");
   const [countryCode, setCountryCode] = useState("");
   const [timezone, setTimezone] = useState("");
+  const [paymentMode, setPaymentMode] = useState("NO_PAYMENT");
 
   // Initialize form from organization data
   useEffect(() => {
@@ -71,6 +72,7 @@ export default function OrganizationGeneralPage() {
       setPostalCode((organization as any).postalCode || "");
       setCountryCode((organization as any).countryCode || "");
       setTimezone((organization as any).timezone || "");
+      setPaymentMode((organization as any).paymentMode || "NO_PAYMENT");
     }
   }, [organization]);
 
@@ -117,6 +119,7 @@ export default function OrganizationGeneralPage() {
         lat: nextLat,
         lng: nextLng,
         timezone: timezone || undefined,
+        paymentMode: paymentMode || undefined,
       } as any);
       toast.success("Organization settings saved successfully");
     } catch (err) {
@@ -260,6 +263,32 @@ export default function OrganizationGeneralPage() {
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+1 (555) 123-4567"
             />
+          </div>
+        </div>
+
+        {/* Payment Mode */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-lg mb-md border-b pb-md">
+          <div className="space-y-2">
+            <Label htmlFor="paymentMode">Agent Payment Mode</Label>
+            <Select value={paymentMode} onValueChange={setPaymentMode}>
+              <SelectTrigger id="paymentMode">
+                <SelectValue placeholder="Select payment mode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NO_PAYMENT">
+                  No Payment Required
+                </SelectItem>
+                <SelectItem value="UPFRONT_PAYMENT">
+                  Upfront Payment (Stripe Checkout)
+                </SelectItem>
+                <SelectItem value="INVOICE_AFTER_DELIVERY">
+                  Invoice After Delivery
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <Muted className="text-xs">
+              How agents pay when booking your services
+            </Muted>
           </div>
         </div>
 

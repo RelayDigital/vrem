@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRequireRole } from "@/hooks/useRequireRole";
+import { useUser } from "@clerk/nextjs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -17,25 +18,47 @@ export default function SecurityPasswordPage() {
     "EDITOR",
     "PROJECT_MANAGER",
   ]);
+  const { user: clerkUser } = useUser();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   // Layout already handles auth loading - if we reach here, user exists
   if (!user) {
     return null;
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (newPassword !== confirmPassword) {
       toast.error("Passwords do not match");
       return;
     }
-    // TODO: Implement save logic with API
-    toast.success("Password updated successfully");
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    if (!currentPassword) {
+      toast.error("Please enter your current password");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await clerkUser?.updatePassword({
+        currentPassword,
+        newPassword,
+      });
+      toast.success("Password updated successfully");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error: any) {
+      const message = error.errors?.[0]?.message || error.message || "Failed to update password";
+      toast.error(message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

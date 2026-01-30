@@ -12,7 +12,6 @@ import { randomUUID } from 'crypto';
 const OTP_EXPIRY_MINUTES = 10;
 const RATE_LIMIT_WINDOW_MINUTES = 10;
 const MAX_REQUESTS_PER_WINDOW = 5;
-const DEV_FALLBACK_CODE = '000000';
 
 @Injectable()
 export class OtpService {
@@ -105,7 +104,6 @@ export class OtpService {
     code: string,
   ): Promise<{ valid: boolean; token: string }> {
     const normalizedEmail = email.toLowerCase().trim();
-    const isDev = process.env.NODE_ENV !== 'production';
 
     // Find the most recent unexpired, unused OTP for this email
     const otp = await this.prisma.emailOtp.findFirst({
@@ -122,18 +120,11 @@ export class OtpService {
       throw new UnauthorizedException('No valid OTP found. Please request a new code.');
     }
 
-    // In dev mode, allow fallback code
-    const isDevFallback = isDev && code === DEV_FALLBACK_CODE;
-
     // Verify the code
-    const isValid = isDevFallback || await bcrypt.compare(code, otp.code);
+    const isValid = await bcrypt.compare(code, otp.code);
 
     if (!isValid) {
       throw new UnauthorizedException('Invalid OTP code');
-    }
-
-    if (isDevFallback) {
-      this.logger.warn(`Dev fallback OTP code used for ${normalizedEmail}`);
     }
 
     // Mark as verified

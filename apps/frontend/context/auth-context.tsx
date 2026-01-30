@@ -149,6 +149,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             setUser(normalizeUser(authData));
 
+            // Check if user needs to complete onboarding (SSO users who haven't chosen account type)
+            if (!authData.onboardingCompletedAt) {
+              console.debug('[AuthContext] User needs onboarding - redirecting to account type selection');
+              // Still set up basic state so the onboarding page can make API calls
+              const orgs = authData.memberships || [];
+              setMemberships(orgs);
+              const personalOrgId = authData.personalOrgId || orgs[0]?.orgId || null;
+              if (personalOrgId) {
+                api.organizations.setActiveOrganization(personalOrgId);
+              }
+              setActiveOrganizationId(personalOrgId);
+              setIsLoading(false);
+              router.push('/onboarding/account-type');
+              return;
+            }
+
             // Use memberships from the auth response (DB is source of truth)
             const orgs = authData.memberships || [];
             setMemberships(orgs);

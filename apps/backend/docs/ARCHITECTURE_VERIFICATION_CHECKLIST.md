@@ -332,7 +332,7 @@ async function main() {
     SELECT om.*, u.email
     FROM "OrganizationMember" om
     JOIN "User" u ON u.id = om."userId"
-    WHERE om."role" NOT IN ('OWNER', 'ADMIN', 'TECHNICIAN', 'DISPATCHER', 'VIEWER')
+    WHERE om."role" NOT IN ('OWNER', 'ADMIN', 'TECHNICIAN', 'EDITOR', 'PROJECT_MANAGER', 'AGENT')
   `;
   console.log('Invalid org roles:',
     Array.isArray(invalidRoles) && invalidRoles.length === 0

@@ -1,9 +1,10 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { OrgContextGuard } from './auth/org-context.guard';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { FRONTEND_URL } from './config/urls.config';
 import { validateEnvironment } from './config/env.validation';
 
@@ -73,7 +74,8 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
 
-  // OpenAPI / Swagger setup
+  // OpenAPI / Swagger setup (disabled in production for security)
+  const isProduction = process.env.NODE_ENV === 'production';
   const swaggerConfig = new DocumentBuilder()
     .setTitle('VREM API')
     .setDescription('VX Real Estate Media — Backend API Reference')
@@ -107,11 +109,39 @@ async function bootstrap() {
     .addTag('Tours', 'Virtual tour management')
     .addTag('Nylas', 'Nylas email integration')
     .addTag('Calendar', 'ICS calendar feeds')
+    .addTag('Invoices', 'Invoice management')
     .addTag('Stripe', 'Stripe payments & webhooks')
     .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api', app, document);
+  if (!isProduction) {
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api', app, document);
+    logger.log('Swagger API docs available at /api');
+  }
+
+  // Global validation pipe - ensures all DTOs are validated
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,           // Strip properties not in DTO
+      forbidNonWhitelisted: false, // Don't throw on extra properties (lenient)
+      transform: true,            // Auto-transform payloads to DTO instances
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+    }),
+  );
+
+  // Global exception filter - sanitizes errors in production
+  app.useGlobalFilters(new AllExceptionsFilter());
+
+  // Security headers (minimal, production-safe)
+  app.use((req: any, res: any, next: any) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+  });
 
   app.useGlobalGuards(app.get(JwtAuthGuard), app.get(OrgContextGuard));
 

@@ -5,7 +5,7 @@ import {
   ConflictException,
   Logger,
 } from '@nestjs/common';
-import { Prisma, OrgType, CalendarEvent, PendingOrderStatus, ProjectStatus } from '@prisma/client';
+import { Prisma, OrgType, CalendarEvent, PendingOrderStatus, ProjectStatus, PaymentMode } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CronofyService } from '../cronofy/cronofy.service';
 import { AuthorizationService } from '../auth/authorization.service';
@@ -16,6 +16,7 @@ import { CalendarSyncService } from '../nylas/calendar-sync.service';
 import { AuthenticatedUser, OrgContext } from '../auth/auth-context';
 import { CreateOrderDto, SchedulingMode } from './dto/create-order.dto';
 import { OrderResult } from './dto/order-result.dto';
+import { EmailService } from '../email/email.service';
 import { FRONTEND_URL } from '../config/urls.config';
 
 @Injectable()
@@ -30,6 +31,7 @@ export class OrdersService {
     private packages: PackagesService,
     private nylas: NylasService,
     private calendarSync: CalendarSyncService,
+    private emailService: EmailService,
   ) {}
 
   /**
@@ -38,17 +40,38 @@ export class OrdersService {
    *
    * Two flows:
    * 1. Agent flow (providerOrgId set): Agent creates order for a COMPANY org where they are a customer
+   *    - Checks provider's paymentMode to determine if payment is required
    * 2. Company flow (no providerOrgId): Company creates order internally with customer info
    */
   async createOrder(
     ctx: OrgContext,
     user: AuthenticatedUser,
     dto: CreateOrderDto,
-  ): Promise<OrderResult> {
+  ): Promise<OrderResult | { requiresPayment: true; checkoutUrl: string; sessionId: string }> {
     // Determine if this is an agent flow (ordering from a provider)
     const isAgentFlow = !!dto.providerOrgId;
 
     if (isAgentFlow) {
+      // Check provider's payment mode
+      const providerOrg = await this.prisma.organization.findUnique({
+        where: { id: dto.providerOrgId },
+      });
+
+      if (!providerOrg) {
+        throw new ForbiddenException('Provider organization not found');
+      }
+
+      // If upfront payment required and package selected, redirect to Stripe checkout
+      if (providerOrg.paymentMode === PaymentMode.UPFRONT_PAYMENT && dto.packageId) {
+        const checkout = await this.createCheckoutSession(ctx, user, dto);
+        return {
+          requiresPayment: true,
+          checkoutUrl: checkout.checkoutUrl,
+          sessionId: checkout.sessionId,
+        };
+      }
+
+      // Otherwise, create order directly (NO_PAYMENT or INVOICE_AFTER_DELIVERY)
       return this.createAgentOrder(user, dto);
     }
 
@@ -151,6 +174,28 @@ export class OrdersService {
           projectManager: true,
         },
       });
+
+      // Send new order notification email to company owner/admins (fire-and-forget)
+      const orgMembers = await tx.organizationMember.findMany({
+        where: {
+          orgId: dto.providerOrgId!,
+          role: { in: ['OWNER', 'ADMIN'] },
+        },
+        include: { user: true },
+      });
+      const address = [addressData.addressLine1, addressData.city].filter(Boolean).join(', ') || 'Unknown address';
+      for (const member of orgMembers) {
+        this.emailService.sendNewOrderEmail(
+          member.user.email,
+          providerOrg.name,
+          customerRelation.name,
+          address,
+          dto.scheduledTime ? new Date(dto.scheduledTime) : null,
+          completeProject!.id,
+        ).catch((err) => {
+          this.logger.warn(`Failed to send new order email to ${member.user.email}: ${err.message}`);
+        });
+      }
 
       return {
         project: completeProject!,
@@ -280,6 +325,22 @@ export class OrdersService {
     }
 
     return result;
+  }
+
+  /**
+   * Gets the payment mode for a provider organization.
+   */
+  async getProviderPaymentMode(orgId: string): Promise<{ paymentMode: string }> {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { paymentMode: true },
+    });
+
+    if (!org) {
+      throw new ForbiddenException('Organization not found');
+    }
+
+    return { paymentMode: org.paymentMode };
   }
 
   /**

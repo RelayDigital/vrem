@@ -337,6 +337,7 @@ export class OrganizationsService {
     if (dto.countryCode !== undefined) updateData.countryCode = dto.countryCode;
     if (dto.lat !== undefined) updateData.lat = dto.lat;
     if (dto.lng !== undefined) updateData.lng = dto.lng;
+    if (dto.paymentMode !== undefined) updateData.paymentMode = dto.paymentMode;
 
     // Auto-geocode if address changed but lat/lng not explicitly provided
     const addressFieldsChanged =

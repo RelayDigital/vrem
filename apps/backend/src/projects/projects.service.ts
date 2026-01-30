@@ -1027,6 +1027,20 @@ export class ProjectsService {
   }
 
   private async setProjectStatus(projectId: string, status: ProjectStatus) {
+    // Get current project to detect status change
+    const currentProject = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        customer: { include: { user: true } },
+        technician: true,
+        editor: true,
+        projectManager: true,
+        organization: true,
+      },
+    });
+
+    const oldStatus = currentProject?.status;
+
     // When status changes to DELIVERED, also set deliveryEnabledAt
     const data: any = { status };
     if (status === ProjectStatus.DELIVERED) {
@@ -1042,10 +1056,50 @@ export class ProjectsService {
       }
     }
 
-    return this.prisma.project.update({
+    const updated = await this.prisma.project.update({
       where: { id: projectId },
       data,
     });
+
+    // Send email notifications for status changes (fire-and-forget)
+    if (currentProject && oldStatus !== status) {
+      const address = [currentProject.addressLine1, currentProject.city].filter(Boolean).join(', ') || 'Unknown address';
+      const recipients: { email: string; name: string }[] = [];
+
+      // Notify technician
+      if (currentProject.technician?.email) {
+        recipients.push({ email: currentProject.technician.email, name: currentProject.technician.name });
+      }
+      // Notify editor
+      if (currentProject.editor?.email) {
+        recipients.push({ email: currentProject.editor.email, name: currentProject.editor.name });
+      }
+      // Notify project manager
+      if (currentProject.projectManager?.email) {
+        recipients.push({ email: currentProject.projectManager.email, name: currentProject.projectManager.name });
+      }
+      // Notify customer (if they have a linked user with email)
+      if (currentProject.customer?.user?.email) {
+        recipients.push({ email: currentProject.customer.user.email, name: currentProject.customer.name });
+      } else if (currentProject.customer?.email) {
+        recipients.push({ email: currentProject.customer.email, name: currentProject.customer.name });
+      }
+
+      for (const recipient of recipients) {
+        this.emailService.sendStatusChangeEmail(
+          recipient.email,
+          recipient.name,
+          address,
+          oldStatus || 'UNKNOWN',
+          status,
+          projectId,
+        ).catch((err) => {
+          this.logger.warn(`Failed to send status change email to ${recipient.email}: ${err.message}`);
+        });
+      }
+    }
+
+    return updated;
   }
 
   // =============================

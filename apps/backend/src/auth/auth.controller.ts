@@ -5,7 +5,6 @@ import {
   Post,
   Req,
   UnauthorizedException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
@@ -14,6 +13,9 @@ import { Public } from './public.decorator';
 import { RegisterDto } from './dto/register.dto';
 import { OAuthLoginDto } from './dto/oauth-login.dto';
 import { OnboardingRegisterDto } from './dto/onboarding-register.dto';
+import { CompleteOnboardingDto } from './dto/complete-onboarding.dto';
+import { CurrentUser } from './current-user.decorator';
+import type { AuthenticatedUser } from './auth-context';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -113,19 +115,21 @@ export class AuthController {
   }
 
   /**
-   * Get a Clerk sign-in token for test accounts.
-   * In production, only @example.com test accounts are allowed.
-   * In development, all accounts are allowed.
+   * Complete onboarding for SSO-provisioned users.
+   * Sets the user's chosen account type and marks onboarding as complete.
    */
-  @ApiOperation({ summary: 'Get Clerk sign-in token for test accounts' })
-  @Throttle({ default: { ttl: 60000, limit: 3 } })
-  @Public()
-  @Post('test-login')
-  async testLogin(@Body() body: { email: string; password: string }) {
-    // In production, only allow @example.com test accounts
-    if (process.env.NODE_ENV === 'production' && !body.email?.endsWith('@example.com')) {
-      throw new ForbiddenException('This endpoint is only for test accounts in production');
-    }
-    return this.authService.getTestAccountSignInToken(body.email, body.password);
+  @ApiOperation({ summary: 'Complete SSO onboarding — set account type' })
+  @ApiBearerAuth('bearer')
+  @Post('complete-onboarding')
+  async completeOnboarding(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: CompleteOnboardingDto,
+  ) {
+    return this.authService.completeOnboarding(
+      user.id,
+      body.accountType,
+      body.useCases,
+    );
   }
+
 }

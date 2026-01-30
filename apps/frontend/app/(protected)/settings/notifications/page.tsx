@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRequireRole } from "@/hooks/useRequireRole";
 import { Muted } from "@/components/ui/typography";
 import { Switch } from "@/components/ui/switch";
@@ -13,6 +13,7 @@ import { SettingsRightContentSection } from "@/components/shared/settings/Settin
 import { useUser } from "@clerk/nextjs";
 import { AlertTriangle, Phone, CheckCircle2, Loader2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
+import { api } from "@/lib/api";
 
 export default function NotificationsPage() {
   const { user, isLoading } = useRequireRole([
@@ -27,6 +28,23 @@ export default function NotificationsPage() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
   const [jobAssignmentAlerts, setJobAssignmentAlerts] = useState(true);
+  const [emailStatusChange, setEmailStatusChange] = useState(true);
+  const [emailInvoice, setEmailInvoice] = useState(true);
+  const [emailNewMessage, setEmailNewMessage] = useState(true);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
+
+  // Load notification preferences from API
+  useEffect(() => {
+    if (user) {
+      api.notificationPreferences.get().then((prefs) => {
+        setEmailNotifications(prefs.emailNewOrder);
+        setJobAssignmentAlerts(prefs.emailProjectAssigned);
+        setEmailStatusChange(prefs.emailStatusChange);
+        setEmailInvoice(prefs.emailInvoice);
+        setEmailNewMessage(prefs.emailNewMessage);
+      }).catch(() => {});
+    }
+  }, [user]);
 
   // Phone number management
   const [isAddingPhone, setIsAddingPhone] = useState(false);
@@ -132,9 +150,25 @@ export default function NotificationsPage() {
     setPhoneResource(null);
   };
 
-  const handleSave = () => {
-    // TODO: Implement save logic with API
-    toast.success("Notification preferences saved successfully");
+  const handleSave = async () => {
+    setIsSavingPrefs(true);
+    try {
+      await api.notificationPreferences.update({
+        emailNewOrder: emailNotifications,
+        emailOrderConfirmed: emailNotifications,
+        emailProjectAssigned: jobAssignmentAlerts,
+        emailStatusChange,
+        emailDeliveryReady: emailNotifications,
+        emailApprovalChange: emailNotifications,
+        emailNewMessage,
+        emailInvoice,
+      });
+      toast.success("Notification preferences saved successfully");
+    } catch (error) {
+      toast.error("Failed to save notification preferences");
+    } finally {
+      setIsSavingPrefs(false);
+    }
   };
 
   return (
@@ -310,6 +344,51 @@ export default function NotificationsPage() {
               id="job-alerts"
               checked={jobAssignmentAlerts}
               onCheckedChange={setJobAssignmentAlerts}
+            />
+          </div>
+
+          {/* Status Change Notifications */}
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div>
+              <Label htmlFor="status-change">Project Status Updates</Label>
+              <Muted className="text-xs block">
+                Notify when project status changes
+              </Muted>
+            </div>
+            <Switch
+              id="status-change"
+              checked={emailStatusChange}
+              onCheckedChange={setEmailStatusChange}
+            />
+          </div>
+
+          {/* Invoice Notifications */}
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div>
+              <Label htmlFor="invoice-notif">Invoice Notifications</Label>
+              <Muted className="text-xs block">
+                Notify about invoice activity
+              </Muted>
+            </div>
+            <Switch
+              id="invoice-notif"
+              checked={emailInvoice}
+              onCheckedChange={setEmailInvoice}
+            />
+          </div>
+
+          {/* Message Notifications */}
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div>
+              <Label htmlFor="message-notif">Message Notifications</Label>
+              <Muted className="text-xs block">
+                Notify when you receive new messages
+              </Muted>
+            </div>
+            <Switch
+              id="message-notif"
+              checked={emailNewMessage}
+              onCheckedChange={setEmailNewMessage}
             />
           </div>
         </div>

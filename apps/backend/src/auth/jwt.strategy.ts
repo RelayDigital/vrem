@@ -40,6 +40,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     // Get metadata from Clerk
     const metadata = clerkUser.unsafeMetadata || {};
+    const hasAccountTypeFromMetadata = !!metadata.accountType;
     const accountType = (metadata.accountType as UserAccountType) || UserAccountType.AGENT;
     const inviteCode = metadata.inviteCode as string | undefined;
     const useCases = metadata.useCases as string[] | undefined;
@@ -74,6 +75,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             password: crypto.randomBytes(32).toString('hex'), // Random password, not used
             accountType,
             avatarUrl: clerkUser.imageUrl || null,
+            // Only mark onboarding complete if accountType was explicitly provided via Clerk metadata
+            // (from sign-up form). SSO users without metadata need to complete onboarding to choose their type.
+            onboardingCompletedAt: hasAccountTypeFromMetadata ? new Date() : null,
           },
         });
 

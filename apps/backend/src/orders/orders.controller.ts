@@ -83,6 +83,17 @@ export class OrdersController {
   }
 
   /**
+   * Gets the payment mode for a provider organization.
+   * Used by agents to determine if upfront payment is required.
+   * GET /orders/provider/:orgId/payment-mode
+   */
+  @ApiOperation({ summary: 'Get provider payment mode' })
+  @Get('provider/:orgId/payment-mode')
+  async getProviderPaymentMode(@Param('orgId') orgId: string) {
+    return this.ordersService.getProviderPaymentMode(orgId);
+  }
+
+  /**
    * Cancel an order as the customer (agent).
    * Only allows cancellation if the user is the customer of the project.
    * DELETE /orders/:projectId/cancel

@@ -28,11 +28,9 @@ import {
   ChevronRight,
   User,
   Building2,
-  Beaker,
   Handshake,
-  Package,
   Shield,
-  HelpCircle,
+  Receipt,
 } from "lucide-react";
 import {
   Collapsible,
@@ -142,6 +140,12 @@ export function CompanySidebar() {
       tooltip: "Customers",
     },
     {
+      path: "/invoices",
+      icon: Receipt,
+      label: "Invoices",
+      tooltip: "Invoices",
+    },
+    {
       path: "/audit",
       icon: FileText,
       label: "Audit Log",
@@ -177,24 +181,19 @@ export function CompanySidebar() {
           label: "Organization",
         },
         {
-          path: "/settings/product/features",
-          icon: Package,
-          label: "Product",
+          path: "/settings/organization/billing",
+          icon: Receipt,
+          label: "Billing",
+        },
+        {
+          path: "/settings/notifications",
+          icon: Settings,
+          label: "Notifications",
         },
         {
           path: "/settings/security/password",
           icon: Shield,
           label: "Security",
-        },
-        {
-          path: "/settings/preferences/appearance",
-          icon: Settings,
-          label: "Preferences",
-        },
-        {
-          path: "/settings/support/help-center",
-          icon: HelpCircle,
-          label: "Support",
         },
       ],
     },
@@ -204,7 +203,7 @@ export function CompanySidebar() {
       (item) =>
         !(
           isLimitedRole &&
-          (item.label === "Customers" || item.label === "Audit Log")
+          (item.label === "Customers" || item.label === "Audit Log" || item.label === "Invoices")
         )
     )
     .map((item) => {
@@ -212,7 +211,7 @@ export function CompanySidebar() {
       const filteredSubmenu = isLimitedRole
         ? item.submenu.filter(
             (subItem) =>
-              subItem.label !== "Organization" && subItem.label !== "Product"
+              subItem.label !== "Organization" && subItem.label !== "Billing"
           )
         : item.submenu;
       return { ...item, submenu: filteredSubmenu };
